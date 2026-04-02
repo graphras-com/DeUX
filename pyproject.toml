@@ -1,12 +1,57 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
-name = "homedeck"
+name = "deckboard"
 version = "0.1.0"
-description = "Elgato Stream Deck+ Home Assistant controller, powered by deckboard"
+description = "A high-level, asyncio-native Python library for Elgato Stream Deck devices."
 readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.11"
+authors = [
+    { name = "Graphras" },
+]
+keywords = ["streamdeck", "elgato", "deck", "asyncio", "hid"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Hardware",
+    "Typing :: Typed",
+]
 dependencies = [
-    "pillow>=12.2.0",
+    "pillow>=12.0.0",
     "streamdeck>=0.9.8",
     "cairosvg>=2.7.0",
     "httpx>=0.27.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Graphras-com/deckboard"
+Repository = "https://github.com/Graphras-com/deckboard"
+Issues = "https://github.com/Graphras-com/deckboard/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/deckboard"]
+
+[tool.ruff]
+target-version = "py311"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "TCH"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true

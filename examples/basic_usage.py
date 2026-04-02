@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
-"""Example app demonstrating the deckboard library with Stream Deck+.
+"""Basic usage example for the deckboard library.
 
-This replaces the old main.py with a clean, high-level API.
+Demonstrates multi-page UI with buttons, dials, touchscreen widgets,
+and event handlers on an Elgato Stream Deck+.
+
+Run with::
+
+    python examples/basic_usage.py
 """
 
 import asyncio
