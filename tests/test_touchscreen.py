@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import time
+from unittest.mock import patch
+
 import pytest
 from PIL import Image
 
 from deckboard.touchscreen import TouchScreen, Widget
+from deckboard.widgets.volume import VolumeSlider
+from deckboard.widgets.brightness import BrightnessSlider
+from deckboard.widgets.equalizer import EqualizerSlider
+from deckboard.widgets.balance import BalanceSlider
 
 
 # ── Widget ──────────────────────────────────────────────────────────────
@@ -220,3 +227,232 @@ class TestTouchScreenAnyDirty:
             w.mark_clean()
         touchscreen.widget(2).set_label("changed")
         assert touchscreen.any_dirty is True
+
+
+# ── Widget.render() ─────────────────────────────────────────────────────
+
+
+class TestWidgetRender:
+    def test_classic_render_no_icon(self, widget: Widget):
+        """render() without sliders uses classic icon+label+value layout."""
+        widget.set_label("Test")
+        img = widget.render()
+        assert img.size == (200, 100)
+        assert img.mode == "RGB"
+
+    def test_classic_render_with_icon(self, widget: Widget, sample_icon):
+        img = widget.render(icon=sample_icon)
+        assert img.size == (200, 100)
+
+    def test_classic_render_blank(self, widget: Widget):
+        img = widget.render()
+        assert img.size == (200, 100)
+
+    def test_slider_render_single(self, widget: Widget):
+        vol = VolumeSlider("Volume", value=50)
+        widget.add_slider(vol)
+        img = widget.render()
+        assert img.size == (200, 100)
+        assert img.mode == "RGB"
+
+    def test_slider_render_two_large(self, widget: Widget):
+        vol = VolumeSlider("Volume", value=50)
+        bri = BrightnessSlider("Bright", value=70)
+        widget.add_slider(vol)
+        widget.add_slider(bri)
+        img = widget.render()
+        assert img.size == (200, 100)
+
+    def test_slider_render_four_small(self, widget: Widget):
+        s1 = EqualizerSlider("Sub", value=50)
+        s2 = EqualizerSlider("Bass", value=40)
+        s3 = EqualizerSlider("Treble", value=60)
+        s4 = BalanceSlider("Balance", value=50)
+        widget.add_slider(s1)
+        widget.add_slider(s2)
+        widget.add_slider(s3)
+        widget.add_slider(s4)
+        img = widget.render()
+        assert img.size == (200, 100)
+
+    def test_slider_render_ignores_icon(self, widget: Widget, sample_icon):
+        """When sliders are present, the icon argument is ignored."""
+        vol = VolumeSlider("Volume", value=50)
+        widget.add_slider(vol)
+        img_with = widget.render(icon=sample_icon)
+        img_without = widget.render()
+        # Both should produce the same slider image (icon ignored)
+        assert img_with.size == img_without.size
+
+
+# ── Widget slider sub-element management ────────────────────────────────
+
+
+class TestWidgetAddSlider:
+    def test_add_single(self, widget: Widget):
+        vol = VolumeSlider("Volume")
+        result = widget.add_slider(vol)
+        assert result is widget  # chaining
+        assert len(widget.sliders) == 1
+        assert widget.sliders[0] is vol
+
+    def test_first_is_default(self, widget: Widget):
+        vol = VolumeSlider("Volume")
+        widget.add_slider(vol)
+        assert widget.active_slider is vol
+        assert widget.active_slider_index == 0
+        assert widget._default_slider_index == 0
+
+    def test_add_multiple(self, widget: Widget):
+        s1 = VolumeSlider("Vol")
+        s2 = BrightnessSlider("Bri")
+        widget.add_slider(s1)
+        widget.add_slider(s2)
+        assert len(widget.sliders) == 2
+
+    def test_explicit_default(self, widget: Widget):
+        s1 = VolumeSlider("Vol")
+        s2 = BrightnessSlider("Bri")
+        widget.add_slider(s1)
+        widget.add_slider(s2, default=True)
+        assert widget._default_slider_index == 1
+        assert widget.active_slider_index == 1
+        assert widget.active_slider is s2
+
+    def test_marks_dirty(self, widget: Widget):
+        widget.mark_clean()
+        widget.add_slider(VolumeSlider())
+        assert widget.is_dirty is True
+
+    def test_rejects_non_slider(self, widget: Widget):
+        with pytest.raises(TypeError, match="Expected a Slider instance"):
+            widget.add_slider("not a slider")  # type: ignore[arg-type]
+
+    def test_sliders_returns_copy(self, widget: Widget):
+        vol = VolumeSlider()
+        widget.add_slider(vol)
+        sliders = widget.sliders
+        sliders.clear()  # mutating the copy
+        assert len(widget.sliders) == 1  # original unchanged
+
+
+class TestWidgetActiveSlider:
+    def test_no_sliders(self, widget: Widget):
+        assert widget.active_slider is None
+
+    def test_default_active(self, widget: Widget):
+        vol = VolumeSlider()
+        widget.add_slider(vol)
+        assert widget.active_slider is vol
+
+
+class TestWidgetSelectionTimeout:
+    def test_default_timeout(self, widget: Widget):
+        assert widget.selection_timeout == 5.0
+
+    def test_set_timeout(self, widget: Widget):
+        result = widget.set_selection_timeout(10)
+        assert result is widget
+        assert widget.selection_timeout == 10.0
+
+    def test_negative_clamped_to_zero(self, widget: Widget):
+        widget.set_selection_timeout(-3)
+        assert widget.selection_timeout == 0.0
+
+
+class TestWidgetCycleSlider:
+    def test_single_slider_noop(self, widget: Widget):
+        widget.add_slider(VolumeSlider())
+        widget.mark_clean()
+        widget.cycle_active_slider()
+        assert widget.active_slider_index == 0
+        assert widget.is_dirty is False  # no change
+
+    def test_two_sliders_cycle(self, widget: Widget):
+        widget.add_slider(VolumeSlider())
+        widget.add_slider(BrightnessSlider())
+        assert widget.active_slider_index == 0
+        widget.cycle_active_slider()
+        assert widget.active_slider_index == 1
+        widget.cycle_active_slider()
+        assert widget.active_slider_index == 0  # wraps
+
+    def test_marks_dirty(self, widget: Widget):
+        widget.add_slider(VolumeSlider())
+        widget.add_slider(BrightnessSlider())
+        widget.mark_clean()
+        widget.cycle_active_slider()
+        assert widget.is_dirty is True
+
+
+class TestWidgetCheckSelectionTimeout:
+    def test_no_selection_no_change(self, widget: Widget):
+        widget.add_slider(VolumeSlider())
+        widget.add_slider(BrightnessSlider())
+        # No cycle happened → _last_selection_time is None
+        assert widget.check_selection_timeout() is False
+
+    def test_already_at_default(self, widget: Widget):
+        widget.add_slider(VolumeSlider())
+        widget.add_slider(BrightnessSlider())
+        # Even if we set a time, active == default, so no change
+        widget._last_selection_time = time.monotonic() - 100
+        assert widget.check_selection_timeout() is False
+
+    def test_timeout_disabled(self, widget: Widget):
+        widget.add_slider(VolumeSlider())
+        widget.add_slider(BrightnessSlider())
+        widget.set_selection_timeout(0)
+        widget.cycle_active_slider()
+        assert widget.check_selection_timeout() is False
+
+    def test_timeout_not_elapsed(self, widget: Widget):
+        widget.add_slider(VolumeSlider())
+        widget.add_slider(BrightnessSlider())
+        widget.set_selection_timeout(999)
+        widget.cycle_active_slider()
+        assert widget.active_slider_index == 1
+        assert widget.check_selection_timeout() is False
+        assert widget.active_slider_index == 1  # not reset
+
+    def test_timeout_elapsed_resets(self, widget: Widget):
+        widget.add_slider(VolumeSlider())
+        widget.add_slider(BrightnessSlider())
+        widget.set_selection_timeout(0.01)
+        widget.cycle_active_slider()
+        assert widget.active_slider_index == 1
+        # Fake time passing
+        widget._last_selection_time = time.monotonic() - 1.0
+        widget.mark_clean()
+        assert widget.check_selection_timeout() is True
+        assert widget.active_slider_index == 0  # back to default
+        assert widget._last_selection_time is None
+        assert widget.is_dirty is True
+
+
+class TestWidgetHandleDialTurn:
+    def test_no_sliders_noop(self, widget: Widget):
+        widget.handle_dial_turn(1)  # should not raise
+
+    def test_adjusts_active_slider(self, widget: Widget):
+        vol = VolumeSlider(value=50, step=5)
+        widget.add_slider(vol)
+        widget.mark_clean()
+        widget.handle_dial_turn(1)
+        assert vol.value == 55
+        assert widget.is_dirty is True
+
+    def test_adjusts_negative(self, widget: Widget):
+        vol = VolumeSlider(value=50, step=5)
+        widget.add_slider(vol)
+        widget.handle_dial_turn(-2)
+        assert vol.value == 40
+
+
+class TestWidgetHandleDialPress:
+    def test_cycles_slider(self, widget: Widget):
+        widget.add_slider(VolumeSlider())
+        widget.add_slider(BrightnessSlider())
+        assert widget.active_slider_index == 0
+        widget.handle_dial_press()
+        assert widget.active_slider_index == 1

@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import logging
+import time
+from typing import TYPE_CHECKING
 
 from PIL import Image
 
-from .image import WIDGET_COUNT
+from .image import WIDGET_COUNT, render_widget_image
 from .types import AsyncHandler
+
+if TYPE_CHECKING:
+    from .widgets.slider import Slider
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +45,13 @@ class Widget:
         self._drag_handler: AsyncHandler | None = None
         self._rendered: Image.Image | None = None
         self._dirty = True
+
+        # Slider sub-elements
+        self._sliders: list[Slider] = []
+        self._active_slider_index: int = 0
+        self._default_slider_index: int = 0
+        self._selection_timeout: float = 5.0
+        self._last_selection_time: float | None = None
 
     @property
     def index(self) -> int:
@@ -153,6 +165,150 @@ class Widget:
     def set_rendered(self, img: Image.Image) -> None:
         self._rendered = img
         self._dirty = False
+
+    # -- Slider sub-element management -------------------------------------
+
+    def add_slider(self, slider: Slider, default: bool = False) -> Widget:
+        """Add a slider sub-element to this widget zone.
+
+        Args:
+            slider: A :class:`Slider` instance to display in this zone.
+            default: If ``True``, this slider becomes the default
+                (the one selected after timeout).
+
+        Returns:
+            This widget (for chaining).
+        """
+        from .widgets.slider import Slider as _Slider
+
+        if not isinstance(slider, _Slider):
+            msg = f"Expected a Slider instance, got {type(slider).__name__}"
+            raise TypeError(msg)
+        self._sliders.append(slider)
+        idx = len(self._sliders) - 1
+        if default or idx == 0:
+            self._default_slider_index = idx
+            self._active_slider_index = idx
+        self._dirty = True
+        return self
+
+    @property
+    def sliders(self) -> list[Slider]:
+        """All slider sub-elements in this widget zone."""
+        return list(self._sliders)
+
+    @property
+    def active_slider(self) -> Slider | None:
+        """The slider currently controlled by the dial, or ``None``."""
+        if not self._sliders:
+            return None
+        return self._sliders[self._active_slider_index]
+
+    @property
+    def active_slider_index(self) -> int:
+        """Index of the currently active slider."""
+        return self._active_slider_index
+
+    @property
+    def selection_timeout(self) -> float:
+        """Seconds before active slider resets to the default."""
+        return self._selection_timeout
+
+    def set_selection_timeout(self, seconds: float) -> Widget:
+        """Set how long before active slider resets to the default.
+
+        Args:
+            seconds: Timeout in seconds.  Use ``0`` to disable.
+        """
+        self._selection_timeout = max(0.0, seconds)
+        return self
+
+    def cycle_active_slider(self) -> None:
+        """Advance to the next slider (wrapping around).
+
+        Called on dial push.  Marks the widget dirty so the highlight
+        redraws on the next render.
+        """
+        if len(self._sliders) <= 1:
+            return
+        self._active_slider_index = (self._active_slider_index + 1) % len(self._sliders)
+        self._last_selection_time = time.monotonic()
+        self._dirty = True
+
+    def check_selection_timeout(self) -> bool:
+        """Reset to the default slider if the timeout has elapsed.
+
+        Returns:
+            ``True`` if the active slider changed (widget is now dirty).
+        """
+        if (
+            self._selection_timeout <= 0
+            or self._last_selection_time is None
+            or self._active_slider_index == self._default_slider_index
+        ):
+            return False
+        elapsed = time.monotonic() - self._last_selection_time
+        if elapsed >= self._selection_timeout:
+            self._active_slider_index = self._default_slider_index
+            self._last_selection_time = None
+            self._dirty = True
+            return True
+        return False
+
+    def handle_dial_turn(self, direction: int) -> None:
+        """Adjust the active slider's value by *direction* steps.
+
+        Marks the widget dirty so the next render reflects the change.
+        """
+        if self._sliders:
+            self._sliders[self._active_slider_index].adjust(direction)
+            self._dirty = True
+
+    def handle_dial_press(self) -> None:
+        """Cycle to the next slider.  Called on dial push."""
+        self.cycle_active_slider()
+
+    # -- Rendering ---------------------------------------------------------
+
+    def render(self, icon: Image.Image | None = None) -> Image.Image:
+        """Render this widget zone as a 200x100 PIL Image.
+
+        If sliders have been added via :meth:`add_slider`, they are
+        rendered instead of the default icon/label/value layout.
+
+        Args:
+            icon: Pre-fetched icon image (used by the classic layout).
+
+        Returns:
+            A 200x100 RGB :class:`~PIL.Image.Image`.
+        """
+        if self._sliders:
+            return self._render_with_sliders()
+        return render_widget_image(
+            icon=icon,
+            label=self._label,
+            value=self._value,
+        )
+
+    def _render_with_sliders(self) -> Image.Image:
+        """Compose all slider sub-elements into a single widget image."""
+        from .image import TOUCHSCREEN_HEIGHT, WIDGET_WIDTH
+
+        img = Image.new("RGB", (WIDGET_WIDTH, TOUCHSCREEN_HEIGHT), "black")
+        if not self._sliders:
+            return img
+
+        self.check_selection_timeout()
+
+        count = len(self._sliders)
+        slot_height = TOUCHSCREEN_HEIGHT // count
+        for i, slider in enumerate(self._sliders):
+            y = i * slot_height
+            active = i == self._active_slider_index and count > 1
+            slider.render_onto(
+                img, x=0, y=y, width=WIDGET_WIDTH, height=slot_height, active=active
+            )
+        return img
 
 
 class TouchScreen:

@@ -19,7 +19,6 @@ from .image import (
     render_blank_key,
     render_blank_touchscreen,
     render_key_image,
-    render_widget_image,
 )
 from .page import Page
 from .touchscreen import Widget
@@ -334,11 +333,7 @@ class Deck:
                     widget.icon_name, color=widget.icon_color
                 )
 
-            img = render_widget_image(
-                icon=icon_img,
-                label=widget.label,
-                value=widget.value,
-            )
+            img = widget.render(icon=icon_img)
             widget.set_rendered(img)
             widget_images.append(img)
 
@@ -423,6 +418,11 @@ class Deck:
             dial = page.dials.get(event.dial)
             if dial and dial._turn_handler:
                 await dial._turn_handler(event.direction)
+            # Update widget slider if present
+            widget = page.touchscreen.widget(event.dial)
+            if widget.sliders:
+                widget.handle_dial_turn(event.direction)
+                await self.refresh()
 
         elif isinstance(event, DialPressEvent):
             dial = page.dials.get(event.dial)
@@ -431,6 +431,12 @@ class Deck:
                     await dial._press_handler()
                 elif not event.pressed and dial._release_handler:
                     await dial._release_handler()
+            # Cycle widget slider selection on press
+            if event.pressed:
+                widget = page.touchscreen.widget(event.dial)
+                if widget.sliders:
+                    widget.handle_dial_press()
+                    await self.refresh()
 
         elif isinstance(event, TouchEvent):
             zone = event.zone

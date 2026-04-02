@@ -260,6 +260,21 @@ class TestDeckDispatch:
 
         await deck._dispatch(DialTurnEvent(dial=2, direction=1))
 
+    async def test_dial_turn_updates_widget_slider(self, deck):
+        """Dial turn forwards to widget sliders and triggers refresh."""
+        from deckboard.widgets.volume import VolumeSlider
+
+        p = deck.page("main")
+        w = p.widget(1)
+        slider = VolumeSlider()
+        w.add_slider(slider)
+        deck._active_page = p
+
+        with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
+            await deck._dispatch(DialTurnEvent(dial=1, direction=5))
+            mock_refresh.assert_awaited_once()
+        assert slider.value == 5  # default 0 + 5
+
     async def test_dial_press_dispatches(self, deck):
         p = deck.page("main")
         handler = AsyncMock()
@@ -290,6 +305,23 @@ class TestDeckDispatch:
         deck._active_page = p
 
         await deck._dispatch(DialPressEvent(dial=3, pressed=True))
+
+    async def test_dial_press_cycles_widget_slider(self, deck):
+        """Dial press cycles active slider on the widget and triggers refresh."""
+        from deckboard.widgets.volume import VolumeSlider
+        from deckboard.widgets.brightness import BrightnessSlider
+
+        p = deck.page("main")
+        w = p.widget(0)
+        w.add_slider(VolumeSlider())
+        w.add_slider(BrightnessSlider())
+        deck._active_page = p
+
+        assert w._active_slider_index == 0
+        with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
+            await deck._dispatch(DialPressEvent(dial=0, pressed=True))
+            mock_refresh.assert_awaited_once()
+        assert w._active_slider_index == 1
 
     async def test_touch_short_dispatches(self, deck):
         p = deck.page("main")
