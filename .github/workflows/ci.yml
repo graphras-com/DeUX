@@ -1,0 +1,22 @@
+# CI pipeline — calls the reusable python-test workflow.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test Suite
+    uses: ./.github/workflows/python-test.yml
+    with:
+      python-versions: '["3.11", "3.12", "3.13"]'
+      coverage-threshold: 95
