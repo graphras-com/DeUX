@@ -1,0 +1,12 @@
+[project]
+name = "homedeck"
+version = "0.1.0"
+description = "Elgato Stream Deck+ Home Assistant controller, powered by deckboard"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pillow>=12.2.0",
+    "streamdeck>=0.9.8",
+    "cairosvg>=2.7.0",
+    "httpx>=0.27.0",
+]
