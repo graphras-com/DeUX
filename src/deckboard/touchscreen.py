@@ -261,9 +261,13 @@ class Widget:
         """Adjust the active slider's value by *direction* steps.
 
         Marks the widget dirty so the next render reflects the change.
+        Also resets the selection timeout so the active slider doesn't
+        revert to the default while the user is still interacting.
         """
         if self._sliders:
             self._sliders[self._active_slider_index].adjust(direction)
+            if self._active_slider_index != self._default_slider_index:
+                self._last_selection_time = time.monotonic()
             self._dirty = True
 
     def handle_dial_press(self) -> None:
