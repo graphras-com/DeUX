@@ -370,6 +370,22 @@ class Deck:
 
     # -- Event dispatch loop -----------------------------------------------
 
+    async def _check_timeouts(self) -> None:
+        """Check all widget selection timeouts on the active page.
+
+        If any widget's active slider reverts to its default because the
+        timeout elapsed, a refresh is triggered so the display updates.
+        """
+        page = self._active_page
+        if not page:
+            return
+        any_changed = False
+        for widget in page.widgets:
+            if widget.check_selection_timeout():
+                any_changed = True
+        if any_changed:
+            await self.refresh()
+
     async def _event_loop(self) -> None:
         """Main event dispatch loop: reads events from the transport queue
         and dispatches them to the active page's handlers."""
@@ -383,6 +399,7 @@ class Deck:
                         self._transport.queue.get(), timeout=0.5
                     )
                 except asyncio.TimeoutError:
+                    await self._check_timeouts()
                     continue
 
                 if not self._active_page:

@@ -449,6 +449,64 @@ class TestWidgetHandleDialTurn:
         widget.handle_dial_turn(-2)
         assert vol.value == 40
 
+    def test_resets_selection_timeout_on_non_default(self, widget: Widget):
+        """Turning dial while a non-default slider is active should
+        reset the selection timeout so it doesn't expire during use."""
+        vol = VolumeSlider(value=50, step=5)
+        bri = BrightnessSlider(value=50, step=5)
+        widget.add_slider(vol, default=True)
+        widget.add_slider(bri)
+
+        # Select the non-default slider
+        widget.cycle_active_slider()
+        assert widget.active_slider_index == 1
+        original_time = widget._last_selection_time
+        assert original_time is not None
+
+        # Simulate a small delay, then turn the dial
+        widget._last_selection_time = time.monotonic() - 3.0
+        widget.handle_dial_turn(1)
+
+        # Timeout should have been refreshed to a recent timestamp
+        assert widget._last_selection_time is not None
+        assert widget._last_selection_time > original_time
+
+    def test_no_timeout_reset_on_default_slider(self, widget: Widget):
+        """Turning dial while the default slider is active should NOT
+        set _last_selection_time (no timeout to manage)."""
+        vol = VolumeSlider(value=50, step=5)
+        bri = BrightnessSlider(value=50, step=5)
+        widget.add_slider(vol, default=True)
+        widget.add_slider(bri)
+
+        # Active slider is already the default (index 0)
+        assert widget.active_slider_index == widget._default_slider_index
+        assert widget._last_selection_time is None
+
+        widget.handle_dial_turn(1)
+        assert widget._last_selection_time is None
+
+    def test_dial_turn_prevents_timeout_expiry(self, widget: Widget):
+        """Continuous dial turns should keep the selection alive past
+        the configured timeout."""
+        vol = VolumeSlider(value=50, step=5)
+        bri = BrightnessSlider(value=50, step=5)
+        widget.add_slider(vol, default=True)
+        widget.add_slider(bri)
+        widget.set_selection_timeout(2.0)
+
+        # Select non-default slider
+        widget.cycle_active_slider()
+        assert widget.active_slider_index == 1
+
+        # Simulate time passing almost to timeout, then turn
+        widget._last_selection_time = time.monotonic() - 1.9
+        widget.handle_dial_turn(1)
+
+        # Should NOT have timed out
+        assert widget.active_slider_index == 1
+        assert widget.check_selection_timeout() is False
+
 
 class TestWidgetHandleDialPress:
     def test_cycles_slider(self, widget: Widget):
