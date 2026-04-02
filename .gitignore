@@ -12,11 +12,14 @@ dist/
 *.egg-info/
 *.egg
 MANIFEST
+wheels/
+sdist/
 
 # Virtual environments
 .venv/
 venv/
 env/
+ENV/
 
 # IDE / Editor
 .vscode/
@@ -24,10 +27,20 @@ env/
 *.swp
 *.swo
 *~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
 
 # OS
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 
 # Testing / Coverage
 .tox/
@@ -37,13 +50,29 @@ Thumbs.db
 htmlcov/
 .pytest_cache/
 .mypy_cache/
+nosetests.xml
+coverage.xml
 
 # Ruff
 .ruff_cache/
 
+# Type checkers
+.pytype/
+.pyre/
+dmypy.json
+.dmypy.json
+
 # OpenCode
 .opencode/
 
-# Environments
+# Cursor
+.cursor/
+.cursorignore
+.cursorindexingignore
+
+# Environments / secrets
 .env
+.env.*
 .envrc
+*.pem
+*.key
