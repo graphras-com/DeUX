@@ -6,6 +6,7 @@ import pytest
 from PIL import Image
 
 from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH
+from deckboard.touchscreen import Widget
 from deckboard.widgets.slider import LargeSlider, Slider, SmallSlider
 
 
@@ -260,3 +261,47 @@ class TestSliderAbstractGuards:
     def test_cannot_instantiate_small_slider(self):
         with pytest.raises(TypeError):
             SmallSlider("X")  # type: ignore[abstract]
+
+
+# ── Dirty propagation to parent Widget ───────────────────────────────────
+
+
+class TestSliderWidgetBackReference:
+    def test_no_widget_by_default(self):
+        s = _ConcreteLargeSlider("X", value=50)
+        assert s._widget is None
+
+    def test_add_slider_sets_widget(self):
+        w = Widget(0)
+        s = _ConcreteLargeSlider("X", value=50)
+        w.add_slider(s)
+        assert s._widget is w
+
+    def test_set_value_marks_widget_dirty(self):
+        w = Widget(0)
+        s = _ConcreteLargeSlider("X", value=50)
+        w.add_slider(s)
+        w.mark_clean()
+        assert w.is_dirty is False
+        s.set_value(75)
+        assert w.is_dirty is True
+
+    def test_set_value_without_widget_does_not_raise(self):
+        s = _ConcreteLargeSlider("X", value=50)
+        s.set_value(75)  # no widget attached — should not raise
+        assert s.value == 75
+
+    def test_adjust_marks_widget_dirty(self):
+        w = Widget(0)
+        s = _ConcreteLargeSlider("X", value=50, step=5)
+        w.add_slider(s)
+        w.mark_clean()
+        assert w.is_dirty is False
+        s.adjust(1)
+        assert s.value == 55
+        assert w.is_dirty is True
+
+    def test_adjust_without_widget_does_not_raise(self):
+        s = _ConcreteLargeSlider("X", value=50, step=5)
+        s.adjust(1)
+        assert s.value == 55
