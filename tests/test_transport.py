@@ -1,0 +1,283 @@
+"""Tests for deckboard._transport — AsyncTransport class."""
+
+from __future__ import annotations
+
+import asyncio
+from unittest.mock import MagicMock, call
+
+import pytest
+
+from deckboard._transport import AsyncTransport
+from deckboard.types import (
+    DialPressEvent,
+    DialTurnEvent,
+    EventType,
+    KeyEvent,
+    TouchEvent,
+)
+
+
+@pytest.fixture
+def mock_device():
+    device = MagicMock()
+    device.set_key_callback = MagicMock()
+    device.set_dial_callback = MagicMock()
+    device.set_touchscreen_callback = MagicMock()
+    return device
+
+
+# ── start / stop ────────────────────────────────────────────────────────
+
+
+class TestTransportLifecycle:
+    async def test_start_registers_callbacks(self, mock_device):
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        transport.start()
+        mock_device.set_key_callback.assert_called_once_with(transport._on_key)
+        mock_device.set_dial_callback.assert_called_once_with(transport._on_dial)
+        mock_device.set_touchscreen_callback.assert_called_once_with(
+            transport._on_touch
+        )
+        assert transport._running is True
+
+    async def test_stop_unregisters_callbacks(self, mock_device):
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        transport.start()
+        transport.stop()
+        mock_device.set_key_callback.assert_called_with(None)
+        mock_device.set_dial_callback.assert_called_with(None)
+        mock_device.set_touchscreen_callback.assert_called_with(None)
+        assert transport._running is False
+
+    async def test_queue_property(self, mock_device):
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        assert isinstance(transport.queue, asyncio.Queue)
+
+
+# ── _enqueue ────────────────────────────────────────────────────────────
+
+
+class TestTransportEnqueue:
+    async def test_enqueue_puts_event(self, mock_device):
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        transport.start()
+        event = KeyEvent(key=0, pressed=True)
+        transport._enqueue(event)
+        await asyncio.sleep(0.01)
+        result = transport.queue.get_nowait()
+        assert result == event
+
+    async def test_enqueue_ignored_when_stopped(self, mock_device):
+        """Events are dropped when transport is not running."""
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        # Don't call start() — transport._running is False
+        event = KeyEvent(key=0, pressed=True)
+        transport._enqueue(event)
+        await asyncio.sleep(0.01)
+        assert transport.queue.empty()
+
+
+# ── _on_key ─────────────────────────────────────────────────────────────
+
+
+class TestTransportOnKey:
+    async def test_key_press(self, mock_device):
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        transport.start()
+        transport._on_key(mock_device, 3, True)
+        await asyncio.sleep(0.01)
+        event = transport.queue.get_nowait()
+        assert isinstance(event, KeyEvent)
+        assert event.key == 3
+        assert event.pressed is True
+
+    async def test_key_release(self, mock_device):
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        transport.start()
+        transport._on_key(mock_device, 5, False)
+        await asyncio.sleep(0.01)
+        event = transport.queue.get_nowait()
+        assert event.key == 5
+        assert event.pressed is False
+
+
+# ── _on_dial ────────────────────────────────────────────────────────────
+
+
+class TestTransportOnDial:
+    async def test_dial_push(self, mock_device):
+        from StreamDeck.Devices.StreamDeck import DialEventType
+
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        transport.start()
+        transport._on_dial(mock_device, 1, DialEventType.PUSH, True)
+        await asyncio.sleep(0.01)
+        event = transport.queue.get_nowait()
+        assert isinstance(event, DialPressEvent)
+        assert event.dial == 1
+        assert event.pressed is True
+
+    async def test_dial_push_release(self, mock_device):
+        from StreamDeck.Devices.StreamDeck import DialEventType
+
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        transport.start()
+        transport._on_dial(mock_device, 2, DialEventType.PUSH, False)
+        await asyncio.sleep(0.01)
+        event = transport.queue.get_nowait()
+        assert isinstance(event, DialPressEvent)
+        assert event.pressed is False
+
+    async def test_dial_turn_clockwise(self, mock_device):
+        from StreamDeck.Devices.StreamDeck import DialEventType
+
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        transport.start()
+        transport._on_dial(mock_device, 0, DialEventType.TURN, 3)
+        await asyncio.sleep(0.01)
+        event = transport.queue.get_nowait()
+        assert isinstance(event, DialTurnEvent)
+        assert event.dial == 0
+        assert event.direction == 3
+
+    async def test_dial_turn_counterclockwise(self, mock_device):
+        from StreamDeck.Devices.StreamDeck import DialEventType
+
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        transport.start()
+        transport._on_dial(mock_device, 1, DialEventType.TURN, -2)
+        await asyncio.sleep(0.01)
+        event = transport.queue.get_nowait()
+        assert isinstance(event, DialTurnEvent)
+        assert event.direction == -2
+
+
+# ── _on_touch ───────────────────────────────────────────────────────────
+
+
+class TestTransportOnTouch:
+    async def test_touch_short(self, mock_device):
+        from StreamDeck.Devices.StreamDeck import TouchscreenEventType
+
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        transport.start()
+        transport._on_touch(
+            mock_device,
+            TouchscreenEventType.SHORT,
+            {"x": 100, "y": 50},
+        )
+        await asyncio.sleep(0.01)
+        event = transport.queue.get_nowait()
+        assert isinstance(event, TouchEvent)
+        assert event.event_type == EventType.TOUCH_SHORT
+        assert event.x == 100
+        assert event.y == 50
+        assert event.x_out is None
+        assert event.y_out is None
+
+    async def test_touch_long(self, mock_device):
+        from StreamDeck.Devices.StreamDeck import TouchscreenEventType
+
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        transport.start()
+        transport._on_touch(
+            mock_device,
+            TouchscreenEventType.LONG,
+            {"x": 300, "y": 80},
+        )
+        await asyncio.sleep(0.01)
+        event = transport.queue.get_nowait()
+        assert event.event_type == EventType.TOUCH_LONG
+
+    async def test_touch_drag(self, mock_device):
+        from StreamDeck.Devices.StreamDeck import TouchscreenEventType
+
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        transport.start()
+        transport._on_touch(
+            mock_device,
+            TouchscreenEventType.DRAG,
+            {"x": 10, "y": 20, "x_out": 500, "y_out": 80},
+        )
+        await asyncio.sleep(0.01)
+        event = transport.queue.get_nowait()
+        assert event.event_type == EventType.TOUCH_DRAG
+        assert event.x == 10
+        assert event.y == 20
+        assert event.x_out == 500
+        assert event.y_out == 80
+
+    async def test_touch_missing_keys_default_zero(self, mock_device):
+        from StreamDeck.Devices.StreamDeck import TouchscreenEventType
+
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        transport.start()
+        transport._on_touch(
+            mock_device,
+            TouchscreenEventType.SHORT,
+            {},  # no x, y keys
+        )
+        await asyncio.sleep(0.01)
+        event = transport.queue.get_nowait()
+        assert event.x == 0
+        assert event.y == 0
+
+    async def test_unknown_touch_type_ignored(self, mock_device):
+        """Unknown touch event types should be silently ignored."""
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        transport.start()
+        unknown_type = MagicMock()
+        transport._on_touch(mock_device, unknown_type, {"x": 0, "y": 0})
+        await asyncio.sleep(0.01)
+        assert transport.queue.empty()
+
+
+# ── Error handling in callbacks ─────────────────────────────────────────
+
+
+class TestTransportErrorHandling:
+    async def test_key_callback_error_logged(self, mock_device):
+        """Errors in key callback are caught and logged."""
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        transport.start()
+        transport._enqueue = MagicMock(side_effect=RuntimeError("test error"))
+        transport._on_key(mock_device, 0, True)
+        # Should not propagate the exception
+        assert transport.queue.empty()
+
+    async def test_dial_callback_error_logged(self, mock_device):
+        from StreamDeck.Devices.StreamDeck import DialEventType
+
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        transport.start()
+        transport._enqueue = MagicMock(side_effect=RuntimeError("test"))
+        transport._on_dial(mock_device, 0, DialEventType.PUSH, True)
+        # Should not propagate
+
+    async def test_touch_callback_error_logged(self, mock_device):
+        from StreamDeck.Devices.StreamDeck import TouchscreenEventType
+
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop)
+        transport.start()
+        transport._enqueue = MagicMock(side_effect=RuntimeError("test"))
+        transport._on_touch(mock_device, TouchscreenEventType.SHORT, {"x": 0, "y": 0})
+        # Should not propagate
