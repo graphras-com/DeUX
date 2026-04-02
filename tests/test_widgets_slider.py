@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from PIL import Image
 
+from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH
 from deckboard.widgets.slider import LargeSlider, Slider, SmallSlider
 
 
@@ -150,13 +151,13 @@ class TestSliderFormatValue:
 
 class TestSliderDrawRoundedRect:
     def test_draws_without_error(self):
-        img = Image.new("RGB", (200, 100), "black")
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
         from PIL import ImageDraw
 
         draw = ImageDraw.Draw(img)
         Slider._draw_rounded_rect(
             draw,
-            (10, 10, 190, 90),
+            (10, 10, WIDGET_WIDTH - 10, WIDGET_HEIGHT - 10),
             radius=5,
             fill="white",
             outline="red",
@@ -166,7 +167,7 @@ class TestSliderDrawRoundedRect:
 
 class TestSliderDrawGradient:
     def test_gradient_basic(self):
-        img = Image.new("RGB", (200, 100), "black")
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
         Slider._draw_gradient(img, 10, 10, 50, 20, "#000000", "#FFFFFF")
         # Check left edge is dark, right edge is bright
         left_pixel = img.getpixel((10, 20))
@@ -174,16 +175,16 @@ class TestSliderDrawGradient:
         assert left_pixel[0] < right_pixel[0]
 
     def test_gradient_zero_width(self):
-        img = Image.new("RGB", (200, 100), "black")
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
         # Should not raise
         Slider._draw_gradient(img, 10, 10, 0, 20, "#000000", "#FFFFFF")
 
     def test_gradient_zero_height(self):
-        img = Image.new("RGB", (200, 100), "black")
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
         Slider._draw_gradient(img, 10, 10, 20, 0, "#000000", "#FFFFFF")
 
     def test_gradient_single_pixel_wide(self):
-        img = Image.new("RGB", (200, 100), "black")
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
         Slider._draw_gradient(img, 10, 10, 1, 10, "#FF0000", "#0000FF")
 
 
@@ -191,53 +192,57 @@ class TestSliderDrawGradient:
 
 
 class TestLargeSliderRender:
-    def test_renders_200x100_image(self):
+    def test_renders_widget_size_image(self):
         s = _ConcreteLargeSlider("Volume", value=50)
-        img = Image.new("RGB", (200, 100), "black")
-        s.render_onto(img, x=0, y=0, width=200, height=50)
-        assert img.size == (200, 100)
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        s.render_onto(img, x=0, y=0, width=WIDGET_WIDTH, height=WIDGET_HEIGHT // 2)
+        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_renders_with_active_highlight(self):
         s = _ConcreteLargeSlider("Volume", value=50)
-        img = Image.new("RGB", (200, 100), "black")
-        s.render_onto(img, x=0, y=0, width=200, height=50, active=True)
-        assert img.size == (200, 100)
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        s.render_onto(
+            img, x=0, y=0, width=WIDGET_WIDTH, height=WIDGET_HEIGHT // 2, active=True
+        )
+        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_renders_at_min(self):
         s = _ConcreteLargeSlider("Volume", value=0)
-        img = Image.new("RGB", (200, 100), "black")
-        s.render_onto(img, x=0, y=0, width=200, height=50)
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        s.render_onto(img, x=0, y=0, width=WIDGET_WIDTH, height=WIDGET_HEIGHT // 2)
 
     def test_renders_at_max(self):
         s = _ConcreteLargeSlider("Volume", value=100)
-        img = Image.new("RGB", (200, 100), "black")
-        s.render_onto(img, x=0, y=0, width=200, height=50)
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        s.render_onto(img, x=0, y=0, width=WIDGET_WIDTH, height=WIDGET_HEIGHT // 2)
 
 
 # ── SmallSlider ──────────────────────────────────────────────────────────
 
 
 class TestSmallSliderRender:
-    def test_renders_200x100_image(self):
+    def test_renders_widget_size_image(self):
         s = _ConcreteSmallSlider("Bass", value=50)
-        img = Image.new("RGB", (200, 100), "black")
-        s.render_onto(img, x=0, y=0, width=200, height=25)
-        assert img.size == (200, 100)
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        s.render_onto(img, x=0, y=0, width=WIDGET_WIDTH, height=WIDGET_HEIGHT // 4)
+        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_renders_with_active_highlight(self):
         s = _ConcreteSmallSlider("Bass", value=50)
-        img = Image.new("RGB", (200, 100), "black")
-        s.render_onto(img, x=0, y=0, width=200, height=25, active=True)
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        s.render_onto(
+            img, x=0, y=0, width=WIDGET_WIDTH, height=WIDGET_HEIGHT // 4, active=True
+        )
 
     def test_renders_at_min(self):
         s = _ConcreteSmallSlider("Bass", value=0)
-        img = Image.new("RGB", (200, 100), "black")
-        s.render_onto(img, x=0, y=0, width=200, height=25)
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        s.render_onto(img, x=0, y=0, width=WIDGET_WIDTH, height=WIDGET_HEIGHT // 4)
 
     def test_renders_at_max(self):
         s = _ConcreteSmallSlider("Bass", value=100)
-        img = Image.new("RGB", (200, 100), "black")
-        s.render_onto(img, x=0, y=0, width=200, height=25)
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        s.render_onto(img, x=0, y=0, width=WIDGET_WIDTH, height=WIDGET_HEIGHT // 4)
 
 
 # ── Abstract class guards ────────────────────────────────────────────────

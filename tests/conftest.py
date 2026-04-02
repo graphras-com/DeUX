@@ -13,6 +13,7 @@ from deckboard.button import Button
 from deckboard.dial import Dial
 from deckboard.icon import IconManager
 from deckboard.page import Page
+from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH
 from deckboard.touchscreen import TouchScreen, Widget
 
 
@@ -66,8 +67,8 @@ def sample_rgb_icon():
 
 @pytest.fixture
 def sample_widget_image():
-    """A 200x100 RGB test image for widgets."""
-    return Image.new("RGB", (200, 100), (0, 0, 255))
+    """A WIDGET_WIDTH x WIDGET_HEIGHT RGB test image for widgets."""
+    return Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), (0, 0, 255))
 
 
 @pytest.fixture

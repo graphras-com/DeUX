@@ -131,26 +131,29 @@ class TestTouchEvent:
             e.x = 5  # type: ignore[misc]
 
     def test_zone_first_widget(self):
-        """x in [0, 199] -> zone 0."""
+        """Touches within the first widget zone (left margin to end of widget 0)."""
+        # Left edge of screen (within left margin) still maps to zone 0
         assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=0, y=0).zone == 0
-        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=199, y=0).zone == 0
+        # Inside widget 0 area
+        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=4, y=0).zone == 0
+        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=198, y=0).zone == 0
 
     def test_zone_second_widget(self):
-        """x in [200, 399] -> zone 1."""
-        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=200, y=0).zone == 1
-        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=399, y=0).zone == 1
+        """Touches within the second widget zone."""
+        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=203, y=0).zone == 1
+        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=397, y=0).zone == 1
 
     def test_zone_third_widget(self):
-        """x in [400, 599] -> zone 2."""
-        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=400, y=0).zone == 2
+        """Touches within the third widget zone."""
+        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=402, y=0).zone == 2
 
     def test_zone_fourth_widget(self):
-        """x in [600, 799] -> zone 3."""
-        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=600, y=0).zone == 3
+        """Touches within the fourth widget zone."""
+        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=601, y=0).zone == 3
         assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=799, y=0).zone == 3
 
     def test_zone_capped_at_3(self):
-        """x >= 800 should still return zone 3 (capped by min(..., 3))."""
+        """x >= 800 should still return zone 3 (capped)."""
         assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=1000, y=0).zone == 3
         assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=800, y=0).zone == 3
 

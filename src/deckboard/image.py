@@ -13,8 +13,23 @@ ICON_PADDING = (KEY_SIZE[0] - ICON_SIZE) // 2  # 20px
 
 TOUCHSCREEN_WIDTH = 800
 TOUCHSCREEN_HEIGHT = 100
-WIDGET_WIDTH = 200  # 800 / 4 zones
 WIDGET_COUNT = 4
+
+# Touchscreen margins — the bottom of the physical screen is partially
+# hidden by the viewing angle, so we inset the usable area.
+MARGIN_TOP = 4
+MARGIN_BOTTOM = 18
+MARGIN_LEFT = 4
+MARGIN_RIGHT = 4
+WIDGET_GAP = 4  # horizontal gap between adjacent widgets
+
+# Usable area after margins
+USABLE_WIDTH = TOUCHSCREEN_WIDTH - MARGIN_LEFT - MARGIN_RIGHT  # 792
+USABLE_HEIGHT = TOUCHSCREEN_HEIGHT - MARGIN_TOP - MARGIN_BOTTOM  # 78
+
+# Each widget size: (usable_width - 3 gaps) / 4
+WIDGET_WIDTH = (USABLE_WIDTH - (WIDGET_COUNT - 1) * WIDGET_GAP) // WIDGET_COUNT  # 195
+WIDGET_HEIGHT = USABLE_HEIGHT  # 78
 
 # Font for labels/values - use default bitmap font (always available)
 _font: ImageFont.FreeTypeFont | ImageFont.ImageFont | None = None
@@ -111,29 +126,29 @@ def render_widget_image(
     value: str | None = None,
     background: str = "black",
 ) -> Image.Image:
-    """Render a single 200x100 widget zone image (PIL Image, not encoded).
+    """Render a single widget zone image (PIL Image, not encoded).
 
-    Layout (200x100):
-      - Left side: 60x60 icon (centered vertically, 10px from left)
+    Layout (195x78):
+      - Left side: 50x50 icon (centered vertically, 8px from left)
       - Right side: label on top, value below
 
     Args:
-        icon: RGBA icon image (will be resized to 60x60).
+        icon: RGBA icon image (will be resized to 50x50).
         label: Primary text label.
         value: Secondary value text.
         background: Background color.
 
     Returns:
-        PIL Image (RGB, 200x100).
+        PIL Image (RGB, WIDGET_WIDTH x WIDGET_HEIGHT).
     """
-    img = Image.new("RGB", (WIDGET_WIDTH, TOUCHSCREEN_HEIGHT), background)
+    img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), background)
     draw = ImageDraw.Draw(img)
     font = get_font()
     small_font = get_small_font()
 
-    widget_icon_size = 60
-    icon_x = 10
-    icon_y = (TOUCHSCREEN_HEIGHT - widget_icon_size) // 2  # vertically centered
+    widget_icon_size = 50
+    icon_x = 8
+    icon_y = (WIDGET_HEIGHT - widget_icon_size) // 2  # vertically centered
 
     if icon is not None:
         sized = icon.resize((widget_icon_size, widget_icon_size), Image.LANCZOS)
@@ -142,16 +157,16 @@ def render_widget_image(
         else:
             img.paste(sized, (icon_x, icon_y))
 
-    text_x = icon_x + widget_icon_size + 12  # right of icon
+    text_x = icon_x + widget_icon_size + 10  # right of icon
     if label and value:
         # Label at top, value below
-        draw.text((text_x, 25), label, fill="white", font=font)
-        draw.text((text_x, 50), value, fill="#aaaaaa", font=small_font)
+        draw.text((text_x, 18), label, fill="white", font=font)
+        draw.text((text_x, 40), value, fill="#aaaaaa", font=small_font)
     elif label:
         # Label centered vertically
-        draw.text((text_x, 38), label, fill="white", font=font)
+        draw.text((text_x, 30), label, fill="white", font=font)
     elif value:
-        draw.text((text_x, 38), value, fill="#aaaaaa", font=small_font)
+        draw.text((text_x, 30), value, fill="#aaaaaa", font=small_font)
 
     return img
 
@@ -159,8 +174,11 @@ def render_widget_image(
 def compose_touchscreen(widgets: list[Image.Image | None]) -> bytes:
     """Compose 4 widget images into a single 800x100 touchscreen JPEG.
 
+    Widgets are placed within the usable area defined by the margins,
+    separated by ``WIDGET_GAP`` pixels.
+
     Args:
-        widgets: List of up to 4 PIL Images (200x100 each).
+        widgets: List of up to 4 PIL Images (WIDGET_WIDTH x WIDGET_HEIGHT each).
                  None entries render as black.
 
     Returns:
@@ -172,7 +190,8 @@ def compose_touchscreen(widgets: list[Image.Image | None]) -> bytes:
         if i >= WIDGET_COUNT:
             break
         if widget_img is not None:
-            img.paste(widget_img, (i * WIDGET_WIDTH, 0))
+            x = MARGIN_LEFT + i * (WIDGET_WIDTH + WIDGET_GAP)
+            img.paste(widget_img, (x, MARGIN_TOP))
 
     return _encode_jpeg(img)
 
