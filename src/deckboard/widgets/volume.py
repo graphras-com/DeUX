@@ -52,7 +52,7 @@ class VolumeSlider(LargeSlider):
         if fill_w > 0:
             self._draw_rounded_rect(
                 draw,
-                (ix, iy, ix + fill_w, iy + ih),
+                (ix, iy, ix + fill_w - 1, iy + ih - 1),
                 radius=_LARGE_INNER_RX,
                 fill="white",
             )

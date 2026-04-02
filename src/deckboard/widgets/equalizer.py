@@ -51,7 +51,7 @@ class EqualizerSlider(SmallSlider):
         ind_x = ix + int((iw - _SMALL_INDICATOR_W) * self.normalized)
         self._draw_rounded_rect(
             draw,
-            (ind_x, iy, ind_x + _SMALL_INDICATOR_W, iy + ih),
+            (ind_x, iy, ind_x + _SMALL_INDICATOR_W - 1, iy + ih - 1),
             radius=_SMALL_INNER_RX,
             fill="white",
         )
