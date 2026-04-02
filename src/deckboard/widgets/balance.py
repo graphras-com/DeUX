@@ -72,7 +72,7 @@ class BalanceSlider(SmallSlider):
         if left_fill_w > 0:
             self._draw_rounded_rect(
                 draw,
-                (centre_x - left_fill_w, iy, centre_x, iy + ih),
+                (centre_x - left_fill_w, iy, centre_x, iy + ih - 1),
                 radius=_SMALL_INNER_RX,
                 fill="white",
             )
@@ -82,14 +82,14 @@ class BalanceSlider(SmallSlider):
         if right_fill_w > 0:
             self._draw_rounded_rect(
                 draw,
-                (centre_x, iy, centre_x + right_fill_w, iy + ih),
+                (centre_x, iy, centre_x + right_fill_w, iy + ih - 1),
                 radius=_SMALL_INNER_RX,
                 fill="white",
             )
 
         # Centre line
         draw.line(
-            [(centre_x, iy), (centre_x, iy + ih)],
+            [(centre_x, iy), (centre_x, iy + ih - 1)],
             fill="black",
             width=1,
         )

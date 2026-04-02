@@ -57,7 +57,7 @@ class KelvinSlider(LargeSlider):
         ind_x = ix + int((iw - _LARGE_INDICATOR_W) * self.normalized)
         self._draw_rounded_rect(
             draw,
-            (ind_x, iy, ind_x + _LARGE_INDICATOR_W, iy + ih),
+            (ind_x, iy, ind_x + _LARGE_INDICATOR_W - 1, iy + ih - 1),
             radius=_LARGE_INNER_RX,
             fill="white",
             outline="black",
