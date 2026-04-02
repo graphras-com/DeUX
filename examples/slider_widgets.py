@@ -13,8 +13,9 @@ Layout::
     ├──────────┼──────────┼──────────┼──────────┤
     │          │          │          │          │   ← buttons (row 2)
     ├──────────┼──────────┼──────────┼──────────┤
-    │ Volume   │ Bright + │  Kelvin  │ Sub+Bass │   ← touchscreen
-    │          │  Temp    │          │ +Balance │
+    │ Volume   │ Bright + │  Kelvin  │Sub+Bass │   ← touchscreen
+    │          │  Temp    │          │+Treble  │
+    │          │          │          │+Balance │
     └──────────┴──────────┴──────────┴──────────┘
         dial 0     dial 1     dial 2     dial 3
 
@@ -71,14 +72,16 @@ async def main() -> None:
         kelvin = KelvinSlider(value=4000)
         page.widget(2).add_slider(kelvin)
 
-        # -- Zone 3: Sub + Bass + Balance (three small sliders) ------------
+        # -- Zone 3: Sub + Bass + Treble + Balance (four small sliders) ----
         #    Press dial 3 to cycle through them.
 
         sub = EqualizerSlider("Sub", value=50)
         bass = EqualizerSlider("Bass", value=50)
+        treble = EqualizerSlider("Treble", value=50)
         bal = BalanceSlider(value=50)
         page.widget(3).add_slider(sub, default=True)
         page.widget(3).add_slider(bass)
+        page.widget(3).add_slider(treble)
         page.widget(3).add_slider(bal)
         page.widget(3).set_selection_timeout(5)
 
@@ -93,6 +96,7 @@ async def main() -> None:
             kelvin.set_value(4000)
             sub.set_value(50)
             bass.set_value(50)
+            treble.set_value(50)
             bal.set_value(50)
             await deck.refresh()
             print("All sliders reset.")
@@ -107,6 +111,7 @@ async def main() -> None:
                 f"Kelvin={kelvin.format_value()}, "
                 f"Sub={sub.format_value()}, "
                 f"Bass={bass.format_value()}, "
+                f"Treble={treble.format_value()}, "
                 f"Balance={bal.format_value()}"
             )
 
@@ -121,7 +126,7 @@ async def main() -> None:
         print("\nSlider showcase ready!")
         print("  Turn dials to adjust values.")
         print("  Press dial 1 to cycle Brightness / Temperature.")
-        print("  Press dial 3 to cycle Sub / Bass / Balance.")
+        print("  Press dial 3 to cycle Sub / Bass / Treble / Balance.")
         print("  Button 0 = Reset All, Button 1 = Print Values.")
         print("  Button 7 = Exit.\n")
 
