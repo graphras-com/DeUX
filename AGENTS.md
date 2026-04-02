@@ -2,6 +2,35 @@
 
 Instructions for AI coding agents working on the **deckboard** repository.
 
+## Mandatory workflow — read this FIRST
+
+You MUST follow this sequence for every task. Do not write any code before step 1. Do NOT skip or reorder any step.
+
+1. **Create a branch** — your first action on any task must be creating a branch from up-to-date `main`:
+   ```
+   git checkout main && git pull
+   git checkout -b <prefix>/<name>
+   ```
+   If you are already on a non-main branch from a previous task, confirm with the user before reusing it.
+
+2. **Do the work** — make your changes.
+
+3. **Run the full test suite** — every test must pass before you commit:
+   ```
+   python -m pytest tests/ --cov=deckboard --cov-report=term-missing --cov-fail-under=95
+   ```
+   If `python` does not resolve to Python 3.11+, use `python3` or the full interpreter path.
+
+4. **Commit** — only after all tests pass. Do not commit with failing tests.
+
+5. **Push and create a PR** — every completed task must end with a pull request:
+   ```
+   git push -u origin <branch>
+   gh pr create --title "..." --body "..."
+   ```
+
+**Never commit directly to `main`.** No exceptions.
+
 ## Project overview
 
 Deckboard is a high-level, asyncio-native Python library for Elgato Stream Deck+ devices. It wraps the low-level `python-elgato-streamdeck` HID library and provides a clean API for buttons, dials, touchscreen widgets, icons, and page management.
@@ -39,11 +68,7 @@ tests/                  # Test suite (287 tests, 100% coverage)
   python-test.yml       # Reusable test workflow
 ```
 
-## Git workflow
-
-**All development must happen on task/feature-specific branches. Never commit directly to `main`.**
-
-### Branch naming
+## Branch naming
 
 Use descriptive branch names with a prefix:
 
@@ -53,30 +78,7 @@ Use descriptive branch names with a prefix:
 - `docs/<name>` — documentation changes
 - `ci/<name>` — CI/CD changes
 
-### Development process
-
-1. **Create a branch** from `main` before starting work:
-   ```
-   git checkout main && git pull
-   git checkout -b feature/<name>
-   ```
-
-2. **Run tests before every commit** to ensure nothing is broken:
-   ```
-   python -m pytest tests/ --cov=deckboard --cov-report=term-missing --cov-fail-under=95
-   ```
-
-3. **Only commit when all tests pass.** Do not commit with failing tests.
-
-4. **Push the branch** and **create a pull request** when the task is complete:
-   ```
-   git push -u origin feature/<name>
-   gh pr create --title "..." --body "..."
-   ```
-
-5. PRs must target `main` and CI must pass before merging.
-
-### Commit messages
+## Commit messages
 
 Follow this style (see existing history):
 
@@ -134,11 +136,8 @@ CI runs automatically on pushes to `main`, PRs targeting `main`, and manual disp
 
 System dependencies required in CI: `libcairo2-dev`, `libhidapi-dev`.
 
-## Important reminders
+## Other reminders
 
-1. **Never push directly to `main`.** Always use a feature branch + PR.
-2. **Always run the full test suite before committing.** All 287+ tests must pass.
-3. **Maintain coverage at 95%+.** Add tests for any new code.
-4. **Create a PR when the task is done.** Include a summary of changes.
-5. **Do not commit secrets** (`.env`, keys, credentials). The `.gitignore` is already configured.
-6. **Mock all hardware.** Tests must work without a physical Stream Deck device.
+- Do not commit secrets (`.env`, keys, credentials). The `.gitignore` is already configured.
+- Mock all hardware. Tests must work without a physical Stream Deck device.
+- Add tests for any new code to maintain 95%+ coverage.
