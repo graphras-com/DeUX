@@ -254,11 +254,13 @@ class LargeSlider(Slider, ABC):
         val_w = bbox[2] - bbox[0]
         draw.text((x + mx + bar_w - val_w, label_y), val_text, fill="white", font=font)
 
-        # Frame
+        # Frame (use inclusive integer coords for symmetric stroke)
         stroke_color = _HIGHLIGHT_COLOR if active else _NORMAL_STROKE_COLOR
+        fx = x + mx
+        fy = bar_y
         self._draw_rounded_rect(
             draw,
-            (x + mx + 0.5, bar_y + 0.5, x + mx + bar_w - 0.5, bar_y + frame_h - 0.5),
+            (fx, fy, fx + bar_w - 1, fy + frame_h - 1),
             radius=_LARGE_FRAME_RX,
             outline=stroke_color,
             width=_LARGE_FRAME_STROKE,
@@ -266,8 +268,8 @@ class LargeSlider(Slider, ABC):
 
         # Inner track coordinates
         pad = _LARGE_INNER_PAD
-        ix = x + mx + pad
-        iy = bar_y + pad
+        ix = fx + pad
+        iy = fy + pad
         iw = bar_w - 2 * pad
         ih = frame_h - 2 * pad
 
@@ -326,11 +328,11 @@ class SmallSlider(Slider, ABC):
         # Vertically centre the frame in the slot
         bar_y = y + (height - frame_h) // 2
 
-        # Frame
+        # Frame (use inclusive integer coords for symmetric stroke)
         stroke_color = _HIGHLIGHT_COLOR if active else _NORMAL_STROKE_COLOR
         self._draw_rounded_rect(
             draw,
-            (bar_x + 0.5, bar_y + 0.5, bar_x + bar_w - 0.5, bar_y + frame_h - 0.5),
+            (bar_x, bar_y, bar_x + bar_w - 1, bar_y + frame_h - 1),
             radius=_SMALL_FRAME_RX,
             outline=stroke_color,
             width=_SMALL_FRAME_STROKE,
