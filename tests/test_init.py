@@ -11,6 +11,8 @@ class TestPublicAPI:
 
     def test_all_exports(self):
         expected = {
+            "BalanceSlider",
+            "BrightnessSlider",
             "Button",
             "Deck",
             "DeckError",
@@ -19,13 +21,20 @@ class TestPublicAPI:
             "Dial",
             "DialPressEvent",
             "DialTurnEvent",
+            "EqualizerSlider",
             "EventType",
             "IconError",
             "IconManager",
+            "KelvinSlider",
             "KeyEvent",
+            "LargeSlider",
             "Page",
+            "Slider",
+            "SmallSlider",
+            "TemperatureSlider",
             "TouchEvent",
             "TouchScreen",
+            "VolumeSlider",
             "Widget",
         }
         assert set(deckboard.__all__) == expected
@@ -87,3 +96,26 @@ class TestPublicAPI:
         from deckboard import DeviceInfo
 
         assert DeviceInfo is not None
+
+    def test_widgets_importable(self):
+        from deckboard import (
+            BalanceSlider,
+            BrightnessSlider,
+            EqualizerSlider,
+            KelvinSlider,
+            LargeSlider,
+            Slider,
+            SmallSlider,
+            TemperatureSlider,
+            VolumeSlider,
+        )
+
+        assert Slider is not None
+        assert LargeSlider is not None
+        assert SmallSlider is not None
+        assert VolumeSlider is not None
+        assert BrightnessSlider is not None
+        assert KelvinSlider is not None
+        assert TemperatureSlider is not None
+        assert EqualizerSlider is not None
+        assert BalanceSlider is not None

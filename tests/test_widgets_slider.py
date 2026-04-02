@@ -1,0 +1,257 @@
+"""Tests for deckboard.widgets.slider — Slider, LargeSlider, SmallSlider."""
+
+from __future__ import annotations
+
+import pytest
+from PIL import Image
+
+from deckboard.widgets.slider import LargeSlider, Slider, SmallSlider
+
+
+# ── Concrete test subclasses (since the bases are abstract) ──────────────
+
+
+class _ConcreteLargeSlider(LargeSlider):
+    """Minimal concrete LargeSlider for testing."""
+
+    def _draw_bar_contents(self, draw, img, ix, iy, iw, ih):
+        pass  # No-op — just test the frame/layout
+
+
+class _ConcreteSmallSlider(SmallSlider):
+    """Minimal concrete SmallSlider for testing."""
+
+    def _draw_bar_contents(self, draw, img, ix, iy, iw, ih):
+        pass
+
+
+# ── Slider base class ────────────────────────────────────────────────────
+
+
+class TestSliderInit:
+    def test_defaults(self):
+        s = _ConcreteLargeSlider("Test")
+        assert s.label == "Test"
+        assert s.value == 0
+        assert s.min_value == 0
+        assert s.max_value == 100
+        assert s.unit == "%"
+        assert s.step == 1
+
+    def test_custom_params(self):
+        s = _ConcreteLargeSlider(
+            "Vol",
+            min_value=10,
+            max_value=50,
+            value=30,
+            unit="dB",
+            step=2,
+        )
+        assert s.label == "Vol"
+        assert s.value == 30
+        assert s.min_value == 10
+        assert s.max_value == 50
+        assert s.unit == "dB"
+        assert s.step == 2
+
+    def test_value_defaults_to_min(self):
+        s = _ConcreteLargeSlider("X", min_value=20, max_value=80)
+        assert s.value == 20
+
+
+class TestSliderNormalized:
+    def test_at_min(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=0)
+        assert s.normalized == 0.0
+
+    def test_at_max(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=100)
+        assert s.normalized == 1.0
+
+    def test_midpoint(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        assert s.normalized == pytest.approx(0.5)
+
+    def test_custom_range(self):
+        s = _ConcreteLargeSlider("X", min_value=2000, max_value=6500, value=3125)
+        expected = (3125 - 2000) / (6500 - 2000)
+        assert s.normalized == pytest.approx(expected)
+
+    def test_zero_range(self):
+        s = _ConcreteLargeSlider("X", min_value=50, max_value=50, value=50)
+        assert s.normalized == 0.0
+
+    def test_negative_range(self):
+        s = _ConcreteLargeSlider("X", min_value=100, max_value=50, value=75)
+        assert s.normalized == 0.0  # span <= 0
+
+
+class TestSliderSetValue:
+    def test_set_normal(self):
+        s = _ConcreteLargeSlider("X")
+        s.set_value(42)
+        assert s.value == 42
+
+    def test_clamp_low(self):
+        s = _ConcreteLargeSlider("X", min_value=10, max_value=90)
+        s.set_value(-5)
+        assert s.value == 10
+
+    def test_clamp_high(self):
+        s = _ConcreteLargeSlider("X", min_value=10, max_value=90)
+        s.set_value(200)
+        assert s.value == 90
+
+
+class TestSliderAdjust:
+    def test_positive_direction(self):
+        s = _ConcreteLargeSlider("X", value=50, step=5)
+        s.adjust(1)
+        assert s.value == 55
+
+    def test_negative_direction(self):
+        s = _ConcreteLargeSlider("X", value=50, step=5)
+        s.adjust(-1)
+        assert s.value == 45
+
+    def test_clamped_at_max(self):
+        s = _ConcreteLargeSlider("X", value=98, max_value=100, step=5)
+        s.adjust(1)
+        assert s.value == 100
+
+    def test_clamped_at_min(self):
+        s = _ConcreteLargeSlider("X", value=2, min_value=0, step=5)
+        s.adjust(-1)
+        assert s.value == 0
+
+    def test_multi_step(self):
+        s = _ConcreteLargeSlider("X", value=50, step=5)
+        s.adjust(3)
+        assert s.value == 65
+
+
+class TestSliderFormatValue:
+    def test_integer_percent(self):
+        s = _ConcreteLargeSlider("X", value=50, unit="%")
+        assert s.format_value() == "50%"
+
+    def test_float_value(self):
+        s = _ConcreteLargeSlider("X", value=20.5, unit="\u00b0C")
+        assert s.format_value() == "20.5\u00b0C"
+
+    def test_kelvin(self):
+        s = _ConcreteLargeSlider("X", value=3000, unit="K")
+        assert s.format_value() == "3000K"
+
+    def test_no_unit(self):
+        s = _ConcreteLargeSlider("X", value=42, unit="")
+        assert s.format_value() == "42"
+
+
+class TestSliderDrawRoundedRect:
+    def test_draws_without_error(self):
+        img = Image.new("RGB", (200, 100), "black")
+        from PIL import ImageDraw
+
+        draw = ImageDraw.Draw(img)
+        Slider._draw_rounded_rect(
+            draw,
+            (10, 10, 190, 90),
+            radius=5,
+            fill="white",
+            outline="red",
+        )
+        # No assertion on pixels — just ensure it doesn't raise
+
+
+class TestSliderDrawGradient:
+    def test_gradient_basic(self):
+        img = Image.new("RGB", (200, 100), "black")
+        Slider._draw_gradient(img, 10, 10, 50, 20, "#000000", "#FFFFFF")
+        # Check left edge is dark, right edge is bright
+        left_pixel = img.getpixel((10, 20))
+        right_pixel = img.getpixel((59, 20))
+        assert left_pixel[0] < right_pixel[0]
+
+    def test_gradient_zero_width(self):
+        img = Image.new("RGB", (200, 100), "black")
+        # Should not raise
+        Slider._draw_gradient(img, 10, 10, 0, 20, "#000000", "#FFFFFF")
+
+    def test_gradient_zero_height(self):
+        img = Image.new("RGB", (200, 100), "black")
+        Slider._draw_gradient(img, 10, 10, 20, 0, "#000000", "#FFFFFF")
+
+    def test_gradient_single_pixel_wide(self):
+        img = Image.new("RGB", (200, 100), "black")
+        Slider._draw_gradient(img, 10, 10, 1, 10, "#FF0000", "#0000FF")
+
+
+# ── LargeSlider ─────────────────────────────────────────────────────────
+
+
+class TestLargeSliderRender:
+    def test_renders_200x100_image(self):
+        s = _ConcreteLargeSlider("Volume", value=50)
+        img = Image.new("RGB", (200, 100), "black")
+        s.render_onto(img, x=0, y=0, width=200, height=50)
+        assert img.size == (200, 100)
+
+    def test_renders_with_active_highlight(self):
+        s = _ConcreteLargeSlider("Volume", value=50)
+        img = Image.new("RGB", (200, 100), "black")
+        s.render_onto(img, x=0, y=0, width=200, height=50, active=True)
+        assert img.size == (200, 100)
+
+    def test_renders_at_min(self):
+        s = _ConcreteLargeSlider("Volume", value=0)
+        img = Image.new("RGB", (200, 100), "black")
+        s.render_onto(img, x=0, y=0, width=200, height=50)
+
+    def test_renders_at_max(self):
+        s = _ConcreteLargeSlider("Volume", value=100)
+        img = Image.new("RGB", (200, 100), "black")
+        s.render_onto(img, x=0, y=0, width=200, height=50)
+
+
+# ── SmallSlider ──────────────────────────────────────────────────────────
+
+
+class TestSmallSliderRender:
+    def test_renders_200x100_image(self):
+        s = _ConcreteSmallSlider("Bass", value=50)
+        img = Image.new("RGB", (200, 100), "black")
+        s.render_onto(img, x=0, y=0, width=200, height=25)
+        assert img.size == (200, 100)
+
+    def test_renders_with_active_highlight(self):
+        s = _ConcreteSmallSlider("Bass", value=50)
+        img = Image.new("RGB", (200, 100), "black")
+        s.render_onto(img, x=0, y=0, width=200, height=25, active=True)
+
+    def test_renders_at_min(self):
+        s = _ConcreteSmallSlider("Bass", value=0)
+        img = Image.new("RGB", (200, 100), "black")
+        s.render_onto(img, x=0, y=0, width=200, height=25)
+
+    def test_renders_at_max(self):
+        s = _ConcreteSmallSlider("Bass", value=100)
+        img = Image.new("RGB", (200, 100), "black")
+        s.render_onto(img, x=0, y=0, width=200, height=25)
+
+
+# ── Abstract class guards ────────────────────────────────────────────────
+
+
+class TestSliderAbstractGuards:
+    def test_cannot_instantiate_slider(self):
+        with pytest.raises(TypeError):
+            Slider("X")  # type: ignore[abstract]
+
+    def test_cannot_instantiate_large_slider(self):
+        with pytest.raises(TypeError):
+            LargeSlider("X")  # type: ignore[abstract]
+
+    def test_cannot_instantiate_small_slider(self):
+        with pytest.raises(TypeError):
+            SmallSlider("X")  # type: ignore[abstract]

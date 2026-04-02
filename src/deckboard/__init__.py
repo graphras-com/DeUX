@@ -35,8 +35,21 @@ from .types import (
     KeyEvent,
     TouchEvent,
 )
+from .widgets import (
+    BalanceSlider,
+    BrightnessSlider,
+    EqualizerSlider,
+    KelvinSlider,
+    LargeSlider,
+    Slider,
+    SmallSlider,
+    TemperatureSlider,
+    VolumeSlider,
+)
 
 __all__ = [
+    "BalanceSlider",
+    "BrightnessSlider",
     "Button",
     "Deck",
     "DeckError",
@@ -45,13 +58,20 @@ __all__ = [
     "Dial",
     "DialPressEvent",
     "DialTurnEvent",
+    "EqualizerSlider",
     "EventType",
     "IconError",
     "IconManager",
+    "KelvinSlider",
     "KeyEvent",
+    "LargeSlider",
     "Page",
+    "Slider",
+    "SmallSlider",
+    "TemperatureSlider",
     "TouchEvent",
     "TouchScreen",
+    "VolumeSlider",
     "Widget",
 ]
 
