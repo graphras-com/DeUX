@@ -160,6 +160,10 @@ class Widget:
     def mark_clean(self) -> None:
         self._dirty = False
 
+    def mark_dirty(self) -> None:
+        """Flag this widget for re-rendering on the next refresh."""
+        self._dirty = True
+
     @property
     def rendered(self) -> Image.Image | None:
         return self._rendered
@@ -186,6 +190,7 @@ class Widget:
         if not isinstance(slider, _Slider):
             msg = f"Expected a Slider instance, got {type(slider).__name__}"
             raise TypeError(msg)
+        slider._widget = self
         self._sliders.append(slider)
         idx = len(self._sliders) - 1
         if default or idx == 0:
