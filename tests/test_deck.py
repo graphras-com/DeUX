@@ -350,13 +350,13 @@ class TestDeckDispatch:
         await deck._dispatch(
             TouchEvent(
                 event_type=EventType.TOUCH_DRAG,
-                x=400,
+                x=450,
                 y=20,
-                x_out=500,
+                x_out=550,
                 y_out=80,
             )
         )
-        handler.assert_awaited_once_with(400, 20, 500, 80)
+        handler.assert_awaited_once_with(450, 20, 550, 80)
 
     async def test_touch_no_handler(self, deck):
         p = deck.page("main")

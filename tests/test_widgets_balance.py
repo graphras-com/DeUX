@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from PIL import Image
 
+from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH
 from deckboard.widgets.balance import BalanceSlider
 
 
@@ -31,38 +32,38 @@ class TestBalanceSliderRender:
     def test_render_at_centre(self):
         """Both speakers full when centred (value=50)."""
         s = BalanceSlider(value=50)
-        img = Image.new("RGB", (200, 100), "black")
-        s.render_onto(img, 0, 0, 200, 25)
-        assert img.size == (200, 100)
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
+        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_render_full_left(self):
         """Only left speaker at value=0."""
         s = BalanceSlider(value=0)
-        img = Image.new("RGB", (200, 100), "black")
-        s.render_onto(img, 0, 0, 200, 25)
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
 
     def test_render_full_right(self):
         """Only right speaker at value=100."""
         s = BalanceSlider(value=100)
-        img = Image.new("RGB", (200, 100), "black")
-        s.render_onto(img, 0, 0, 200, 25)
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
 
     def test_render_active(self):
         s = BalanceSlider(value=50)
-        img = Image.new("RGB", (200, 100), "black")
-        s.render_onto(img, 0, 0, 200, 25, active=True)
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4, active=True)
 
     def test_centre_line_drawn(self):
         """The centre line should produce a dark pixel at the midpoint."""
         s = BalanceSlider(value=50)
-        img = Image.new("RGB", (200, 100), "white")
-        s.render_onto(img, 0, 0, 200, 25)
+        slot_h = WIDGET_HEIGHT // 4
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "white")
+        s.render_onto(img, 0, 0, WIDGET_WIDTH, slot_h)
         # The centre of the bar area should have the black centre line
-        # bar_x starts at ~56, bar_w = 200 - 56 = 144, centre = 56 + 72 = 128
-        # This is approximate; just check a strip is dark
-        centre_x = 56 + (200 - 56) // 2
+        # bar_x starts at ~56, bar_w = WIDGET_WIDTH - 56, centre ≈ 56 + bar_w/2
+        centre_x = 56 + (WIDGET_WIDTH - 56) // 2
         found_dark = False
-        for y_px in range(0, 25):
+        for y_px in range(0, slot_h):
             px = img.getpixel((centre_x, y_px))
             if px[0] < 50 and px[1] < 50 and px[2] < 50:
                 found_dark = True

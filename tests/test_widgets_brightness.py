@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from PIL import Image
 
+from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH
 from deckboard.widgets.brightness import BrightnessSlider
 
 
@@ -26,34 +27,35 @@ class TestBrightnessSliderInit:
 class TestBrightnessSliderRender:
     def test_render_at_zero(self):
         s = BrightnessSlider(value=0)
-        img = Image.new("RGB", (200, 100), "black")
-        s.render_onto(img, 0, 0, 200, 50)
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
 
     def test_render_at_half(self):
         s = BrightnessSlider(value=50)
-        img = Image.new("RGB", (200, 100), "black")
-        s.render_onto(img, 0, 0, 200, 50)
-        assert img.size == (200, 100)
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
+        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_render_at_max(self):
         s = BrightnessSlider(value=100)
-        img = Image.new("RGB", (200, 100), "black")
-        s.render_onto(img, 0, 0, 200, 50)
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
 
     def test_render_active(self):
         s = BrightnessSlider(value=50)
-        img = Image.new("RGB", (200, 100), "black")
-        s.render_onto(img, 0, 0, 200, 50, active=True)
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2, active=True)
 
     def test_has_gradient(self):
         """The gradient should produce non-black pixels in the bar area."""
         s = BrightnessSlider(value=50)
-        img = Image.new("RGB", (200, 100), "black")
-        s.render_onto(img, 0, 50, 200, 50)
+        slot_h = WIDGET_HEIGHT // 2
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        s.render_onto(img, 0, slot_h, WIDGET_WIDTH, slot_h)
         # Check that there are some non-black pixels in the lower area
         has_non_black = False
-        for x_px in range(200):
-            for y_px in range(50, 100):
+        for x_px in range(WIDGET_WIDTH):
+            for y_px in range(slot_h, WIDGET_HEIGHT):
                 if img.getpixel((x_px, y_px)) != (0, 0, 0):
                     has_non_black = True
                     break

@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 from PIL import Image
 
+from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH
 from deckboard.touchscreen import TouchScreen, Widget
 from deckboard.widgets.volume import VolumeSlider
 from deckboard.widgets.brightness import BrightnessSlider
@@ -100,7 +101,7 @@ class TestWidgetClear:
         widget.set_icon("mdi:x")
         widget.set_label("L")
         widget.set_value("V")
-        widget.set_rendered(Image.new("RGB", (200, 100)))
+        widget.set_rendered(Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT)))
         widget.clear()
         assert widget.icon_name is None
         assert widget.label is None
@@ -168,7 +169,7 @@ class TestWidgetEventHandlers:
 
 class TestWidgetRendering:
     def test_set_rendered(self, widget: Widget):
-        img = Image.new("RGB", (200, 100))
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT))
         widget.set_rendered(img)
         assert widget.rendered is img
         assert widget.is_dirty is False
@@ -237,22 +238,22 @@ class TestWidgetRender:
         """render() without sliders uses classic icon+label+value layout."""
         widget.set_label("Test")
         img = widget.render()
-        assert img.size == (200, 100)
+        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
         assert img.mode == "RGB"
 
     def test_classic_render_with_icon(self, widget: Widget, sample_icon):
         img = widget.render(icon=sample_icon)
-        assert img.size == (200, 100)
+        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_classic_render_blank(self, widget: Widget):
         img = widget.render()
-        assert img.size == (200, 100)
+        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_slider_render_single(self, widget: Widget):
         vol = VolumeSlider("Volume", value=50)
         widget.add_slider(vol)
         img = widget.render()
-        assert img.size == (200, 100)
+        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
         assert img.mode == "RGB"
 
     def test_slider_render_two_large(self, widget: Widget):
@@ -261,7 +262,7 @@ class TestWidgetRender:
         widget.add_slider(vol)
         widget.add_slider(bri)
         img = widget.render()
-        assert img.size == (200, 100)
+        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_slider_render_four_small(self, widget: Widget):
         s1 = EqualizerSlider("Sub", value=50)
@@ -273,7 +274,7 @@ class TestWidgetRender:
         widget.add_slider(s3)
         widget.add_slider(s4)
         img = widget.render()
-        assert img.size == (200, 100)
+        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_slider_render_ignores_icon(self, widget: Widget, sample_icon):
         """When sliders are present, the icon argument is ignored."""

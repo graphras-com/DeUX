@@ -13,6 +13,7 @@ from deckboard.image import (
     TOUCHSCREEN_HEIGHT,
     TOUCHSCREEN_WIDTH,
     WIDGET_COUNT,
+    WIDGET_HEIGHT,
     WIDGET_WIDTH,
     _encode_jpeg,
     _get_font,
@@ -154,32 +155,32 @@ class TestRenderWidgetImage:
     def test_blank_returns_image(self):
         result = render_widget_image()
         assert isinstance(result, Image.Image)
-        assert result.size == (WIDGET_WIDTH, TOUCHSCREEN_HEIGHT)
+        assert result.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
         assert result.mode == "RGB"
 
     def test_with_icon(self, sample_icon):
         result = render_widget_image(icon=sample_icon)
-        assert result.size == (WIDGET_WIDTH, TOUCHSCREEN_HEIGHT)
+        assert result.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_with_rgb_icon(self, sample_rgb_icon):
         result = render_widget_image(icon=sample_rgb_icon)
-        assert result.size == (WIDGET_WIDTH, TOUCHSCREEN_HEIGHT)
+        assert result.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_with_label_only(self):
         result = render_widget_image(label="Volume")
-        assert result.size == (WIDGET_WIDTH, TOUCHSCREEN_HEIGHT)
+        assert result.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_with_value_only(self):
         result = render_widget_image(value="75%")
-        assert result.size == (WIDGET_WIDTH, TOUCHSCREEN_HEIGHT)
+        assert result.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_with_label_and_value(self):
         result = render_widget_image(label="Volume", value="75%")
-        assert result.size == (WIDGET_WIDTH, TOUCHSCREEN_HEIGHT)
+        assert result.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_with_all(self, sample_icon):
         result = render_widget_image(icon=sample_icon, label="Vol", value="50%")
-        assert result.size == (WIDGET_WIDTH, TOUCHSCREEN_HEIGHT)
+        assert result.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
 
 # ── compose_touchscreen ─────────────────────────────────────────────────

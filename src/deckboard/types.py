@@ -55,8 +55,19 @@ class TouchEvent:
 
     @property
     def zone(self) -> int:
-        """Which widget zone (0-3) this touch falls in, based on x position."""
-        return min(self.x // 200, 3)
+        """Which widget zone (0-3) this touch falls in, based on x position.
+
+        Accounts for left margin and inter-widget gaps so that touches
+        map correctly to the inset widget layout.
+        """
+        from .image import MARGIN_LEFT, WIDGET_GAP, WIDGET_WIDTH
+
+        # Shift x into the usable coordinate space
+        rel = self.x - MARGIN_LEFT
+        # Each zone spans WIDGET_WIDTH pixels plus the gap to its right
+        stride = WIDGET_WIDTH + WIDGET_GAP
+        zone = rel // stride
+        return max(0, min(zone, 3))
 
 
 # Union of all event types

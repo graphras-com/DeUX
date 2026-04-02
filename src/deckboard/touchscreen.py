@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from PIL import Image
 
-from .image import WIDGET_COUNT, render_widget_image
+from .image import WIDGET_COUNT, WIDGET_HEIGHT, WIDGET_WIDTH, render_widget_image
 from .types import AsyncHandler
 
 if TYPE_CHECKING:
@@ -18,10 +18,12 @@ logger = logging.getLogger(__name__)
 
 
 class Widget:
-    """Represents a single touchscreen zone (200x100px) under a dial.
+    """Represents a single touchscreen zone (195x78px) under a dial.
 
     The Stream Deck+ touchscreen (800x100) is divided into 4 zones,
-    each aligned with one of the 4 dials.
+    each aligned with one of the 4 dials.  A margin is applied around
+    the usable area (top=4, bottom=18, left=4, right=4) and widgets
+    are separated by a 4px gap, giving each zone 195x78 usable pixels.
 
     Usage::
 
@@ -271,7 +273,7 @@ class Widget:
     # -- Rendering ---------------------------------------------------------
 
     def render(self, icon: Image.Image | None = None) -> Image.Image:
-        """Render this widget zone as a 200x100 PIL Image.
+        """Render this widget zone as a WIDGET_WIDTH x WIDGET_HEIGHT PIL Image.
 
         If sliders have been added via :meth:`add_slider`, they are
         rendered instead of the default icon/label/value layout.
@@ -280,7 +282,7 @@ class Widget:
             icon: Pre-fetched icon image (used by the classic layout).
 
         Returns:
-            A 200x100 RGB :class:`~PIL.Image.Image`.
+            A WIDGET_WIDTH x WIDGET_HEIGHT RGB :class:`~PIL.Image.Image`.
         """
         if self._sliders:
             return self._render_with_sliders()
@@ -292,16 +294,14 @@ class Widget:
 
     def _render_with_sliders(self) -> Image.Image:
         """Compose all slider sub-elements into a single widget image."""
-        from .image import TOUCHSCREEN_HEIGHT, WIDGET_WIDTH
-
-        img = Image.new("RGB", (WIDGET_WIDTH, TOUCHSCREEN_HEIGHT), "black")
+        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
         if not self._sliders:
             return img
 
         self.check_selection_timeout()
 
         count = len(self._sliders)
-        slot_height = TOUCHSCREEN_HEIGHT // count
+        slot_height = WIDGET_HEIGHT // count
         for i, slider in enumerate(self._sliders):
             y = i * slot_height
             active = i == self._active_slider_index and count > 1
