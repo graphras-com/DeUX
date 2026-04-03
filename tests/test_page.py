@@ -8,6 +8,8 @@ from deckboard.button import Button
 from deckboard.dial import Dial
 from deckboard.page import Page
 from deckboard.touchscreen import TouchScreen, Widget
+from deckboard.widgets.icon_widget import IconWidget
+from deckboard.widgets.slider_widget import SliderWidget
 
 
 class TestPageInit:
@@ -96,6 +98,22 @@ class TestPageWidget:
         assert isinstance(w, Widget)
         assert w is page.touchscreen.widget(0)
 
+    def test_default_is_icon_widget(self, page: Page):
+        w = page.widget(0)
+        assert isinstance(w, IconWidget)
+
     def test_index_error(self, page: Page):
         with pytest.raises(IndexError):
             page.widget(4)
+
+
+class TestPageSetWidget:
+    def test_replace_with_slider_widget(self, page: Page):
+        sw = SliderWidget(0)
+        page.set_widget(0, sw)
+        assert page.widget(0) is sw
+
+    def test_replace_preserves_others(self, page: Page):
+        original_1 = page.widget(1)
+        page.set_widget(0, SliderWidget(0))
+        assert page.widget(1) is original_1

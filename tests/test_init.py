@@ -25,11 +25,13 @@ class TestPublicAPI:
             "EventType",
             "IconError",
             "IconManager",
+            "IconWidget",
             "KelvinSlider",
             "KeyEvent",
             "LargeSlider",
             "Page",
             "Slider",
+            "SliderWidget",
             "SmallSlider",
             "TemperatureSlider",
             "TouchEvent",
@@ -102,9 +104,11 @@ class TestPublicAPI:
             BalanceSlider,
             BrightnessSlider,
             EqualizerSlider,
+            IconWidget,
             KelvinSlider,
             LargeSlider,
             Slider,
+            SliderWidget,
             SmallSlider,
             TemperatureSlider,
             VolumeSlider,
@@ -119,3 +123,5 @@ class TestPublicAPI:
         assert TemperatureSlider is not None
         assert EqualizerSlider is not None
         assert BalanceSlider is not None
+        assert IconWidget is not None
+        assert SliderWidget is not None

@@ -22,6 +22,7 @@ from .image import (
 )
 from .page import Page
 from .touchscreen import Widget
+from .widgets.icon_widget import IconWidget
 from .types import (
     DeckEvent,
     DeviceInfo,
@@ -327,13 +328,14 @@ class Deck:
 
         widget_images = []
         for widget in self._active_page.widgets:
-            icon_img = None
-            if widget.icon_name:
+            # Pre-fetch icon for IconWidget instances
+            if isinstance(widget, IconWidget) and widget.icon_name:
                 icon_img = await self.icons.get(
                     widget.icon_name, color=widget.icon_color
                 )
+                widget.set_icon_image(icon_img)
 
-            img = widget.render(icon=icon_img)
+            img = widget.render()
             widget.set_rendered(img)
             widget_images.append(img)
 
@@ -435,10 +437,10 @@ class Deck:
             dial = page.dials.get(event.dial)
             if dial and dial._turn_handler:
                 await dial._turn_handler(event.direction)
-            # Update widget slider if present
+            # Forward to widget (e.g. SliderWidget adjusts its active slider)
             widget = page.touchscreen.widget(event.dial)
-            if widget.sliders:
-                widget.handle_dial_turn(event.direction)
+            widget.handle_dial_turn(event.direction)
+            if widget.is_dirty:
                 await self.refresh()
 
         elif isinstance(event, DialPressEvent):
@@ -448,11 +450,11 @@ class Deck:
                     await dial._press_handler()
                 elif not event.pressed and dial._release_handler:
                     await dial._release_handler()
-            # Cycle widget slider selection on press
+            # Forward dial press to widget (e.g. SliderWidget cycles sliders)
             if event.pressed:
                 widget = page.touchscreen.widget(event.dial)
-                if widget.sliders:
-                    widget.handle_dial_press()
+                widget.handle_dial_press()
+                if widget.is_dirty:
                     await self.refresh()
 
         elif isinstance(event, TouchEvent):

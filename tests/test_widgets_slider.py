@@ -8,6 +8,7 @@ from PIL import Image
 from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH
 from deckboard.touchscreen import Widget
 from deckboard.widgets.slider import LargeSlider, Slider, SmallSlider
+from deckboard.widgets.slider_widget import SliderWidget
 
 
 # ── Concrete test subclasses (since the bases are abstract) ──────────────
@@ -272,13 +273,13 @@ class TestSliderWidgetBackReference:
         assert s._widget is None
 
     def test_add_slider_sets_widget(self):
-        w = Widget(0)
+        w = SliderWidget(0)
         s = _ConcreteLargeSlider("X", value=50)
         w.add_slider(s)
         assert s._widget is w
 
     def test_set_value_marks_widget_dirty(self):
-        w = Widget(0)
+        w = SliderWidget(0)
         s = _ConcreteLargeSlider("X", value=50)
         w.add_slider(s)
         w.mark_clean()
@@ -292,7 +293,7 @@ class TestSliderWidgetBackReference:
         assert s.value == 75
 
     def test_adjust_marks_widget_dirty(self):
-        w = Widget(0)
+        w = SliderWidget(0)
         s = _ConcreteLargeSlider("X", value=50, step=5)
         w.add_slider(s)
         w.mark_clean()

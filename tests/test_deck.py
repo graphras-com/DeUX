@@ -263,11 +263,13 @@ class TestDeckDispatch:
     async def test_dial_turn_updates_widget_slider(self, deck):
         """Dial turn forwards to widget sliders and triggers refresh."""
         from deckboard.widgets.volume import VolumeSlider
+        from deckboard.widgets.slider_widget import SliderWidget
 
         p = deck.page("main")
-        w = p.widget(1)
+        sw = SliderWidget(1)
         slider = VolumeSlider()
-        w.add_slider(slider)
+        sw.add_slider(slider)
+        p.set_widget(1, sw)
         deck._active_page = p
 
         with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
@@ -310,18 +312,20 @@ class TestDeckDispatch:
         """Dial press cycles active slider on the widget and triggers refresh."""
         from deckboard.widgets.volume import VolumeSlider
         from deckboard.widgets.brightness import BrightnessSlider
+        from deckboard.widgets.slider_widget import SliderWidget
 
         p = deck.page("main")
-        w = p.widget(0)
-        w.add_slider(VolumeSlider())
-        w.add_slider(BrightnessSlider())
+        sw = SliderWidget(0)
+        sw.add_slider(VolumeSlider())
+        sw.add_slider(BrightnessSlider())
+        p.set_widget(0, sw)
         deck._active_page = p
 
-        assert w._active_slider_index == 0
+        assert sw._active_slider_index == 0
         with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
             await deck._dispatch(DialPressEvent(dial=0, pressed=True))
             mock_refresh.assert_awaited_once()
-        assert w._active_slider_index == 1
+        assert sw._active_slider_index == 1
 
     async def test_touch_short_dispatches(self, deck):
         p = deck.page("main")
@@ -628,12 +632,14 @@ class TestDeckCheckTimeouts:
         """No refresh when no widget has an expired timeout."""
         from deckboard.widgets.volume import VolumeSlider
         from deckboard.widgets.brightness import BrightnessSlider
+        from deckboard.widgets.slider_widget import SliderWidget
 
         p = deck.page("main")
-        w = p.widget(0)
-        w.add_slider(VolumeSlider(), default=True)
-        w.add_slider(BrightnessSlider())
-        w.set_selection_timeout(5)
+        sw = SliderWidget(0)
+        sw.add_slider(VolumeSlider(), default=True)
+        sw.add_slider(BrightnessSlider())
+        sw.set_selection_timeout(5)
+        p.set_widget(0, sw)
         deck._active_page = p
 
         with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
@@ -645,48 +651,53 @@ class TestDeckCheckTimeouts:
         import time
         from deckboard.widgets.volume import VolumeSlider
         from deckboard.widgets.brightness import BrightnessSlider
+        from deckboard.widgets.slider_widget import SliderWidget
 
         p = deck.page("main")
-        w = p.widget(0)
-        w.add_slider(VolumeSlider(), default=True)
-        w.add_slider(BrightnessSlider())
-        w.set_selection_timeout(1)
+        sw = SliderWidget(0)
+        sw.add_slider(VolumeSlider(), default=True)
+        sw.add_slider(BrightnessSlider())
+        sw.set_selection_timeout(1)
+        p.set_widget(0, sw)
         deck._active_page = p
 
         # Select non-default slider, then simulate timeout expiry
-        w.cycle_active_slider()
-        assert w.active_slider_index == 1
-        w._last_selection_time = time.monotonic() - 2.0
+        sw.cycle_active_slider()
+        assert sw.active_slider_index == 1
+        sw._last_selection_time = time.monotonic() - 2.0
 
         with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
             await deck._check_timeouts()
             mock_refresh.assert_awaited_once()
 
         # Should have reverted to default
-        assert w.active_slider_index == 0
+        assert sw.active_slider_index == 0
 
     async def test_multiple_widgets_only_expired_triggers(self, deck):
         """Only widgets with expired timeouts cause a refresh."""
         import time
         from deckboard.widgets.volume import VolumeSlider
         from deckboard.widgets.brightness import BrightnessSlider
+        from deckboard.widgets.slider_widget import SliderWidget
 
         p = deck.page("main")
 
         # Widget 0: not expired
-        w0 = p.widget(0)
-        w0.add_slider(VolumeSlider(), default=True)
-        w0.add_slider(BrightnessSlider())
-        w0.set_selection_timeout(10)
-        w0.cycle_active_slider()
+        sw0 = SliderWidget(0)
+        sw0.add_slider(VolumeSlider(), default=True)
+        sw0.add_slider(BrightnessSlider())
+        sw0.set_selection_timeout(10)
+        sw0.cycle_active_slider()
+        p.set_widget(0, sw0)
 
         # Widget 1: expired
-        w1 = p.widget(1)
-        w1.add_slider(VolumeSlider(), default=True)
-        w1.add_slider(BrightnessSlider())
-        w1.set_selection_timeout(1)
-        w1.cycle_active_slider()
-        w1._last_selection_time = time.monotonic() - 2.0
+        sw1 = SliderWidget(1)
+        sw1.add_slider(VolumeSlider(), default=True)
+        sw1.add_slider(BrightnessSlider())
+        sw1.set_selection_timeout(1)
+        sw1.cycle_active_slider()
+        sw1._last_selection_time = time.monotonic() - 2.0
+        p.set_widget(1, sw1)
 
         deck._active_page = p
 
@@ -694,9 +705,9 @@ class TestDeckCheckTimeouts:
             await deck._check_timeouts()
             mock_refresh.assert_awaited_once()
 
-        # w0 unchanged, w1 reverted
-        assert w0.active_slider_index == 1
-        assert w1.active_slider_index == 0
+        # sw0 unchanged, sw1 reverted
+        assert sw0.active_slider_index == 1
+        assert sw1.active_slider_index == 0
 
 
 class TestDeckEventLoop:

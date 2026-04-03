@@ -3,33 +3,41 @@
 from __future__ import annotations
 
 import logging
-import time
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from PIL import Image
 
-from .image import WIDGET_COUNT, WIDGET_HEIGHT, WIDGET_WIDTH, render_widget_image
+from .image import WIDGET_COUNT, WIDGET_HEIGHT, WIDGET_WIDTH
 from .types import AsyncHandler
 
 if TYPE_CHECKING:
-    from .widgets.slider import Slider
+    pass
 
 logger = logging.getLogger(__name__)
 
 
-class Widget:
-    """Represents a single touchscreen zone (195x78px) under a dial.
+class Widget(ABC):
+    """Abstract base for a single touchscreen zone (195x78px) under a dial.
 
     The Stream Deck+ touchscreen (800x100) is divided into 4 zones,
     each aligned with one of the 4 dials.  A margin is applied around
     the usable area (top=4, bottom=18, left=4, right=4) and widgets
     are separated by a 4px gap, giving each zone 195x78 usable pixels.
 
+    Subclass this to build custom widgets.  At minimum, implement
+    :meth:`render`.  Override the ``handle_dial_*`` and
+    ``check_selection_timeout`` hooks to react to dial events.
+
     Usage::
 
-        widget.set_icon("mdi:volume-high")
-        widget.set_label("Volume")
-        widget.set_value("75%")
+        class MyWidget(Widget):
+            def render(self) -> Image.Image:
+                img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+                # ... draw custom content ...
+                return img
+
+    Event handlers are registered with decorators::
 
         @widget.on_tap
         async def handle():
@@ -38,61 +46,15 @@ class Widget:
 
     def __init__(self, index: int) -> None:
         self._index = index
-        self._icon_name: str | None = None
-        self._icon_color: str = "white"
-        self._label: str | None = None
-        self._value: str | None = None
         self._tap_handler: AsyncHandler | None = None
         self._long_press_handler: AsyncHandler | None = None
         self._drag_handler: AsyncHandler | None = None
         self._rendered: Image.Image | None = None
         self._dirty = True
 
-        # Slider sub-elements
-        self._sliders: list[Slider] = []
-        self._active_slider_index: int = 0
-        self._default_slider_index: int = 0
-        self._selection_timeout: float = 5.0
-        self._last_selection_time: float | None = None
-
     @property
     def index(self) -> int:
         return self._index
-
-    # -- Configuration methods (return self for chaining) ------------------
-
-    def set_icon(self, name: str, color: str = "white") -> Widget:
-        """Set the icon by Iconify name.
-
-        Args:
-            name: Icon name in ``prefix:name`` format.
-            color: Icon color. Defaults to white.
-        """
-        self._icon_name = name
-        self._icon_color = color
-        self._dirty = True
-        return self
-
-    def set_label(self, label: str | None) -> Widget:
-        """Set the primary text label."""
-        self._label = label
-        self._dirty = True
-        return self
-
-    def set_value(self, value: str | None) -> Widget:
-        """Set the secondary value text."""
-        self._value = value
-        self._dirty = True
-        return self
-
-    def clear(self) -> Widget:
-        """Clear all content from this widget zone."""
-        self._icon_name = None
-        self._label = None
-        self._value = None
-        self._rendered = None
-        self._dirty = True
-        return self
 
     # -- Decorator-based event registration --------------------------------
 
@@ -135,23 +97,7 @@ class Widget:
         self._drag_handler = handler
         return handler
 
-    # -- Internal ----------------------------------------------------------
-
-    @property
-    def icon_name(self) -> str | None:
-        return self._icon_name
-
-    @property
-    def icon_color(self) -> str:
-        return self._icon_color
-
-    @property
-    def label(self) -> str | None:
-        return self._label
-
-    @property
-    def value(self) -> str | None:
-        return self._value
+    # -- Dirty tracking ----------------------------------------------------
 
     @property
     def is_dirty(self) -> bool:
@@ -172,165 +118,74 @@ class Widget:
         self._rendered = img
         self._dirty = False
 
-    # -- Slider sub-element management -------------------------------------
+    # -- Rendering (abstract) ----------------------------------------------
 
-    def add_slider(self, slider: Slider, default: bool = False) -> Widget:
-        """Add a slider sub-element to this widget zone.
-
-        Args:
-            slider: A :class:`Slider` instance to display in this zone.
-            default: If ``True``, this slider becomes the default
-                (the one selected after timeout).
-
-        Returns:
-            This widget (for chaining).
-        """
-        from .widgets.slider import Slider as _Slider
-
-        if not isinstance(slider, _Slider):
-            msg = f"Expected a Slider instance, got {type(slider).__name__}"
-            raise TypeError(msg)
-        slider._widget = self
-        self._sliders.append(slider)
-        idx = len(self._sliders) - 1
-        if default or idx == 0:
-            self._default_slider_index = idx
-            self._active_slider_index = idx
-        self._dirty = True
-        return self
-
-    @property
-    def sliders(self) -> list[Slider]:
-        """All slider sub-elements in this widget zone."""
-        return list(self._sliders)
-
-    @property
-    def active_slider(self) -> Slider | None:
-        """The slider currently controlled by the dial, or ``None``."""
-        if not self._sliders:
-            return None
-        return self._sliders[self._active_slider_index]
-
-    @property
-    def active_slider_index(self) -> int:
-        """Index of the currently active slider."""
-        return self._active_slider_index
-
-    @property
-    def selection_timeout(self) -> float:
-        """Seconds before active slider resets to the default."""
-        return self._selection_timeout
-
-    def set_selection_timeout(self, seconds: float) -> Widget:
-        """Set how long before active slider resets to the default.
-
-        Args:
-            seconds: Timeout in seconds.  Use ``0`` to disable.
-        """
-        self._selection_timeout = max(0.0, seconds)
-        return self
-
-    def cycle_active_slider(self) -> None:
-        """Advance to the next slider (wrapping around).
-
-        Called on dial push.  Marks the widget dirty so the highlight
-        redraws on the next render.
-        """
-        if len(self._sliders) <= 1:
-            return
-        self._active_slider_index = (self._active_slider_index + 1) % len(self._sliders)
-        self._last_selection_time = time.monotonic()
-        self._dirty = True
-
-    def check_selection_timeout(self) -> bool:
-        """Reset to the default slider if the timeout has elapsed.
-
-        Returns:
-            ``True`` if the active slider changed (widget is now dirty).
-        """
-        if (
-            self._selection_timeout <= 0
-            or self._last_selection_time is None
-            or self._active_slider_index == self._default_slider_index
-        ):
-            return False
-        elapsed = time.monotonic() - self._last_selection_time
-        if elapsed >= self._selection_timeout:
-            self._active_slider_index = self._default_slider_index
-            self._last_selection_time = None
-            self._dirty = True
-            return True
-        return False
-
-    def handle_dial_turn(self, direction: int) -> None:
-        """Adjust the active slider's value by *direction* steps.
-
-        Marks the widget dirty so the next render reflects the change.
-        Also resets the selection timeout so the active slider doesn't
-        revert to the default while the user is still interacting.
-        """
-        if self._sliders:
-            self._sliders[self._active_slider_index].adjust(direction)
-            if self._active_slider_index != self._default_slider_index:
-                self._last_selection_time = time.monotonic()
-            self._dirty = True
-
-    def handle_dial_press(self) -> None:
-        """Cycle to the next slider.  Called on dial push."""
-        self.cycle_active_slider()
-
-    # -- Rendering ---------------------------------------------------------
-
-    def render(self, icon: Image.Image | None = None) -> Image.Image:
+    @abstractmethod
+    def render(self) -> Image.Image:
         """Render this widget zone as a WIDGET_WIDTH x WIDGET_HEIGHT PIL Image.
-
-        If sliders have been added via :meth:`add_slider`, they are
-        rendered instead of the default icon/label/value layout.
-
-        Args:
-            icon: Pre-fetched icon image (used by the classic layout).
 
         Returns:
             A WIDGET_WIDTH x WIDGET_HEIGHT RGB :class:`~PIL.Image.Image`.
         """
-        if self._sliders:
-            return self._render_with_sliders()
-        return render_widget_image(
-            icon=icon,
-            label=self._label,
-            value=self._value,
-        )
 
-    def _render_with_sliders(self) -> Image.Image:
-        """Compose all slider sub-elements into a single widget image."""
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        if not self._sliders:
-            return img
+    # -- Dial interaction hooks (default no-ops) ---------------------------
 
-        self.check_selection_timeout()
+    def handle_dial_turn(self, direction: int) -> None:
+        """Called when the dial above this widget is turned.
 
-        count = len(self._sliders)
-        slot_height = WIDGET_HEIGHT // count
-        for i, slider in enumerate(self._sliders):
-            y = i * slot_height
-            active = i == self._active_slider_index and count > 1
-            slider.render_onto(
-                img, x=0, y=y, width=WIDGET_WIDTH, height=slot_height, active=active
-            )
-        return img
+        Override to handle dial rotation.  The default is a no-op.
+        """
+
+    def handle_dial_press(self) -> None:
+        """Called when the dial above this widget is pressed.
+
+        Override to handle dial presses.  The default is a no-op.
+        """
+
+    def check_selection_timeout(self) -> bool:
+        """Check whether an internal selection timeout has elapsed.
+
+        Override to implement timeout logic (e.g. for slider cycling).
+        The default always returns ``False``.
+
+        Returns:
+            ``True`` if the widget state changed and needs re-rendering.
+        """
+        return False
 
 
 class TouchScreen:
     """Manages the 4 widget zones on the Stream Deck+ touchscreen."""
 
     def __init__(self) -> None:
-        self._widgets: list[Widget] = [Widget(i) for i in range(WIDGET_COUNT)]
+        # Import here to avoid circular imports at module level
+        from .widgets.icon_widget import IconWidget
+
+        self._widgets: list[Widget] = [IconWidget(i) for i in range(WIDGET_COUNT)]
 
     def widget(self, index: int) -> Widget:
         """Get a widget zone by index (0-3)."""
         if not 0 <= index < WIDGET_COUNT:
             raise IndexError(f"Widget index must be 0-{WIDGET_COUNT - 1}, got {index}")
         return self._widgets[index]
+
+    def set_widget(self, index: int, widget: Widget) -> None:
+        """Replace the widget at *index* with a custom widget.
+
+        Args:
+            index: Widget zone index (0-3).
+            widget: A :class:`Widget` subclass instance.
+
+        Raises:
+            IndexError: If *index* is out of range.
+            TypeError: If *widget* is not a :class:`Widget` instance.
+        """
+        if not 0 <= index < WIDGET_COUNT:
+            raise IndexError(f"Widget index must be 0-{WIDGET_COUNT - 1}, got {index}")
+        if not isinstance(widget, Widget):
+            msg = f"Expected a Widget instance, got {type(widget).__name__}"
+            raise TypeError(msg)
+        self._widgets[index] = widget
 
     @property
     def widgets(self) -> list[Widget]:
