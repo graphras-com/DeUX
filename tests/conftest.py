@@ -15,6 +15,8 @@ from deckboard.icon import IconManager
 from deckboard.page import Page
 from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH
 from deckboard.touchscreen import TouchScreen, Widget
+from deckboard.widgets.icon_widget import IconWidget
+from deckboard.widgets.slider_widget import SliderWidget
 
 
 @pytest.fixture
@@ -31,8 +33,14 @@ def dial():
 
 @pytest.fixture
 def widget():
-    """A fresh Widget at index 0."""
-    return Widget(0)
+    """A fresh IconWidget at index 0."""
+    return IconWidget(0)
+
+
+@pytest.fixture
+def slider_widget():
+    """A fresh SliderWidget at index 0."""
+    return SliderWidget(0)
 
 
 @pytest.fixture

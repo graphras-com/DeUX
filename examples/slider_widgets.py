@@ -33,6 +33,7 @@ from deckboard import (
     Deck,
     EqualizerSlider,
     KelvinSlider,
+    SliderWidget,
     TemperatureSlider,
     VolumeSlider,
 )
@@ -56,21 +57,27 @@ async def main() -> None:
         # -- Zone 0: Volume (single large slider) -------------------------
 
         vol = VolumeSlider(value=50)
-        page.widget(0).add_slider(vol)
+        sw0 = SliderWidget(0)
+        sw0.add_slider(vol)
+        page.set_widget(0, sw0)
 
         # -- Zone 1: Brightness + Temperature (two large sliders) ----------
         #    Press dial 1 to cycle between them.
 
         bright = BrightnessSlider(value=80)
         temp = TemperatureSlider(value=20)
-        page.widget(1).add_slider(bright, default=True)
-        page.widget(1).add_slider(temp)
-        page.widget(1).set_selection_timeout(3)  # revert to brightness after 3s
+        sw1 = SliderWidget(1)
+        sw1.add_slider(bright, default=True)
+        sw1.add_slider(temp)
+        sw1.set_selection_timeout(3)  # revert to brightness after 3s
+        page.set_widget(1, sw1)
 
         # -- Zone 2: Kelvin (single large slider) -------------------------
 
         kelvin = KelvinSlider(value=4000)
-        page.widget(2).add_slider(kelvin)
+        sw2 = SliderWidget(2)
+        sw2.add_slider(kelvin)
+        page.set_widget(2, sw2)
 
         # -- Zone 3: Sub + Bass + Treble + Balance (four small sliders) ----
         #    Press dial 3 to cycle through them.
@@ -79,11 +86,13 @@ async def main() -> None:
         bass = EqualizerSlider("Bass", value=50)
         treble = EqualizerSlider("Treble", value=50)
         bal = BalanceSlider(value=50)
-        page.widget(3).add_slider(sub, default=True)
-        page.widget(3).add_slider(bass)
-        page.widget(3).add_slider(treble)
-        page.widget(3).add_slider(bal)
-        page.widget(3).set_selection_timeout(5)
+        sw3 = SliderWidget(3)
+        sw3.add_slider(sub, default=True)
+        sw3.add_slider(bass)
+        sw3.add_slider(treble)
+        sw3.add_slider(bal)
+        sw3.set_selection_timeout(5)
+        page.set_widget(3, sw3)
 
         # -- Button handlers -----------------------------------------------
 

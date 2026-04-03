@@ -17,7 +17,7 @@ from PIL import Image, ImageDraw, ImageFont
 from ..image import get_font
 
 if TYPE_CHECKING:
-    from ..touchscreen import Widget
+    from ..touchscreen import Widget  # abstract base — any Widget subclass
 
 # ── Layout constants (derived from the reference SVG) ────────────────────
 

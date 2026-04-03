@@ -7,6 +7,7 @@ import logging
 from .button import Button
 from .dial import Dial
 from .touchscreen import TouchScreen, Widget
+from .widgets.icon_widget import IconWidget
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,15 @@ class Page:
             The Widget instance for this zone on this page.
         """
         return self._touchscreen.widget(index)
+
+    def set_widget(self, index: int, widget: Widget) -> None:
+        """Replace the widget at *index* with a custom widget.
+
+        Args:
+            index: Widget zone index (0-3).
+            widget: A :class:`Widget` subclass instance.
+        """
+        self._touchscreen.set_widget(index, widget)
 
     @property
     def buttons(self) -> dict[int, Button]:

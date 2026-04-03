@@ -34,6 +34,7 @@ from deckboard import (
     BrightnessSlider,
     Deck,
     KelvinSlider,
+    SliderWidget,
     TemperatureSlider,
 )
 
@@ -75,10 +76,21 @@ def build_room_page(
     temp = TemperatureSlider(value=22)
     bal = BalanceSlider("Fan Spd", value=50)
 
-    page.widget(0).add_slider(bright)
-    page.widget(1).add_slider(kelvin)
-    page.widget(2).add_slider(temp)
-    page.widget(3).add_slider(bal)
+    sw0 = SliderWidget(0)
+    sw0.add_slider(bright)
+    page.set_widget(0, sw0)
+
+    sw1 = SliderWidget(1)
+    sw1.add_slider(kelvin)
+    page.set_widget(1, sw1)
+
+    sw2 = SliderWidget(2)
+    sw2.add_slider(temp)
+    page.set_widget(2, sw2)
+
+    sw3 = SliderWidget(3)
+    sw3.add_slider(bal)
+    page.set_widget(3, sw3)
 
     # -- Scene handlers (set slider values in one shot) --------------------
 
