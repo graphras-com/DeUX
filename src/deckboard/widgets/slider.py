@@ -18,6 +18,7 @@ from ..image import get_font
 
 if TYPE_CHECKING:
     from ..touchscreen import Widget  # abstract base — any Widget subclass
+    from ..types import AsyncHandler
 
 # ── Layout constants (derived from the reference SVG) ────────────────────
 
@@ -73,6 +74,7 @@ class Slider(ABC):
         self._unit = unit
         self._step = float(step)
         self._widget: Widget | None = None  # back-reference set by Widget.add_slider()
+        self._change_handler: AsyncHandler | None = None
 
     # -- Properties --------------------------------------------------------
 
@@ -110,11 +112,37 @@ class Slider(ABC):
 
     # -- Mutators ----------------------------------------------------------
 
+    def on_change(self, handler: AsyncHandler) -> AsyncHandler:
+        """Decorator to register a handler for value change events.
+
+        The handler receives the new ``value`` after clamping.  It is
+        invoked asynchronously by the event loop after the value changes
+        (via dial turn or programmatic :meth:`set_value`).
+
+        Usage::
+
+            @slider.on_change
+            async def handle(value: float):
+                print(f"New value: {value}")
+        """
+        self._change_handler = handler
+        return handler
+
     def set_value(self, v: float) -> None:
-        """Set the value, clamping to ``[min_value, max_value]``."""
+        """Set the value, clamping to ``[min_value, max_value]``.
+
+        If the value actually changes and an :meth:`on_change` handler
+        is registered, a callback is queued on the parent widget for
+        deferred async invocation.
+        """
+        old = self._value
         self._value = max(self._min, min(self._max, float(v)))
         if self._widget is not None:
             self._widget.mark_dirty()
+            if self._change_handler is not None and self._value != old:
+                self._widget.queue_pending_callback(
+                    self._change_handler, (self._value,)
+                )
 
     def adjust(self, direction: int) -> None:
         """Adjust the value by ``direction * step``."""

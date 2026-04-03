@@ -49,6 +49,9 @@ class Widget(ABC):
         self._tap_handler: AsyncHandler | None = None
         self._long_press_handler: AsyncHandler | None = None
         self._drag_handler: AsyncHandler | None = None
+        self._dial_turn_handler: AsyncHandler | None = None
+        self._dial_press_handler: AsyncHandler | None = None
+        self._pending_callbacks: list[tuple[AsyncHandler, tuple[float]]] = []
         self._rendered: Image.Image | None = None
         self._dirty = True
 
@@ -96,6 +99,59 @@ class Widget(ABC):
         """
         self._drag_handler = handler
         return handler
+
+    def on_dial_turn(self, handler: AsyncHandler) -> AsyncHandler:
+        """Decorator to register a handler for dial turn events on this widget.
+
+        The handler receives a single ``direction`` argument:
+        positive = clockwise, negative = counter-clockwise.
+
+        Usage::
+
+            @widget.on_dial_turn
+            async def handle(direction: int):
+                ...
+        """
+        self._dial_turn_handler = handler
+        return handler
+
+    def on_dial_press(self, handler: AsyncHandler) -> AsyncHandler:
+        """Decorator to register a handler for dial press events on this widget.
+
+        Usage::
+
+            @widget.on_dial_press
+            async def handle():
+                ...
+        """
+        self._dial_press_handler = handler
+        return handler
+
+    # -- Pending callbacks (deferred async invocation) ---------------------
+
+    def queue_pending_callback(self, handler: AsyncHandler, args: tuple[float]) -> None:
+        """Enqueue a callback for deferred async invocation.
+
+        Called by child elements (e.g. sliders) when their value changes
+        synchronously.  The queued callbacks are drained and awaited by
+        :class:`~deckboard.deck.Deck` during event dispatch or refresh.
+
+        Args:
+            handler: The async callback to invoke.
+            args: Positional arguments to pass to the callback.
+        """
+        self._pending_callbacks.append((handler, args))
+
+    def drain_pending_callbacks(self) -> list[tuple[AsyncHandler, tuple[float]]]:
+        """Remove and return all pending callbacks.
+
+        Returns:
+            A list of ``(handler, args)`` tuples.  The list is empty if
+            no callbacks are pending.
+        """
+        callbacks = self._pending_callbacks
+        self._pending_callbacks = []
+        return callbacks
 
     # -- Dirty tracking ----------------------------------------------------
 

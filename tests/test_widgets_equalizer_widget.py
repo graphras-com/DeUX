@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH
 from deckboard.widgets.balance import BalanceSlider
@@ -181,3 +181,99 @@ class TestEqualizerWidgetIsSubclassOfTouchPanel:
 
         w = EqualizerWidget(0)
         assert isinstance(w, TouchPanel)
+
+
+class TestEqualizerWidgetOnChangeIntegration:
+    """Integration tests: on_change callbacks with EqualizerWidget sliders."""
+
+    def test_on_change_queued_on_set_value(self):
+        w = EqualizerWidget(0, sub=50)
+        handler = AsyncMock()
+        w.sub.on_change(handler)
+        w.sub.set_value(75)
+        callbacks = w.drain_pending_callbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0] == (handler, (75.0,))
+
+    def test_on_change_queued_on_dial_turn(self):
+        w = EqualizerWidget(0, sub=50)
+        handler = AsyncMock()
+        w.sub.on_change(handler)
+        w.handle_dial_turn(3)
+        callbacks = w.drain_pending_callbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0] == (handler, (53.0,))
+
+    def test_on_change_fires_for_active_slider_only(self):
+        w = EqualizerWidget(0, sub=50, bass=50)
+        sub_handler = AsyncMock()
+        bass_handler = AsyncMock()
+        w.sub.on_change(sub_handler)
+        w.bass.on_change(bass_handler)
+        w.handle_dial_turn(5)  # sub is active by default
+        callbacks = w.drain_pending_callbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0][0] is sub_handler
+
+    def test_on_change_follows_active_slider_after_press(self):
+        w = EqualizerWidget(0, sub=50, bass=50)
+        sub_handler = AsyncMock()
+        bass_handler = AsyncMock()
+        w.sub.on_change(sub_handler)
+        w.bass.on_change(bass_handler)
+        w.handle_dial_press()  # switch to bass
+        w.drain_pending_callbacks()  # clear any pending
+        w.handle_dial_turn(2)
+        callbacks = w.drain_pending_callbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0][0] is bass_handler
+        assert callbacks[0][1] == (52.0,)
+
+    def test_on_change_not_queued_when_clamped_at_max(self):
+        w = EqualizerWidget(0, sub=100)
+        handler = AsyncMock()
+        w.sub.on_change(handler)
+        w.handle_dial_turn(1)
+        callbacks = w.drain_pending_callbacks()
+        assert len(callbacks) == 0
+
+    def test_on_change_not_queued_when_clamped_at_min(self):
+        w = EqualizerWidget(0, sub=0)
+        handler = AsyncMock()
+        w.sub.on_change(handler)
+        w.handle_dial_turn(-1)
+        callbacks = w.drain_pending_callbacks()
+        assert len(callbacks) == 0
+
+    def test_multiple_sliders_with_handlers_independent(self):
+        w = EqualizerWidget(0, sub=50, treble=50)
+        sub_handler = AsyncMock()
+        treble_handler = AsyncMock()
+        w.sub.on_change(sub_handler)
+        w.treble.on_change(treble_handler)
+        # Programmatic set_value on both sliders
+        w.sub.set_value(60)
+        w.treble.set_value(70)
+        callbacks = w.drain_pending_callbacks()
+        assert len(callbacks) == 2
+        handlers = [cb[0] for cb in callbacks]
+        assert sub_handler in handlers
+        assert treble_handler in handlers
+
+    def test_balance_slider_on_change(self):
+        w = EqualizerWidget(0, balance=50)
+        handler = AsyncMock()
+        w.balance.on_change(handler)
+        w.balance.set_value(75)
+        callbacks = w.drain_pending_callbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0] == (handler, (75.0,))
+
+    def test_drain_clears_pending(self):
+        w = EqualizerWidget(0, sub=50)
+        handler = AsyncMock()
+        w.sub.on_change(handler)
+        w.sub.set_value(60)
+        w.drain_pending_callbacks()
+        callbacks = w.drain_pending_callbacks()
+        assert len(callbacks) == 0
