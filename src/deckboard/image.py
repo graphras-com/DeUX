@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .render.debug_grid import draw_key_grid, draw_touchscreen_grid
 from .render.fonts import _get_font, get_font, get_large_font, get_small_font
 from .render.key_renderer import _encode_jpeg, render_blank_key, render_key_image
 from .render.metrics import (
@@ -77,6 +78,8 @@ __all__ = [
     "_encode_jpeg",
     "_get_font",
     "compose_touchscreen",
+    "draw_key_grid",
+    "draw_touchscreen_grid",
     "get_font",
     "get_large_font",
     "get_small_font",

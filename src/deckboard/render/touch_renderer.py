@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from PIL import Image, ImageDraw
 
+from .debug_grid import draw_touchscreen_grid
 from .fonts import get_font, get_small_font
 from .key_renderer import _encode_jpeg
 from .metrics import (
@@ -53,8 +54,16 @@ def render_status_card_image(
     return img
 
 
-def compose_touchstrip(cards: list[Image.Image | None]) -> bytes:
-    """Compose 4 card images into a single touchscreen JPEG."""
+def compose_touchstrip(
+    cards: list[Image.Image | None],
+    debug_grid: bool = False,
+) -> bytes:
+    """Compose 4 card images into a single touchscreen JPEG.
+
+    Args:
+        cards: Up to 4 card images (or ``None`` for blank slots).
+        debug_grid: When ``True``, overlay a 10x10 alignment grid.
+    """
     img = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), "black")
 
     for index, card_image in enumerate(cards):
@@ -64,9 +73,12 @@ def compose_touchstrip(cards: list[Image.Image | None]) -> bytes:
             x = MARGIN_LEFT + index * (PANEL_WIDTH + PANEL_GAP)
             img.paste(card_image, (x, MARGIN_TOP))
 
+    if debug_grid:
+        img = draw_touchscreen_grid(img)
+
     return _encode_jpeg(img)
 
 
-def render_blank_touchscreen() -> bytes:
+def render_blank_touchscreen(debug_grid: bool = False) -> bytes:
     """Render a blank touch-strip image."""
-    return compose_touchstrip([None] * PANEL_COUNT)
+    return compose_touchstrip([None] * PANEL_COUNT, debug_grid=debug_grid)
