@@ -34,6 +34,7 @@ WIDGET_HEIGHT = USABLE_HEIGHT  # 78
 # Font for labels/values - use default bitmap font (always available)
 _font: ImageFont.FreeTypeFont | ImageFont.ImageFont | None = None
 _small_font: ImageFont.FreeTypeFont | ImageFont.ImageFont | None = None
+_large_font: ImageFont.FreeTypeFont | ImageFont.ImageFont | None = None
 
 
 def _get_font(size: int = 14) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -70,6 +71,14 @@ def get_small_font() -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     if _small_font is None:
         _small_font = _get_font(12)
     return _small_font
+
+
+def get_large_font() -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    """Get a larger font for prominent text elements."""
+    global _large_font
+    if _large_font is None:
+        _large_font = _get_font(20)
+    return _large_font
 
 
 def render_key_image(

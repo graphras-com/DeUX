@@ -751,7 +751,7 @@ class TestTouchPanelAddElement:
 
     def test_add_small_text(self):
         panel = TouchPanel(0)
-        t = SmallText("Label", "Value")
+        t = SmallText("Value")
         result = panel.add_element(t)
         assert result is panel
         assert len(panel.elements) == 1
@@ -838,7 +838,7 @@ class TestTouchPanelMixedElements:
         """Text element between sliders should be skipped during cycling."""
         panel = TouchPanel(0)
         s1 = EqualizerSlider("Bass", value=50)
-        t = SmallText("Info", "Value")
+        t = SmallText("Value")
         s2 = EqualizerSlider("Treble", value=50)
         panel.add_element(s1)  # index 0
         panel.add_element(t)  # index 1 — not selectable
@@ -856,7 +856,7 @@ class TestTouchPanelMixedElements:
         """Panel with only text elements should have no active slider."""
         panel = TouchPanel(0)
         panel.add_element(LargeText("Title"))
-        panel.add_element(SmallText("Label", "Value"))
+        panel.add_element(SmallText("Value"))
         assert panel.active_slider is None
         # Cycling and dial turn should be no-ops
         panel.cycle_active_slider()
@@ -924,17 +924,17 @@ class TestTouchPanelRenderMixed:
 
     def test_render_small_texts_and_sliders(self):
         panel = TouchPanel(0)
-        panel.add_element(SmallText("Status", "Online"))
+        panel.add_element(SmallText("Online"))
         panel.add_element(EqualizerSlider("Bass", value=50))
         panel.add_element(EqualizerSlider("Treble", value=60))
-        panel.add_element(SmallText("Info", "OK"))
+        panel.add_element(SmallText("OK"))
         img = panel.render()
         assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_render_only_text(self):
         panel = TouchPanel(0)
         panel.add_element(LargeText("Title"))
-        panel.add_element(SmallText("Key", "Value"))
+        panel.add_element(SmallText("Value"))
         img = panel.render()
         assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 

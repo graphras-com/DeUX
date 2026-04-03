@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PIL import Image
 
-from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH
+from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH, get_large_font
 from deckboard.widgets.text import LargeText, SmallText, _truncate_text
 from deckboard.widgets.touch_panel import TouchPanel
 
@@ -163,19 +163,17 @@ class TestLargeTextRender:
 
 class TestSmallTextInit:
     def test_defaults(self):
-        t = SmallText("Label")
-        assert t.label == "Label"
+        t = SmallText()
         assert t.text == ""
         assert t.color == "white"
         assert t.selectable is False
 
     def test_custom_text(self):
-        t = SmallText("Status", "Online")
-        assert t.label == "Status"
+        t = SmallText("Online")
         assert t.text == "Online"
 
     def test_custom_color(self):
-        t = SmallText("X", "Y", color="#00ff00")
+        t = SmallText("Y", color="#00ff00")
         assert t.color == "#00ff00"
 
     def test_not_selectable(self):
@@ -185,13 +183,13 @@ class TestSmallTextInit:
 
 class TestSmallTextSetText:
     def test_sets_text(self):
-        t = SmallText("Label", "old")
+        t = SmallText("old")
         t.set_text("new")
         assert t.text == "new"
 
     def test_marks_widget_dirty(self):
         panel = TouchPanel(0)
-        t = SmallText("Label", "old")
+        t = SmallText("old")
         panel.add_element(t)
         panel.mark_clean()
         assert panel.is_dirty is False
@@ -199,20 +197,20 @@ class TestSmallTextSetText:
         assert panel.is_dirty is True
 
     def test_without_widget_does_not_raise(self):
-        t = SmallText("Label", "old")
+        t = SmallText("old")
         t.set_text("new")
         assert t.text == "new"
 
 
 class TestSmallTextSetColor:
     def test_sets_color(self):
-        t = SmallText("Label")
+        t = SmallText()
         t.set_color("#ff00ff")
         assert t.color == "#ff00ff"
 
     def test_marks_widget_dirty(self):
         panel = TouchPanel(0)
-        t = SmallText("Label")
+        t = SmallText()
         panel.add_element(t)
         panel.mark_clean()
         assert panel.is_dirty is False
@@ -220,38 +218,52 @@ class TestSmallTextSetColor:
         assert panel.is_dirty is True
 
     def test_without_widget_does_not_raise(self):
-        t = SmallText("Label")
+        t = SmallText()
         t.set_color("red")
         assert t.color == "red"
 
 
 class TestSmallTextRender:
     def test_renders_onto_image(self):
-        t = SmallText("Status", "Online")
+        t = SmallText("Online")
         img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
         t.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
         assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_renders_empty_text(self):
-        t = SmallText("Label", "")
+        t = SmallText("")
         img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
         t.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
         assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_renders_long_text_truncated(self):
-        t = SmallText("Label", "A" * 200)
+        t = SmallText("A" * 200)
         img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
         t.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
         assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_active_ignored(self):
-        t = SmallText("Label", "Value")
+        t = SmallText("Value")
         img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
         t.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4, active=True)
         assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
     def test_renders_with_custom_color(self):
-        t = SmallText("Label", "Green", color="#00ff00")
+        t = SmallText("Green", color="#00ff00")
         img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
         t.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
         assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+
+
+# ── get_large_font ───────────────────────────────────────────────────────
+
+
+class TestGetLargeFont:
+    def test_returns_font(self):
+        font = get_large_font()
+        assert font is not None
+
+    def test_cached(self):
+        f1 = get_large_font()
+        f2 = get_large_font()
+        assert f1 is f2

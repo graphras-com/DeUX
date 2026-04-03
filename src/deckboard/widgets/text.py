@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 from PIL import Image, ImageDraw, ImageFont
 
-from ..image import get_font, get_small_font
+from ..image import get_font, get_large_font, get_small_font
 
 if TYPE_CHECKING:
     from ..touchscreen import Widget  # abstract base — any Widget subclass
@@ -25,11 +25,9 @@ if TYPE_CHECKING:
 
 # Large text — same slot height as LargeSlider
 _LARGE_MARGIN_X = 2
-_LARGE_FONT_SIZE = 14
 
 # Small text — same slot height as SmallSlider
-_SMALL_LABEL_WIDTH = 54
-_SMALL_LABEL_GAP = 2
+_SMALL_MARGIN_X = 4
 
 
 def _truncate_text(
@@ -128,7 +126,7 @@ class LargeText:
             active: Ignored — text elements are never active.
         """
         draw = ImageDraw.Draw(img)
-        font = get_font()
+        font = get_large_font()
 
         mx = _LARGE_MARGIN_X
         available_w = width - 2 * mx
@@ -149,29 +147,23 @@ class LargeText:
 class SmallText:
     """A compact, single-line text element the same height as a SmallSlider.
 
-    The layout mirrors :class:`SmallSlider`: a fixed-width label column
-    on the left and the text value to its right.  If the text overflows
-    the right portion it is truncated with an ellipsis (``\u2026``).
+    Unlike :class:`SmallSlider`, there is no label column — the text
+    occupies the entire width of the slot with a small horizontal margin.
+    If the text overflows it is truncated with an ellipsis (``\u2026``).
 
     Args:
-        label: Left-column label (e.g. ``"Status"``).
         text: Initial display text.
-        color: Text colour for the value portion.  Defaults to ``"white"``.
+        color: Text colour.  Defaults to ``"white"``.
     """
 
     selectable: bool = False
 
-    def __init__(self, label: str, text: str = "", *, color: str = "white") -> None:
-        self._label = label
+    def __init__(self, text: str = "", *, color: str = "white") -> None:
         self._text = text
         self._color = color
         self._widget: Widget | None = None
 
     # -- Properties --------------------------------------------------------
-
-    @property
-    def label(self) -> str:
-        return self._label
 
     @property
     def text(self) -> str:
@@ -217,9 +209,8 @@ class SmallText:
     ) -> None:
         """Draw this text element onto *img* within the given rectangle.
 
-        Layout mirrors :class:`SmallSlider`: fixed-width label on the
-        left, value text to the right.  Overflow is truncated with an
-        ellipsis.
+        The text is left-aligned with a small margin and vertically
+        centred within the slot.  Overflow is truncated with an ellipsis.
 
         Args:
             img: Target image (modified in-place).
@@ -230,28 +221,17 @@ class SmallText:
             active: Ignored — text elements are never active.
         """
         draw = ImageDraw.Draw(img)
-        font = get_font()
-        small_font = get_small_font()
+        font = get_small_font()
 
-        # Label on the left (right-aligned within label column)
-        label_x_end = x + _SMALL_LABEL_WIDTH
-        bbox = draw.textbbox((0, 0), self._label, font=font)
-        label_w = bbox[2] - bbox[0]
-        label_h = bbox[3] - bbox[1]
+        mx = _SMALL_MARGIN_X
+        available_w = width - 2 * mx
 
-        label_y = y + (height - label_h) // 2 - 1
-        draw.text(
-            (label_x_end - label_w, label_y), self._label, fill="white", font=font
-        )
+        display = _truncate_text(self._text, font, available_w, draw)
 
-        # Text value to the right of the label
-        text_x = label_x_end + _SMALL_LABEL_GAP
-        available_w = width - text_x + x
-
-        display = _truncate_text(self._text, small_font, available_w, draw)
-
-        bbox = draw.textbbox((0, 0), display, font=small_font)
+        bbox = draw.textbbox((0, 0), display, font=font)
         text_h = bbox[3] - bbox[1]
+
+        text_x = x + mx
         text_y = y + (height - text_h) // 2 - 1
 
-        draw.text((text_x, text_y), display, fill=self._color, font=small_font)
+        draw.text((text_x, text_y), display, fill=self._color, font=font)

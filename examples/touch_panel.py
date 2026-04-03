@@ -90,7 +90,7 @@ async def main() -> None:
 
         bass = EqualizerSlider("Bass", value=50)
         treble = EqualizerSlider("Treble", value=50)
-        eq_label = SmallText("Mode", "EQ", color="#aaaaaa")
+        eq_label = SmallText("EQ", color="#aaaaaa")
         bal2 = BalanceSlider(value=50)
 
         panel2 = TouchPanel(2)
@@ -105,10 +105,10 @@ async def main() -> None:
         #    Demonstrates text at both ends of the stack.  Pressing dial 3
         #    cycles between Sub and Balance only.
 
-        status = SmallText("Status", "Online", color="#00cc66")
+        status = SmallText("Online", color="#00cc66")
         sub = EqualizerSlider("Sub", value=50)
         bal3 = BalanceSlider(value=50)
-        footer = SmallText("Health", "OK", color="#aaaaaa")
+        footer = SmallText("OK", color="#aaaaaa")
 
         panel3 = TouchPanel(3)
         panel3.add_element(status)
