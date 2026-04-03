@@ -45,14 +45,14 @@ from deckboard import Deck
 
 async def main():
     async with Deck() as deck:
-        page = deck.page("main")
-        page.button(0).set_icon("mdi:home").set_label("Home")
+        screen = deck.screen("main")
+        screen.key(0).set_icon("mdi:home").set_label("Home")
 
-        @page.button(0).on_press
+        @screen.key(0).on_press
         async def on_home():
             print("Home pressed!")
 
-        await deck.set_page("main")
+        await deck.set_screen("main")
         await deck.wait_closed()
 
 asyncio.run(main())

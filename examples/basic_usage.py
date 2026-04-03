@@ -28,7 +28,7 @@ async def main():
 
         # -- Main page -----------------------------------------------------
 
-        main_page = deck.page("main")
+        main_page = deck.screen("main")
 
         # Row 1: navigation icons
         main_page.button(0).set_icon("mdi:home").set_label("Home")
@@ -43,16 +43,16 @@ async def main():
         main_page.button(7).set_icon("mdi:cog").set_label("Settings")
 
         # Touchscreen widgets (under each dial)
-        main_page.widget(0).set_icon("mdi:volume-high").set_label("Volume").set_value(
+        main_page.card(0).set_icon("mdi:volume-high").set_label("Volume").set_value(
             "50%"
         )
-        main_page.widget(1).set_icon("mdi:lightbulb-on").set_label(
+        main_page.card(1).set_icon("mdi:lightbulb-on").set_label(
             "Brightness"
         ).set_value("80%")
-        main_page.widget(2).set_icon("mdi:thermostat").set_label("Temp").set_value(
+        main_page.card(2).set_icon("mdi:thermostat").set_label("Temp").set_value(
             "22°C"
         )
-        main_page.widget(3).set_icon("mdi:fan").set_label("Fan").set_value("Auto")
+        main_page.card(3).set_icon("mdi:fan").set_label("Fan").set_value("Auto")
 
         # Button event handlers
         volume = 50
@@ -64,7 +64,7 @@ async def main():
         @main_page.button(7).on_press
         async def on_settings():
             print("Switching to settings page")
-            await deck.set_page("settings")
+            await deck.set_screen("settings")
 
         @main_page.button(4).on_press
         async def on_play():
@@ -84,57 +84,57 @@ async def main():
             nonlocal volume
             volume = max(0, min(100, volume + direction * 5))
             print(f"Volume: {volume}%")
-            main_page.widget(0).set_value(f"{volume}%")
+            main_page.card(0).set_value(f"{volume}%")
             await deck.refresh()
 
         @main_page.dial(0).on_press
         async def on_volume_mute():
             print("Volume muted!")
-            main_page.widget(0).set_icon("mdi:volume-off").set_value("Muted")
+            main_page.card(0).set_icon("mdi:volume-off").set_value("Muted")
             await deck.refresh()
 
         @main_page.dial(0).on_release
         async def on_volume_unmute():
-            main_page.widget(0).set_icon("mdi:volume-high").set_value(f"{volume}%")
+            main_page.card(0).set_icon("mdi:volume-high").set_value(f"{volume}%")
             await deck.refresh()
 
         # Widget touch handlers
-        @main_page.widget(0).on_tap
+        @main_page.card(0).on_tap
         async def on_volume_tap():
             print("Volume widget tapped!")
 
         # -- Settings page -------------------------------------------------
 
-        settings = deck.page("settings")
+        settings = deck.screen("settings")
 
         settings.button(0).set_icon("mdi:arrow-left").set_label("Back")
         settings.button(1).set_icon("mdi:brightness-6").set_label("Bright")
         settings.button(2).set_icon("mdi:information-outline").set_label("Info")
 
-        settings.widget(0).set_label("Settings")
-        settings.widget(3).set_icon("mdi:close").set_label("Exit")
+        settings.card(0).set_label("Settings")
+        settings.card(3).set_icon("mdi:close").set_label("Exit")
 
         @settings.button(0).on_press
         async def on_back():
             print("Back to main page")
-            await deck.set_page("main")
+            await deck.set_screen("main")
 
         @settings.dial(0).on_turn
         async def on_brightness_turn(direction: int):
             new_brightness = deck.brightness + direction * 10
             await deck.set_brightness(new_brightness)
-            settings.widget(0).set_value(f"{new_brightness}%")
+            settings.card(0).set_value(f"{new_brightness}%")
             await deck.refresh()
             print(f"Brightness: {new_brightness}%")
 
-        @settings.widget(3).on_tap
+        @settings.card(3).on_tap
         async def on_exit():
             print("Exit tapped - stopping deck")
             await deck.stop()
 
         # -- Activate main page and wait -----------------------------------
 
-        await deck.set_page("main")
+        await deck.set_screen("main")
         print("\nDeck is ready! Press buttons, turn dials, touch the screen.")
         print("Press dial 0 to mute, turn dial 0 for volume.")
         print("Press button 7 (Settings) to switch pages.")

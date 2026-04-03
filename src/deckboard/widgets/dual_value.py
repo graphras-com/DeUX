@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 from PIL import Image, ImageDraw, ImageFont
 
 from ..image import get_large_font, get_small_font
+from ..ui.elements.base import Element
 
 if TYPE_CHECKING:
     from ..touchscreen import Widget  # abstract base — any Widget subclass
@@ -58,7 +59,7 @@ def _truncate_value(
     return ellipsis
 
 
-class LargeDualValue:
+class LargeDualValue(Element):
     """Two icon + value pairs displayed side by side, same height as a LargeSlider.
 
     The element is split into two equal halves.  Each half shows a small
@@ -74,8 +75,6 @@ class LargeDualValue:
         color: Text colour for both values.  Defaults to ``"white"``.
     """
 
-    selectable: bool = False
-
     def __init__(
         self,
         left_value: str = "",
@@ -85,12 +84,12 @@ class LargeDualValue:
         right_icon: Image.Image | None = None,
         color: str = "white",
     ) -> None:
+        super().__init__()
         self._left_icon = left_icon
         self._left_value = left_value
         self._right_icon = right_icon
         self._right_value = right_value
         self._color = color
-        self._widget: Widget | None = None
 
     # -- Properties --------------------------------------------------------
 
@@ -123,8 +122,8 @@ class LargeDualValue:
         next refresh cycle.
         """
         self._left_icon = icon
-        if self._widget is not None:
-            self._widget.mark_dirty()
+        if self._card is not None:
+            self._card.mark_dirty()
 
     def set_left_value(self, value: str) -> None:
         """Update the left section value text.
@@ -133,8 +132,8 @@ class LargeDualValue:
         next refresh cycle.
         """
         self._left_value = value
-        if self._widget is not None:
-            self._widget.mark_dirty()
+        if self._card is not None:
+            self._card.mark_dirty()
 
     def set_right_icon(self, icon: Image.Image | None) -> None:
         """Update the right section icon.
@@ -143,8 +142,8 @@ class LargeDualValue:
         next refresh cycle.
         """
         self._right_icon = icon
-        if self._widget is not None:
-            self._widget.mark_dirty()
+        if self._card is not None:
+            self._card.mark_dirty()
 
     def set_right_value(self, value: str) -> None:
         """Update the right section value text.
@@ -153,8 +152,8 @@ class LargeDualValue:
         next refresh cycle.
         """
         self._right_value = value
-        if self._widget is not None:
-            self._widget.mark_dirty()
+        if self._card is not None:
+            self._card.mark_dirty()
 
     def set_color(self, color: str) -> None:
         """Update the text colour for both values.
@@ -163,8 +162,8 @@ class LargeDualValue:
         next refresh cycle.
         """
         self._color = color
-        if self._widget is not None:
-            self._widget.mark_dirty()
+        if self._card is not None:
+            self._card.mark_dirty()
 
     # -- Rendering ---------------------------------------------------------
 
@@ -269,7 +268,7 @@ class LargeDualValue:
         draw.text((text_x, text_y), display, fill=self._color, font=font)
 
 
-class SmallDualValue:
+class SmallDualValue(Element):
     """Two icon + value pairs displayed side by side, same height as a SmallSlider.
 
     Compact version of :class:`LargeDualValue` with a smaller icon and
@@ -283,8 +282,6 @@ class SmallDualValue:
         color: Text colour for both values.  Defaults to ``"white"``.
     """
 
-    selectable: bool = False
-
     def __init__(
         self,
         left_value: str = "",
@@ -294,12 +291,12 @@ class SmallDualValue:
         right_icon: Image.Image | None = None,
         color: str = "white",
     ) -> None:
+        super().__init__()
         self._left_icon = left_icon
         self._left_value = left_value
         self._right_icon = right_icon
         self._right_value = right_value
         self._color = color
-        self._widget: Widget | None = None
 
     # -- Properties --------------------------------------------------------
 
@@ -332,8 +329,8 @@ class SmallDualValue:
         next refresh cycle.
         """
         self._left_icon = icon
-        if self._widget is not None:
-            self._widget.mark_dirty()
+        if self._card is not None:
+            self._card.mark_dirty()
 
     def set_left_value(self, value: str) -> None:
         """Update the left section value text.
@@ -342,8 +339,8 @@ class SmallDualValue:
         next refresh cycle.
         """
         self._left_value = value
-        if self._widget is not None:
-            self._widget.mark_dirty()
+        if self._card is not None:
+            self._card.mark_dirty()
 
     def set_right_icon(self, icon: Image.Image | None) -> None:
         """Update the right section icon.
@@ -352,8 +349,8 @@ class SmallDualValue:
         next refresh cycle.
         """
         self._right_icon = icon
-        if self._widget is not None:
-            self._widget.mark_dirty()
+        if self._card is not None:
+            self._card.mark_dirty()
 
     def set_right_value(self, value: str) -> None:
         """Update the right section value text.
@@ -362,8 +359,8 @@ class SmallDualValue:
         next refresh cycle.
         """
         self._right_value = value
-        if self._widget is not None:
-            self._widget.mark_dirty()
+        if self._card is not None:
+            self._card.mark_dirty()
 
     def set_color(self, color: str) -> None:
         """Update the text colour for both values.
@@ -372,8 +369,8 @@ class SmallDualValue:
         next refresh cycle.
         """
         self._color = color
-        if self._widget is not None:
-            self._widget.mark_dirty()
+        if self._card is not None:
+            self._card.mark_dirty()
 
     # -- Rendering ---------------------------------------------------------
 

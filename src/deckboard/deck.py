@@ -10,19 +10,17 @@ from typing import Any
 
 from StreamDeck.DeviceManager import DeviceManager
 
-from ._transport import AsyncTransport
+from .runtime.transport import AsyncTransport
 from .button import Button
-from .dial import Dial
 from .icon import IconManager
+from .render.metrics import TOUCHSCREEN_HEIGHT, TOUCHSCREEN_WIDTH
+from .render.touch_renderer import compose_touchstrip
 from .image import (
-    compose_touchscreen,
     render_blank_key,
-    render_blank_touchscreen,
     render_key_image,
 )
-from .page import Page
+from .page import Page, Screen
 from .touchscreen import Widget
-from .widgets.icon_widget import IconWidget
 from .types import (
     DeckEvent,
     DeviceInfo,
@@ -95,9 +93,11 @@ class Deck:
         # Icon manager
         self.icons = IconManager(cache_dir=icon_cache_dir)
 
-        # Pages
+        # Screens
         self._pages: dict[str, Page] = {}
         self._active_page: Page | None = None
+        self._screens = self._pages
+        self._active_screen: Screen | None = None
 
     # -- Async context manager ---------------------------------------------
 
@@ -243,36 +243,53 @@ class Deck:
                 self._executor, self._device.set_brightness, self._brightness
             )
 
-    # -- Page management ---------------------------------------------------
+    # -- Screen management -------------------------------------------------
 
-    def page(self, name: str) -> Page:
-        """Get or create a page by name.
+    def screen(self, name: str) -> Screen:
+        """Get or create a screen by name.
 
         Args:
-            name: Page name.
+            name: Screen name.
 
         Returns:
-            The Page instance. First page created becomes the default.
+            The Screen instance.
         """
         if name not in self._pages:
-            self._pages[name] = Page(name)
+            self._pages[name] = Screen(name)
         return self._pages[name]
 
-    async def set_page(self, name: str) -> None:
-        """Switch to a named page, rendering all its buttons and widgets.
+    def page(self, name: str) -> Page:
+        """Compatibility alias for :meth:`screen`."""
+        return self.screen(name)
+
+    async def set_screen(self, name: str) -> None:
+        """Switch to a named screen, rendering all keys and cards.
 
         Args:
-            name: Page name (must already exist via ``deck.page(name)``).
+            name: Screen name (must already exist via ``deck.screen(name)``).
         """
         if name not in self._pages:
-            raise DeckError(f"Page '{name}' does not exist")
+            raise DeckError(f"Screen '{name}' does not exist")
 
         self._active_page = self._pages[name]
-        logger.info("Switching to page: %s", name)
+        self._active_screen = self._active_page
+        logger.info("Switching to screen: %s", name)
 
-        # Render all buttons and touchscreen for this page
+        # Render all keys and cards for this screen
         await self._render_all_buttons()
         await self._render_touchscreen()
+
+    async def set_page(self, name: str) -> None:
+        """Compatibility alias for :meth:`set_screen`."""
+        try:
+            await self.set_screen(name)
+        except DeckError as exc:
+            message = str(exc).replace("Screen", "Page").replace("screen", "page")
+            raise DeckError(message) from exc
+
+    @property
+    def active_screen(self) -> Screen | None:
+        return self._active_screen
 
     @property
     def active_page(self) -> Page | None:
@@ -288,8 +305,8 @@ class Deck:
         loop = asyncio.get_running_loop()
 
         for key_index in range(_KEY_COUNT):
-            button = self._active_page.buttons.get(key_index)
-            if button and button.icon_name:
+            button = self._active_page.keys.get(key_index)
+            if button and (button.icon_name or button.label):
                 await self._render_button(button)
             else:
                 # Blank key
@@ -308,7 +325,7 @@ class Deck:
 
         icon_img = None
         if button.icon_name:
-            icon_img = await self.icons.get(button.icon_name, color=button._icon_color)
+            icon_img = await self.icons.get(button.icon_name, color=button.icon_color)
 
         image_bytes = render_key_image(icon=icon_img, label=button.label)
         button.set_rendered_image(image_bytes)
@@ -326,20 +343,14 @@ class Deck:
         if not self._device or not self._active_page:
             return
 
-        widget_images = []
-        for widget in self._active_page.widgets:
-            # Pre-fetch icon for IconWidget instances
-            if isinstance(widget, IconWidget) and widget.icon_name:
-                icon_img = await self.icons.get(
-                    widget.icon_name, color=widget.icon_color
-                )
-                widget.set_icon_image(icon_img)
+        card_images = []
+        for card in self._active_page.cards:
+            await card.prepare_assets(self.icons)
+            img = card.render()
+            card.set_rendered(img)
+            card_images.append(img)
 
-            img = widget.render()
-            widget.set_rendered(img)
-            widget_images.append(img)
-
-        touchscreen_bytes = compose_touchscreen(widget_images)
+        touchscreen_bytes = compose_touchstrip(card_images)
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
@@ -348,8 +359,8 @@ class Deck:
             touchscreen_bytes,
             0,
             0,
-            800,
-            100,
+            TOUCHSCREEN_WIDTH,
+            TOUCHSCREEN_HEIGHT,
         )
 
     async def refresh(self) -> None:
@@ -363,17 +374,17 @@ class Deck:
         if not self._active_page:
             return
 
-        # Drain pending callbacks from all widgets (programmatic set_value)
-        for widget in self._active_page.widgets:
-            await self._drain_widget_callbacks(widget)
+        # Drain pending callbacks from all cards (programmatic set_value)
+        for card in self._active_page.cards:
+            await self._drain_widget_callbacks(card)
 
-        # Render dirty buttons
-        for button in self._active_page.buttons.values():
+        # Render dirty keys
+        for button in self._active_page.keys.values():
             if button.is_dirty:
                 await self._render_button(button)
 
-        # Render touchscreen if any widget is dirty
-        if self._active_page.touchscreen.any_dirty:
+        # Render the touch strip if any card is dirty
+        if self._active_page.touch_strip.any_dirty:
             await self._render_touchscreen()
 
     # -- Event dispatch loop -----------------------------------------------
@@ -388,8 +399,8 @@ class Deck:
         if not page:
             return
         any_changed = False
-        for widget in page.widgets:
-            if widget.check_selection_timeout():
+        for card in page.cards:
+            if card.check_selection_timeout():
                 any_changed = True
         if any_changed:
             await self.refresh()
@@ -442,59 +453,32 @@ class Deck:
             return
 
         if isinstance(event, KeyEvent):
-            button = page.buttons.get(event.key)
+            button = page.keys.get(event.key)
             if button:
-                if event.pressed and button._press_handler:
-                    await button._press_handler()
-                elif not event.pressed and button._release_handler:
-                    await button._release_handler()
+                await button.dispatch(event.pressed)
 
         elif isinstance(event, DialTurnEvent):
-            dial = page.dials.get(event.dial)
-            if dial and dial._turn_handler:
-                await dial._turn_handler(event.direction)
-            # Widget-level dial turn handler
-            widget = page.touchscreen.widget(event.dial)
-            if widget._dial_turn_handler:
-                await widget._dial_turn_handler(event.direction)
-            # Forward to widget (e.g. SliderWidget adjusts its active slider)
-            widget.handle_dial_turn(event.direction)
-            # Drain deferred callbacks (e.g. slider on_change)
-            await self._drain_widget_callbacks(widget)
-            if widget.is_dirty:
+            dial = page.encoders.get(event.dial)
+            if dial:
+                await dial.dispatch_turn(event.direction)
+            card = page.touch_strip.card(event.dial)
+            await card.dispatch_dial_turn(event.direction)
+            await self._drain_widget_callbacks(card)
+            if card.is_dirty:
                 await self.refresh()
 
         elif isinstance(event, DialPressEvent):
-            dial = page.dials.get(event.dial)
+            dial = page.encoders.get(event.dial)
             if dial:
-                if event.pressed and dial._press_handler:
-                    await dial._press_handler()
-                elif not event.pressed and dial._release_handler:
-                    await dial._release_handler()
-            # Forward dial press to widget (e.g. SliderWidget cycles sliders)
+                await dial.dispatch_press(event.pressed)
             if event.pressed:
-                widget = page.touchscreen.widget(event.dial)
-                # Widget-level dial press handler
-                if widget._dial_press_handler:
-                    await widget._dial_press_handler()
-                widget.handle_dial_press()
-                # Drain deferred callbacks (if any)
-                await self._drain_widget_callbacks(widget)
-                if widget.is_dirty:
+                card = page.touch_strip.card(event.dial)
+                await card.dispatch_dial_press()
+                await self._drain_widget_callbacks(card)
+                if card.is_dirty:
                     await self.refresh()
 
         elif isinstance(event, TouchEvent):
             zone = event.zone
-            widget = page.touchscreen.widget(zone)
-
-            if event.event_type == EventType.TOUCH_SHORT:
-                if widget._tap_handler:
-                    await widget._tap_handler()
-            elif event.event_type == EventType.TOUCH_LONG:
-                if widget._long_press_handler:
-                    await widget._long_press_handler()
-            elif event.event_type == EventType.TOUCH_DRAG:
-                if widget._drag_handler:
-                    await widget._drag_handler(
-                        event.x, event.y, event.x_out, event.y_out
-                    )
+            card = page.touch_strip.card(zone)
+            await card.dispatch_touch(event)

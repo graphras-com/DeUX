@@ -38,13 +38,13 @@ async def main() -> None:
         info = deck.info
         print(f"Connected: {info.deck_type} (serial: {info.serial})")
 
-        page = deck.page("equalizer")
+        page = deck.screen("equalizer")
 
         # -- EqualizerWidget on zone 3 (dial 3) ---------------------------
-        #    One line instead of creating four sliders + a SliderWidget.
+        #    One line instead of creating four sliders + a StackCard.
 
         eq = EqualizerWidget(3, sub=50, bass=50, treble=50, balance=50)
-        page.set_widget(3, eq)
+        page.set_card(3, eq)
 
         # -- Buttons (row 1) — actions ------------------------------------
 
@@ -116,7 +116,7 @@ async def main() -> None:
 
         # -- Go! -----------------------------------------------------------
 
-        await deck.set_page("equalizer")
+        await deck.set_screen("equalizer")
         print("\nEqualizer widget ready!")
         print("  Turn dial 3 to adjust the active band.")
         print("  Press dial 3 to cycle Sub → Bass → Treble → Balance.")

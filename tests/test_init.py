@@ -14,6 +14,8 @@ class TestPublicAPI:
             "BalanceSlider",
             "BrightnessSlider",
             "Button",
+            "Card",
+            "Control",
             "Deck",
             "DeckError",
             "DeckEvent",
@@ -21,27 +23,35 @@ class TestPublicAPI:
             "Dial",
             "DialPressEvent",
             "DialTurnEvent",
+            "Element",
+            "EncoderSlot",
             "EqualizerSlider",
             "EqualizerWidget",
             "EventType",
             "IconError",
             "IconManager",
             "IconWidget",
+            "KeySlot",
             "KelvinSlider",
             "KeyEvent",
             "LargeDualValue",
             "LargeSlider",
             "LargeText",
             "Page",
+            "RangeControl",
+            "Screen",
             "Slider",
             "SliderWidget",
             "SmallDualValue",
             "SmallSlider",
             "SmallText",
+            "StackCard",
+            "StatusCard",
             "TemperatureSlider",
             "TouchEvent",
             "TouchPanel",
             "TouchScreen",
+            "TouchStrip",
             "VolumeSlider",
             "Widget",
         }
@@ -90,15 +100,18 @@ class TestPublicAPI:
         assert IconError is not None
 
     def test_page_importable(self):
-        from deckboard import Page
+        from deckboard import Page, Screen
 
         assert Page is not None
+        assert Screen is not None
 
     def test_touchscreen_importable(self):
-        from deckboard import TouchScreen, Widget
+        from deckboard import Card, TouchScreen, TouchStrip, Widget
 
         assert TouchScreen is not None
+        assert TouchStrip is not None
         assert Widget is not None
+        assert Card is not None
 
     def test_device_info_importable(self):
         from deckboard import DeviceInfo
@@ -109,21 +122,35 @@ class TestPublicAPI:
         from deckboard import (
             BalanceSlider,
             BrightnessSlider,
+            Control,
+            Element,
+            EncoderSlot,
             EqualizerSlider,
             IconWidget,
+            KeySlot,
             KelvinSlider,
             LargeSlider,
             LargeText,
+            RangeControl,
+            Screen,
             Slider,
             SliderWidget,
             SmallSlider,
             SmallText,
+            StackCard,
+            StatusCard,
             TemperatureSlider,
             TouchPanel,
             VolumeSlider,
         )
 
+        assert Screen is not None
+        assert KeySlot is not None
+        assert EncoderSlot is not None
+        assert Control is not None
+        assert Element is not None
         assert Slider is not None
+        assert RangeControl is not None
         assert LargeSlider is not None
         assert SmallSlider is not None
         assert VolumeSlider is not None
@@ -133,7 +160,9 @@ class TestPublicAPI:
         assert EqualizerSlider is not None
         assert BalanceSlider is not None
         assert IconWidget is not None
+        assert StatusCard is not None
         assert SliderWidget is not None
         assert TouchPanel is not None
+        assert StackCard is not None
         assert LargeText is not None
         assert SmallText is not None
