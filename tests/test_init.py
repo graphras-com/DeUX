@@ -22,6 +22,7 @@ class TestPublicAPI:
             "DialPressEvent",
             "DialTurnEvent",
             "EqualizerSlider",
+            "EqualizerWidget",
             "EventType",
             "IconError",
             "IconManager",

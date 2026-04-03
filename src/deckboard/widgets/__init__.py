@@ -6,6 +6,7 @@ from .balance import BalanceSlider
 from .brightness import BrightnessSlider
 from .dual_value import LargeDualValue, SmallDualValue
 from .equalizer import EqualizerSlider
+from .equalizer_widget import EqualizerWidget
 from .icon_widget import IconWidget
 from .kelvin import KelvinSlider
 from .slider import LargeSlider, Slider, SmallSlider
@@ -19,6 +20,7 @@ __all__ = [
     "BalanceSlider",
     "BrightnessSlider",
     "EqualizerSlider",
+    "EqualizerWidget",
     "IconWidget",
     "KelvinSlider",
     "LargeDualValue",
