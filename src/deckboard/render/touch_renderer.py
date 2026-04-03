@@ -31,7 +31,7 @@ def render_status_card_image(
     font = get_font()
     small_font = get_small_font()
 
-    card_icon_size = 50
+    card_icon_size = 55
     icon_x = 8
     icon_y = (PANEL_HEIGHT - card_icon_size) // 2
 
@@ -44,12 +44,12 @@ def render_status_card_image(
 
     text_x = icon_x + card_icon_size + 10
     if label and value:
-        draw.text((text_x, 18), label, fill="white", font=font)
-        draw.text((text_x, 40), value, fill="#aaaaaa", font=small_font)
+        draw.text((text_x, 20), label, fill="white", font=font)
+        draw.text((text_x, 44), value, fill="#aaaaaa", font=small_font)
     elif label:
-        draw.text((text_x, 30), label, fill="white", font=font)
+        draw.text((text_x, 33), label, fill="white", font=font)
     elif value:
-        draw.text((text_x, 30), value, fill="#aaaaaa", font=small_font)
+        draw.text((text_x, 33), value, fill="#aaaaaa", font=small_font)
 
     return img
 
