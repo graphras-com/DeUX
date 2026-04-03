@@ -13,9 +13,9 @@ from .metrics import (
     TOUCHSCREEN_WIDTH,
 )
 
-# Grid density: 10 columns x 10 rows for the full 800x100 touchscreen.
-_GRID_COLS = 10
-_GRID_ROWS = 10
+# Grid density: 4 columns x 4 rows within the usable (margin-bounded) area.
+_GRID_COLS = 4
+_GRID_ROWS = 4
 
 # Colours — margin lines are brighter so they stand out.
 _MARGIN_COLOR = (120, 120, 120)  # lighter grey for margin boundaries
@@ -23,11 +23,12 @@ _GRID_COLOR = (50, 50, 50)  # subtle dark grey for inner grid lines
 
 
 def draw_touchscreen_grid(img: Image.Image) -> Image.Image:
-    """Draw a 10x10 debug grid on a touchscreen-sized image.
+    """Draw a 4x4 debug grid within the margin boundaries of a touchscreen image.
 
     Margin boundaries (top/bottom/left/right) are drawn with a
     brighter line so they are easy to distinguish from the evenly
-    spaced inner grid lines.
+    spaced inner grid lines.  All grid lines run only between the
+    margin boundaries, not edge-to-edge.
 
     Args:
         img: An 800x100 RGB :class:`~PIL.Image.Image`.
@@ -40,42 +41,33 @@ def draw_touchscreen_grid(img: Image.Image) -> Image.Image:
     draw = ImageDraw.Draw(overlay)
     w, h = overlay.size
 
-    col_step = w / _GRID_COLS
-    row_step = h / _GRID_ROWS
+    # Margin boundary positions
+    left = MARGIN_LEFT
+    right = w - MARGIN_RIGHT - 1
+    top = MARGIN_TOP
+    bottom = h - MARGIN_BOTTOM - 1
 
-    # Inner vertical grid lines
+    usable_w = right - left
+    usable_h = bottom - top
+
+    col_step = usable_w / _GRID_COLS
+    row_step = usable_h / _GRID_ROWS
+
+    # Inner vertical grid lines (margin-to-margin)
     for i in range(1, _GRID_COLS):
-        x = round(i * col_step)
-        draw.line([(x, 0), (x, h - 1)], fill=_GRID_COLOR)
+        x = round(left + i * col_step)
+        draw.line([(x, top), (x, bottom)], fill=_GRID_COLOR)
 
-    # Inner horizontal grid lines
+    # Inner horizontal grid lines (margin-to-margin)
     for i in range(1, _GRID_ROWS):
-        y = round(i * row_step)
-        draw.line([(0, y), (w - 1, y)], fill=_GRID_COLOR)
+        y = round(top + i * row_step)
+        draw.line([(left, y), (right, y)], fill=_GRID_COLOR)
 
     # Margin boundary lines (brighter)
-    # Left margin
-    draw.line(
-        [(MARGIN_LEFT, 0), (MARGIN_LEFT, h - 1)],
-        fill=_MARGIN_COLOR,
-    )
-    # Right margin
-    right_x = w - MARGIN_RIGHT - 1
-    draw.line(
-        [(right_x, 0), (right_x, h - 1)],
-        fill=_MARGIN_COLOR,
-    )
-    # Top margin
-    draw.line(
-        [(0, MARGIN_TOP), (w - 1, MARGIN_TOP)],
-        fill=_MARGIN_COLOR,
-    )
-    # Bottom margin
-    bottom_y = h - MARGIN_BOTTOM - 1
-    draw.line(
-        [(0, bottom_y), (w - 1, bottom_y)],
-        fill=_MARGIN_COLOR,
-    )
+    draw.line([(left, top), (left, bottom)], fill=_MARGIN_COLOR)
+    draw.line([(right, top), (right, bottom)], fill=_MARGIN_COLOR)
+    draw.line([(left, top), (right, top)], fill=_MARGIN_COLOR)
+    draw.line([(left, bottom), (right, bottom)], fill=_MARGIN_COLOR)
 
     return overlay
 

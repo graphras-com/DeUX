@@ -63,37 +63,82 @@ class TestDrawTouchscreenGrid:
         img = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), "black")
         result = draw_touchscreen_grid(img)
 
-        # Left margin line at x=MARGIN_LEFT
-        assert result.getpixel((MARGIN_LEFT, TOUCHSCREEN_HEIGHT // 2)) == _MARGIN_COLOR
+        left = MARGIN_LEFT
+        right = TOUCHSCREEN_WIDTH - MARGIN_RIGHT - 1
+        top = MARGIN_TOP
+        bottom = TOUCHSCREEN_HEIGHT - MARGIN_BOTTOM - 1
+        mid_x = (left + right) // 2
+        mid_y = (top + bottom) // 2
 
-        # Top margin line at y=MARGIN_TOP
-        assert result.getpixel((TOUCHSCREEN_WIDTH // 2, MARGIN_TOP)) == _MARGIN_COLOR
+        # Left margin line
+        assert result.getpixel((left, mid_y)) == _MARGIN_COLOR
+        # Right margin line
+        assert result.getpixel((right, mid_y)) == _MARGIN_COLOR
+        # Top margin line
+        assert result.getpixel((mid_x, top)) == _MARGIN_COLOR
+        # Bottom margin line
+        assert result.getpixel((mid_x, bottom)) == _MARGIN_COLOR
 
-        # Right margin line at x = W - MARGIN_RIGHT - 1
-        right_x = TOUCHSCREEN_WIDTH - MARGIN_RIGHT - 1
-        assert result.getpixel((right_x, TOUCHSCREEN_HEIGHT // 2)) == _MARGIN_COLOR
-
-        # Bottom margin line at y = H - MARGIN_BOTTOM - 1
-        bottom_y = TOUCHSCREEN_HEIGHT - MARGIN_BOTTOM - 1
-        assert result.getpixel((TOUCHSCREEN_WIDTH // 2, bottom_y)) == _MARGIN_COLOR
-
-    def test_inner_grid_pixels_present(self):
-        """Inner grid lines should appear at expected positions."""
+    def test_margin_lines_stay_within_bounds(self):
+        """Margin lines should not extend beyond the margin rectangle."""
         img = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), "black")
         result = draw_touchscreen_grid(img)
 
-        # Vertical grid line at column 5 (midpoint)
-        col_step = TOUCHSCREEN_WIDTH / _GRID_COLS
-        x = round(5 * col_step)
-        pixel = result.getpixel((x, TOUCHSCREEN_HEIGHT // 2))
-        # This pixel should be a grid or margin colour (not black)
+        # Pixels outside the margin rectangle should remain black
+        # Above the top margin on the left margin column
+        assert result.getpixel((MARGIN_LEFT, 0)) == (0, 0, 0)
+        # Below the bottom margin on the left margin column
+        assert result.getpixel((MARGIN_LEFT, TOUCHSCREEN_HEIGHT - 1)) == (0, 0, 0)
+        # Left of the left margin on the top margin row
+        assert result.getpixel((0, MARGIN_TOP)) == (0, 0, 0)
+        # Right of the right margin on the top margin row
+        assert result.getpixel((TOUCHSCREEN_WIDTH - 1, MARGIN_TOP)) == (0, 0, 0)
+
+    def test_inner_grid_pixels_present(self):
+        """Inner grid lines should appear within the usable area."""
+        img = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), "black")
+        result = draw_touchscreen_grid(img)
+
+        left = MARGIN_LEFT
+        right = TOUCHSCREEN_WIDTH - MARGIN_RIGHT - 1
+        top = MARGIN_TOP
+        bottom = TOUCHSCREEN_HEIGHT - MARGIN_BOTTOM - 1
+        usable_w = right - left
+        usable_h = bottom - top
+
+        # Vertical grid line at column 2 (midpoint of 4 columns)
+        col_step = usable_w / _GRID_COLS
+        x = round(left + 2 * col_step)
+        mid_y = (top + bottom) // 2
+        pixel = result.getpixel((x, mid_y))
         assert pixel != (0, 0, 0)
 
-        # Horizontal grid line at row 5 (midpoint)
-        row_step = TOUCHSCREEN_HEIGHT / _GRID_ROWS
-        y = round(5 * row_step)
-        pixel = result.getpixel((TOUCHSCREEN_WIDTH // 2, y))
+        # Horizontal grid line at row 2 (midpoint of 4 rows)
+        row_step = usable_h / _GRID_ROWS
+        y = round(top + 2 * row_step)
+        mid_x = (left + right) // 2
+        pixel = result.getpixel((mid_x, y))
         assert pixel != (0, 0, 0)
+
+    def test_inner_grid_lines_stay_within_margins(self):
+        """Inner grid lines should not extend beyond the margin rectangle."""
+        img = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), "black")
+        result = draw_touchscreen_grid(img)
+
+        left = MARGIN_LEFT
+        right = TOUCHSCREEN_WIDTH - MARGIN_RIGHT - 1
+        top = MARGIN_TOP
+        bottom = TOUCHSCREEN_HEIGHT - MARGIN_BOTTOM - 1
+        usable_w = right - left
+
+        # Pick a vertical inner grid line
+        col_step = usable_w / _GRID_COLS
+        x = round(left + 1 * col_step)
+
+        # The pixel above the top margin on that column should be black
+        assert result.getpixel((x, 0)) == (0, 0, 0)
+        # The pixel below the bottom margin on that column should be black
+        assert result.getpixel((x, TOUCHSCREEN_HEIGHT - 1)) == (0, 0, 0)
 
     def test_works_with_non_black_background(self):
         """Grid draws over arbitrary backgrounds without error."""
