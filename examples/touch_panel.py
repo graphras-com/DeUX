@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Touch panel showcase — mixing text labels with sliders.
+"""Stack card showcase — mixing text labels with sliders.
 
-Demonstrates the :class:`TouchPanel` container with :class:`LargeText`,
+Demonstrates the :class:`StackCard` container with :class:`LargeText`,
 :class:`SmallText`, and slider sub-elements.  Text elements display
 read-only information while sliders remain interactive.  Pressing a
 dial cycles only through the sliders; text elements are skipped.
@@ -39,7 +39,7 @@ from deckboard import (
     BrightnessSlider,
     Deck,
     EqualizerSlider,
-    TouchPanel,
+    StackCard,
     VolumeSlider,
 )
 from deckboard.widgets.text import LargeText, SmallText
@@ -52,7 +52,7 @@ async def main() -> None:
         info = deck.info
         print(f"Connected: {info.deck_type} (serial: {info.serial})")
 
-        page = deck.page("panels")
+        page = deck.screen("panels")
 
         # -- Buttons -------------------------------------------------------
 
@@ -67,10 +67,10 @@ async def main() -> None:
         header0 = LargeText("Room", color="#aaaaaa")
         bright = BrightnessSlider(value=80)
 
-        panel0 = TouchPanel(0)
+        panel0 = StackCard(0)
         panel0.add_element(header0)
         panel0.add_element(bright)
-        page.set_widget(0, panel0)
+        page.set_card(0, panel0)
 
         # -- Zone 1: Volume slider + text readout --------------------------
         #    The slider adjusts volume; the text shows the formatted value
@@ -79,10 +79,10 @@ async def main() -> None:
         vol = VolumeSlider(value=65)
         readout = LargeText(vol.format_value(), color="#5599ff")
 
-        panel1 = TouchPanel(1)
+        panel1 = StackCard(1)
         panel1.add_element(vol)
         panel1.add_element(readout)
-        page.set_widget(1, panel1)
+        page.set_card(1, panel1)
 
         # -- Zone 2: Two EQ sliders + text label + balance slider ----------
         #    Press dial 2 to cycle among the three sliders (Bass, Treble,
@@ -93,13 +93,13 @@ async def main() -> None:
         eq_label = SmallText("EQ", color="#aaaaaa")
         bal2 = BalanceSlider(value=50)
 
-        panel2 = TouchPanel(2)
+        panel2 = StackCard(2)
         panel2.add_element(bass, default=True)
         panel2.add_element(treble)
         panel2.add_element(eq_label)
         panel2.add_element(bal2)
         panel2.set_selection_timeout(4)
-        page.set_widget(2, panel2)
+        page.set_card(2, panel2)
 
         # -- Zone 3: Status text + two sliders + footer text ---------------
         #    Demonstrates text at both ends of the stack.  Pressing dial 3
@@ -110,19 +110,19 @@ async def main() -> None:
         bal3 = BalanceSlider(value=50)
         footer = SmallText("OK", color="#aaaaaa")
 
-        panel3 = TouchPanel(3)
+        panel3 = StackCard(3)
         panel3.add_element(status)
         panel3.add_element(sub, default=True)
         panel3.add_element(bal3)
         panel3.add_element(footer)
         panel3.set_selection_timeout(4)
-        page.set_widget(3, panel3)
+        page.set_card(3, panel3)
 
         # -- Dial handler: update volume readout on turn -------------------
 
         @page.dial(1).on_turn
         async def on_vol_turn(direction: int) -> None:
-            # The slider value is adjusted automatically by TouchPanel;
+            # The slider value is adjusted automatically by StackCard;
             # we just need to sync the text readout.
             readout.set_text(vol.format_value())
             await deck.refresh()
@@ -168,7 +168,7 @@ async def main() -> None:
 
         # -- Go! -----------------------------------------------------------
 
-        await deck.set_page("panels")
+        await deck.set_screen("panels")
         print("\nTouch panel showcase ready!")
         print("  Zone 0: 'Room' header + Brightness slider.")
         print("  Zone 1: Volume slider + live text readout.")

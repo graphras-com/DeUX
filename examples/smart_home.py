@@ -34,7 +34,7 @@ from deckboard import (
     BrightnessSlider,
     Deck,
     KelvinSlider,
-    SliderWidget,
+    StackCard,
     TemperatureSlider,
 )
 
@@ -53,7 +53,7 @@ def build_room_page(
 
     Returns a dict of slider references so the caller can inspect them.
     """
-    page = deck.page(name)
+    page = deck.screen(name)
 
     # -- Row 1: scenes & navigation ----------------------------------------
 
@@ -76,21 +76,21 @@ def build_room_page(
     temp = TemperatureSlider(value=22)
     bal = BalanceSlider("Fan Spd", value=50)
 
-    sw0 = SliderWidget(0)
+    sw0 = StackCard(0)
     sw0.add_slider(bright)
-    page.set_widget(0, sw0)
+    page.set_card(0, sw0)
 
-    sw1 = SliderWidget(1)
+    sw1 = StackCard(1)
     sw1.add_slider(kelvin)
-    page.set_widget(1, sw1)
+    page.set_card(1, sw1)
 
-    sw2 = SliderWidget(2)
+    sw2 = StackCard(2)
     sw2.add_slider(temp)
-    page.set_widget(2, sw2)
+    page.set_card(2, sw2)
 
-    sw3 = SliderWidget(3)
+    sw3 = StackCard(3)
     sw3.add_slider(bal)
-    page.set_widget(3, sw3)
+    page.set_card(3, sw3)
 
     # -- Scene handlers (set slider values in one shot) --------------------
 
@@ -113,7 +113,7 @@ def build_room_page(
     @page.button(3).on_press
     async def on_switch() -> None:
         print(f"Switching to {other_page}")
-        await deck.set_page(other_page)
+        await deck.set_screen(other_page)
 
     # -- Device toggles (simulated) ----------------------------------------
 
@@ -175,7 +175,7 @@ async def main() -> None:
         )
 
         # Start on the living room page
-        await deck.set_page("Living Room")
+        await deck.set_screen("Living Room")
         print("\nSmart home dashboard ready!")
         print("  Turn dials to adjust brightness, colour temp, room temp, fan speed.")
         print("  Button 1 = Movie scene, Button 2 = Bright scene.")

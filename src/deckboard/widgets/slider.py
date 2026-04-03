@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 from PIL import Image, ImageDraw, ImageFont
 
+from ..ui.controls.base import Control
 from ..image import get_font
 
 if TYPE_CHECKING:
@@ -48,7 +49,7 @@ _HIGHLIGHT_COLOR = "#5599ff"
 _NORMAL_STROKE_COLOR = "white"
 
 
-class Slider(ABC):
+class Slider(Control, ABC):
     """Abstract base for all slider / progressbar sub-elements.
 
     A slider holds a numeric value within a ``[min_value, max_value]``
@@ -67,13 +68,13 @@ class Slider(ABC):
         unit: str = "%",
         step: float = 1,
     ) -> None:
+        super().__init__()
         self._label = label
         self._min = float(min_value)
         self._max = float(max_value)
         self._value = float(value) if value is not None else self._min
         self._unit = unit
         self._step = float(step)
-        self._widget: Widget | None = None  # back-reference set by Widget.add_slider()
         self._change_handler: AsyncHandler | None = None
 
     # -- Properties --------------------------------------------------------
@@ -137,10 +138,10 @@ class Slider(ABC):
         """
         old = self._value
         self._value = max(self._min, min(self._max, float(v)))
-        if self._widget is not None:
-            self._widget.mark_dirty()
+        if self._card is not None:
+            self._card.mark_dirty()
             if self._change_handler is not None and self._value != old:
-                self._widget.queue_pending_callback(
+                self._card.queue_pending_callback(
                     self._change_handler, (self._value,)
                 )
 

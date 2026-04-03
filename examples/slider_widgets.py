@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Slider widgets showcase — every slider type on one layout.
+"""Stack card showcase — every slider type on one layout.
 
 Demonstrates all six slider types on the Stream Deck+ touchscreen.
 Each dial controls the sliders in its zone; press the dial to cycle
@@ -33,7 +33,7 @@ from deckboard import (
     Deck,
     EqualizerSlider,
     KelvinSlider,
-    SliderWidget,
+    StackCard,
     TemperatureSlider,
     VolumeSlider,
 )
@@ -46,7 +46,7 @@ async def main() -> None:
         info = deck.info
         print(f"Connected: {info.deck_type} (serial: {info.serial})")
 
-        page = deck.page("sliders")
+        page = deck.screen("sliders")
 
         # -- Buttons -------------------------------------------------------
 
@@ -57,27 +57,27 @@ async def main() -> None:
         # -- Zone 0: Volume (single large slider) -------------------------
 
         vol = VolumeSlider(value=50)
-        sw0 = SliderWidget(0)
+        sw0 = StackCard(0)
         sw0.add_slider(vol)
-        page.set_widget(0, sw0)
+        page.set_card(0, sw0)
 
         # -- Zone 1: Brightness + Temperature (two large sliders) ----------
         #    Press dial 1 to cycle between them.
 
         bright = BrightnessSlider(value=80)
         temp = TemperatureSlider(value=20)
-        sw1 = SliderWidget(1)
+        sw1 = StackCard(1)
         sw1.add_slider(bright, default=True)
         sw1.add_slider(temp)
         sw1.set_selection_timeout(3)  # revert to brightness after 3s
-        page.set_widget(1, sw1)
+        page.set_card(1, sw1)
 
         # -- Zone 2: Kelvin (single large slider) -------------------------
 
         kelvin = KelvinSlider(value=4000)
-        sw2 = SliderWidget(2)
+        sw2 = StackCard(2)
         sw2.add_slider(kelvin)
-        page.set_widget(2, sw2)
+        page.set_card(2, sw2)
 
         # -- Zone 3: Sub + Bass + Treble + Balance (four small sliders) ----
         #    Press dial 3 to cycle through them.
@@ -86,13 +86,13 @@ async def main() -> None:
         bass = EqualizerSlider("Bass", value=50)
         treble = EqualizerSlider("Treble", value=50)
         bal = BalanceSlider(value=50)
-        sw3 = SliderWidget(3)
+        sw3 = StackCard(3)
         sw3.add_slider(sub, default=True)
         sw3.add_slider(bass)
         sw3.add_slider(treble)
         sw3.add_slider(bal)
         sw3.set_selection_timeout(5)
-        page.set_widget(3, sw3)
+        page.set_card(3, sw3)
 
         # -- Button handlers -----------------------------------------------
 
@@ -131,7 +131,7 @@ async def main() -> None:
 
         # -- Go! -----------------------------------------------------------
 
-        await deck.set_page("sliders")
+        await deck.set_screen("sliders")
         print("\nSlider showcase ready!")
         print("  Turn dials to adjust values.")
         print("  Press dial 1 to cycle Brightness / Temperature.")

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Dual-value widget showcase — icon + value pairs on the touchscreen.
+"""Dual-value card showcase — icon + value pairs on the touchscreen.
 
 Demonstrates :class:`LargeDualValue` and :class:`SmallDualValue`
-elements inside a :class:`TouchPanel`.  These widgets display two
+elements inside a :class:`StackCard`.  These cards display two
 side-by-side sections, each with a small icon and a left-aligned
 value — ideal for showing paired readings (e.g. temperature +
 humidity, upload + download speeds).
@@ -34,7 +34,7 @@ Run with::
 import asyncio
 import logging
 
-from deckboard import Deck, TouchPanel, VolumeSlider
+from deckboard import Deck, StackCard, VolumeSlider
 from deckboard.widgets.dual_value import LargeDualValue, SmallDualValue
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -45,7 +45,7 @@ async def main() -> None:
         info = deck.info
         print(f"Connected: {info.deck_type} (serial: {info.serial})")
 
-        page = deck.page("dual_value")
+        page = deck.screen("dual_value")
 
         # -- Pre-fetch icons -----------------------------------------------
         #    DualValue elements accept PIL Images directly, so we fetch
@@ -83,10 +83,10 @@ async def main() -> None:
             "1013hPa", "3.2m/s", left_icon=icon_pressure, right_icon=icon_wind
         )
 
-        panel0 = TouchPanel(0)
+        panel0 = StackCard(0)
         panel0.add_element(climate1)
         panel0.add_element(climate2)
-        page.set_widget(0, panel0)
+        page.set_card(0, panel0)
 
         # -- Zone 1: Four small dual-value rows (network) ------------------
         #    Compact layout for dense information.
@@ -104,12 +104,12 @@ async def main() -> None:
             "24 dev", "1.2GB", left_icon=icon_devices, right_icon=icon_data
         )
 
-        panel1 = TouchPanel(1)
+        panel1 = StackCard(1)
         panel1.add_element(net1)
         panel1.add_element(net2)
         panel1.add_element(net3)
         panel1.add_element(net4)
-        page.set_widget(1, panel1)
+        page.set_card(1, panel1)
 
         # -- Zone 2: Mixed large + small dual-value rows -------------------
         #    One large row on top, two small rows below.
@@ -124,11 +124,11 @@ async def main() -> None:
             "On", "Auto", left_icon=icon_power, right_icon=icon_fan
         )
 
-        panel2 = TouchPanel(2)
+        panel2 = StackCard(2)
         panel2.add_element(mixed_large)
         panel2.add_element(mixed_small1)
         panel2.add_element(mixed_small2)
-        page.set_widget(2, panel2)
+        page.set_card(2, panel2)
 
         # -- Zone 3: Dual-value + volume slider ----------------------------
         #    Demonstrates mixing dual-value with a slider.
@@ -138,10 +138,10 @@ async def main() -> None:
         )
         vol = VolumeSlider(value=65)
 
-        panel3 = TouchPanel(3)
+        panel3 = StackCard(3)
         panel3.add_element(info_row)
         panel3.add_element(vol)
-        page.set_widget(3, panel3)
+        page.set_card(3, panel3)
 
         # -- Button handlers -----------------------------------------------
 
@@ -163,7 +163,7 @@ async def main() -> None:
 
         # -- Go! -----------------------------------------------------------
 
-        await deck.set_page("dual_value")
+        await deck.set_screen("dual_value")
         print("\nDual-value widget showcase ready!")
         print("  Zone 0: Climate readings (temp, humidity, pressure, wind).")
         print("  Zone 1: Network stats (upload, download, signal, latency).")

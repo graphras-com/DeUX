@@ -9,10 +9,10 @@ from typing import TYPE_CHECKING
 from PIL import Image
 
 from .image import WIDGET_COUNT, WIDGET_HEIGHT, WIDGET_WIDTH
-from .types import AsyncHandler
+from .types import AsyncHandler, EventType, TouchEvent
 
 if TYPE_CHECKING:
-    pass
+    from .icon import IconManager
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +174,32 @@ class Widget(ABC):
         self._rendered = img
         self._dirty = False
 
+    async def prepare_assets(self, icons: IconManager) -> None:
+        """Prepare external assets needed for rendering this card."""
+
+    async def dispatch_dial_turn(self, direction: int) -> None:
+        """Dispatch a dial-turn event to the card."""
+        if self._dial_turn_handler is not None:
+            await self._dial_turn_handler(direction)
+        self.handle_dial_turn(direction)
+
+    async def dispatch_dial_press(self) -> None:
+        """Dispatch a dial-press event to the card."""
+        if self._dial_press_handler is not None:
+            await self._dial_press_handler()
+        self.handle_dial_press()
+
+    async def dispatch_touch(self, event: TouchEvent) -> None:
+        """Dispatch a touch gesture to the card."""
+        if event.event_type == EventType.TOUCH_SHORT:
+            if self._tap_handler is not None:
+                await self._tap_handler()
+        elif event.event_type == EventType.TOUCH_LONG:
+            if self._long_press_handler is not None:
+                await self._long_press_handler()
+        elif event.event_type == EventType.TOUCH_DRAG and self._drag_handler is not None:
+            await self._drag_handler(event.x, event.y, event.x_out, event.y_out)
+
     # -- Rendering (abstract) ----------------------------------------------
 
     @abstractmethod
@@ -225,6 +251,10 @@ class TouchScreen:
             raise IndexError(f"Widget index must be 0-{WIDGET_COUNT - 1}, got {index}")
         return self._widgets[index]
 
+    def card(self, index: int) -> Widget:
+        """Get a card zone by index (0-3)."""
+        return self.widget(index)
+
     def set_widget(self, index: int, widget: Widget) -> None:
         """Replace the widget at *index* with a custom widget.
 
@@ -243,8 +273,16 @@ class TouchScreen:
             raise TypeError(msg)
         self._widgets[index] = widget
 
+    def set_card(self, index: int, card: Widget) -> None:
+        """Replace the card at *index* with a custom card."""
+        self.set_widget(index, card)
+
     @property
     def widgets(self) -> list[Widget]:
+        return self._widgets
+
+    @property
+    def cards(self) -> list[Widget]:
         return self._widgets
 
     @property

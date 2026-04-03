@@ -1,4 +1,4 @@
-"""Page class: a named layout of buttons, dials, and widgets that can be swapped."""
+"""Screen and Page classes for deckboard navigable layouts."""
 
 from __future__ import annotations
 
@@ -7,31 +7,27 @@ import logging
 from .button import Button
 from .dial import Dial
 from .touchscreen import TouchScreen, Widget
-from .widgets.icon_widget import IconWidget
 
 logger = logging.getLogger(__name__)
 
 # Stream Deck+ constants
 _KEY_COUNT = 8
 _DIAL_COUNT = 4
-_WIDGET_COUNT = 4
+class Screen:
+    """A named layout containing keys, encoders, and touch-strip cards.
 
-
-class Page:
-    """A named layout containing buttons, dials, and touchscreen widgets.
-
-    Pages allow you to define multiple layouts and switch between them.
-    When a page is activated, all key images, touchscreen widgets, and
+    Screens allow you to define multiple layouts and switch between them.
+    When a screen is activated, all key images, touch-strip cards, and
     event handlers swap atomically.
 
     Usage::
 
-        main = deck.page("main")
-        main.button(0).set_icon("mdi:home")
+        main = deck.screen("main")
+        main.key(0).set_icon("mdi:home")
 
-        @main.button(0).on_press
+        @main.key(0).on_press
         async def handle():
-            await deck.set_page("settings")
+            await deck.set_screen("settings")
     """
 
     def __init__(self, name: str) -> None:
@@ -44,8 +40,8 @@ class Page:
     def name(self) -> str:
         return self._name
 
-    def button(self, index: int) -> Button:
-        """Get or create a button by index (0-7 for Stream Deck+).
+    def key(self, index: int) -> Button:
+        """Get or create a key slot by index (0-7 for Stream Deck+).
 
         Args:
             index: Key index.
@@ -60,8 +56,12 @@ class Page:
             self._buttons[index] = Button(index)
         return self._buttons[index]
 
-    def dial(self, index: int) -> Dial:
-        """Get or create a dial by index (0-3 for Stream Deck+).
+    def button(self, index: int) -> Button:
+        """Compatibility alias for :meth:`key`."""
+        return self.key(index)
+
+    def encoder(self, index: int) -> Dial:
+        """Get or create an encoder slot by index (0-3 for Stream Deck+).
 
         Args:
             index: Dial index.
@@ -76,28 +76,32 @@ class Page:
             self._dials[index] = Dial(index)
         return self._dials[index]
 
+    def dial(self, index: int) -> Dial:
+        """Compatibility alias for :meth:`encoder`."""
+        return self.encoder(index)
+
+    def card(self, index: int) -> Widget:
+        """Get a touch-strip card zone by index (0-3)."""
+        return self._touchscreen.card(index)
+
     def widget(self, index: int) -> Widget:
-        """Get a touchscreen widget zone by index (0-3).
+        """Compatibility alias for :meth:`card`."""
+        return self.card(index)
 
-        Args:
-            index: Widget zone index.
-
-        Returns:
-            The Widget instance for this zone on this page.
-        """
-        return self._touchscreen.widget(index)
+    def set_card(self, index: int, card: Widget) -> None:
+        """Replace the card at *index* with a custom card."""
+        self._touchscreen.set_card(index, card)
 
     def set_widget(self, index: int, widget: Widget) -> None:
-        """Replace the widget at *index* with a custom widget.
-
-        Args:
-            index: Widget zone index (0-3).
-            widget: A :class:`Widget` subclass instance.
-        """
-        self._touchscreen.set_widget(index, widget)
+        """Compatibility alias for :meth:`set_card`."""
+        self.set_card(index, widget)
 
     @property
     def buttons(self) -> dict[int, Button]:
+        return self._buttons
+
+    @property
+    def keys(self) -> dict[int, Button]:
         return self._buttons
 
     @property
@@ -105,9 +109,24 @@ class Page:
         return self._dials
 
     @property
+    def encoders(self) -> dict[int, Dial]:
+        return self._dials
+
+    @property
     def touchscreen(self) -> TouchScreen:
+        return self._touchscreen
+
+    @property
+    def touch_strip(self) -> TouchScreen:
         return self._touchscreen
 
     @property
     def widgets(self) -> list[Widget]:
         return self._touchscreen.widgets
+
+    @property
+    def cards(self) -> list[Widget]:
+        return self._touchscreen.cards
+
+
+Page = Screen

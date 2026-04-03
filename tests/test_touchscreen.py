@@ -847,7 +847,7 @@ class TestTouchPanelAddElement:
         panel = TouchPanel(0)
         with pytest.raises(
             TypeError,
-            match="Expected a Slider, LargeText, SmallText, LargeDualValue, or SmallDualValue",
+            match="Expected a Control or Element instance",
         ):
             panel.add_element("not an element")  # type: ignore[arg-type]
 

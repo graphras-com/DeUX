@@ -58,6 +58,11 @@ class TestDeckInit:
 
 
 class TestDeckPage:
+    def test_creates_screen(self, deck):
+        p = deck.screen("main")
+        assert isinstance(p, Page)
+        assert p.name == "main"
+
     def test_creates_page(self, deck):
         p = deck.page("main")
         assert isinstance(p, Page)
@@ -105,6 +110,15 @@ class TestDeckBrightness:
 
 
 class TestDeckSetPage:
+    async def test_sets_active_screen(self, deck):
+        deck.screen("main")
+        deck._render_all_buttons = AsyncMock()
+        deck._render_touchscreen = AsyncMock()
+
+        await deck.set_screen("main")
+        assert deck.active_screen is not None
+        assert deck.active_screen.name == "main"
+
     async def test_nonexistent_page_raises(self, deck):
         with pytest.raises(DeckError, match="Page 'missing' does not exist"):
             await deck.set_page("missing")

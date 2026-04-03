@@ -25,7 +25,7 @@ Run with::
 import asyncio
 import logging
 
-from deckboard import BalanceSlider, Deck, EqualizerSlider, SliderWidget, VolumeSlider
+from deckboard import BalanceSlider, Deck, EqualizerSlider, StackCard, VolumeSlider
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -35,7 +35,7 @@ async def main() -> None:
         info = deck.info
         print(f"Connected: {info.deck_type} (serial: {info.serial})")
 
-        page = deck.page("media")
+        page = deck.screen("media")
 
         # -- Transport controls (row 1) ------------------------------------
 
@@ -60,21 +60,21 @@ async def main() -> None:
         )
         bal = BalanceSlider(value=50)
 
-        sw0 = SliderWidget(0)
+        sw0 = StackCard(0)
         sw0.add_slider(vol)
-        page.set_widget(0, sw0)
+        page.set_card(0, sw0)
 
-        sw1 = SliderWidget(1)
+        sw1 = StackCard(1)
         sw1.add_slider(bass)
-        page.set_widget(1, sw1)
+        page.set_card(1, sw1)
 
-        sw2 = SliderWidget(2)
+        sw2 = StackCard(2)
         sw2.add_slider(treble)
-        page.set_widget(2, sw2)
+        page.set_card(2, sw2)
 
-        sw3 = SliderWidget(3)
+        sw3 = StackCard(3)
         sw3.add_slider(bal)
-        page.set_widget(3, sw3)
+        page.set_card(3, sw3)
 
         # -- Playback state -------------------------------------------------
 
@@ -139,7 +139,7 @@ async def main() -> None:
 
         # -- Activate and run -----------------------------------------------
 
-        await deck.set_page("media")
+        await deck.set_screen("media")
         print("\nMedia controller ready!")
         print("  Dial 0: Volume | Dial 1: Bass | Dial 2: Treble | Dial 3: Balance")
         print("  Press dial 0 to toggle mute.")

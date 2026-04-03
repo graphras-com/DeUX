@@ -6,13 +6,16 @@ import pytest
 
 from deckboard.button import Button
 from deckboard.dial import Dial
-from deckboard.page import Page
+from deckboard.page import Page, Screen
 from deckboard.touchscreen import TouchScreen, Widget
 from deckboard.widgets.icon_widget import IconWidget
 from deckboard.widgets.slider_widget import SliderWidget
 
 
 class TestPageInit:
+    def test_is_screen(self, page: Page):
+        assert isinstance(page, Screen)
+
     def test_name(self, page: Page):
         assert page.name == "test"
 
@@ -30,6 +33,9 @@ class TestPageInit:
 
 
 class TestPageButton:
+    def test_key_alias(self, page: Page):
+        assert page.key(0) is page.button(0)
+
     def test_creates_button(self, page: Page):
         b = page.button(0)
         assert isinstance(b, Button)
@@ -64,6 +70,9 @@ class TestPageButton:
 
 
 class TestPageDial:
+    def test_encoder_alias(self, page: Page):
+        assert page.encoder(0) is page.dial(0)
+
     def test_creates_dial(self, page: Page):
         d = page.dial(0)
         assert isinstance(d, Dial)
@@ -93,6 +102,9 @@ class TestPageDial:
 
 
 class TestPageWidget:
+    def test_card_alias(self, page: Page):
+        assert page.card(0) is page.widget(0)
+
     def test_delegates_to_touchscreen(self, page: Page):
         w = page.widget(0)
         assert isinstance(w, Widget)
@@ -108,6 +120,11 @@ class TestPageWidget:
 
 
 class TestPageSetWidget:
+    def test_set_card_alias(self, page: Page):
+        sw = SliderWidget(0)
+        page.set_card(0, sw)
+        assert page.card(0) is sw
+
     def test_replace_with_slider_widget(self, page: Page):
         sw = SliderWidget(0)
         page.set_widget(0, sw)

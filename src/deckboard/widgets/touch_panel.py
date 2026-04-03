@@ -3,22 +3,19 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from PIL import Image
 
 from ..image import WIDGET_HEIGHT, WIDGET_WIDTH
 from ..touchscreen import Widget
+from ..ui.controls.base import Control
+from ..ui.elements.base import Element
 
 if TYPE_CHECKING:
-    from .dual_value import LargeDualValue, SmallDualValue
     from .slider import Slider
-    from .text import LargeText, SmallText
 
-# Union of all element types that can be placed inside a TouchPanel.
-PanelElement = Union[
-    "Slider", "LargeText", "SmallText", "LargeDualValue", "SmallDualValue"
-]
+PanelElement = Control | Element
 
 
 class TouchPanel(Widget):
@@ -74,23 +71,11 @@ class TouchPanel(Widget):
         Returns:
             This panel (for chaining).
         """
-        from .dual_value import LargeDualValue as _LargeDualValue
-        from .dual_value import SmallDualValue as _SmallDualValue
-        from .slider import Slider as _Slider
-        from .text import LargeText as _LargeText
-        from .text import SmallText as _SmallText
-
-        if not isinstance(
-            element,
-            (_Slider, _LargeText, _SmallText, _LargeDualValue, _SmallDualValue),
-        ):
-            msg = (
-                f"Expected a Slider, LargeText, SmallText, LargeDualValue, "
-                f"or SmallDualValue instance, got {type(element).__name__}"
-            )
+        if not isinstance(element, (Control, Element)):
+            msg = f"Expected a Control or Element instance, got {type(element).__name__}"
             raise TypeError(msg)
 
-        element._widget = self  # type: ignore[union-attr]
+        element.bind_to_card(self)
         self._elements.append(element)
 
         # Update selectable tracking
@@ -103,6 +88,13 @@ class TouchPanel(Widget):
 
         self._dirty = True
         return self
+
+    def add_control(self, control: Control, *, default: bool = False) -> TouchPanel:
+        """Add an interactive control to this panel."""
+        if not isinstance(control, Control):
+            msg = f"Expected a Control instance, got {type(control).__name__}"
+            raise TypeError(msg)
+        return self.add_element(control, default=default)
 
     def add_slider(self, slider: Slider, default: bool = False) -> TouchPanel:
         """Add a slider sub-element to this panel.
@@ -137,6 +129,11 @@ class TouchPanel(Widget):
         return [e for e in self._elements if isinstance(e, _Slider)]
 
     @property
+    def controls(self) -> list[Control]:
+        """All interactive controls in this panel."""
+        return [element for element in self._elements if isinstance(element, Control)]
+
+    @property
     def active_slider(self) -> Slider | None:
         """The slider currently controlled by the dial, or ``None``."""
         from .slider import Slider as _Slider
@@ -153,6 +150,14 @@ class TouchPanel(Widget):
     def active_slider_index(self) -> int:
         """Index (into :attr:`elements`) of the currently active slider."""
         return self._active_slider_index
+
+    @property
+    def active_control(self) -> Control | None:
+        """The control currently attached to the dial, if any."""
+        active = self.active_slider
+        if active is None:
+            return None
+        return active
 
     @property
     def selection_timeout(self) -> float:
@@ -187,6 +192,10 @@ class TouchPanel(Widget):
         self._active_slider_index = selectable[next_pos]
         self._last_selection_time = time.monotonic()
         self._dirty = True
+
+    def cycle_active_control(self) -> None:
+        """Compatibility alias for :meth:`cycle_active_slider`."""
+        self.cycle_active_slider()
 
     # -- Widget hooks (override base class no-ops) -------------------------
 

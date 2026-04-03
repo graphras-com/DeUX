@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 from PIL import Image, ImageDraw, ImageFont
 
 from ..image import get_font, get_large_font, get_small_font
+from ..ui.elements.base import Element
 
 if TYPE_CHECKING:
     from ..touchscreen import Widget  # abstract base — any Widget subclass
@@ -50,7 +51,7 @@ def _truncate_text(
     return ellipsis
 
 
-class LargeText:
+class LargeText(Element):
     """A full-width, single-line text element the same height as a LargeSlider.
 
     The text is displayed centred within the slot.  If it overflows the
@@ -61,12 +62,10 @@ class LargeText:
         color: Text colour.  Defaults to ``"white"``.
     """
 
-    selectable: bool = False
-
     def __init__(self, text: str = "", *, color: str = "white") -> None:
+        super().__init__()
         self._text = text
         self._color = color
-        self._widget: Widget | None = None
 
     # -- Properties --------------------------------------------------------
 
@@ -87,8 +86,8 @@ class LargeText:
         next refresh cycle.
         """
         self._text = text
-        if self._widget is not None:
-            self._widget.mark_dirty()
+        if self._card is not None:
+            self._card.mark_dirty()
 
     def set_color(self, color: str) -> None:
         """Update the text colour.
@@ -97,8 +96,8 @@ class LargeText:
         next refresh cycle.
         """
         self._color = color
-        if self._widget is not None:
-            self._widget.mark_dirty()
+        if self._card is not None:
+            self._card.mark_dirty()
 
     # -- Rendering ---------------------------------------------------------
 
@@ -144,7 +143,7 @@ class LargeText:
         draw.text((text_x, text_y), display, fill=self._color, font=font)
 
 
-class SmallText:
+class SmallText(Element):
     """A compact, single-line text element the same height as a SmallSlider.
 
     Unlike :class:`SmallSlider`, there is no label column — the text
@@ -156,12 +155,10 @@ class SmallText:
         color: Text colour.  Defaults to ``"white"``.
     """
 
-    selectable: bool = False
-
     def __init__(self, text: str = "", *, color: str = "white") -> None:
+        super().__init__()
         self._text = text
         self._color = color
-        self._widget: Widget | None = None
 
     # -- Properties --------------------------------------------------------
 
@@ -182,8 +179,8 @@ class SmallText:
         next refresh cycle.
         """
         self._text = text
-        if self._widget is not None:
-            self._widget.mark_dirty()
+        if self._card is not None:
+            self._card.mark_dirty()
 
     def set_color(self, color: str) -> None:
         """Update the text colour.
@@ -192,8 +189,8 @@ class SmallText:
         next refresh cycle.
         """
         self._color = color
-        if self._widget is not None:
-            self._widget.mark_dirty()
+        if self._card is not None:
+            self._card.mark_dirty()
 
     # -- Rendering ---------------------------------------------------------
 

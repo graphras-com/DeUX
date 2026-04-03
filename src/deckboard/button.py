@@ -41,6 +41,10 @@ class Button:
     def label(self) -> str | None:
         return self._label
 
+    @property
+    def icon_color(self) -> str:
+        return self._icon_color
+
     # -- Configuration methods (return self for chaining) ------------------
 
     def set_icon(self, name: str, color: str = "white") -> Button:
@@ -104,6 +108,12 @@ class Button:
         """
         self._release_handler = handler
         return handler
+
+    async def dispatch(self, pressed: bool) -> None:
+        """Dispatch a press or release event through the registered handlers."""
+        handler = self._press_handler if pressed else self._release_handler
+        if handler is not None:
+            await handler()
 
     # -- Internal methods --------------------------------------------------
 

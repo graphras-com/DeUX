@@ -69,3 +69,14 @@ class Dial:
         """
         self._release_handler = handler
         return handler
+
+    async def dispatch_turn(self, direction: int) -> None:
+        """Dispatch a dial turn event through the registered handler."""
+        if self._turn_handler is not None:
+            await self._turn_handler(direction)
+
+    async def dispatch_press(self, pressed: bool) -> None:
+        """Dispatch a dial press or release event."""
+        handler = self._press_handler if pressed else self._release_handler
+        if handler is not None:
+            await handler()

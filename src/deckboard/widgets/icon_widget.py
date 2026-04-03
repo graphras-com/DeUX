@@ -5,6 +5,7 @@ from __future__ import annotations
 from PIL import Image
 
 from ..image import render_widget_image
+from ..icon import IconManager
 from ..touchscreen import Widget
 
 
@@ -95,6 +96,13 @@ class IconWidget(Widget):
         :class:`~deckboard.icon.IconManager`.
         """
         self._icon_image = img
+
+    async def prepare_assets(self, icons: IconManager) -> None:
+        """Pre-fetch the icon needed for this card before rendering."""
+        if self._icon_name is None:
+            self._icon_image = None
+            return
+        self._icon_image = await icons.get(self._icon_name, color=self._icon_color)
 
     # -- Rendering ---------------------------------------------------------
 
