@@ -179,6 +179,12 @@ class TestWidgetRendering:
         widget.mark_clean()
         assert widget.is_dirty is False
 
+    def test_mark_dirty(self, widget: Widget):
+        widget.mark_clean()
+        assert widget.is_dirty is False
+        widget.mark_dirty()
+        assert widget.is_dirty is True
+
 
 # ── TouchScreen ─────────────────────────────────────────────────────────
 
