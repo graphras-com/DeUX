@@ -209,8 +209,8 @@ class SmallText:
     ) -> None:
         """Draw this text element onto *img* within the given rectangle.
 
-        The text is left-aligned with a small margin and vertically
-        centred within the slot.  Overflow is truncated with an ellipsis.
+        The text is horizontally centred and vertically centred within
+        the slot.  Overflow is truncated with an ellipsis.
 
         Args:
             img: Target image (modified in-place).
@@ -229,9 +229,11 @@ class SmallText:
         display = _truncate_text(self._text, font, available_w, draw)
 
         bbox = draw.textbbox((0, 0), display, font=font)
+        text_w = bbox[2] - bbox[0]
         text_h = bbox[3] - bbox[1]
 
-        text_x = x + mx
+        # Centre horizontally and vertically
+        text_x = x + mx + (available_w - text_w) // 2
         text_y = y + (height - text_h) // 2 - 1
 
         draw.text((text_x, text_y), display, fill=self._color, font=font)
