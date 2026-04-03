@@ -37,6 +37,7 @@ class TestPublicAPI:
             "LargeDualValue",
             "LargeSlider",
             "LargeText",
+            "LightWidget",
             "MediaWidget",
             "Page",
             "RangeControl",
