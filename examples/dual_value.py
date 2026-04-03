@@ -24,7 +24,7 @@ Layout::
 Zone 0: Two LargeDualValue rows (climate readings).
 Zone 1: Four SmallDualValue rows (network stats).
 Zone 2: One LargeDualValue + two SmallDualValue rows (mixed).
-Zone 3: Two LargeDualValue + VolumeSlider (mixed with slider).
+Zone 3: LargeDualValue info row + VolumeSlider (mixed with slider).
 
 Run with::
 
@@ -47,6 +47,27 @@ async def main() -> None:
 
         page = deck.page("dual_value")
 
+        # -- Pre-fetch icons -----------------------------------------------
+        #    DualValue elements accept PIL Images directly, so we fetch
+        #    them via the deck's IconManager before building the panels.
+
+        icon_temp = await deck.icons.get("mdi:thermometer", color="white")
+        icon_humidity = await deck.icons.get("mdi:water-percent", color="#55aaff")
+        icon_pressure = await deck.icons.get("mdi:gauge", color="#aaaaaa")
+        icon_wind = await deck.icons.get("mdi:weather-windy", color="#aaaaaa")
+        icon_upload = await deck.icons.get("mdi:arrow-up-bold", color="#00cc66")
+        icon_download = await deck.icons.get("mdi:arrow-down-bold", color="#ff6644")
+        icon_signal = await deck.icons.get("mdi:wifi", color="#5599ff")
+        icon_latency = await deck.icons.get("mdi:timer-outline", color="#ffaa00")
+        icon_freq = await deck.icons.get("mdi:access-point", color="#aaaaaa")
+        icon_security = await deck.icons.get("mdi:lock", color="#00cc66")
+        icon_devices = await deck.icons.get("mdi:devices", color="#aaaaaa")
+        icon_data = await deck.icons.get("mdi:database", color="#aaaaaa")
+        icon_bright = await deck.icons.get("mdi:white-balance-sunny", color="#ffcc00")
+        icon_kelvin = await deck.icons.get("mdi:lightbulb-on", color="#ffaa44")
+        icon_power = await deck.icons.get("mdi:power", color="#00cc66")
+        icon_fan = await deck.icons.get("mdi:fan", color="#aaaaaa")
+
         # -- Buttons -------------------------------------------------------
 
         page.button(0).set_icon("mdi:refresh").set_label("Refresh")
@@ -55,8 +76,12 @@ async def main() -> None:
         # -- Zone 0: Two large dual-value rows (climate) -------------------
         #    Each row shows a pair of readings side by side.
 
-        climate1 = LargeDualValue("22°C", "45%")
-        climate2 = LargeDualValue("1013hPa", "3.2m/s")
+        climate1 = LargeDualValue(
+            "22°C", "45%", left_icon=icon_temp, right_icon=icon_humidity
+        )
+        climate2 = LargeDualValue(
+            "1013hPa", "3.2m/s", left_icon=icon_pressure, right_icon=icon_wind
+        )
 
         panel0 = TouchPanel(0)
         panel0.add_element(climate1)
@@ -66,10 +91,18 @@ async def main() -> None:
         # -- Zone 1: Four small dual-value rows (network) ------------------
         #    Compact layout for dense information.
 
-        net1 = SmallDualValue("95 Mb", "48 Mb")
-        net2 = SmallDualValue("-42dBm", "12ms")
-        net3 = SmallDualValue("5 GHz", "WPA3")
-        net4 = SmallDualValue("24 dev", "1.2GB")
+        net1 = SmallDualValue(
+            "95 Mb", "48 Mb", left_icon=icon_upload, right_icon=icon_download
+        )
+        net2 = SmallDualValue(
+            "-42dBm", "12ms", left_icon=icon_signal, right_icon=icon_latency
+        )
+        net3 = SmallDualValue(
+            "5 GHz", "WPA3", left_icon=icon_freq, right_icon=icon_security
+        )
+        net4 = SmallDualValue(
+            "24 dev", "1.2GB", left_icon=icon_devices, right_icon=icon_data
+        )
 
         panel1 = TouchPanel(1)
         panel1.add_element(net1)
@@ -81,9 +114,15 @@ async def main() -> None:
         # -- Zone 2: Mixed large + small dual-value rows -------------------
         #    One large row on top, two small rows below.
 
-        mixed_large = LargeDualValue("80%", "4000K")
-        mixed_small1 = SmallDualValue("22°C", "45%")
-        mixed_small2 = SmallDualValue("On", "Auto")
+        mixed_large = LargeDualValue(
+            "80%", "4000K", left_icon=icon_bright, right_icon=icon_kelvin
+        )
+        mixed_small1 = SmallDualValue(
+            "22°C", "45%", left_icon=icon_temp, right_icon=icon_humidity
+        )
+        mixed_small2 = SmallDualValue(
+            "On", "Auto", left_icon=icon_power, right_icon=icon_fan
+        )
 
         panel2 = TouchPanel(2)
         panel2.add_element(mixed_large)
@@ -94,7 +133,9 @@ async def main() -> None:
         # -- Zone 3: Dual-value + volume slider ----------------------------
         #    Demonstrates mixing dual-value with a slider.
 
-        info_row = LargeDualValue("22°C", "45%")
+        info_row = LargeDualValue(
+            "22°C", "45%", left_icon=icon_temp, right_icon=icon_humidity
+        )
         vol = VolumeSlider(value=65)
 
         panel3 = TouchPanel(3)
