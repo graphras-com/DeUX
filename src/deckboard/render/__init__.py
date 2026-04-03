@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .debug_grid import draw_key_grid, draw_touchscreen_grid
 from .fonts import get_font, get_large_font, get_small_font
 from .icons import IconError, IconManager
 from .key_renderer import render_blank_key, render_key_image
@@ -47,6 +48,8 @@ __all__ = [
     "USABLE_HEIGHT",
     "USABLE_WIDTH",
     "compose_touchstrip",
+    "draw_key_grid",
+    "draw_touchscreen_grid",
     "get_font",
     "get_large_font",
     "get_small_font",

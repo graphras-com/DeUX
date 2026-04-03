@@ -93,6 +93,9 @@ class Deck:
         # Icon manager
         self.icons = IconManager(cache_dir=icon_cache_dir)
 
+        # Debug grid overlay
+        self._debug_grid = False
+
         # Screens
         self._pages: dict[str, Page] = {}
         self._active_page: Page | None = None
@@ -243,6 +246,17 @@ class Deck:
                 self._executor, self._device.set_brightness, self._brightness
             )
 
+    # -- Debug grid --------------------------------------------------------
+
+    @property
+    def debug_grid(self) -> bool:
+        """Whether a debug alignment grid is drawn over rendered images."""
+        return self._debug_grid
+
+    @debug_grid.setter
+    def debug_grid(self, value: bool) -> None:
+        self._debug_grid = value
+
     # -- Screen management -------------------------------------------------
 
     def screen(self, name: str) -> Screen:
@@ -310,7 +324,7 @@ class Deck:
                 await self._render_button(button)
             else:
                 # Blank key
-                image_bytes = render_blank_key()
+                image_bytes = render_blank_key(debug_grid=self._debug_grid)
                 await loop.run_in_executor(
                     self._executor,
                     self._device.set_key_image,
@@ -327,7 +341,11 @@ class Deck:
         if button.icon_name:
             icon_img = await self.icons.get(button.icon_name, color=button.icon_color)
 
-        image_bytes = render_key_image(icon=icon_img, label=button.label)
+        image_bytes = render_key_image(
+            icon=icon_img,
+            label=button.label,
+            debug_grid=self._debug_grid,
+        )
         button.set_rendered_image(image_bytes)
 
         loop = asyncio.get_running_loop()
@@ -350,7 +368,7 @@ class Deck:
             card.set_rendered(img)
             card_images.append(img)
 
-        touchscreen_bytes = compose_touchstrip(card_images)
+        touchscreen_bytes = compose_touchstrip(card_images, debug_grid=self._debug_grid)
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(

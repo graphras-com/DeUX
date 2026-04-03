@@ -106,6 +106,62 @@ class TestDeckBrightness:
         assert deck.brightness == 60
 
 
+# ── Deck.debug_grid ─────────────────────────────────────────────────────
+
+
+class TestDeckDebugGrid:
+    def test_initially_false(self, deck):
+        assert deck.debug_grid is False
+
+    def test_set_true(self, deck):
+        deck.debug_grid = True
+        assert deck.debug_grid is True
+
+    def test_set_false(self, deck):
+        deck.debug_grid = True
+        deck.debug_grid = False
+        assert deck.debug_grid is False
+
+    async def test_render_all_buttons_uses_debug_grid(
+        self, deck, mock_streamdeck_device
+    ):
+        """Blank keys are rendered with debug_grid when enabled."""
+        deck._device = mock_streamdeck_device
+        p = deck.page("main")
+        deck._active_page = p
+        deck.debug_grid = True
+
+        await deck._render_all_buttons()
+        assert mock_streamdeck_device.set_key_image.call_count == _KEY_COUNT
+
+    async def test_render_button_uses_debug_grid(self, deck, mock_streamdeck_device):
+        """Configured button renders with debug_grid overlay."""
+        from PIL import Image as PILImage
+
+        deck._device = mock_streamdeck_device
+        from deckboard.button import Button
+
+        b = Button(0)
+        b.set_label("Test")
+        deck.debug_grid = True
+
+        await deck._render_button(b)
+        mock_streamdeck_device.set_key_image.assert_called_once()
+        assert b.image_bytes is not None
+
+    async def test_render_touchscreen_uses_debug_grid(
+        self, deck, mock_streamdeck_device
+    ):
+        """Touchscreen renders with debug_grid overlay."""
+        deck._device = mock_streamdeck_device
+        p = deck.page("main")
+        deck._active_page = p
+        deck.debug_grid = True
+
+        await deck._render_touchscreen()
+        mock_streamdeck_device.set_touchscreen_image.assert_called_once()
+
+
 # ── Deck.set_page ───────────────────────────────────────────────────────
 
 

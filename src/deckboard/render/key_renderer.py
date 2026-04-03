@@ -6,6 +6,7 @@ import io
 
 from PIL import Image, ImageDraw
 
+from .debug_grid import draw_key_grid
 from .fonts import get_font
 from .metrics import ICON_PADDING, ICON_SIZE, KEY_SIZE
 
@@ -14,8 +15,16 @@ def render_key_image(
     icon: Image.Image | None = None,
     label: str | None = None,
     background: str = "black",
+    debug_grid: bool = False,
 ) -> bytes:
-    """Render a JPEG image for a Stream Deck+ key."""
+    """Render a JPEG image for a Stream Deck+ key.
+
+    Args:
+        icon: Optional icon image to render on the key.
+        label: Optional text label below the icon.
+        background: Background colour name.
+        debug_grid: When ``True``, overlay a 4x4 alignment grid.
+    """
     img = Image.new("RGB", KEY_SIZE, background)
 
     if icon is not None:
@@ -39,12 +48,15 @@ def render_key_image(
         text_y = KEY_SIZE[1] - 24
         draw.text((text_x, text_y), label, fill="white", font=font)
 
+    if debug_grid:
+        img = draw_key_grid(img)
+
     return _encode_jpeg(img)
 
 
-def render_blank_key() -> bytes:
+def render_blank_key(debug_grid: bool = False) -> bytes:
     """Render a blank key image."""
-    return render_key_image()
+    return render_key_image(debug_grid=debug_grid)
 
 
 def _encode_jpeg(img: Image.Image, quality: int = 90) -> bytes:

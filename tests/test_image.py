@@ -18,6 +18,8 @@ from deckboard.image import (
     _encode_jpeg,
     _get_font,
     compose_touchscreen,
+    draw_key_grid,
+    draw_touchscreen_grid,
     get_font,
     get_small_font,
     render_blank_key,
@@ -147,6 +149,21 @@ class TestRenderKeyImage:
         # JPEG magic bytes: 0xFF 0xD8 0xFF
         assert result[:2] == b"\xff\xd8"
 
+    def test_debug_grid_returns_bytes(self):
+        result = render_key_image(debug_grid=True)
+        assert isinstance(result, bytes)
+        assert len(result) > 0
+
+    def test_debug_grid_dimensions(self):
+        result = render_key_image(debug_grid=True)
+        img = _decode_jpeg(result)
+        assert img.size == KEY_SIZE
+
+    def test_debug_grid_with_icon_and_label(self, sample_icon):
+        result = render_key_image(icon=sample_icon, label="Test", debug_grid=True)
+        img = _decode_jpeg(result)
+        assert img.size == KEY_SIZE
+
 
 # ── render_widget_image ─────────────────────────────────────────────────
 
@@ -221,6 +238,16 @@ class TestComposeTouchscreen:
         result = compose_touchscreen([sample_widget_image] * 4)
         assert result[:2] == b"\xff\xd8"
 
+    def test_debug_grid(self, sample_widget_image):
+        """compose_touchscreen with debug_grid=True is not implemented via wrapper."""
+        # The compatibility wrapper does not forward debug_grid,
+        # but compose_touchstrip (the underlying function) does.
+        from deckboard.render.touch_renderer import compose_touchstrip
+
+        result = compose_touchstrip([sample_widget_image] * 4, debug_grid=True)
+        img = _decode_jpeg(result)
+        assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
+
 
 # ── render_blank_key ────────────────────────────────────────────────────
 
@@ -237,6 +264,11 @@ class TestRenderBlankKey:
     def test_is_jpeg(self):
         assert render_blank_key()[:2] == b"\xff\xd8"
 
+    def test_debug_grid(self):
+        result = render_blank_key(debug_grid=True)
+        img = _decode_jpeg(result)
+        assert img.size == KEY_SIZE
+
 
 # ── render_blank_touchscreen ────────────────────────────────────────────
 
@@ -248,6 +280,11 @@ class TestRenderBlankTouchscreen:
 
     def test_dimensions(self):
         img = _decode_jpeg(render_blank_touchscreen())
+        assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
+
+    def test_debug_grid(self):
+        result = render_blank_touchscreen(debug_grid=True)
+        img = _decode_jpeg(result)
         assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
 
 
@@ -270,3 +307,14 @@ class TestEncodeJpeg:
         high = _encode_jpeg(img, quality=95)
         # Lower quality should produce smaller file
         assert len(low) < len(high)
+
+
+# ── debug grid re-exports ───────────────────────────────────────────────
+
+
+class TestDebugGridReexports:
+    def test_draw_touchscreen_grid_importable(self):
+        assert draw_touchscreen_grid is not None
+
+    def test_draw_key_grid_importable(self):
+        assert draw_key_grid is not None
