@@ -54,6 +54,8 @@ class Slider(ABC):
     range and knows how to render itself onto a PIL image.
     """
 
+    selectable: bool = True
+
     def __init__(
         self,
         label: str,

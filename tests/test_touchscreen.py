@@ -1,4 +1,4 @@
-"""Tests for deckboard.touchscreen — Widget (abstract), IconWidget, SliderWidget, and TouchScreen."""
+"""Tests for deckboard.touchscreen — Widget (abstract), IconWidget, SliderWidget, TouchPanel, and TouchScreen."""
 
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH
 from deckboard.touchscreen import TouchScreen, Widget
 from deckboard.widgets.icon_widget import IconWidget
 from deckboard.widgets.slider_widget import SliderWidget
+from deckboard.widgets.touch_panel import TouchPanel
+from deckboard.widgets.text import LargeText, SmallText
 from deckboard.widgets.volume import VolumeSlider
 from deckboard.widgets.brightness import BrightnessSlider
 from deckboard.widgets.equalizer import EqualizerSlider
@@ -698,3 +700,281 @@ class TestTouchScreenAnyDirty:
         assert isinstance(w0, IconWidget)
         w0.set_label("changed")
         assert touchscreen.any_dirty is True
+
+
+# ── TouchPanel ──────────────────────────────────────────────────────────
+
+
+class TestTouchPanelInit:
+    def test_is_widget(self):
+        panel = TouchPanel(0)
+        assert isinstance(panel, Widget)
+
+    def test_index(self):
+        panel = TouchPanel(2)
+        assert panel.index == 2
+
+    def test_no_elements(self):
+        panel = TouchPanel(0)
+        assert panel.elements == []
+        assert panel.sliders == []
+        assert panel.active_slider is None
+
+
+class TestSliderWidgetIsTouchPanel:
+    """SliderWidget is now a backward-compatible alias for TouchPanel."""
+
+    def test_alias(self):
+        assert SliderWidget is TouchPanel
+
+    def test_instance(self):
+        sw = SliderWidget(0)
+        assert isinstance(sw, TouchPanel)
+
+
+class TestTouchPanelAddElement:
+    def test_add_slider(self):
+        panel = TouchPanel(0)
+        vol = VolumeSlider("Volume")
+        result = panel.add_element(vol)
+        assert result is panel
+        assert len(panel.elements) == 1
+        assert panel.elements[0] is vol
+
+    def test_add_large_text(self):
+        panel = TouchPanel(0)
+        t = LargeText("Hello")
+        result = panel.add_element(t)
+        assert result is panel
+        assert len(panel.elements) == 1
+        assert panel.elements[0] is t
+
+    def test_add_small_text(self):
+        panel = TouchPanel(0)
+        t = SmallText("Value")
+        result = panel.add_element(t)
+        assert result is panel
+        assert len(panel.elements) == 1
+        assert panel.elements[0] is t
+
+    def test_rejects_invalid_type(self):
+        panel = TouchPanel(0)
+        with pytest.raises(
+            TypeError, match="Expected a Slider, LargeText, or SmallText"
+        ):
+            panel.add_element("not an element")  # type: ignore[arg-type]
+
+    def test_marks_dirty(self):
+        panel = TouchPanel(0)
+        panel.mark_clean()
+        panel.add_element(LargeText("Hi"))
+        assert panel.is_dirty is True
+
+    def test_elements_returns_copy(self):
+        panel = TouchPanel(0)
+        panel.add_element(LargeText("Hi"))
+        elements = panel.elements
+        elements.clear()
+        assert len(panel.elements) == 1
+
+    def test_text_default_flag_ignored(self):
+        """Passing default=True for a non-selectable element should not crash."""
+        panel = TouchPanel(0)
+        t = LargeText("Title")
+        panel.add_element(t, default=True)
+        # No selectable elements, so active slider is None
+        assert panel.active_slider is None
+
+
+class TestTouchPanelMixedElements:
+    def test_sliders_filters_text(self):
+        panel = TouchPanel(0)
+        panel.add_element(LargeText("Title"))
+        vol = VolumeSlider("Volume")
+        panel.add_element(vol)
+        assert panel.sliders == [vol]
+        assert len(panel.elements) == 2
+
+    def test_active_slider_with_text_and_sliders(self):
+        panel = TouchPanel(0)
+        panel.add_element(LargeText("Title"))
+        vol = VolumeSlider("Volume")
+        panel.add_element(vol)
+        assert panel.active_slider is vol
+
+    def test_cycling_skips_text(self):
+        """Dial press should only cycle among selectable (slider) elements."""
+        panel = TouchPanel(0)
+        t = LargeText("Title")
+        s1 = VolumeSlider("Volume", value=50)
+        s2 = BrightnessSlider("Bright", value=50)
+        panel.add_element(t)  # index 0 — not selectable
+        panel.add_element(s1)  # index 1 — selectable
+        panel.add_element(s2)  # index 2 — selectable
+
+        assert panel.active_slider is s1
+        assert panel.active_slider_index == 1
+
+        panel.cycle_active_slider()
+        assert panel.active_slider is s2
+        assert panel.active_slider_index == 2
+
+        panel.cycle_active_slider()
+        assert panel.active_slider is s1
+        assert panel.active_slider_index == 1  # wraps, skipping text
+
+    def test_single_slider_with_text_noop_cycle(self):
+        """With only one selectable element, cycling should be a no-op."""
+        panel = TouchPanel(0)
+        panel.add_element(LargeText("Title"))
+        vol = VolumeSlider("Volume")
+        panel.add_element(vol)
+        panel.mark_clean()
+        panel.cycle_active_slider()
+        assert panel.active_slider_index == 1  # unchanged
+        assert panel.is_dirty is False
+
+    def test_text_between_sliders(self):
+        """Text element between sliders should be skipped during cycling."""
+        panel = TouchPanel(0)
+        s1 = EqualizerSlider("Bass", value=50)
+        t = SmallText("Value")
+        s2 = EqualizerSlider("Treble", value=50)
+        panel.add_element(s1)  # index 0
+        panel.add_element(t)  # index 1 — not selectable
+        panel.add_element(s2)  # index 2
+
+        assert panel.active_slider is s1
+        panel.cycle_active_slider()
+        assert panel.active_slider is s2
+        assert panel.active_slider_index == 2
+        panel.cycle_active_slider()
+        assert panel.active_slider is s1
+        assert panel.active_slider_index == 0
+
+    def test_only_text_elements(self):
+        """Panel with only text elements should have no active slider."""
+        panel = TouchPanel(0)
+        panel.add_element(LargeText("Title"))
+        panel.add_element(SmallText("Value"))
+        assert panel.active_slider is None
+        # Cycling and dial turn should be no-ops
+        panel.cycle_active_slider()
+        panel.handle_dial_turn(1)
+        panel.handle_dial_press()
+
+    def test_default_on_second_slider_with_text(self):
+        """Setting default on the second slider should track correctly."""
+        panel = TouchPanel(0)
+        panel.add_element(LargeText("Title"))
+        s1 = VolumeSlider("Volume")
+        s2 = BrightnessSlider("Bright")
+        panel.add_element(s1)
+        panel.add_element(s2, default=True)
+        assert panel.active_slider is s2
+        assert panel._default_slider_index == 2
+
+
+class TestTouchPanelDialWithMixedElements:
+    def test_dial_turn_adjusts_slider_not_text(self):
+        panel = TouchPanel(0)
+        panel.add_element(LargeText("Title"))
+        vol = VolumeSlider("Volume", value=50, step=5)
+        panel.add_element(vol)
+        panel.mark_clean()
+        panel.handle_dial_turn(1)
+        assert vol.value == 55
+        assert panel.is_dirty is True
+
+    def test_dial_press_cycles_sliders(self):
+        panel = TouchPanel(0)
+        panel.add_element(LargeText("Title"))
+        s1 = VolumeSlider("Volume")
+        s2 = BrightnessSlider("Bright")
+        panel.add_element(s1)
+        panel.add_element(s2)
+        assert panel.active_slider_index == 1
+        panel.handle_dial_press()
+        assert panel.active_slider_index == 2
+
+    def test_timeout_resets_to_default_with_text(self):
+        panel = TouchPanel(0)
+        panel.add_element(LargeText("Title"))
+        s1 = VolumeSlider("Volume")
+        s2 = BrightnessSlider("Bright")
+        panel.add_element(s1, default=True)
+        panel.add_element(s2)
+        panel.set_selection_timeout(0.01)
+        panel.cycle_active_slider()
+        assert panel.active_slider_index == 2  # s2
+        panel._last_selection_time = time.monotonic() - 1.0
+        panel.mark_clean()
+        assert panel.check_selection_timeout() is True
+        assert panel.active_slider_index == 1  # back to s1 (default)
+
+
+class TestTouchPanelRenderMixed:
+    def test_render_text_and_sliders(self):
+        panel = TouchPanel(0)
+        panel.add_element(LargeText("Now Playing"))
+        panel.add_element(VolumeSlider("Volume", value=50))
+        img = panel.render()
+        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        assert img.mode == "RGB"
+
+    def test_render_small_texts_and_sliders(self):
+        panel = TouchPanel(0)
+        panel.add_element(SmallText("Online"))
+        panel.add_element(EqualizerSlider("Bass", value=50))
+        panel.add_element(EqualizerSlider("Treble", value=60))
+        panel.add_element(SmallText("OK"))
+        img = panel.render()
+        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+
+    def test_render_only_text(self):
+        panel = TouchPanel(0)
+        panel.add_element(LargeText("Title"))
+        panel.add_element(SmallText("Value"))
+        img = panel.render()
+        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+
+    def test_render_empty(self):
+        panel = TouchPanel(0)
+        img = panel.render()
+        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        assert img.mode == "RGB"
+
+    def test_render_active_highlight_only_on_selectable(self):
+        """With 2 sliders and 1 text, active highlight should only show on sliders."""
+        panel = TouchPanel(0)
+        panel.add_element(LargeText("Title"))
+        panel.add_element(VolumeSlider("Volume", value=50))
+        panel.add_element(BrightnessSlider("Bright", value=70))
+        # Should render without error
+        img = panel.render()
+        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+
+
+class TestTouchPanelEdgeCases:
+    def test_active_slider_returns_none_when_index_points_to_text(self):
+        """If _active_slider_index points to a non-selectable element, return None."""
+        panel = TouchPanel(0)
+        panel.add_element(LargeText("Title"))
+        vol = VolumeSlider("Volume")
+        panel.add_element(vol)
+        # Manually force index to point at the text element
+        panel._active_slider_index = 0
+        assert panel.active_slider is None
+
+    def test_cycle_recovers_when_active_index_not_in_selectable(self):
+        """If _active_slider_index is somehow invalid, cycling should recover."""
+        panel = TouchPanel(0)
+        s1 = VolumeSlider("Volume")
+        s2 = BrightnessSlider("Bright")
+        panel.add_element(s1)
+        panel.add_element(s2)
+        # Manually break the index
+        panel._active_slider_index = 999
+        panel.cycle_active_slider()
+        # Should recover: pos defaults to 0, next is 1
+        assert panel.active_slider_index == 1

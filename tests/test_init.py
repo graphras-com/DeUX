@@ -29,12 +29,15 @@ class TestPublicAPI:
             "KelvinSlider",
             "KeyEvent",
             "LargeSlider",
+            "LargeText",
             "Page",
             "Slider",
             "SliderWidget",
             "SmallSlider",
+            "SmallText",
             "TemperatureSlider",
             "TouchEvent",
+            "TouchPanel",
             "TouchScreen",
             "VolumeSlider",
             "Widget",
@@ -107,10 +110,13 @@ class TestPublicAPI:
             IconWidget,
             KelvinSlider,
             LargeSlider,
+            LargeText,
             Slider,
             SliderWidget,
             SmallSlider,
+            SmallText,
             TemperatureSlider,
+            TouchPanel,
             VolumeSlider,
         )
 
@@ -125,3 +131,6 @@ class TestPublicAPI:
         assert BalanceSlider is not None
         assert IconWidget is not None
         assert SliderWidget is not None
+        assert TouchPanel is not None
+        assert LargeText is not None
+        assert SmallText is not None
