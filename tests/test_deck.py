@@ -379,6 +379,177 @@ class TestDeckDispatch:
         handler.assert_awaited_once()
 
 
+# ── Deck._dispatch — widget event callbacks ─────────────────────────────
+
+
+class TestDeckDispatchWidgetCallbacks:
+    """Tests for widget-level dial decorators and slider on_change callbacks."""
+
+    async def test_dial_turn_calls_widget_dial_turn_handler(self, deck):
+        """Widget on_dial_turn handler is called on DialTurnEvent."""
+        from deckboard.widgets.slider_widget import SliderWidget
+
+        p = deck.page("main")
+        sw = SliderWidget(0)
+        p.set_widget(0, sw)
+        deck._active_page = p
+
+        handler = AsyncMock()
+        sw.on_dial_turn(handler)
+
+        with patch.object(deck, "refresh", new_callable=AsyncMock):
+            await deck._dispatch(DialTurnEvent(dial=0, direction=3))
+
+        handler.assert_awaited_once_with(3)
+
+    async def test_dial_press_calls_widget_dial_press_handler(self, deck):
+        """Widget on_dial_press handler is called on DialPressEvent."""
+        from deckboard.widgets.slider_widget import SliderWidget
+        from deckboard.widgets.volume import VolumeSlider
+
+        p = deck.page("main")
+        sw = SliderWidget(0)
+        sw.add_slider(VolumeSlider())
+        sw.add_slider(VolumeSlider())
+        p.set_widget(0, sw)
+        deck._active_page = p
+
+        handler = AsyncMock()
+        sw.on_dial_press(handler)
+
+        with patch.object(deck, "refresh", new_callable=AsyncMock):
+            await deck._dispatch(DialPressEvent(dial=0, pressed=True))
+
+        handler.assert_awaited_once()
+
+    async def test_dial_press_release_does_not_call_widget_handler(self, deck):
+        """Widget on_dial_press is NOT called for release events."""
+        from deckboard.widgets.slider_widget import SliderWidget
+
+        p = deck.page("main")
+        sw = SliderWidget(0)
+        p.set_widget(0, sw)
+        deck._active_page = p
+
+        handler = AsyncMock()
+        sw.on_dial_press(handler)
+
+        await deck._dispatch(DialPressEvent(dial=0, pressed=False))
+        handler.assert_not_awaited()
+
+    async def test_dial_turn_drains_slider_on_change(self, deck):
+        """Slider on_change callback is awaited after dial turn adjusts value."""
+        from deckboard.widgets.slider_widget import SliderWidget
+        from deckboard.widgets.volume import VolumeSlider
+
+        p = deck.page("main")
+        sw = SliderWidget(0)
+        vol = VolumeSlider(value=50, step=5)
+        sw.add_slider(vol)
+        p.set_widget(0, sw)
+        deck._active_page = p
+
+        change_handler = AsyncMock()
+        vol.on_change(change_handler)
+
+        with patch.object(deck, "refresh", new_callable=AsyncMock):
+            await deck._dispatch(DialTurnEvent(dial=0, direction=1))
+
+        change_handler.assert_awaited_once_with(55.0)
+
+    async def test_dial_turn_order_dial_then_widget_then_change(self, deck):
+        """Dispatch order: dial handler → widget dial handler → slider on_change."""
+        from deckboard.widgets.slider_widget import SliderWidget
+        from deckboard.widgets.volume import VolumeSlider
+
+        p = deck.page("main")
+        sw = SliderWidget(0)
+        vol = VolumeSlider(value=50, step=5)
+        sw.add_slider(vol)
+        p.set_widget(0, sw)
+        deck._active_page = p
+
+        call_order = []
+
+        dial_handler = AsyncMock(side_effect=lambda d: call_order.append("dial"))
+        p.dial(0).on_turn(dial_handler)
+
+        widget_handler = AsyncMock(side_effect=lambda d: call_order.append("widget"))
+        sw.on_dial_turn(widget_handler)
+
+        change_handler = AsyncMock(side_effect=lambda v: call_order.append("change"))
+        vol.on_change(change_handler)
+
+        with patch.object(deck, "refresh", new_callable=AsyncMock):
+            await deck._dispatch(DialTurnEvent(dial=0, direction=1))
+
+        assert call_order == ["dial", "widget", "change"]
+
+    async def test_refresh_drains_pending_callbacks(self, deck):
+        """Programmatic set_value + refresh drains on_change callbacks."""
+        from deckboard.widgets.slider_widget import SliderWidget
+        from deckboard.widgets.volume import VolumeSlider
+
+        p = deck.page("main")
+        sw = SliderWidget(0)
+        vol = VolumeSlider(value=50)
+        sw.add_slider(vol)
+        p.set_widget(0, sw)
+        deck._active_page = p
+        deck._render_button = AsyncMock()
+        deck._render_touchscreen = AsyncMock()
+
+        change_handler = AsyncMock()
+        vol.on_change(change_handler)
+
+        # Programmatic change (not from dial)
+        vol.set_value(80)
+
+        await deck.refresh()
+        change_handler.assert_awaited_once_with(80.0)
+
+    async def test_no_on_change_when_value_unchanged_via_dial(self, deck):
+        """No on_change callback when dial turn doesn't change value (at max)."""
+        from deckboard.widgets.slider_widget import SliderWidget
+        from deckboard.widgets.volume import VolumeSlider
+
+        p = deck.page("main")
+        sw = SliderWidget(0)
+        vol = VolumeSlider(value=100, max_value=100, step=5)
+        sw.add_slider(vol)
+        p.set_widget(0, sw)
+        deck._active_page = p
+
+        change_handler = AsyncMock()
+        vol.on_change(change_handler)
+
+        with patch.object(deck, "refresh", new_callable=AsyncMock):
+            await deck._dispatch(DialTurnEvent(dial=0, direction=1))
+
+        change_handler.assert_not_awaited()
+
+    async def test_drain_widget_callbacks_helper(self, deck):
+        """_drain_widget_callbacks awaits all pending callbacks in order."""
+        from deckboard.widgets.slider_widget import SliderWidget
+
+        sw = SliderWidget(0)
+        results = []
+
+        async def h1(v: float):
+            results.append(("h1", v))
+
+        async def h2(v: float):
+            results.append(("h2", v))
+
+        sw.queue_pending_callback(h1, (1.0,))
+        sw.queue_pending_callback(h2, (2.0,))
+
+        await deck._drain_widget_callbacks(sw)
+        assert results == [("h1", 1.0), ("h2", 2.0)]
+        # Queue should be empty after drain
+        assert sw.drain_pending_callbacks() == []
+
+
 # ── Deck._render_all_buttons ────────────────────────────────────────────
 
 

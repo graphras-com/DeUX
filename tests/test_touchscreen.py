@@ -141,6 +141,92 @@ class TestWidgetAbstractBase:
         assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
 
 
+class TestWidgetDialDecorators:
+    def test_on_dial_turn(self):
+        w = _ConcreteWidget(0)
+
+        @w.on_dial_turn
+        async def handler(direction: int):
+            pass
+
+        assert w._dial_turn_handler is handler
+
+    def test_on_dial_turn_returns_handler(self):
+        w = _ConcreteWidget(0)
+
+        async def handler(direction: int):
+            pass
+
+        result = w.on_dial_turn(handler)
+        assert result is handler
+
+    def test_on_dial_press(self):
+        w = _ConcreteWidget(0)
+
+        @w.on_dial_press
+        async def handler():
+            pass
+
+        assert w._dial_press_handler is handler
+
+    def test_on_dial_press_returns_handler(self):
+        w = _ConcreteWidget(0)
+
+        async def handler():
+            pass
+
+        result = w.on_dial_press(handler)
+        assert result is handler
+
+    def test_dial_handlers_initially_none(self):
+        w = _ConcreteWidget(0)
+        assert w._dial_turn_handler is None
+        assert w._dial_press_handler is None
+
+
+class TestWidgetPendingCallbacks:
+    def test_initially_empty(self):
+        w = _ConcreteWidget(0)
+        assert w.drain_pending_callbacks() == []
+
+    def test_queue_and_drain(self):
+        w = _ConcreteWidget(0)
+
+        async def handler(value: float):
+            pass
+
+        w.queue_pending_callback(handler, (42.0,))
+        callbacks = w.drain_pending_callbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0] == (handler, (42.0,))
+
+    def test_drain_clears_queue(self):
+        w = _ConcreteWidget(0)
+
+        async def handler(value: float):
+            pass
+
+        w.queue_pending_callback(handler, (1.0,))
+        w.drain_pending_callbacks()
+        assert w.drain_pending_callbacks() == []
+
+    def test_multiple_callbacks_preserved_in_order(self):
+        w = _ConcreteWidget(0)
+
+        async def h1(value: float):
+            pass
+
+        async def h2(value: float):
+            pass
+
+        w.queue_pending_callback(h1, (10.0,))
+        w.queue_pending_callback(h2, (20.0,))
+        callbacks = w.drain_pending_callbacks()
+        assert len(callbacks) == 2
+        assert callbacks[0] == (h1, (10.0,))
+        assert callbacks[1] == (h2, (20.0,))
+
+
 # ── IconWidget ──────────────────────────────────────────────────────────
 
 

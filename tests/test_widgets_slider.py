@@ -306,3 +306,119 @@ class TestSliderWidgetBackReference:
         s = _ConcreteLargeSlider("X", value=50, step=5)
         s.adjust(1)
         assert s.value == 55
+
+
+# ── on_change callback ──────────────────────────────────────────────────
+
+
+class TestSliderOnChange:
+    def test_handler_initially_none(self):
+        s = _ConcreteLargeSlider("X", value=50)
+        assert s._change_handler is None
+
+    def test_on_change_registers_handler(self):
+        s = _ConcreteLargeSlider("X", value=50)
+
+        @s.on_change
+        async def handler(value: float):
+            pass
+
+        assert s._change_handler is handler
+
+    def test_on_change_returns_handler(self):
+        s = _ConcreteLargeSlider("X", value=50)
+
+        async def handler(value: float):
+            pass
+
+        result = s.on_change(handler)
+        assert result is handler
+
+    def test_set_value_queues_callback_on_widget(self):
+        w = SliderWidget(0)
+        s = _ConcreteLargeSlider("X", value=50)
+        w.add_slider(s)
+
+        @s.on_change
+        async def handler(value: float):
+            pass
+
+        s.set_value(75)
+        callbacks = w.drain_pending_callbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0] == (handler, (75.0,))
+
+    def test_set_value_no_callback_when_value_unchanged(self):
+        w = SliderWidget(0)
+        s = _ConcreteLargeSlider("X", value=50)
+        w.add_slider(s)
+
+        @s.on_change
+        async def handler(value: float):
+            pass
+
+        s.set_value(50)  # same value
+        callbacks = w.drain_pending_callbacks()
+        assert callbacks == []
+
+    def test_set_value_no_callback_without_handler(self):
+        w = SliderWidget(0)
+        s = _ConcreteLargeSlider("X", value=50)
+        w.add_slider(s)
+
+        s.set_value(75)
+        callbacks = w.drain_pending_callbacks()
+        assert callbacks == []
+
+    def test_set_value_no_callback_without_widget(self):
+        s = _ConcreteLargeSlider("X", value=50)
+
+        @s.on_change
+        async def handler(value: float):
+            pass
+
+        s.set_value(75)  # no widget — should not raise
+        assert s.value == 75
+
+    def test_adjust_queues_callback(self):
+        w = SliderWidget(0)
+        s = _ConcreteLargeSlider("X", value=50, step=5)
+        w.add_slider(s)
+
+        @s.on_change
+        async def handler(value: float):
+            pass
+
+        s.adjust(1)
+        callbacks = w.drain_pending_callbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0] == (handler, (55.0,))
+
+    def test_adjust_no_callback_when_clamped_at_same_value(self):
+        w = SliderWidget(0)
+        s = _ConcreteLargeSlider("X", value=100, max_value=100, step=5)
+        w.add_slider(s)
+
+        @s.on_change
+        async def handler(value: float):
+            pass
+
+        s.adjust(1)  # already at max, value stays 100
+        callbacks = w.drain_pending_callbacks()
+        assert callbacks == []
+
+    def test_multiple_set_value_calls_queue_multiple_callbacks(self):
+        w = SliderWidget(0)
+        s = _ConcreteLargeSlider("X", value=50)
+        w.add_slider(s)
+
+        @s.on_change
+        async def handler(value: float):
+            pass
+
+        s.set_value(60)
+        s.set_value(70)
+        callbacks = w.drain_pending_callbacks()
+        assert len(callbacks) == 2
+        assert callbacks[0] == (handler, (60.0,))
+        assert callbacks[1] == (handler, (70.0,))

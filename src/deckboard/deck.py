@@ -357,9 +357,15 @@ class Deck:
 
         Call this after changing button icons/labels or widget values
         if you need immediate updates outside of ``set_page()``.
+        Also drains any pending callbacks queued by programmatic
+        ``set_value()`` calls on sliders.
         """
         if not self._active_page:
             return
+
+        # Drain pending callbacks from all widgets (programmatic set_value)
+        for widget in self._active_page.widgets:
+            await self._drain_widget_callbacks(widget)
 
         # Render dirty buttons
         for button in self._active_page.buttons.values():
@@ -419,6 +425,16 @@ class Deck:
         finally:
             self._closed_event.set()
 
+    async def _drain_widget_callbacks(self, widget: Widget) -> None:
+        """Drain and await all pending callbacks queued on a widget.
+
+        Callbacks are enqueued by child elements (e.g. sliders) when
+        their value changes synchronously.  This method pops them all
+        and awaits each in order.
+        """
+        for handler, args in widget.drain_pending_callbacks():
+            await handler(*args)
+
     async def _dispatch(self, event: DeckEvent) -> None:
         """Dispatch a single event to the appropriate handler on the active page."""
         page = self._active_page
@@ -437,9 +453,14 @@ class Deck:
             dial = page.dials.get(event.dial)
             if dial and dial._turn_handler:
                 await dial._turn_handler(event.direction)
-            # Forward to widget (e.g. SliderWidget adjusts its active slider)
+            # Widget-level dial turn handler
             widget = page.touchscreen.widget(event.dial)
+            if widget._dial_turn_handler:
+                await widget._dial_turn_handler(event.direction)
+            # Forward to widget (e.g. SliderWidget adjusts its active slider)
             widget.handle_dial_turn(event.direction)
+            # Drain deferred callbacks (e.g. slider on_change)
+            await self._drain_widget_callbacks(widget)
             if widget.is_dirty:
                 await self.refresh()
 
@@ -453,7 +474,12 @@ class Deck:
             # Forward dial press to widget (e.g. SliderWidget cycles sliders)
             if event.pressed:
                 widget = page.touchscreen.widget(event.dial)
+                # Widget-level dial press handler
+                if widget._dial_press_handler:
+                    await widget._dial_press_handler()
                 widget.handle_dial_press()
+                # Drain deferred callbacks (if any)
+                await self._drain_widget_callbacks(widget)
                 if widget.is_dirty:
                     await self.refresh()
 
