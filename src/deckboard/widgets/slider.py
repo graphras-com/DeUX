@@ -349,20 +349,18 @@ class SmallSlider(Slider, ABC):
         label_w = bbox[2] - bbox[0]
         label_h = bbox[3] - bbox[1]
 
-        # Vertically centre the label in the slot
-        label_y = y + (height - label_h) // 2 - 1
-
-        draw.text(
-            (label_x_end - label_w, label_y), self._label, fill="white", font=font
-        )
-
         # Bar area to the right of the label
         bar_x = label_x_end + _SMALL_LABEL_GAP
         bar_w = width - bar_x + x
         frame_h = _SMALL_FRAME_HEIGHT
 
-        # Vertically centre the frame in the slot
-        bar_y = y + (height - frame_h) // 2
+        # Position: bar at the bottom of the slot, label vertically centred on bar
+        bar_y = y + height - frame_h - 1
+        label_y = bar_y + (frame_h - label_h) // 2
+
+        draw.text(
+            (label_x_end - label_w, label_y), self._label, fill="white", font=font
+        )
 
         # Frame (use inclusive integer coords for symmetric stroke)
         stroke_color = _HIGHLIGHT_COLOR if active else _NORMAL_STROKE_COLOR
