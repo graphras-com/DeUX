@@ -23,21 +23,21 @@ if TYPE_CHECKING:
 
 # ── Layout constants (derived from the reference SVG) ────────────────────
 
-# Large slider — fits 2 per 200x100 widget zone
+# Large slider — fits 2 per widget zone
 _LARGE_MARGIN_X = 2
 _LARGE_LABEL_FONT_SIZE = 14
 _LARGE_LABEL_GAP = 3  # gap between label line and frame top
-_LARGE_FRAME_HEIGHT = 15
+_LARGE_FRAME_HEIGHT = 17
 _LARGE_FRAME_RX = 2
 _LARGE_FRAME_STROKE = 1
 _LARGE_INNER_PAD = 2  # padding between frame and inner track
 _LARGE_INDICATOR_W = 3
 _LARGE_INNER_RX = 1
 
-# Small slider — fits 4 per 200x100 widget zone
+# Small slider — fits 4 per widget zone
 _SMALL_LABEL_WIDTH = 54
 _SMALL_LABEL_GAP = 2
-_SMALL_FRAME_HEIGHT = 11
+_SMALL_FRAME_HEIGHT = 12
 _SMALL_FRAME_RX = 2
 _SMALL_FRAME_STROKE = 1
 _SMALL_INNER_PAD = 2
@@ -141,9 +141,7 @@ class Slider(Control, ABC):
         if self._card is not None:
             self._card.mark_dirty()
             if self._change_handler is not None and self._value != old:
-                self._card.queue_pending_callback(
-                    self._change_handler, (self._value,)
-                )
+                self._card.queue_pending_callback(self._change_handler, (self._value,))
 
     def adjust(self, direction: int) -> None:
         """Adjust the value by ``direction * step``."""

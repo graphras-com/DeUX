@@ -14,8 +14,8 @@ class IconWidget(Widget):
 
     This is the default widget type created by :class:`TouchScreen`.
 
-    Layout (195x78):
-      - Left side: 50x50 icon (centered vertically, 8px from left)
+    Layout (195x86):
+      - Left side: 55x55 icon (centered vertically, 8px from left)
       - Right side: label on top, value below
 
     Usage::

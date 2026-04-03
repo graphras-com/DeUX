@@ -29,12 +29,12 @@ if TYPE_CHECKING:
 # ── Layout constants ─────────────────────────────────────────────────────
 
 # Large dual-value — same slot height as LargeSlider (WIDGET_HEIGHT // 2)
-_LARGE_ICON_SIZE = 24
+_LARGE_ICON_SIZE = 26
 _LARGE_ICON_MARGIN_LEFT = 4
 _LARGE_ICON_GAP = 4  # gap between icon column and value text
 
 # Small dual-value — same slot height as SmallSlider (WIDGET_HEIGHT // 4)
-_SMALL_ICON_SIZE = 12
+_SMALL_ICON_SIZE = 13
 _SMALL_ICON_MARGIN_LEFT = 4
 _SMALL_ICON_GAP = 3  # gap between icon column and value text
 
