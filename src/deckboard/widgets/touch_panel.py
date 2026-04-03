@@ -11,11 +11,14 @@ from ..image import WIDGET_HEIGHT, WIDGET_WIDTH
 from ..touchscreen import Widget
 
 if TYPE_CHECKING:
+    from .dual_value import LargeDualValue, SmallDualValue
     from .slider import Slider
     from .text import LargeText, SmallText
 
 # Union of all element types that can be placed inside a TouchPanel.
-PanelElement = Union["Slider", "LargeText", "SmallText"]
+PanelElement = Union[
+    "Slider", "LargeText", "SmallText", "LargeDualValue", "SmallDualValue"
+]
 
 
 class TouchPanel(Widget):
@@ -59,23 +62,32 @@ class TouchPanel(Widget):
     def add_element(
         self, element: PanelElement, *, default: bool = False
     ) -> TouchPanel:
-        """Add a sub-element (slider or text) to this panel.
+        """Add a sub-element (slider, text, or dual-value) to this panel.
 
         Args:
-            element: A :class:`Slider`, :class:`LargeText`, or
-                :class:`SmallText` instance.
+            element: A :class:`Slider`, :class:`LargeText`,
+                :class:`SmallText`, :class:`LargeDualValue`, or
+                :class:`SmallDualValue` instance.
             default: If ``True`` **and** the element is selectable, it
                 becomes the default active element after timeout.
 
         Returns:
             This panel (for chaining).
         """
+        from .dual_value import LargeDualValue as _LargeDualValue
+        from .dual_value import SmallDualValue as _SmallDualValue
         from .slider import Slider as _Slider
         from .text import LargeText as _LargeText
         from .text import SmallText as _SmallText
 
-        if not isinstance(element, (_Slider, _LargeText, _SmallText)):
-            msg = f"Expected a Slider, LargeText, or SmallText instance, got {type(element).__name__}"
+        if not isinstance(
+            element,
+            (_Slider, _LargeText, _SmallText, _LargeDualValue, _SmallDualValue),
+        ):
+            msg = (
+                f"Expected a Slider, LargeText, SmallText, LargeDualValue, "
+                f"or SmallDualValue instance, got {type(element).__name__}"
+            )
             raise TypeError(msg)
 
         element._widget = self  # type: ignore[union-attr]

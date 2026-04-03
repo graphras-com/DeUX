@@ -760,7 +760,8 @@ class TestTouchPanelAddElement:
     def test_rejects_invalid_type(self):
         panel = TouchPanel(0)
         with pytest.raises(
-            TypeError, match="Expected a Slider, LargeText, or SmallText"
+            TypeError,
+            match="Expected a Slider, LargeText, SmallText, LargeDualValue, or SmallDualValue",
         ):
             panel.add_element("not an element")  # type: ignore[arg-type]
 

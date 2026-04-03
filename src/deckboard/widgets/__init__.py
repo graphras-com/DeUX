@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .balance import BalanceSlider
 from .brightness import BrightnessSlider
+from .dual_value import LargeDualValue, SmallDualValue
 from .equalizer import EqualizerSlider
 from .icon_widget import IconWidget
 from .kelvin import KelvinSlider
@@ -20,10 +21,12 @@ __all__ = [
     "EqualizerSlider",
     "IconWidget",
     "KelvinSlider",
+    "LargeDualValue",
     "LargeSlider",
     "LargeText",
     "Slider",
     "SliderWidget",
+    "SmallDualValue",
     "SmallSlider",
     "SmallText",
     "TemperatureSlider",
