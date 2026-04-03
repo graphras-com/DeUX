@@ -9,6 +9,7 @@ from .equalizer import EqualizerSlider
 from .equalizer_widget import EqualizerWidget
 from .icon_widget import IconWidget
 from .kelvin import KelvinSlider
+from .light_widget import LightWidget
 from .media_widget import MediaWidget
 from .slider import LargeSlider, Slider, SmallSlider
 from .slider_widget import SliderWidget
@@ -27,6 +28,7 @@ __all__ = [
     "LargeDualValue",
     "LargeSlider",
     "LargeText",
+    "LightWidget",
     "MediaWidget",
     "Slider",
     "SliderWidget",
