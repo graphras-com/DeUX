@@ -4,26 +4,20 @@ Instructions for AI coding agents working on the **deckboard** repository.
 
 ## Mandatory workflow — read this FIRST
 
-You MUST follow this sequence for every task. Do not write any code before step 1. Do NOT skip or reorder any step.
+You MUST follow this sequence for every task. Do not write any code before step 1.
 
-1. **Create a branch** — your first action on any task must be creating a branch from up-to-date `main`:
+1. **Create a branch** from up-to-date `main`:
    ```
    git checkout main && git pull
    git checkout -b <prefix>/<name>
    ```
-   If you are already on a non-main branch from a previous task, confirm with the user before reusing it.
-
-2. **Do the work** — make your changes.
-
+2. **Do the work.**
 3. **Run the full test suite** — every test must pass before you commit:
    ```
    python -m pytest tests/ --cov=deckboard --cov-report=term-missing --cov-fail-under=95
    ```
-   If `python` does not resolve to Python 3.11+, use `python3` or the full interpreter path.
-
-4. **Commit** — only after all tests pass. Do not commit with failing tests.
-
-5. **Push and create a PR** — every completed task must end with a pull request:
+4. **Commit** — only after all tests pass.
+5. **Push and create a PR**:
    ```
    git push -u origin <branch>
    gh pr create --title "..." --body "..."
@@ -33,111 +27,187 @@ You MUST follow this sequence for every task. Do not write any code before step 
 
 ## Project overview
 
-Deckboard is a high-level, asyncio-native Python library for Elgato Stream Deck+ devices. It wraps the low-level `python-elgato-streamdeck` HID library and provides a clean API for buttons, dials, touchscreen widgets, icons, and page management.
-
-### Tech stack
-
-- **Language:** Python 3.11+
-- **Build system:** Hatchling (`pyproject.toml`)
-- **Async:** asyncio (native, no third-party event loop)
-- **Dependencies:** Pillow, streamdeck, cairosvg, httpx
-- **Testing:** pytest, pytest-asyncio, pytest-cov
-- **Linting:** Ruff
-- **Type checking:** mypy (strict mode)
-- **CI:** GitHub Actions with reusable workflows
+Deckboard is an asyncio-native Python 3.11+ library for Elgato Stream Deck+ devices. It wraps the low-level `python-elgato-streamdeck` HID library and provides a high-level API for buttons, dials, touchscreen widgets, icons, and page management.
 
 ### Repository structure
 
 ```
-src/deckboard/          # Library source code
-  __init__.py           # Public API surface
-  _transport.py         # Async bridge for HID callbacks
-  button.py             # Button abstraction
-  deck.py               # Main Deck class (entry point)
-  dial.py               # Dial abstraction
-  icon.py               # Icon fetching (Iconify API) and caching
-  image.py              # Image rendering helpers (key/touchscreen composition)
-  page.py               # Page management
-  touchscreen.py        # Widget and TouchScreen abstractions
-  types.py              # Event types and data classes
-tests/                  # Test suite (287 tests, 100% coverage)
-  conftest.py           # Shared fixtures
-  test_*.py             # One test file per source module
-.github/workflows/
-  ci.yml                # CI caller workflow
-  python-test.yml       # Reusable test workflow
+src/deckboard/              # Library source
+  __init__.py               # Public API surface and __all__
+  _transport.py             # Async bridge for HID callbacks (sync thread → asyncio queue)
+  button.py                 # Button abstraction (keys 0-7)
+  deck.py                   # Main Deck class — entry point, event loop, rendering
+  dial.py                   # Dial abstraction (rotary encoders 0-3)
+  icon.py                   # Icon fetching (Iconify API), SVG→PNG, disk/memory cache
+  image.py                  # Image rendering helpers, layout constants, JPEG encoding
+  page.py                   # Page management (named layouts of buttons/dials/widgets)
+  touchscreen.py            # Abstract Widget base class, TouchScreen container
+  types.py                  # Event dataclasses, enums, type aliases
+  widgets/                  # Concrete widget implementations
+    __init__.py             # Re-exports all widget classes
+    slider.py               # Abstract Slider/LargeSlider/SmallSlider base classes
+    slider_widget.py        # SliderWidget — groups multiple sliders under one dial
+    icon_widget.py          # IconWidget — icon + label + value display
+    text.py                 # LargeText, SmallText elements
+    touch_panel.py          # TouchPanel — generic container for mixed elements
+    volume.py, brightness.py, temperature.py, kelvin.py, balance.py, equalizer.py
+tests/                      # One test file per source module
+  conftest.py               # Shared fixtures (mock device, sample images, etc.)
+```
+
+## Build / lint / test commands
+
+```bash
+# Install in editable mode with test deps
+pip install -e ".[test]"
+
+# Full test suite with coverage (CI gate = 95%)
+python -m pytest tests/ --cov=deckboard --cov-report=term-missing --cov-fail-under=95
+
+# Single test file
+python -m pytest tests/test_deck.py -v
+
+# Single test class
+python -m pytest tests/test_button.py::TestButtonSetIcon -v
+
+# Single test method
+python -m pytest tests/test_deck.py::TestDeckEventLoop::test_event_loop_timeout_continues -v
+
+# Lint (Ruff)
+ruff check src/ tests/
+
+# Type check (mypy strict)
+mypy src/deckboard/
+```
+
+## Code style
+
+### Imports and file header
+
+Every `.py` file must start with:
+1. A module docstring (one-line summary of the module's purpose)
+2. `from __future__ import annotations`
+3. Stdlib imports, then third-party, then local — Ruff's `I` rule enforces isort ordering
+
+```python
+"""Button class: wraps a physical key on the Stream Deck."""
+
+from __future__ import annotations
+
+import logging                          # stdlib
+from typing import TYPE_CHECKING
+
+from PIL import Image                   # third-party
+
+from .types import AsyncHandler         # local (relative)
+```
+
+Use `TYPE_CHECKING` blocks for imports only needed by type checkers (Ruff `TCH` rule):
+```python
+if TYPE_CHECKING:
+    from StreamDeck.Devices.StreamDeck import StreamDeck
+```
+
+### Type annotations
+
+- **mypy strict mode** — annotate every function signature, every variable where inference is ambiguous.
+- Use modern union syntax: `str | None`, `int | float`, `tuple[int, int]`.
+- Use `@dataclass(frozen=True, slots=True)` for immutable data (see `types.py`).
+- Type aliases go in `types.py`: `AsyncHandler = Callable[..., Coroutine[Any, Any, None]]`.
+
+### Naming conventions
+
+- Classes: `PascalCase` — `Deck`, `Button`, `SliderWidget`, `VolumeSlider`
+- Functions/methods: `snake_case` — `set_value()`, `render_key_image()`
+- Private attributes: leading underscore — `self._device`, `self._running`
+- Module-level constants: `UPPER_SNAKE_CASE` — `WIDGET_WIDTH`, `KEY_SIZE`
+- Private module constants: leading underscore — `_KEY_COUNT = 8`, `_ICONIFY_API`
+- Loggers: one per module — `logger = logging.getLogger(__name__)`
+
+### Error handling
+
+- Define module-specific exception classes inheriting from `Exception`:
+  `DeckError`, `IconError`.
+- Use `raise ... from e` to chain exceptions.
+- Guard state access: raise early with descriptive messages
+  (e.g., `raise DeckError("Device not opened")`).
+- Log unexpected errors with `logger.exception(...)` and continue or re-raise.
+- Validate index arguments with range checks:
+  `if not 0 <= index < _KEY_COUNT: raise IndexError(...)`.
+
+### Patterns used throughout
+
+- **Async context manager** for resource lifecycle (`Deck.__aenter__`/`__aexit__`).
+- **Decorator-based event registration** — `@button.on_press`, `@dial.on_turn`.
+- **Method chaining** — mutators return `self` (e.g., `button.set_icon(...).set_label(...)`).
+- **Dirty tracking** — `is_dirty` / `mark_clean()` / `mark_dirty()` on widgets and buttons.
+- **Abstract base classes** — `Widget(ABC)` with `@abstractmethod render()`.
+- **Thread-safe bridge** — `_transport.py` uses `loop.call_soon_threadsafe()` to enqueue events from the HID reader thread.
+
+### Ruff lint rules (`pyproject.toml`)
+
+```
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "TCH"]
+target-version = "py311"
+```
+
+## Testing
+
+### Requirements
+
+- **Coverage >= 95%** — CI enforces this gate.
+- **All hardware is mocked** — tests run without a physical Stream Deck.
+- `asyncio_mode = "auto"` — no `@pytest.mark.asyncio` decorator needed.
+- Use `unittest.mock.MagicMock` / `AsyncMock` for device mocking.
+- Use `respx` for mocking HTTP requests (icon fetching).
+
+### Test file conventions
+
+- One file per source module: `test_button.py`, `test_deck.py`, `test_widgets_volume.py`.
+- Group related tests in classes: `class TestButtonSetIcon:`, `class TestDeckDispatch:`.
+- Shared fixtures in `conftest.py` (buttons, dials, widgets, mock device, sample images).
+- Test edge cases and error paths, not just the happy path.
+
+### Example test structure
+
+```python
+"""Tests for deckboard.button — Button class."""
+
+from __future__ import annotations
+import pytest
+from deckboard.button import Button
+
+class TestButtonSetIcon:
+    def test_sets_icon_name(self, button: Button):
+        button.set_icon("mdi:home")
+        assert button.icon_name == "mdi:home"
+
+    def test_marks_dirty(self, button: Button):
+        button.mark_clean()
+        button.set_icon("mdi:home")
+        assert button.is_dirty is True
 ```
 
 ## Branch naming
 
-Use descriptive branch names with a prefix:
-
 - `feature/<name>` — new functionality
 - `fix/<name>` — bug fixes
 - `refactor/<name>` — code restructuring
-- `docs/<name>` — documentation changes
+- `docs/<name>` — documentation
 - `ci/<name>` — CI/CD changes
 
 ## Commit messages
 
-Follow this style (see existing history):
-
-- Start with a verb: `Add`, `Fix`, `Update`, `Refactor`, `Remove`
-- First line: concise summary (imperative mood)
-- Optional body: explain the "why", not the "what"
-
-## Testing
-
-### Running tests
-
-```bash
-# Full suite with coverage
-python -m pytest tests/ --cov=deckboard --cov-report=term-missing
-
-# Single file
-python -m pytest tests/test_deck.py -v
-
-# Single test
-python -m pytest tests/test_deck.py::TestDeckEventLoop::test_event_loop_timeout_continues -v
-```
-
-### Test requirements
-
-- **Coverage must stay at or above 95%.** The CI enforces this gate.
-- Every source module has a corresponding `tests/test_<module>.py` file.
-- Shared fixtures live in `tests/conftest.py`.
-- All async tests use `asyncio_mode = "auto"` (no `@pytest.mark.asyncio` needed).
-- Hardware interactions (Stream Deck HID device) must be **mocked** — tests must run without physical hardware.
-- Use `unittest.mock.MagicMock` / `AsyncMock` for device mocking.
-
-### Writing new tests
-
-- Place tests in the appropriate `test_<module>.py` file.
-- Group related tests in classes (e.g., `class TestDeckDispatch:`).
-- If adding a new source module, create a corresponding test file.
-- Test edge cases and error paths, not just the happy path.
-
-## Code style
-
-- **Ruff** handles linting and import sorting. Config is in `pyproject.toml`:
-  ```
-  select = ["E", "F", "I", "N", "UP", "B", "SIM", "TCH"]
-  ```
-- **mypy** runs in strict mode targeting Python 3.11.
-- Use type annotations everywhere.
-- Use `from __future__ import annotations` in every file.
+Start with an imperative verb: `Add`, `Fix`, `Update`, `Refactor`, `Remove`.
+First line: concise summary. Optional body: explain the "why".
 
 ## CI/CD
 
-CI runs automatically on pushes to `main`, PRs targeting `main`, and manual dispatch.
-
-- **`ci.yml`** — Caller workflow. Invokes the reusable test workflow.
-- **`python-test.yml`** — Reusable workflow. Tests against Python 3.11, 3.12, 3.13 on Ubuntu. Enforces 95% coverage minimum. Uploads coverage XML as artifact.
-
-System dependencies required in CI: `libcairo2-dev`, `libhidapi-dev`.
+CI runs on pushes to `main`, PRs targeting `main`, and manual dispatch.
+Tests run on Python 3.11, 3.12, 3.13 (Ubuntu). System deps: `libcairo2-dev`, `libhidapi-dev`.
 
 ## Other reminders
 
-- Do not commit secrets (`.env`, keys, credentials). The `.gitignore` is already configured.
-- Mock all hardware. Tests must work without a physical Stream Deck device.
+- Do not commit secrets. The `.gitignore` is configured.
+- Mock all hardware — no physical device required for tests.
 - Add tests for any new code to maintain 95%+ coverage.
