@@ -17,7 +17,7 @@ Layout::
     │          │          │          │Brightness│   ← touchscreen
     │          │          │          │  Kelvin  │
     └──────────┴──────────┴──────────┴──────────┘
-        dial 0     dial 1     dial 2     dial 3
+        enc 0      enc 1      enc 2      enc 3
 
 Run with::
 
@@ -108,8 +108,8 @@ async def main() -> None:
 
         await deck.set_screen("light")
         print("\nLight widget ready!")
-        print("  Turn dial 3 to adjust the active slider.")
-        print("  Press dial 3 to toggle Brightness ↔ Kelvin.")
+        print("  Turn encoder 3 to adjust the active slider.")
+        print("  Press encoder 3 to toggle Brightness ↔ Kelvin.")
         print("  Row 1: Reset, Movie Night, Bright Day, Exit.")
         print("  Row 2: Candle, Sunset, Reading, Focus presets.\n")
 

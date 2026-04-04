@@ -1,4 +1,4 @@
-"""Abstract base card for a single touch-strip zone under a dial."""
+"""Abstract base card for a single touch-strip zone under an encoder."""
 
 from __future__ import annotations
 
@@ -18,16 +18,16 @@ logger = logging.getLogger(__name__)
 
 
 class Card(ABC):
-    """Abstract base for a single touch-strip zone under a dial.
+    """Abstract base for a single touch-strip zone under an encoder.
 
     The Stream Deck+ touchscreen (800x100) is divided into 4 zones,
-    each aligned with one of the 4 dials.  A margin is applied around
+    each aligned with one of the 4 encoders.  A margin is applied around
     the usable area (top=4, bottom=18, left=4, right=4) and widgets
     are separated by a 4px gap, giving each zone 195x78 usable pixels.
 
     Subclass this to build custom widgets.  At minimum, implement
-    :meth:`render`.  Override the ``handle_dial_*`` and
-    ``check_selection_timeout`` hooks to react to dial events.
+    :meth:`render`.  Override the ``handle_encoder_*`` and
+    ``check_selection_timeout`` hooks to react to encoder events.
 
     Usage::
 
@@ -49,8 +49,8 @@ class Card(ABC):
         self._tap_handler: AsyncHandler | None = None
         self._long_press_handler: AsyncHandler | None = None
         self._drag_handler: AsyncHandler | None = None
-        self._dial_turn_handler: AsyncHandler | None = None
-        self._dial_press_handler: AsyncHandler | None = None
+        self._encoder_turn_handler: AsyncHandler | None = None
+        self._encoder_press_handler: AsyncHandler | None = None
         self._pending_callbacks: list[tuple[AsyncHandler, tuple[float]]] = []
         self._rendered: Image.Image | None = None
         self._dirty = True
@@ -100,31 +100,31 @@ class Card(ABC):
         self._drag_handler = handler
         return handler
 
-    def on_dial_turn(self, handler: AsyncHandler) -> AsyncHandler:
-        """Decorator to register a handler for dial turn events on this widget.
+    def on_encoder_turn(self, handler: AsyncHandler) -> AsyncHandler:
+        """Decorator to register a handler for encoder turn events on this widget.
 
         The handler receives a single ``direction`` argument:
         positive = clockwise, negative = counter-clockwise.
 
         Usage::
 
-            @widget.on_dial_turn
+            @widget.on_encoder_turn
             async def handle(direction: int):
                 ...
         """
-        self._dial_turn_handler = handler
+        self._encoder_turn_handler = handler
         return handler
 
-    def on_dial_press(self, handler: AsyncHandler) -> AsyncHandler:
-        """Decorator to register a handler for dial press events on this widget.
+    def on_encoder_press(self, handler: AsyncHandler) -> AsyncHandler:
+        """Decorator to register a handler for encoder press events on this widget.
 
         Usage::
 
-            @widget.on_dial_press
+            @widget.on_encoder_press
             async def handle():
                 ...
         """
-        self._dial_press_handler = handler
+        self._encoder_press_handler = handler
         return handler
 
     # -- Pending callbacks (deferred async invocation) ---------------------
@@ -177,17 +177,17 @@ class Card(ABC):
     async def prepare_assets(self, icons: IconManager) -> None:
         """Prepare external assets needed for rendering this card."""
 
-    async def dispatch_dial_turn(self, direction: int) -> None:
-        """Dispatch a dial-turn event to the card."""
-        if self._dial_turn_handler is not None:
-            await self._dial_turn_handler(direction)
-        self.handle_dial_turn(direction)
+    async def dispatch_encoder_turn(self, direction: int) -> None:
+        """Dispatch an encoder-turn event to the card."""
+        if self._encoder_turn_handler is not None:
+            await self._encoder_turn_handler(direction)
+        self.handle_encoder_turn(direction)
 
-    async def dispatch_dial_press(self) -> None:
-        """Dispatch a dial-press event to the card."""
-        if self._dial_press_handler is not None:
-            await self._dial_press_handler()
-        self.handle_dial_press()
+    async def dispatch_encoder_press(self) -> None:
+        """Dispatch an encoder-press event to the card."""
+        if self._encoder_press_handler is not None:
+            await self._encoder_press_handler()
+        self.handle_encoder_press()
 
     async def dispatch_touch(self, event: TouchEvent) -> None:
         """Dispatch a touch gesture to the card."""
@@ -212,18 +212,18 @@ class Card(ABC):
             A PANEL_WIDTH x PANEL_HEIGHT RGB :class:`~PIL.Image.Image`.
         """
 
-    # -- Dial interaction hooks (default no-ops) ---------------------------
+    # -- Encoder interaction hooks (default no-ops) ------------------------
 
-    def handle_dial_turn(self, direction: int) -> None:
-        """Called when the dial above this widget is turned.
+    def handle_encoder_turn(self, direction: int) -> None:
+        """Called when the encoder above this widget is turned.
 
-        Override to handle dial rotation.  The default is a no-op.
+        Override to handle encoder rotation.  The default is a no-op.
         """
 
-    def handle_dial_press(self) -> None:
-        """Called when the dial above this widget is pressed.
+    def handle_encoder_press(self) -> None:
+        """Called when the encoder above this widget is pressed.
 
-        Override to handle dial presses.  The default is a no-op.
+        Override to handle encoder presses.  The default is a no-op.
         """
 
     def check_selection_timeout(self) -> bool:

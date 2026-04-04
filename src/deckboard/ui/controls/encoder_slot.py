@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class EncoderSlot:
-    """Represents a single physical dial (rotary encoder) on the Stream Deck+.
+    """Represents a single physical rotary encoder on the Stream Deck+.
 
     Use decorators to register event handlers::
 
@@ -32,14 +32,14 @@ class EncoderSlot:
     # -- Decorator-based event registration --------------------------------
 
     def on_turn(self, handler: AsyncHandler) -> AsyncHandler:
-        """Decorator to register a handler for dial turn events.
+        """Decorator to register a handler for encoder turn events.
 
         The handler receives a single ``direction`` argument:
         positive = clockwise, negative = counter-clockwise.
 
         Usage::
 
-            @dial.on_turn
+            @encoder.on_turn
             async def handle(direction: int):
                 ...
         """
@@ -47,11 +47,11 @@ class EncoderSlot:
         return handler
 
     def on_press(self, handler: AsyncHandler) -> AsyncHandler:
-        """Decorator to register a handler for dial press events.
+        """Decorator to register a handler for encoder press events.
 
         Usage::
 
-            @dial.on_press
+            @encoder.on_press
             async def handle():
                 ...
         """
@@ -59,11 +59,11 @@ class EncoderSlot:
         return handler
 
     def on_release(self, handler: AsyncHandler) -> AsyncHandler:
-        """Decorator to register a handler for dial release events.
+        """Decorator to register a handler for encoder release events.
 
         Usage::
 
-            @dial.on_release
+            @encoder.on_release
             async def handle():
                 ...
         """
@@ -71,16 +71,12 @@ class EncoderSlot:
         return handler
 
     async def dispatch_turn(self, direction: int) -> None:
-        """Dispatch a dial turn event through the registered handler."""
+        """Dispatch an encoder turn event through the registered handler."""
         if self._turn_handler is not None:
             await self._turn_handler(direction)
 
     async def dispatch_press(self, pressed: bool) -> None:
-        """Dispatch a dial press or release event."""
+        """Dispatch an encoder press or release event."""
         handler = self._press_handler if pressed else self._release_handler
         if handler is not None:
             await handler()
-
-
-# Backward-compatible alias
-Dial = EncoderSlot

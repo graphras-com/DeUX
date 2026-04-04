@@ -133,41 +133,41 @@ class TestMediaWidgetMute:
         assert w.volume.value == 0
 
 
-class TestMediaWidgetDialInteraction:
-    def test_dial_turn_adjusts_volume(self):
+class TestMediaWidgetEncoderInteraction:
+    def test_encoder_turn_adjusts_volume(self):
         w = MediaCard(0, volume=50)
-        w.handle_dial_turn(1)
+        w.handle_encoder_turn(1)
         assert w.volume.value == 51
 
-    def test_dial_turn_negative(self):
+    def test_encoder_turn_negative(self):
         w = MediaCard(0, volume=50)
-        w.handle_dial_turn(-1)
+        w.handle_encoder_turn(-1)
         assert w.volume.value == 49
 
-    def test_dial_press_toggles_mute(self):
+    def test_encoder_press_toggles_mute(self):
         w = MediaCard(0, volume=75)
-        w.handle_dial_press()
+        w.handle_encoder_press()
         assert w.muted is True
         assert w.volume.value == 0
 
-    def test_dial_press_unmutes(self):
+    def test_encoder_press_unmutes(self):
         w = MediaCard(0, volume=75)
-        w.handle_dial_press()
-        w.handle_dial_press()
+        w.handle_encoder_press()
+        w.handle_encoder_press()
         assert w.muted is False
         assert w.volume.value == 75
 
-    def test_dial_press_does_not_cycle_sliders(self):
-        """With only one slider, dial press should mute, not cycle."""
+    def test_encoder_press_does_not_cycle_sliders(self):
+        """With only one slider, encoder press should mute, not cycle."""
         w = MediaCard(0, volume=50)
-        w.handle_dial_press()
+        w.handle_encoder_press()
         # active_control should still be the volume slider
         assert w.active_control is w.volume
 
-    def test_dial_turn_while_muted(self):
+    def test_encoder_turn_while_muted(self):
         w = MediaCard(0, volume=50)
-        w.handle_dial_press()  # mute
-        w.handle_dial_turn(5)  # adjust while muted
+        w.handle_encoder_press()  # mute
+        w.handle_encoder_turn(5)  # adjust while muted
         assert w.volume.value == 5  # volume changes even when muted
 
 
@@ -188,10 +188,10 @@ class TestMediaWidgetRender:
         img = w.render()
         assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
-    def test_render_after_dial_interaction(self):
+    def test_render_after_encoder_interaction(self):
         w = MediaCard(0)
-        w.handle_dial_turn(10)
-        w.handle_dial_press()  # mute
+        w.handle_encoder_turn(10)
+        w.handle_encoder_press()  # mute
         img = w.render()
         assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
@@ -222,11 +222,11 @@ class TestMediaWidgetOnChangeIntegration:
         assert len(callbacks) == 1
         assert callbacks[0] == (handler, (75.0,))
 
-    def test_on_change_queued_on_dial_turn(self):
+    def test_on_change_queued_on_encoder_turn(self):
         w = MediaCard(0, volume=50)
         handler = AsyncMock()
         w.volume.on_change(handler)
-        w.handle_dial_turn(3)
+        w.handle_encoder_turn(3)
         callbacks = w.drain_pending_callbacks()
         assert len(callbacks) == 1
         assert callbacks[0] == (handler, (53.0,))
@@ -255,7 +255,7 @@ class TestMediaWidgetOnChangeIntegration:
         w = MediaCard(0, volume=100)
         handler = AsyncMock()
         w.volume.on_change(handler)
-        w.handle_dial_turn(1)
+        w.handle_encoder_turn(1)
         callbacks = w.drain_pending_callbacks()
         assert len(callbacks) == 0
 
@@ -263,7 +263,7 @@ class TestMediaWidgetOnChangeIntegration:
         w = MediaCard(0, volume=0)
         handler = AsyncMock()
         w.volume.on_change(handler)
-        w.handle_dial_turn(-1)
+        w.handle_encoder_turn(-1)
         callbacks = w.drain_pending_callbacks()
         assert len(callbacks) == 0
 

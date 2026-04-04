@@ -14,7 +14,7 @@ class DeviceInfo:
     firmware: str
     key_count: int
     key_layout: tuple[int, int]
-    dial_count: int
+    encoder_count: int
     key_pixel_size: tuple[int, int]
     touchscreen_size: tuple[int, int]
     key_image_format: str

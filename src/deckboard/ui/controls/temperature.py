@@ -18,7 +18,7 @@ class TemperatureSlider(LargeSlider):
         value: Initial value.  Defaults to 15.
         min_value: Minimum temperature.  Defaults to 15.
         max_value: Maximum temperature.  Defaults to 25.
-        step: Dial-turn increment.  Defaults to 0.5.
+        step: Encoder-turn increment.  Defaults to 0.5.
     """
 
     def __init__(

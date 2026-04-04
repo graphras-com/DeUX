@@ -19,7 +19,7 @@ Layout::
     │          │ 📶 -42dB │ 🌡 22°C  │ ☀ 80%   │
     │          │ ⏱ 12ms  │ 💧 45%   │ 🔆 4000K │
     └──────────┴──────────┴──────────┴──────────┘
-        dial 0     dial 1     dial 2     dial 3
+        enc 0      enc 1      enc 2      enc 3
 
 Zone 0: Two LargeDualValue rows (climate readings).
 Zone 1: Four SmallDualValue rows (network stats).
@@ -35,7 +35,7 @@ import asyncio
 import logging
 
 from deckboard import Deck, StackCard, VolumeSlider
-from deckboard.widgets.dual_value import LargeDualValue, SmallDualValue
+from deckboard.ui.elements.metrics import LargeDualValue, SmallDualValue
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 

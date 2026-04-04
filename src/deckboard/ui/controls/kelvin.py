@@ -18,7 +18,7 @@ class KelvinSlider(LargeSlider):
         value: Initial value.  Defaults to 2000.
         min_value: Minimum Kelvin.  Defaults to 2000.
         max_value: Maximum Kelvin.  Defaults to 6500.
-        step: Dial-turn increment.  Defaults to 100.
+        step: Encoder-turn increment.  Defaults to 100.
     """
 
     def __init__(

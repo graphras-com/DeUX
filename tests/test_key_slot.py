@@ -1,144 +1,144 @@
-"""Tests for deckboard.ui.controls.key_slot — KeySlot (Button) class."""
+"""Tests for deckboard.ui.controls.key_slot — KeySlot class."""
 
 from __future__ import annotations
 
 import pytest
 
-from deckboard.ui.controls.key_slot import Button, KeySlot
+from deckboard.ui.controls.key_slot import KeySlot
 
 
-class TestButtonInit:
-    def test_index(self, button: Button):
-        assert button.index == 0
+class TestKeySlotInit:
+    def test_index(self, key_slot: KeySlot):
+        assert key_slot.index == 0
 
-    def test_defaults(self, button: Button):
-        assert button.icon_name is None
-        assert button.label is None
-        assert button.image_bytes is None
-        assert button.is_dirty is True
+    def test_defaults(self, key_slot: KeySlot):
+        assert key_slot.icon_name is None
+        assert key_slot.label is None
+        assert key_slot.image_bytes is None
+        assert key_slot.is_dirty is True
 
     def test_custom_index(self):
-        b = Button(7)
-        assert b.index == 7
+        k = KeySlot(7)
+        assert k.index == 7
 
 
-class TestButtonSetIcon:
-    def test_sets_icon_name(self, button: Button):
-        button.set_icon("mdi:home")
-        assert button.icon_name == "mdi:home"
+class TestKeySlotSetIcon:
+    def test_sets_icon_name(self, key_slot: KeySlot):
+        key_slot.set_icon("mdi:home")
+        assert key_slot.icon_name == "mdi:home"
 
-    def test_sets_icon_color(self, button: Button):
-        button.set_icon("mdi:home", color="red")
-        assert button._icon_color == "red"
+    def test_sets_icon_color(self, key_slot: KeySlot):
+        key_slot.set_icon("mdi:home", color="red")
+        assert key_slot._icon_color == "red"
 
-    def test_default_color_is_white(self, button: Button):
-        button.set_icon("mdi:home")
-        assert button._icon_color == "white"
+    def test_default_color_is_white(self, key_slot: KeySlot):
+        key_slot.set_icon("mdi:home")
+        assert key_slot._icon_color == "white"
 
-    def test_marks_dirty(self, button: Button):
-        button.mark_clean()
-        assert button.is_dirty is False
-        button.set_icon("mdi:home")
-        assert button.is_dirty is True
+    def test_marks_dirty(self, key_slot: KeySlot):
+        key_slot.mark_clean()
+        assert key_slot.is_dirty is False
+        key_slot.set_icon("mdi:home")
+        assert key_slot.is_dirty is True
 
-    def test_returns_self(self, button: Button):
-        result = button.set_icon("mdi:home")
-        assert result is button
-
-
-class TestButtonSetLabel:
-    def test_sets_label(self, button: Button):
-        button.set_label("Home")
-        assert button.label == "Home"
-
-    def test_set_none_removes_label(self, button: Button):
-        button.set_label("Home")
-        button.set_label(None)
-        assert button.label is None
-
-    def test_marks_dirty(self, button: Button):
-        button.mark_clean()
-        button.set_label("test")
-        assert button.is_dirty is True
-
-    def test_returns_self(self, button: Button):
-        result = button.set_label("x")
-        assert result is button
+    def test_returns_self(self, key_slot: KeySlot):
+        result = key_slot.set_icon("mdi:home")
+        assert result is key_slot
 
 
-class TestButtonClear:
-    def test_clears_icon(self, button: Button):
-        button.set_icon("mdi:home")
-        button.clear()
-        assert button.icon_name is None
+class TestKeySlotSetLabel:
+    def test_sets_label(self, key_slot: KeySlot):
+        key_slot.set_label("Home")
+        assert key_slot.label == "Home"
 
-    def test_clears_label(self, button: Button):
-        button.set_label("test")
-        button.clear()
-        assert button.label is None
+    def test_set_none_removes_label(self, key_slot: KeySlot):
+        key_slot.set_label("Home")
+        key_slot.set_label(None)
+        assert key_slot.label is None
 
-    def test_clears_image_bytes(self, button: Button):
-        button.set_rendered_image(b"jpeg")
-        button.clear()
-        assert button.image_bytes is None
+    def test_marks_dirty(self, key_slot: KeySlot):
+        key_slot.mark_clean()
+        key_slot.set_label("test")
+        assert key_slot.is_dirty is True
 
-    def test_marks_dirty(self, button: Button):
-        button.mark_clean()
-        button.clear()
-        assert button.is_dirty is True
-
-    def test_returns_self(self, button: Button):
-        assert button.clear() is button
+    def test_returns_self(self, key_slot: KeySlot):
+        result = key_slot.set_label("x")
+        assert result is key_slot
 
 
-class TestButtonChaining:
+class TestKeySlotClear:
+    def test_clears_icon(self, key_slot: KeySlot):
+        key_slot.set_icon("mdi:home")
+        key_slot.clear()
+        assert key_slot.icon_name is None
+
+    def test_clears_label(self, key_slot: KeySlot):
+        key_slot.set_label("test")
+        key_slot.clear()
+        assert key_slot.label is None
+
+    def test_clears_image_bytes(self, key_slot: KeySlot):
+        key_slot.set_rendered_image(b"jpeg")
+        key_slot.clear()
+        assert key_slot.image_bytes is None
+
+    def test_marks_dirty(self, key_slot: KeySlot):
+        key_slot.mark_clean()
+        key_slot.clear()
+        assert key_slot.is_dirty is True
+
+    def test_returns_self(self, key_slot: KeySlot):
+        assert key_slot.clear() is key_slot
+
+
+class TestKeySlotChaining:
     def test_chained_calls(self):
-        b = Button(0)
-        result = b.set_icon("mdi:home", color="red").set_label("Home")
-        assert result is b
-        assert b.icon_name == "mdi:home"
-        assert b.label == "Home"
+        k = KeySlot(0)
+        result = k.set_icon("mdi:home", color="red").set_label("Home")
+        assert result is k
+        assert k.icon_name == "mdi:home"
+        assert k.label == "Home"
 
 
-class TestButtonEventHandlers:
-    def test_on_press_registers_handler(self, button: Button):
+class TestKeySlotEventHandlers:
+    def test_on_press_registers_handler(self, key_slot: KeySlot):
         async def handler():
             pass
 
-        result = button.on_press(handler)
-        assert button._press_handler is handler
+        result = key_slot.on_press(handler)
+        assert key_slot._press_handler is handler
         assert result is handler
 
-    def test_on_release_registers_handler(self, button: Button):
+    def test_on_release_registers_handler(self, key_slot: KeySlot):
         async def handler():
             pass
 
-        result = button.on_release(handler)
-        assert button._release_handler is handler
+        result = key_slot.on_release(handler)
+        assert key_slot._release_handler is handler
         assert result is handler
 
-    def test_on_press_as_decorator(self, button: Button):
-        @button.on_press
+    def test_on_press_as_decorator(self, key_slot: KeySlot):
+        @key_slot.on_press
         async def handler():
             pass
 
-        assert button._press_handler is handler
+        assert key_slot._press_handler is handler
 
-    def test_on_release_as_decorator(self, button: Button):
-        @button.on_release
+    def test_on_release_as_decorator(self, key_slot: KeySlot):
+        @key_slot.on_release
         async def handler():
             pass
 
-        assert button._release_handler is handler
+        assert key_slot._release_handler is handler
 
 
-class TestButtonRendering:
-    def test_set_rendered_image(self, button: Button):
-        button.set_rendered_image(b"jpeg-data")
-        assert button.image_bytes == b"jpeg-data"
-        assert button.is_dirty is False
+class TestKeySlotRendering:
+    def test_set_rendered_image(self, key_slot: KeySlot):
+        key_slot.set_rendered_image(b"jpeg-data")
+        assert key_slot.image_bytes == b"jpeg-data"
+        assert key_slot.is_dirty is False
 
-    def test_mark_clean(self, button: Button):
-        assert button.is_dirty is True
-        button.mark_clean()
-        assert button.is_dirty is False
+    def test_mark_clean(self, key_slot: KeySlot):
+        assert key_slot.is_dirty is True
+        key_slot.mark_clean()
+        assert key_slot.is_dirty is False

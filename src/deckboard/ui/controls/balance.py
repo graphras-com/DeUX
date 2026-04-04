@@ -23,7 +23,7 @@ class BalanceSlider(SmallSlider):
         value: Initial value.  Defaults to 50 (centre).
         min_value: Minimum value.  Defaults to 0 (full left).
         max_value: Maximum value.  Defaults to 100 (full right).
-        step: Dial-turn increment.  Defaults to 1.
+        step: Encoder-turn increment.  Defaults to 1.
     """
 
     def __init__(

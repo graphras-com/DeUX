@@ -74,42 +74,42 @@ class TestLightWidgetAccessors:
         assert w.kelvin.value == 2000
 
 
-class TestLightWidgetDialInteraction:
-    def test_dial_turn_adjusts_active_control(self):
+class TestLightWidgetEncoderInteraction:
+    def test_encoder_turn_adjusts_active_control(self):
         w = LightCard(0, brightness=50)
-        w.handle_dial_turn(1)
+        w.handle_encoder_turn(1)
         assert w.brightness.value == 51
 
-    def test_dial_turn_negative(self):
+    def test_encoder_turn_negative(self):
         w = LightCard(0, brightness=50)
-        w.handle_dial_turn(-1)
+        w.handle_encoder_turn(-1)
         assert w.brightness.value == 49
 
-    def test_dial_press_cycles_active_control(self):
+    def test_encoder_press_cycles_active_control(self):
         w = LightCard(0)
         assert w.active_control is w.brightness
-        w.handle_dial_press()
+        w.handle_encoder_press()
         assert w.active_control is w.kelvin
-        w.handle_dial_press()
+        w.handle_encoder_press()
         assert w.active_control is w.brightness  # wraps
 
-    def test_dial_turn_after_cycle(self):
+    def test_encoder_turn_after_cycle(self):
         w = LightCard(0, kelvin=4000)
-        w.handle_dial_press()  # now on kelvin
-        w.handle_dial_turn(5)
+        w.handle_encoder_press()  # now on kelvin
+        w.handle_encoder_turn(5)
         assert w.kelvin.value == 4500  # step=100, 5 turns = +500
 
-    def test_dial_turn_kelvin_step_size(self):
+    def test_encoder_turn_kelvin_step_size(self):
         """Kelvin slider defaults to step=100."""
         w = LightCard(0, kelvin=3000)
-        w.handle_dial_press()  # switch to kelvin
-        w.handle_dial_turn(1)
+        w.handle_encoder_press()  # switch to kelvin
+        w.handle_encoder_turn(1)
         assert w.kelvin.value == 3100
 
-    def test_dial_turn_brightness_step_size(self):
+    def test_encoder_turn_brightness_step_size(self):
         """Brightness slider defaults to step=1."""
         w = LightCard(0, brightness=50)
-        w.handle_dial_turn(1)
+        w.handle_encoder_turn(1)
         assert w.brightness.value == 51
 
 
@@ -131,11 +131,11 @@ class TestLightWidgetRender:
         _ = w.render()
         # render itself doesn't mark_clean, but it does call check_selection_timeout
 
-    def test_render_after_dial_interaction(self):
+    def test_render_after_encoder_interaction(self):
         w = LightCard(0)
-        w.handle_dial_turn(10)
-        w.handle_dial_press()
-        w.handle_dial_turn(-5)
+        w.handle_encoder_turn(10)
+        w.handle_encoder_press()
+        w.handle_encoder_turn(-5)
         img = w.render()
         assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
@@ -155,7 +155,7 @@ class TestLightWidgetSelectionTimeout:
 
         with patch("deckboard.ui.cards.stack.time") as mock_time:
             mock_time.monotonic = fake_monotonic
-            w.handle_dial_press()  # move to kelvin, records time=100.0
+            w.handle_encoder_press()  # move to kelvin, records time=100.0
             assert w.active_control is w.kelvin
             changed = w.check_selection_timeout()  # elapsed=100.0 >= 0.01
         assert changed is True
@@ -193,11 +193,11 @@ class TestLightWidgetOnChangeIntegration:
         assert len(callbacks) == 1
         assert callbacks[0] == (handler, (75.0,))
 
-    def test_on_change_queued_on_dial_turn(self):
+    def test_on_change_queued_on_encoder_turn(self):
         w = LightCard(0, brightness=50)
         handler = AsyncMock()
         w.brightness.on_change(handler)
-        w.handle_dial_turn(3)
+        w.handle_encoder_turn(3)
         callbacks = w.drain_pending_callbacks()
         assert len(callbacks) == 1
         assert callbacks[0] == (handler, (53.0,))
@@ -208,7 +208,7 @@ class TestLightWidgetOnChangeIntegration:
         kelvin_handler = AsyncMock()
         w.brightness.on_change(bright_handler)
         w.kelvin.on_change(kelvin_handler)
-        w.handle_dial_turn(5)  # brightness is active by default
+        w.handle_encoder_turn(5)  # brightness is active by default
         callbacks = w.drain_pending_callbacks()
         assert len(callbacks) == 1
         assert callbacks[0][0] is bright_handler
@@ -219,9 +219,9 @@ class TestLightWidgetOnChangeIntegration:
         kelvin_handler = AsyncMock()
         w.brightness.on_change(bright_handler)
         w.kelvin.on_change(kelvin_handler)
-        w.handle_dial_press()  # switch to kelvin
+        w.handle_encoder_press()  # switch to kelvin
         w.drain_pending_callbacks()  # clear any pending
-        w.handle_dial_turn(2)
+        w.handle_encoder_turn(2)
         callbacks = w.drain_pending_callbacks()
         assert len(callbacks) == 1
         assert callbacks[0][0] is kelvin_handler
@@ -231,7 +231,7 @@ class TestLightWidgetOnChangeIntegration:
         w = LightCard(0, brightness=100)
         handler = AsyncMock()
         w.brightness.on_change(handler)
-        w.handle_dial_turn(1)
+        w.handle_encoder_turn(1)
         callbacks = w.drain_pending_callbacks()
         assert len(callbacks) == 0
 
@@ -239,7 +239,7 @@ class TestLightWidgetOnChangeIntegration:
         w = LightCard(0, brightness=0)
         handler = AsyncMock()
         w.brightness.on_change(handler)
-        w.handle_dial_turn(-1)
+        w.handle_encoder_turn(-1)
         callbacks = w.drain_pending_callbacks()
         assert len(callbacks) == 0
 

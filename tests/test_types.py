@@ -8,8 +8,8 @@ import pytest
 
 from deckboard.runtime.events import (
     DeckEvent,
-    DialPressEvent,
-    DialTurnEvent,
+    EncoderPressEvent,
+    EncoderTurnEvent,
     EventType,
     KeyEvent,
     TouchEvent,
@@ -22,7 +22,7 @@ from deckboard.runtime.device_info import DeviceInfo
 
 class TestEventType:
     def test_members_exist(self):
-        assert EventType.DIAL_TURN is not None
+        assert EventType.ENCODER_TURN is not None
         assert EventType.TOUCH_SHORT is not None
         assert EventType.TOUCH_LONG is not None
         assert EventType.TOUCH_DRAG is not None
@@ -60,45 +60,47 @@ class TestKeyEvent:
         assert a != b
 
 
-# ── DialTurnEvent ───────────────────────────────────────────────────────
+# ── EncoderTurnEvent ────────────────────────────────────────────────────
 
 
-class TestDialTurnEvent:
+class TestEncoderTurnEvent:
     def test_construction(self):
-        e = DialTurnEvent(dial=2, direction=1)
-        assert e.dial == 2
+        e = EncoderTurnEvent(encoder=2, direction=1)
+        assert e.encoder == 2
         assert e.direction == 1
 
     def test_negative_direction(self):
-        e = DialTurnEvent(dial=0, direction=-3)
+        e = EncoderTurnEvent(encoder=0, direction=-3)
         assert e.direction == -3
 
     def test_frozen(self):
-        e = DialTurnEvent(dial=0, direction=1)
+        e = EncoderTurnEvent(encoder=0, direction=1)
         with pytest.raises(dataclasses.FrozenInstanceError):
-            e.dial = 2  # type: ignore[misc]
+            e.encoder = 2  # type: ignore[misc]
 
     def test_equality(self):
-        assert DialTurnEvent(dial=1, direction=2) == DialTurnEvent(dial=1, direction=2)
+        assert EncoderTurnEvent(encoder=1, direction=2) == EncoderTurnEvent(
+            encoder=1, direction=2
+        )
 
 
-# ── DialPressEvent ──────────────────────────────────────────────────────
+# ── EncoderPressEvent ──────────────────────────────────────────────────
 
 
-class TestDialPressEvent:
+class TestEncoderPressEvent:
     def test_construction(self):
-        e = DialPressEvent(dial=1, pressed=True)
-        assert e.dial == 1
+        e = EncoderPressEvent(encoder=1, pressed=True)
+        assert e.encoder == 1
         assert e.pressed is True
 
     def test_frozen(self):
-        e = DialPressEvent(dial=0, pressed=False)
+        e = EncoderPressEvent(encoder=0, pressed=False)
         with pytest.raises(dataclasses.FrozenInstanceError):
             e.pressed = True  # type: ignore[misc]
 
     def test_equality(self):
-        assert DialPressEvent(dial=0, pressed=True) == DialPressEvent(
-            dial=0, pressed=True
+        assert EncoderPressEvent(encoder=0, pressed=True) == EncoderPressEvent(
+            encoder=0, pressed=True
         )
 
 
@@ -169,7 +171,7 @@ class TestDeviceInfo:
             firmware="1.0.0",
             key_count=8,
             key_layout=(4, 2),
-            dial_count=4,
+            encoder_count=4,
             key_pixel_size=(120, 120),
             touchscreen_size=(800, 100),
             key_image_format="JPEG",
@@ -179,7 +181,7 @@ class TestDeviceInfo:
         assert info.firmware == "1.0.0"
         assert info.key_count == 8
         assert info.key_layout == (4, 2)
-        assert info.dial_count == 4
+        assert info.encoder_count == 4
         assert info.key_pixel_size == (120, 120)
         assert info.touchscreen_size == (800, 100)
         assert info.key_image_format == "JPEG"
@@ -192,7 +194,7 @@ class TestDeviceInfo:
             firmware="x",
             key_count=0,
             key_layout=(0, 0),
-            dial_count=0,
+            encoder_count=0,
             key_pixel_size=(0, 0),
             touchscreen_size=(0, 0),
             key_image_format="x",
@@ -209,9 +211,9 @@ class TestDeckEvent:
         e = KeyEvent(key=0, pressed=True)
         assert isinstance(e, KeyEvent)
 
-    def test_dial_turn_is_deck_event(self):
-        e = DialTurnEvent(dial=0, direction=1)
-        assert isinstance(e, DialTurnEvent)
+    def test_encoder_turn_is_deck_event(self):
+        e = EncoderTurnEvent(encoder=0, direction=1)
+        assert isinstance(e, EncoderTurnEvent)
 
     def test_touch_event_is_deck_event(self):
         e = TouchEvent(event_type=EventType.TOUCH_SHORT, x=0, y=0)

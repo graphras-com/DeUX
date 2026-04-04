@@ -19,7 +19,7 @@ Layout (Living Room)::
     │  Light   │ Colour   │   Room   │  Fan     │   ← touchscreen
     │ Bright.  │  Temp    │  Temp    │ Balance  │
     └──────────┴──────────┴──────────┴──────────┘
-        dial 0     dial 1     dial 2     dial 3
+        enc 0      enc 1      enc 2      enc 3
 
 Run with::
 
@@ -177,7 +177,9 @@ async def main() -> None:
         # Start on the living room page
         await deck.set_screen("Living Room")
         print("\nSmart home dashboard ready!")
-        print("  Turn dials to adjust brightness, colour temp, room temp, fan speed.")
+        print(
+            "  Turn encoders to adjust brightness, colour temp, room temp, fan speed."
+        )
         print("  Button 1 = Movie scene, Button 2 = Bright scene.")
         print("  Button 3 = Switch rooms.")
         print("  Button 7 = All Off.")

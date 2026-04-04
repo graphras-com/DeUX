@@ -13,18 +13,16 @@ class TestPublicAPI:
         expected = {
             "BalanceSlider",
             "BrightnessSlider",
-            "Button",
             "Card",
             "Control",
             "Deck",
             "DeckError",
             "DeckEvent",
             "DeviceInfo",
-            "Dial",
-            "DialPressEvent",
-            "DialTurnEvent",
             "Element",
+            "EncoderPressEvent",
             "EncoderSlot",
+            "EncoderTurnEvent",
             "EqualizerCard",
             "EqualizerSlider",
             "EventType",
@@ -53,10 +51,10 @@ class TestPublicAPI:
         }
         assert set(deckboard.__all__) == expected
 
-    def test_button_importable(self):
-        from deckboard import Button
+    def test_key_slot_importable(self):
+        from deckboard import KeySlot
 
-        assert Button is not None
+        assert KeySlot is not None
 
     def test_deck_importable(self):
         from deckboard import Deck
@@ -68,24 +66,24 @@ class TestPublicAPI:
 
         assert DeckError is not None
 
-    def test_dial_importable(self):
-        from deckboard import Dial
+    def test_encoder_slot_importable(self):
+        from deckboard import EncoderSlot
 
-        assert Dial is not None
+        assert EncoderSlot is not None
 
     def test_event_types_importable(self):
         from deckboard import (
             DeckEvent,
-            DialPressEvent,
-            DialTurnEvent,
+            EncoderPressEvent,
+            EncoderTurnEvent,
             EventType,
             KeyEvent,
             TouchEvent,
         )
 
         assert KeyEvent is not None
-        assert DialTurnEvent is not None
-        assert DialPressEvent is not None
+        assert EncoderTurnEvent is not None
+        assert EncoderPressEvent is not None
         assert TouchEvent is not None
         assert EventType is not None
 

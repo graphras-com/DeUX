@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from deckboard.ui.controls.key_slot import Button
-from deckboard.ui.controls.encoder_slot import Dial
+from deckboard.ui.controls.key_slot import KeySlot
+from deckboard.ui.controls.encoder_slot import EncoderSlot
 from deckboard.ui.screen import Screen
 from deckboard.ui.touch_strip import TouchStrip
 from deckboard.ui.cards.base import Card
@@ -20,11 +20,11 @@ class TestPageInit:
     def test_name(self, page: Screen):
         assert page.name == "test"
 
-    def test_empty_buttons(self, page: Screen):
-        assert page.buttons == {}
+    def test_empty_keys(self, page: Screen):
+        assert page.keys == {}
 
-    def test_empty_dials(self, page: Screen):
-        assert page.dials == {}
+    def test_empty_encoders(self, page: Screen):
+        assert page.encoders == {}
 
     def test_has_touchscreen(self, page: Screen):
         assert isinstance(page.touch_strip, TouchStrip)
@@ -33,14 +33,14 @@ class TestPageInit:
         assert len(page.cards) == 4
 
 
-class TestPageButton:
-    def test_key_alias(self, page: Screen):
+class TestPageKey:
+    def test_key_returns_same(self, page: Screen):
         assert page.key(0) is page.key(0)
 
-    def test_creates_button(self, page: Screen):
-        b = page.key(0)
-        assert isinstance(b, Button)
-        assert b.index == 0
+    def test_creates_key_slot(self, page: Screen):
+        k = page.key(0)
+        assert isinstance(k, KeySlot)
+        assert k.index == 0
 
     def test_same_instance(self, page: Screen):
         a = page.key(0)
@@ -49,35 +49,35 @@ class TestPageButton:
 
     def test_creates_all_indices(self, page: Screen):
         for i in range(8):
-            b = page.key(i)
-            assert b.index == i
+            k = page.key(i)
+            assert k.index == i
 
     def test_different_indices_different_instances(self, page: Screen):
         a = page.key(0)
         b = page.key(1)
         assert a is not b
 
-    def test_stored_in_buttons_dict(self, page: Screen):
-        b = page.key(3)
-        assert page.buttons[3] is b
+    def test_stored_in_keys_dict(self, page: Screen):
+        k = page.key(3)
+        assert page.keys[3] is k
 
     def test_index_too_low(self, page: Screen):
-        with pytest.raises(IndexError, match="Button index must be 0-7"):
+        with pytest.raises(IndexError, match="Key index must be 0-7"):
             page.key(-1)
 
     def test_index_too_high(self, page: Screen):
-        with pytest.raises(IndexError, match="Button index must be 0-7"):
+        with pytest.raises(IndexError, match="Key index must be 0-7"):
             page.key(8)
 
 
-class TestPageDial:
-    def test_encoder_alias(self, page: Screen):
+class TestPageEncoder:
+    def test_encoder_returns_same(self, page: Screen):
         assert page.encoder(0) is page.encoder(0)
 
-    def test_creates_dial(self, page: Screen):
-        d = page.encoder(0)
-        assert isinstance(d, Dial)
-        assert d.index == 0
+    def test_creates_encoder_slot(self, page: Screen):
+        e = page.encoder(0)
+        assert isinstance(e, EncoderSlot)
+        assert e.index == 0
 
     def test_same_instance(self, page: Screen):
         a = page.encoder(0)
@@ -86,19 +86,19 @@ class TestPageDial:
 
     def test_creates_all_indices(self, page: Screen):
         for i in range(4):
-            d = page.encoder(i)
-            assert d.index == i
+            e = page.encoder(i)
+            assert e.index == i
 
-    def test_stored_in_dials_dict(self, page: Screen):
-        d = page.encoder(2)
-        assert page.dials[2] is d
+    def test_stored_in_encoders_dict(self, page: Screen):
+        e = page.encoder(2)
+        assert page.encoders[2] is e
 
     def test_index_too_low(self, page: Screen):
-        with pytest.raises(IndexError, match="Dial index must be 0-3"):
+        with pytest.raises(IndexError, match="Encoder index must be 0-3"):
             page.encoder(-1)
 
     def test_index_too_high(self, page: Screen):
-        with pytest.raises(IndexError, match="Dial index must be 0-3"):
+        with pytest.raises(IndexError, match="Encoder index must be 0-3"):
             page.encoder(4)
 
 

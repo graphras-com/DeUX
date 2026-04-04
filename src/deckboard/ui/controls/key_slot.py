@@ -90,7 +90,7 @@ class KeySlot:
 
         Usage::
 
-            @button.on_press
+            @key.on_press
             async def handle():
                 ...
         """
@@ -102,7 +102,7 @@ class KeySlot:
 
         Usage::
 
-            @button.on_release
+            @key.on_release
             async def handle():
                 ...
         """
@@ -132,7 +132,3 @@ class KeySlot:
     @property
     def image_bytes(self) -> bytes | None:
         return self._image_bytes
-
-
-# Backward-compatible alias
-Button = KeySlot

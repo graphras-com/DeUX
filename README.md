@@ -3,17 +3,17 @@
 A high-level, asyncio-native Python library for Elgato Stream Deck+ devices.
 
 Deckboard provides a clean, declarative API for building multi-page interfaces
-with buttons, dials, and touchscreen widgets on the Stream Deck+. It handles
+with keys, encoders, and touchscreen cards on the Stream Deck+. It handles
 device discovery, image rendering, icon fetching, and event dispatch so you can
 focus on your application logic.
 
 ## Features
 
 - **Async-first** -- built on `asyncio` with `async with` context manager support.
-- **Multi-page UI** -- define named pages, each with their own buttons, dials, and widgets.
+- **Multi-page UI** -- define named screens, each with their own keys, encoders, and cards.
 - **Declarative icons** -- use any [Iconify](https://iconify.design/) icon by name (e.g. `mdi:home`), fetched and cached automatically.
-- **Event decorators** -- register handlers with `@button.on_press`, `@dial.on_turn`, `@widget.on_tap`, etc.
-- **Touchscreen widgets** -- four widget zones on the LCD strip, each with icon, label, and value.
+- **Event decorators** -- register handlers with `@key.on_press`, `@encoder.on_turn`, `@card.on_tap`, etc.
+- **Touchscreen cards** -- four card zones on the LCD strip, each with icon, label, and value.
 - **Automatic rendering** -- dirty tracking and on-demand refresh.
 
 ## Installation

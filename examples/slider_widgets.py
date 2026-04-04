@@ -2,7 +2,7 @@
 """Stack card showcase — every slider type on one layout.
 
 Demonstrates all six slider types on the Stream Deck+ touchscreen.
-Each dial controls the sliders in its zone; press the dial to cycle
+Each dial controls the sliders in its zone; press the encoder to cycle
 between sliders when a zone has more than one.
 
 Layout::
@@ -17,7 +17,7 @@ Layout::
     │          │  Temp    │          │+Treble  │
     │          │          │          │+Balance │
     └──────────┴──────────┴──────────┴──────────┘
-        dial 0     dial 1     dial 2     dial 3
+        enc 0      enc 1      enc 2      enc 3
 
 Run with::
 
@@ -62,7 +62,7 @@ async def main() -> None:
         page.set_card(0, sw0)
 
         # -- Zone 1: Brightness + Temperature (two large sliders) ----------
-        #    Press dial 1 to cycle between them.
+        #    Press encoder 1 to cycle between them.
 
         bright = BrightnessSlider(value=80)
         temp = TemperatureSlider(value=20)
@@ -80,7 +80,7 @@ async def main() -> None:
         page.set_card(2, sw2)
 
         # -- Zone 3: Sub + Bass + Treble + Balance (four small sliders) ----
-        #    Press dial 3 to cycle through them.
+        #    Press encoder 3 to cycle through them.
 
         sub = EqualizerSlider("Sub", value=50)
         bass = EqualizerSlider("Bass", value=50)
@@ -133,9 +133,9 @@ async def main() -> None:
 
         await deck.set_screen("sliders")
         print("\nSlider showcase ready!")
-        print("  Turn dials to adjust values.")
-        print("  Press dial 1 to cycle Brightness / Temperature.")
-        print("  Press dial 3 to cycle Sub / Bass / Treble / Balance.")
+        print("  Turn encoders to adjust values.")
+        print("  Press encoder 1 to cycle Brightness / Temperature.")
+        print("  Press encoder 3 to cycle Sub / Bass / Treble / Balance.")
         print("  Button 0 = Reset All, Button 1 = Print Values.")
         print("  Button 7 = Exit.\n")
 

@@ -10,7 +10,7 @@ section displays a small icon followed by a left-aligned value string.
 There is no visible divider, no frame, and no label.
 
 Dual-value elements are non-selectable: they render inside a
-:class:`StackCard` alongside sliders but are skipped when the dial
+:class:`StackCard` alongside sliders but are skipped when the encoder
 cycles through active elements.
 """
 

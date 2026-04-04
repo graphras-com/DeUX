@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Basic usage example for the deckboard library.
 
-Demonstrates multi-page UI with buttons, dials, touchscreen widgets,
+Demonstrates multi-page UI with keys, encoders, touchscreen widgets,
 and event handlers on an Elgato Stream Deck+.
 
 Run with::
@@ -22,7 +22,7 @@ async def main():
         info = deck.info
         print(f"Connected: {info.deck_type} (serial: {info.serial})")
         print(f"  Keys: {info.key_count} ({info.key_layout[0]}x{info.key_layout[1]})")
-        print(f"  Dials: {info.dial_count}")
+        print(f"  Encoders: {info.encoder_count}")
         print(f"  Key size: {info.key_pixel_size[0]}x{info.key_pixel_size[1]}")
         print(f"  Touchscreen: {info.touchscreen_size[0]}x{info.touchscreen_size[1]}")
 
@@ -42,16 +42,14 @@ async def main():
         main_page.key(6).set_icon("mdi:skip-next")
         main_page.key(7).set_icon("mdi:cog").set_label("Settings")
 
-        # Touchscreen widgets (under each dial)
+        # Touchscreen widgets (under each encoder)
         main_page.card(0).set_icon("mdi:volume-high").set_label("Volume").set_value(
             "50%"
         )
         main_page.card(1).set_icon("mdi:lightbulb-on").set_label(
             "Brightness"
         ).set_value("80%")
-        main_page.card(2).set_icon("mdi:thermostat").set_label("Temp").set_value(
-            "22°C"
-        )
+        main_page.card(2).set_icon("mdi:thermostat").set_label("Temp").set_value("22°C")
         main_page.card(3).set_icon("mdi:fan").set_label("Fan").set_value("Auto")
 
         # Button event handlers
@@ -78,7 +76,7 @@ async def main():
         async def on_skip():
             print("Skip!")
 
-        # Dial handlers
+        # Encoder handlers
         @main_page.encoder(0).on_turn
         async def on_volume_turn(direction: int):
             nonlocal volume
@@ -135,10 +133,10 @@ async def main():
         # -- Activate main page and wait -----------------------------------
 
         await deck.set_screen("main")
-        print("\nDeck is ready! Press buttons, turn dials, touch the screen.")
-        print("Press dial 0 to mute, turn dial 0 for volume.")
-        print("Press button 7 (Settings) to switch pages.")
-        print("Tap widget 3 on settings page to exit.\n")
+        print("\nDeck is ready! Press keys, turn encoders, touch the screen.")
+        print("Press encoder 0 to mute, turn encoder 0 for volume.")
+        print("Press key 7 (Settings) to switch pages.")
+        print("Tap card 3 on settings page to exit.\n")
 
         await deck.wait_closed()
 

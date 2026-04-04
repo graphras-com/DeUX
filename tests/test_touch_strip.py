@@ -123,13 +123,13 @@ class TestWidgetAbstractBase:
         result = w.on_drag(handler)
         assert result is handler
 
-    def test_handle_dial_turn_noop(self):
+    def test_handle_encoder_turn_noop(self):
         w = _ConcreteWidget(0)
-        w.handle_dial_turn(1)  # should not raise
+        w.handle_encoder_turn(1)  # should not raise
 
-    def test_handle_dial_press_noop(self):
+    def test_handle_encoder_press_noop(self):
         w = _ConcreteWidget(0)
-        w.handle_dial_press()  # should not raise
+        w.handle_encoder_press()  # should not raise
 
     def test_check_selection_timeout_returns_false(self):
         w = _ConcreteWidget(0)
@@ -141,47 +141,47 @@ class TestWidgetAbstractBase:
         assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
 
-class TestWidgetDialDecorators:
-    def test_on_dial_turn(self):
+class TestWidgetEncoderDecorators:
+    def test_on_encoder_turn(self):
         w = _ConcreteWidget(0)
 
-        @w.on_dial_turn
+        @w.on_encoder_turn
         async def handler(direction: int):
             pass
 
-        assert w._dial_turn_handler is handler
+        assert w._encoder_turn_handler is handler
 
-    def test_on_dial_turn_returns_handler(self):
+    def test_on_encoder_turn_returns_handler(self):
         w = _ConcreteWidget(0)
 
         async def handler(direction: int):
             pass
 
-        result = w.on_dial_turn(handler)
+        result = w.on_encoder_turn(handler)
         assert result is handler
 
-    def test_on_dial_press(self):
+    def test_on_encoder_press(self):
         w = _ConcreteWidget(0)
 
-        @w.on_dial_press
+        @w.on_encoder_press
         async def handler():
             pass
 
-        assert w._dial_press_handler is handler
+        assert w._encoder_press_handler is handler
 
-    def test_on_dial_press_returns_handler(self):
+    def test_on_encoder_press_returns_handler(self):
         w = _ConcreteWidget(0)
 
         async def handler():
             pass
 
-        result = w.on_dial_press(handler)
+        result = w.on_encoder_press(handler)
         assert result is handler
 
-    def test_dial_handlers_initially_none(self):
+    def test_encoder_handlers_initially_none(self):
         w = _ConcreteWidget(0)
-        assert w._dial_turn_handler is None
-        assert w._dial_press_handler is None
+        assert w._encoder_turn_handler is None
+        assert w._encoder_press_handler is None
 
 
 class TestWidgetPendingCallbacks:
@@ -588,26 +588,26 @@ class TestStackCardCheckSelectionTimeout:
         assert slider_widget.is_dirty is True
 
 
-class TestStackCardHandleDialTurn:
+class TestStackCardHandleEncoderTurn:
     def test_no_sliders_noop(self, slider_widget: StackCard):
-        slider_widget.handle_dial_turn(1)  # should not raise
+        slider_widget.handle_encoder_turn(1)  # should not raise
 
     def test_adjusts_active_control(self, slider_widget: StackCard):
         vol = VolumeSlider(value=50, step=5)
         slider_widget.add_control(vol)
         slider_widget.mark_clean()
-        slider_widget.handle_dial_turn(1)
+        slider_widget.handle_encoder_turn(1)
         assert vol.value == 55
         assert slider_widget.is_dirty is True
 
     def test_adjusts_negative(self, slider_widget: StackCard):
         vol = VolumeSlider(value=50, step=5)
         slider_widget.add_control(vol)
-        slider_widget.handle_dial_turn(-2)
+        slider_widget.handle_encoder_turn(-2)
         assert vol.value == 40
 
     def test_resets_selection_timeout_on_non_default(self, slider_widget: StackCard):
-        """Turning dial while a non-default slider is active should
+        """Turning encoder while a non-default slider is active should
         reset the selection timeout so it doesn't expire during use."""
         vol = VolumeSlider(value=50, step=5)
         bri = BrightnessSlider(value=50, step=5)
@@ -620,16 +620,16 @@ class TestStackCardHandleDialTurn:
         original_time = slider_widget._last_selection_time
         assert original_time is not None
 
-        # Simulate a small delay, then turn the dial
+        # Simulate a small delay, then turn the encoder
         slider_widget._last_selection_time = time.monotonic() - 3.0
-        slider_widget.handle_dial_turn(1)
+        slider_widget.handle_encoder_turn(1)
 
         # Timeout should have been refreshed to a recent timestamp
         assert slider_widget._last_selection_time is not None
         assert slider_widget._last_selection_time > original_time
 
     def test_no_timeout_reset_on_default_slider(self, slider_widget: StackCard):
-        """Turning dial while the default slider is active should NOT
+        """Turning encoder while the default slider is active should NOT
         set _last_selection_time (no timeout to manage)."""
         vol = VolumeSlider(value=50, step=5)
         bri = BrightnessSlider(value=50, step=5)
@@ -642,11 +642,11 @@ class TestStackCardHandleDialTurn:
         )
         assert slider_widget._last_selection_time is None
 
-        slider_widget.handle_dial_turn(1)
+        slider_widget.handle_encoder_turn(1)
         assert slider_widget._last_selection_time is None
 
-    def test_dial_turn_prevents_timeout_expiry(self, slider_widget: StackCard):
-        """Continuous dial turns should keep the selection alive past
+    def test_encoder_turn_prevents_timeout_expiry(self, slider_widget: StackCard):
+        """Continuous encoder turns should keep the selection alive past
         the configured timeout."""
         vol = VolumeSlider(value=50, step=5)
         bri = BrightnessSlider(value=50, step=5)
@@ -660,19 +660,19 @@ class TestStackCardHandleDialTurn:
 
         # Simulate time passing almost to timeout, then turn
         slider_widget._last_selection_time = time.monotonic() - 1.9
-        slider_widget.handle_dial_turn(1)
+        slider_widget.handle_encoder_turn(1)
 
         # Should NOT have timed out
         assert slider_widget.active_control_index == 1
         assert slider_widget.check_selection_timeout() is False
 
 
-class TestStackCardHandleDialPress:
+class TestStackCardHandleEncoderPress:
     def test_cycles_slider(self, slider_widget: StackCard):
         slider_widget.add_control(VolumeSlider())
         slider_widget.add_control(BrightnessSlider())
         assert slider_widget.active_control_index == 0
-        slider_widget.handle_dial_press()
+        slider_widget.handle_encoder_press()
         assert slider_widget.active_control_index == 1
 
 
@@ -892,7 +892,7 @@ class TestTouchPanelMixedElements:
         assert panel.active_control is vol
 
     def test_cycling_skips_text(self):
-        """Dial press should only cycle among selectable (slider) elements."""
+        """Encoder press should only cycle among selectable (slider) elements."""
         panel = StackCard(0)
         t = LargeText("Title")
         s1 = VolumeSlider("Volume", value=50)
@@ -947,10 +947,10 @@ class TestTouchPanelMixedElements:
         panel.add_element(LargeText("Title"))
         panel.add_element(SmallText("Value"))
         assert panel.active_control is None
-        # Cycling and dial turn should be no-ops
+        # Cycling and encoder turn should be no-ops
         panel.cycle_active_control()
-        panel.handle_dial_turn(1)
-        panel.handle_dial_press()
+        panel.handle_encoder_turn(1)
+        panel.handle_encoder_press()
 
     def test_default_on_second_slider_with_text(self):
         """Setting default on the second slider should track correctly."""
@@ -964,18 +964,18 @@ class TestTouchPanelMixedElements:
         assert panel._default_control_index == 2
 
 
-class TestTouchPanelDialWithMixedElements:
-    def test_dial_turn_adjusts_slider_not_text(self):
+class TestTouchPanelEncoderWithMixedElements:
+    def test_encoder_turn_adjusts_slider_not_text(self):
         panel = StackCard(0)
         panel.add_element(LargeText("Title"))
         vol = VolumeSlider("Volume", value=50, step=5)
         panel.add_element(vol)
         panel.mark_clean()
-        panel.handle_dial_turn(1)
+        panel.handle_encoder_turn(1)
         assert vol.value == 55
         assert panel.is_dirty is True
 
-    def test_dial_press_cycles_sliders(self):
+    def test_encoder_press_cycles_sliders(self):
         panel = StackCard(0)
         panel.add_element(LargeText("Title"))
         s1 = VolumeSlider("Volume")
@@ -983,7 +983,7 @@ class TestTouchPanelDialWithMixedElements:
         panel.add_element(s1)
         panel.add_element(s2)
         assert panel.active_control_index == 1
-        panel.handle_dial_press()
+        panel.handle_encoder_press()
         assert panel.active_control_index == 2
 
     def test_timeout_resets_to_default_with_text(self):
