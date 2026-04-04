@@ -1,18 +1,16 @@
-"""IconWidget — the default widget layout with icon, label, and value text."""
+"""Status card with the standard icon, label, and value layout."""
 
 from __future__ import annotations
 
 from PIL import Image
 
-from ..image import render_widget_image
+from ..render.touch_renderer import render_status_card_image
 from ..icon import IconManager
-from ..touchscreen import Widget
+from ..touchscreen import Card
 
 
-class IconWidget(Widget):
-    """A widget displaying an icon, label, and value in the classic layout.
-
-    This is the default widget type created by :class:`TouchScreen`.
+class StatusCard(Card):
+    """A card displaying an icon, label, and value in the classic layout.
 
     Layout (195x86):
       - Left side: 55x55 icon (centered vertically, 8px from left)
@@ -20,9 +18,9 @@ class IconWidget(Widget):
 
     Usage::
 
-        widget.set_icon("mdi:volume-high")
-        widget.set_label("Volume")
-        widget.set_value("75%")
+        card.set_icon("mdi:volume-high")
+        card.set_label("Volume")
+        card.set_value("75%")
     """
 
     def __init__(self, index: int) -> None:
@@ -35,7 +33,7 @@ class IconWidget(Widget):
 
     # -- Configuration methods (return self for chaining) ------------------
 
-    def set_icon(self, name: str, color: str = "white") -> IconWidget:
+    def set_icon(self, name: str, color: str = "white") -> StatusCard:
         """Set the icon by Iconify name.
 
         Args:
@@ -47,20 +45,20 @@ class IconWidget(Widget):
         self._dirty = True
         return self
 
-    def set_label(self, label: str | None) -> IconWidget:
+    def set_label(self, label: str | None) -> StatusCard:
         """Set the primary text label."""
         self._label = label
         self._dirty = True
         return self
 
-    def set_value(self, value: str | None) -> IconWidget:
+    def set_value(self, value: str | None) -> StatusCard:
         """Set the secondary value text."""
         self._value = value
         self._dirty = True
         return self
 
-    def clear(self) -> IconWidget:
-        """Clear all content from this widget zone."""
+    def clear(self) -> StatusCard:
+        """Clear all content from this card zone."""
         self._icon_name = None
         self._label = None
         self._value = None
@@ -107,12 +105,12 @@ class IconWidget(Widget):
     # -- Rendering ---------------------------------------------------------
 
     def render(self) -> Image.Image:
-        """Render this widget using the classic icon/label/value layout.
+        """Render this card using the classic icon/label/value layout.
 
         Returns:
-            A WIDGET_WIDTH x WIDGET_HEIGHT RGB :class:`~PIL.Image.Image`.
+            A PANEL_WIDTH x PANEL_HEIGHT RGB :class:`~PIL.Image.Image`.
         """
-        return render_widget_image(
+        return render_status_card_image(
             icon=self._icon_image,
             label=self._label,
             value=self._value,

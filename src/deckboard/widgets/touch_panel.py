@@ -1,25 +1,20 @@
-"""TouchPanel — a widget zone composed of stacked sub-elements (sliders, text, etc.)."""
+"""Stack card composed of vertically arranged controls and elements."""
 
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
-
 from PIL import Image
 
-from ..image import WIDGET_HEIGHT, WIDGET_WIDTH
-from ..touchscreen import Widget
+from ..render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from ..touchscreen import Card
 from ..ui.controls.base import Control
 from ..ui.elements.base import Element
-
-if TYPE_CHECKING:
-    from .slider import Slider
 
 PanelElement = Control | Element
 
 
-class TouchPanel(Widget):
-    """A widget that displays stacked sub-elements (sliders, text, etc.).
+class StackCard(Card):
+    """A card that displays stacked sub-elements (controls, text, metrics).
 
     Elements are laid out vertically within the widget zone.  Only
     *selectable* elements (e.g. sliders) participate in dial-press
@@ -29,20 +24,20 @@ class TouchPanel(Widget):
     Usage::
 
         from deckboard.widgets import (
-            VolumeSlider, BrightnessSlider, LargeText, TouchPanel,
+            VolumeSlider, BrightnessSlider, LargeText, StackCard,
         )
 
-        panel = TouchPanel(0)
-        panel.add_element(LargeText("Now Playing"))
-        panel.add_element(VolumeSlider("Volume", value=75))
-        panel.add_element(BrightnessSlider("Bright", value=50))
+        card = StackCard(0)
+        card.add_element(LargeText("Now Playing"))
+        card.add_control(VolumeSlider("Volume", value=75), default=True)
+        card.add_control(BrightnessSlider("Bright", value=50))
     """
 
     def __init__(self, index: int) -> None:
         super().__init__(index)
         self._elements: list[PanelElement] = []
-        self._active_slider_index: int = 0
-        self._default_slider_index: int = 0
+        self._active_control_index: int = 0
+        self._default_control_index: int = 0
         self._selection_timeout: float = 5.0
         self._last_selection_time: float | None = None
 
@@ -58,18 +53,16 @@ class TouchPanel(Widget):
 
     def add_element(
         self, element: PanelElement, *, default: bool = False
-    ) -> TouchPanel:
-        """Add a sub-element (slider, text, or dual-value) to this panel.
+    ) -> StackCard:
+        """Add a sub-element (control, text, or metric) to this card.
 
         Args:
-            element: A :class:`Slider`, :class:`LargeText`,
-                :class:`SmallText`, :class:`LargeDualValue`, or
-                :class:`SmallDualValue` instance.
-            default: If ``True`` **and** the element is selectable, it
-                becomes the default active element after timeout.
+            element: A control or render-only element instance.
+            default: If ``True`` and the element is selectable, it
+                becomes the default active control after timeout.
 
         Returns:
-            This panel (for chaining).
+            This card (for chaining).
         """
         if not isinstance(element, (Control, Element)):
             msg = f"Expected a Control or Element instance, got {type(element).__name__}"
@@ -83,88 +76,51 @@ class TouchPanel(Widget):
         if selectable and getattr(element, "selectable", True):
             idx = selectable[-1]  # the one we just added
             if default or len(selectable) == 1:
-                self._default_slider_index = idx
-                self._active_slider_index = idx
+                self._default_control_index = idx
+                self._active_control_index = idx
 
         self._dirty = True
         return self
 
-    def add_control(self, control: Control, *, default: bool = False) -> TouchPanel:
-        """Add an interactive control to this panel."""
+    def add_control(self, control: Control, *, default: bool = False) -> StackCard:
+        """Add an interactive control to this card."""
         if not isinstance(control, Control):
             msg = f"Expected a Control instance, got {type(control).__name__}"
             raise TypeError(msg)
         return self.add_element(control, default=default)
 
-    def add_slider(self, slider: Slider, default: bool = False) -> TouchPanel:
-        """Add a slider sub-element to this panel.
-
-        This is a convenience wrapper around :meth:`add_element`
-        that validates the type is a :class:`Slider`.
-
-        Args:
-            slider: A :class:`Slider` instance.
-            default: If ``True``, this slider becomes the default.
-
-        Returns:
-            This panel (for chaining).
-        """
-        from .slider import Slider as _Slider
-
-        if not isinstance(slider, _Slider):
-            msg = f"Expected a Slider instance, got {type(slider).__name__}"
-            raise TypeError(msg)
-        return self.add_element(slider, default=default)
-
     @property
     def elements(self) -> list[PanelElement]:
-        """All sub-elements in this panel."""
+        """All sub-elements in this card."""
         return list(self._elements)
 
     @property
-    def sliders(self) -> list[Slider]:
-        """All slider sub-elements in this panel (excluding text)."""
-        from .slider import Slider as _Slider
-
-        return [e for e in self._elements if isinstance(e, _Slider)]
-
-    @property
     def controls(self) -> list[Control]:
-        """All interactive controls in this panel."""
+        """All interactive controls in this card."""
         return [element for element in self._elements if isinstance(element, Control)]
 
     @property
-    def active_slider(self) -> Slider | None:
-        """The slider currently controlled by the dial, or ``None``."""
-        from .slider import Slider as _Slider
-
+    def active_control(self) -> Control | None:
+        """The control currently attached to the dial, or ``None``."""
         selectable = self._selectable_indices()
         if not selectable:
             return None
-        idx = self._active_slider_index
-        if idx < len(self._elements) and isinstance(self._elements[idx], _Slider):
+        idx = self._active_control_index
+        if idx < len(self._elements) and isinstance(self._elements[idx], Control):
             return self._elements[idx]
         return None
 
     @property
-    def active_slider_index(self) -> int:
-        """Index (into :attr:`elements`) of the currently active slider."""
-        return self._active_slider_index
-
-    @property
-    def active_control(self) -> Control | None:
-        """The control currently attached to the dial, if any."""
-        active = self.active_slider
-        if active is None:
-            return None
-        return active
+    def active_control_index(self) -> int:
+        """Index into :attr:`elements` of the currently active control."""
+        return self._active_control_index
 
     @property
     def selection_timeout(self) -> float:
         """Seconds before active slider resets to the default."""
         return self._selection_timeout
 
-    def set_selection_timeout(self, seconds: float) -> TouchPanel:
+    def set_selection_timeout(self, seconds: float) -> StackCard:
         """Set how long before active slider resets to the default.
 
         Args:
@@ -173,11 +129,11 @@ class TouchPanel(Widget):
         self._selection_timeout = max(0.0, seconds)
         return self
 
-    def cycle_active_slider(self) -> None:
+    def cycle_active_control(self) -> None:
         """Advance to the next selectable element (wrapping around).
 
         Called on dial push.  Non-selectable elements (text) are
-        skipped.  Marks the widget dirty so the highlight redraws.
+        skipped.  Marks the card dirty so the highlight redraws.
         """
         selectable = self._selectable_indices()
         if len(selectable) <= 1:
@@ -185,58 +141,50 @@ class TouchPanel(Widget):
 
         # Find current position in the selectable list
         try:
-            pos = selectable.index(self._active_slider_index)
+            pos = selectable.index(self._active_control_index)
         except ValueError:
             pos = 0
         next_pos = (pos + 1) % len(selectable)
-        self._active_slider_index = selectable[next_pos]
+        self._active_control_index = selectable[next_pos]
         self._last_selection_time = time.monotonic()
         self._dirty = True
-
-    def cycle_active_control(self) -> None:
-        """Compatibility alias for :meth:`cycle_active_slider`."""
-        self.cycle_active_slider()
-
-    # -- Widget hooks (override base class no-ops) -------------------------
+ 
+    # -- Card hooks (override base class no-ops) ---------------------------
 
     def handle_dial_turn(self, direction: int) -> None:
-        """Adjust the active slider's value by *direction* steps.
+        """Adjust the active control's value by *direction* steps.
 
-        Marks the widget dirty so the next render reflects the change.
-        Also resets the selection timeout so the active slider doesn't
+        Marks the card dirty so the next render reflects the change.
+        Also resets the selection timeout so the active control doesn't
         revert to the default while the user is still interacting.
         """
-        from .slider import Slider as _Slider
-
-        selectable = self._selectable_indices()
-        if not selectable:
+        active = self.active_control
+        if active is None:
             return
-        idx = self._active_slider_index
-        if idx < len(self._elements) and isinstance(self._elements[idx], _Slider):
-            self._elements[idx].adjust(direction)
-            if self._active_slider_index != self._default_slider_index:
-                self._last_selection_time = time.monotonic()
-            self._dirty = True
+        active.adjust(direction)
+        if self._active_control_index != self._default_control_index:
+            self._last_selection_time = time.monotonic()
+        self._dirty = True
 
     def handle_dial_press(self) -> None:
         """Cycle to the next selectable element.  Called on dial push."""
-        self.cycle_active_slider()
+        self.cycle_active_control()
 
     def check_selection_timeout(self) -> bool:
-        """Reset to the default slider if the timeout has elapsed.
+        """Reset to the default control if the timeout has elapsed.
 
         Returns:
-            ``True`` if the active slider changed (widget is now dirty).
+            ``True`` if the active control changed.
         """
         if (
             self._selection_timeout <= 0
             or self._last_selection_time is None
-            or self._active_slider_index == self._default_slider_index
+            or self._active_control_index == self._default_control_index
         ):
             return False
         elapsed = time.monotonic() - self._last_selection_time
         if elapsed >= self._selection_timeout:
-            self._active_slider_index = self._default_slider_index
+            self._active_control_index = self._default_control_index
             self._last_selection_time = None
             self._dirty = True
             return True
@@ -245,12 +193,12 @@ class TouchPanel(Widget):
     # -- Rendering ---------------------------------------------------------
 
     def render(self) -> Image.Image:
-        """Compose all sub-elements into a single widget image.
+        """Compose all sub-elements into a single card image.
 
         Returns:
-            A WIDGET_WIDTH x WIDGET_HEIGHT RGB :class:`~PIL.Image.Image`.
+            A PANEL_WIDTH x PANEL_HEIGHT RGB :class:`~PIL.Image.Image`.
         """
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
         if not self._elements:
             return img
 
@@ -258,15 +206,15 @@ class TouchPanel(Widget):
 
         selectable = self._selectable_indices()
         count = len(self._elements)
-        slot_height = WIDGET_HEIGHT // count
+        slot_height = PANEL_HEIGHT // count
         for i, element in enumerate(self._elements):
             y = i * slot_height
             active = (
-                i == self._active_slider_index
+                i == self._active_control_index
                 and len(selectable) > 1
                 and i in selectable
             )
             element.render_onto(
-                img, x=0, y=y, width=WIDGET_WIDTH, height=slot_height, active=active
+                img, x=0, y=y, width=PANEL_WIDTH, height=slot_height, active=active
             )
         return img

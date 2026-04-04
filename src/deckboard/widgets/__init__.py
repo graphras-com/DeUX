@@ -1,4 +1,4 @@
-"""Ready-to-use widgets and sub-elements for the Stream Deck+ touchscreen."""
+"""Ready-to-use cards, controls, and elements for the Stream Deck+ touch strip."""
 
 from __future__ import annotations
 
@@ -6,36 +6,34 @@ from .balance import BalanceSlider
 from .brightness import BrightnessSlider
 from .dual_value import LargeDualValue, SmallDualValue
 from .equalizer import EqualizerSlider
-from .equalizer_widget import EqualizerWidget
-from .icon_widget import IconWidget
+from .equalizer_widget import EqualizerCard
+from .icon_widget import StatusCard
 from .kelvin import KelvinSlider
-from .light_widget import LightWidget
-from .media_widget import MediaWidget
+from .light_widget import LightCard
+from .media_widget import MediaCard
 from .slider import LargeSlider, Slider, SmallSlider
-from .slider_widget import SliderWidget
 from .temperature import TemperatureSlider
 from .text import LargeText, SmallText
-from .touch_panel import TouchPanel
+from .touch_panel import StackCard
 from .volume import VolumeSlider
 
 __all__ = [
     "BalanceSlider",
     "BrightnessSlider",
     "EqualizerSlider",
-    "EqualizerWidget",
-    "IconWidget",
+    "EqualizerCard",
     "KelvinSlider",
     "LargeDualValue",
     "LargeSlider",
     "LargeText",
-    "LightWidget",
-    "MediaWidget",
+    "LightCard",
+    "MediaCard",
     "Slider",
-    "SliderWidget",
     "SmallDualValue",
     "SmallSlider",
     "SmallText",
+    "StackCard",
+    "StatusCard",
     "TemperatureSlider",
-    "TouchPanel",
     "VolumeSlider",
 ]

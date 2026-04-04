@@ -26,24 +26,24 @@ class TestPublicAPI:
             "Element",
             "EncoderSlot",
             "EqualizerSlider",
-            "EqualizerWidget",
+            "EqualizerCard",
             "EventType",
             "IconError",
             "IconManager",
-            "IconWidget",
+            "StatusCard",
             "KeySlot",
             "KelvinSlider",
             "KeyEvent",
             "LargeDualValue",
             "LargeSlider",
             "LargeText",
-            "LightWidget",
-            "MediaWidget",
-            "Page",
+            "LightCard",
+            "MediaCard",
+            "Screen",
             "RangeControl",
             "Screen",
             "Slider",
-            "SliderWidget",
+            "StackCard",
             "SmallDualValue",
             "SmallSlider",
             "SmallText",
@@ -51,11 +51,11 @@ class TestPublicAPI:
             "StatusCard",
             "TemperatureSlider",
             "TouchEvent",
-            "TouchPanel",
-            "TouchScreen",
+            "StackCard",
+            "TouchStrip",
             "TouchStrip",
             "VolumeSlider",
-            "Widget",
+            "Card",
         }
         assert set(deckboard.__all__) == expected
 
@@ -102,17 +102,17 @@ class TestPublicAPI:
         assert IconError is not None
 
     def test_page_importable(self):
-        from deckboard import Page, Screen
+        from deckboard import Screen, Screen
 
-        assert Page is not None
+        assert Screen is not None
         assert Screen is not None
 
     def test_touchscreen_importable(self):
-        from deckboard import Card, TouchScreen, TouchStrip, Widget
+        from deckboard import Card, TouchStrip, TouchStrip, Card
 
-        assert TouchScreen is not None
         assert TouchStrip is not None
-        assert Widget is not None
+        assert TouchStrip is not None
+        assert Card is not None
         assert Card is not None
 
     def test_device_info_importable(self):
@@ -128,7 +128,7 @@ class TestPublicAPI:
             Element,
             EncoderSlot,
             EqualizerSlider,
-            IconWidget,
+            StatusCard,
             KeySlot,
             KelvinSlider,
             LargeSlider,
@@ -136,13 +136,13 @@ class TestPublicAPI:
             RangeControl,
             Screen,
             Slider,
-            SliderWidget,
+            StackCard,
             SmallSlider,
             SmallText,
             StackCard,
             StatusCard,
             TemperatureSlider,
-            TouchPanel,
+            StackCard,
             VolumeSlider,
         )
 
@@ -161,10 +161,10 @@ class TestPublicAPI:
         assert TemperatureSlider is not None
         assert EqualizerSlider is not None
         assert BalanceSlider is not None
-        assert IconWidget is not None
         assert StatusCard is not None
-        assert SliderWidget is not None
-        assert TouchPanel is not None
+        assert StatusCard is not None
+        assert StackCard is not None
+        assert StackCard is not None
         assert StackCard is not None
         assert LargeText is not None
         assert SmallText is not None

@@ -24,7 +24,7 @@ from .button import Button
 from .deck import Deck, DeckError
 from .dial import Dial
 from .icon import IconError, IconManager
-from .page import Page, Screen
+from .page import Screen
 from .runtime import (
     DeckEvent,
     DeviceInfo,
@@ -34,7 +34,7 @@ from .runtime import (
     KeyEvent,
     TouchEvent,
 )
-from .touchscreen import TouchScreen, Widget
+from .touchscreen import Card, TouchStrip
 from .ui import (
     Card,
     Control,
@@ -49,22 +49,21 @@ from .ui import (
 from .widgets import (
     BalanceSlider,
     BrightnessSlider,
+    EqualizerCard,
     EqualizerSlider,
-    EqualizerWidget,
-    IconWidget,
     KelvinSlider,
     LargeDualValue,
     LargeSlider,
     LargeText,
-    LightWidget,
-    MediaWidget,
+    LightCard,
+    MediaCard,
     Slider,
-    SliderWidget,
     SmallDualValue,
     SmallSlider,
     SmallText,
+    StackCard,
+    StatusCard,
     TemperatureSlider,
-    TouchPanel,
     VolumeSlider,
 )
 
@@ -84,24 +83,21 @@ __all__ = [
     "Element",
     "EncoderSlot",
     "EqualizerSlider",
-    "EqualizerWidget",
+    "EqualizerCard",
     "EventType",
     "IconError",
     "IconManager",
-    "IconWidget",
     "KeySlot",
     "KelvinSlider",
     "KeyEvent",
     "LargeDualValue",
     "LargeSlider",
     "LargeText",
-    "LightWidget",
-    "MediaWidget",
-    "Page",
+    "LightCard",
+    "MediaCard",
     "RangeControl",
     "Screen",
     "Slider",
-    "SliderWidget",
     "SmallDualValue",
     "SmallSlider",
     "SmallText",
@@ -109,11 +105,8 @@ __all__ = [
     "StatusCard",
     "TemperatureSlider",
     "TouchEvent",
-    "TouchPanel",
-    "TouchScreen",
     "TouchStrip",
     "VolumeSlider",
-    "Widget",
 ]
 
 __version__ = "0.1.0"

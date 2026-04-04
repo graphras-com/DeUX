@@ -50,15 +50,15 @@ async def main() -> None:
 
         # -- Buttons -------------------------------------------------------
 
-        page.button(0).set_icon("mdi:restore").set_label("Reset All")
-        page.button(1).set_icon("mdi:printer").set_label("Values")
-        page.button(7).set_icon("mdi:close-circle").set_label("Exit")
+        page.key(0).set_icon("mdi:restore").set_label("Reset All")
+        page.key(1).set_icon("mdi:printer").set_label("Values")
+        page.key(7).set_icon("mdi:close-circle").set_label("Exit")
 
         # -- Zone 0: Volume (single large slider) -------------------------
 
         vol = VolumeSlider(value=50)
         sw0 = StackCard(0)
-        sw0.add_slider(vol)
+        sw0.add_control(vol)
         page.set_card(0, sw0)
 
         # -- Zone 1: Brightness + Temperature (two large sliders) ----------
@@ -67,8 +67,8 @@ async def main() -> None:
         bright = BrightnessSlider(value=80)
         temp = TemperatureSlider(value=20)
         sw1 = StackCard(1)
-        sw1.add_slider(bright, default=True)
-        sw1.add_slider(temp)
+        sw1.add_control(bright, default=True)
+        sw1.add_control(temp)
         sw1.set_selection_timeout(3)  # revert to brightness after 3s
         page.set_card(1, sw1)
 
@@ -76,7 +76,7 @@ async def main() -> None:
 
         kelvin = KelvinSlider(value=4000)
         sw2 = StackCard(2)
-        sw2.add_slider(kelvin)
+        sw2.add_control(kelvin)
         page.set_card(2, sw2)
 
         # -- Zone 3: Sub + Bass + Treble + Balance (four small sliders) ----
@@ -87,16 +87,16 @@ async def main() -> None:
         treble = EqualizerSlider("Treble", value=50)
         bal = BalanceSlider(value=50)
         sw3 = StackCard(3)
-        sw3.add_slider(sub, default=True)
-        sw3.add_slider(bass)
-        sw3.add_slider(treble)
-        sw3.add_slider(bal)
+        sw3.add_control(sub, default=True)
+        sw3.add_control(bass)
+        sw3.add_control(treble)
+        sw3.add_control(bal)
         sw3.set_selection_timeout(5)
         page.set_card(3, sw3)
 
         # -- Button handlers -----------------------------------------------
 
-        @page.button(0).on_press
+        @page.key(0).on_press
         async def on_reset() -> None:
             """Reset every slider to its default value."""
             vol.set_value(50)
@@ -110,7 +110,7 @@ async def main() -> None:
             await deck.refresh()
             print("All sliders reset.")
 
-        @page.button(1).on_press
+        @page.key(1).on_press
         async def on_print() -> None:
             """Print current slider values to the console."""
             print(
@@ -124,7 +124,7 @@ async def main() -> None:
                 f"Balance={bal.format_value()}"
             )
 
-        @page.button(7).on_press
+        @page.key(7).on_press
         async def on_exit() -> None:
             print("Exiting...")
             await deck.stop()

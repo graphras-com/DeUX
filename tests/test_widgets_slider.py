@@ -5,10 +5,10 @@ from __future__ import annotations
 import pytest
 from PIL import Image
 
-from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH
-from deckboard.touchscreen import Widget
+from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
+from deckboard.touchscreen import Card
 from deckboard.widgets.slider import LargeSlider, Slider, SmallSlider
-from deckboard.widgets.slider_widget import SliderWidget
+from deckboard.widgets.touch_panel import StackCard
 
 
 # ── Concrete test subclasses (since the bases are abstract) ──────────────
@@ -153,13 +153,13 @@ class TestSliderFormatValue:
 
 class TestSliderDrawRoundedRect:
     def test_draws_without_error(self):
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
         from PIL import ImageDraw
 
         draw = ImageDraw.Draw(img)
         Slider._draw_rounded_rect(
             draw,
-            (10, 10, WIDGET_WIDTH - 10, WIDGET_HEIGHT - 10),
+            (10, 10, PANEL_WIDTH - 10, PANEL_HEIGHT - 10),
             radius=5,
             fill="white",
             outline="red",
@@ -169,7 +169,7 @@ class TestSliderDrawRoundedRect:
 
 class TestSliderDrawGradient:
     def test_gradient_basic(self):
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
         Slider._draw_gradient(img, 10, 10, 50, 20, "#000000", "#FFFFFF")
         # Check left edge is dark, right edge is bright
         left_pixel = img.getpixel((10, 20))
@@ -177,16 +177,16 @@ class TestSliderDrawGradient:
         assert left_pixel[0] < right_pixel[0]
 
     def test_gradient_zero_width(self):
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
         # Should not raise
         Slider._draw_gradient(img, 10, 10, 0, 20, "#000000", "#FFFFFF")
 
     def test_gradient_zero_height(self):
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
         Slider._draw_gradient(img, 10, 10, 20, 0, "#000000", "#FFFFFF")
 
     def test_gradient_single_pixel_wide(self):
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
         Slider._draw_gradient(img, 10, 10, 1, 10, "#FF0000", "#0000FF")
 
 
@@ -194,57 +194,57 @@ class TestSliderDrawGradient:
 
 
 class TestLargeSliderRender:
-    def test_renders_widget_size_image(self):
+    def test_renders_card_size_image(self):
         s = _ConcreteLargeSlider("Volume", value=50)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, x=0, y=0, width=WIDGET_WIDTH, height=WIDGET_HEIGHT // 2)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, x=0, y=0, width=PANEL_WIDTH, height=PANEL_HEIGHT // 2)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_with_active_highlight(self):
         s = _ConcreteLargeSlider("Volume", value=50)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
         s.render_onto(
-            img, x=0, y=0, width=WIDGET_WIDTH, height=WIDGET_HEIGHT // 2, active=True
+            img, x=0, y=0, width=PANEL_WIDTH, height=PANEL_HEIGHT // 2, active=True
         )
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_at_min(self):
         s = _ConcreteLargeSlider("Volume", value=0)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, x=0, y=0, width=WIDGET_WIDTH, height=WIDGET_HEIGHT // 2)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, x=0, y=0, width=PANEL_WIDTH, height=PANEL_HEIGHT // 2)
 
     def test_renders_at_max(self):
         s = _ConcreteLargeSlider("Volume", value=100)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, x=0, y=0, width=WIDGET_WIDTH, height=WIDGET_HEIGHT // 2)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, x=0, y=0, width=PANEL_WIDTH, height=PANEL_HEIGHT // 2)
 
 
 # ── SmallSlider ──────────────────────────────────────────────────────────
 
 
 class TestSmallSliderRender:
-    def test_renders_widget_size_image(self):
+    def test_renders_card_size_image(self):
         s = _ConcreteSmallSlider("Bass", value=50)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, x=0, y=0, width=WIDGET_WIDTH, height=WIDGET_HEIGHT // 4)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, x=0, y=0, width=PANEL_WIDTH, height=PANEL_HEIGHT // 4)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_with_active_highlight(self):
         s = _ConcreteSmallSlider("Bass", value=50)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
         s.render_onto(
-            img, x=0, y=0, width=WIDGET_WIDTH, height=WIDGET_HEIGHT // 4, active=True
+            img, x=0, y=0, width=PANEL_WIDTH, height=PANEL_HEIGHT // 4, active=True
         )
 
     def test_renders_at_min(self):
         s = _ConcreteSmallSlider("Bass", value=0)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, x=0, y=0, width=WIDGET_WIDTH, height=WIDGET_HEIGHT // 4)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, x=0, y=0, width=PANEL_WIDTH, height=PANEL_HEIGHT // 4)
 
     def test_renders_at_max(self):
         s = _ConcreteSmallSlider("Bass", value=100)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, x=0, y=0, width=WIDGET_WIDTH, height=WIDGET_HEIGHT // 4)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, x=0, y=0, width=PANEL_WIDTH, height=PANEL_HEIGHT // 4)
 
 
 # ── Abstract class guards ────────────────────────────────────────────────
@@ -264,45 +264,45 @@ class TestSliderAbstractGuards:
             SmallSlider("X")  # type: ignore[abstract]
 
 
-# ── Dirty propagation to parent Widget ───────────────────────────────────
+# ── Dirty propagation to parent Card ───────────────────────────────────
 
 
 class TestSliderWidgetBackReference:
-    def test_no_widget_by_default(self):
+    def test_no_card_by_default(self):
         s = _ConcreteLargeSlider("X", value=50)
-        assert s._widget is None
+        assert s._card is None
 
-    def test_add_slider_sets_widget(self):
-        w = SliderWidget(0)
+    def test_add_slider_sets_card(self):
+        w = StackCard(0)
         s = _ConcreteLargeSlider("X", value=50)
-        w.add_slider(s)
-        assert s._widget is w
+        w.add_control(s)
+        assert s._card is w
 
-    def test_set_value_marks_widget_dirty(self):
-        w = SliderWidget(0)
+    def test_set_value_marks_card_dirty(self):
+        w = StackCard(0)
         s = _ConcreteLargeSlider("X", value=50)
-        w.add_slider(s)
+        w.add_control(s)
         w.mark_clean()
         assert w.is_dirty is False
         s.set_value(75)
         assert w.is_dirty is True
 
-    def test_set_value_without_widget_does_not_raise(self):
+    def test_set_value_without_card_does_not_raise(self):
         s = _ConcreteLargeSlider("X", value=50)
         s.set_value(75)  # no widget attached — should not raise
         assert s.value == 75
 
-    def test_adjust_marks_widget_dirty(self):
-        w = SliderWidget(0)
+    def test_adjust_marks_card_dirty(self):
+        w = StackCard(0)
         s = _ConcreteLargeSlider("X", value=50, step=5)
-        w.add_slider(s)
+        w.add_control(s)
         w.mark_clean()
         assert w.is_dirty is False
         s.adjust(1)
         assert s.value == 55
         assert w.is_dirty is True
 
-    def test_adjust_without_widget_does_not_raise(self):
+    def test_adjust_without_card_does_not_raise(self):
         s = _ConcreteLargeSlider("X", value=50, step=5)
         s.adjust(1)
         assert s.value == 55
@@ -334,10 +334,10 @@ class TestSliderOnChange:
         result = s.on_change(handler)
         assert result is handler
 
-    def test_set_value_queues_callback_on_widget(self):
-        w = SliderWidget(0)
+    def test_set_value_queues_callback_on_card(self):
+        w = StackCard(0)
         s = _ConcreteLargeSlider("X", value=50)
-        w.add_slider(s)
+        w.add_control(s)
 
         @s.on_change
         async def handler(value: float):
@@ -349,9 +349,9 @@ class TestSliderOnChange:
         assert callbacks[0] == (handler, (75.0,))
 
     def test_set_value_no_callback_when_value_unchanged(self):
-        w = SliderWidget(0)
+        w = StackCard(0)
         s = _ConcreteLargeSlider("X", value=50)
-        w.add_slider(s)
+        w.add_control(s)
 
         @s.on_change
         async def handler(value: float):
@@ -362,15 +362,15 @@ class TestSliderOnChange:
         assert callbacks == []
 
     def test_set_value_no_callback_without_handler(self):
-        w = SliderWidget(0)
+        w = StackCard(0)
         s = _ConcreteLargeSlider("X", value=50)
-        w.add_slider(s)
+        w.add_control(s)
 
         s.set_value(75)
         callbacks = w.drain_pending_callbacks()
         assert callbacks == []
 
-    def test_set_value_no_callback_without_widget(self):
+    def test_set_value_no_callback_without_card(self):
         s = _ConcreteLargeSlider("X", value=50)
 
         @s.on_change
@@ -381,9 +381,9 @@ class TestSliderOnChange:
         assert s.value == 75
 
     def test_adjust_queues_callback(self):
-        w = SliderWidget(0)
+        w = StackCard(0)
         s = _ConcreteLargeSlider("X", value=50, step=5)
-        w.add_slider(s)
+        w.add_control(s)
 
         @s.on_change
         async def handler(value: float):
@@ -395,9 +395,9 @@ class TestSliderOnChange:
         assert callbacks[0] == (handler, (55.0,))
 
     def test_adjust_no_callback_when_clamped_at_same_value(self):
-        w = SliderWidget(0)
+        w = StackCard(0)
         s = _ConcreteLargeSlider("X", value=100, max_value=100, step=5)
-        w.add_slider(s)
+        w.add_control(s)
 
         @s.on_change
         async def handler(value: float):
@@ -408,9 +408,9 @@ class TestSliderOnChange:
         assert callbacks == []
 
     def test_multiple_set_value_calls_queue_multiple_callbacks(self):
-        w = SliderWidget(0)
+        w = StackCard(0)
         s = _ConcreteLargeSlider("X", value=50)
-        w.add_slider(s)
+        w.add_control(s)
 
         @s.on_change
         async def handler(value: float):

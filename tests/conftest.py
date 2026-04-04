@@ -12,11 +12,11 @@ from PIL import Image
 from deckboard.button import Button
 from deckboard.dial import Dial
 from deckboard.icon import IconManager
-from deckboard.page import Page
-from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH
-from deckboard.touchscreen import TouchScreen, Widget
-from deckboard.widgets.icon_widget import IconWidget
-from deckboard.widgets.slider_widget import SliderWidget
+from deckboard.page import Screen
+from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
+from deckboard.touchscreen import TouchStrip, Card
+from deckboard.widgets.icon_widget import StatusCard
+from deckboard.widgets.touch_panel import StackCard
 
 
 @pytest.fixture
@@ -33,26 +33,26 @@ def dial():
 
 @pytest.fixture
 def widget():
-    """A fresh IconWidget at index 0."""
-    return IconWidget(0)
+    """A fresh StatusCard at index 0."""
+    return StatusCard(0)
 
 
 @pytest.fixture
 def slider_widget():
-    """A fresh SliderWidget at index 0."""
-    return SliderWidget(0)
+    """A fresh StackCard at index 0."""
+    return StackCard(0)
 
 
 @pytest.fixture
 def touchscreen():
-    """A fresh TouchScreen with 4 widgets."""
-    return TouchScreen()
+    """A fresh TouchStrip with 4 widgets."""
+    return TouchStrip()
 
 
 @pytest.fixture
 def page():
-    """A fresh Page named 'test'."""
-    return Page("test")
+    """A fresh Screen named 'test'."""
+    return Screen("test")
 
 
 @pytest.fixture
@@ -75,8 +75,8 @@ def sample_rgb_icon():
 
 @pytest.fixture
 def sample_widget_image():
-    """A WIDGET_WIDTH x WIDGET_HEIGHT RGB test image for widgets."""
-    return Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), (0, 0, 255))
+    """A PANEL_WIDTH x PANEL_HEIGHT RGB test image for widgets."""
+    return Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), (0, 0, 255))
 
 
 @pytest.fixture

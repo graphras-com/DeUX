@@ -9,7 +9,7 @@ import pytest
 
 from deckboard.deck import Deck, DeckError, _KEY_COUNT
 from deckboard.icon import IconManager
-from deckboard.page import Page
+from deckboard.page import Screen
 from deckboard.types import (
     DialPressEvent,
     DialTurnEvent,
@@ -60,22 +60,22 @@ class TestDeckInit:
 class TestDeckPage:
     def test_creates_screen(self, deck):
         p = deck.screen("main")
-        assert isinstance(p, Page)
+        assert isinstance(p, Screen)
         assert p.name == "main"
 
     def test_creates_page(self, deck):
-        p = deck.page("main")
-        assert isinstance(p, Page)
+        p = deck.screen("main")
+        assert isinstance(p, Screen)
         assert p.name == "main"
 
     def test_same_instance(self, deck):
-        a = deck.page("main")
-        b = deck.page("main")
+        a = deck.screen("main")
+        b = deck.screen("main")
         assert a is b
 
     def test_different_pages(self, deck):
-        a = deck.page("main")
-        b = deck.page("settings")
+        a = deck.screen("main")
+        b = deck.screen("settings")
         assert a is not b
         assert a.name == "main"
         assert b.name == "settings"
@@ -127,7 +127,7 @@ class TestDeckDebugGrid:
     ):
         """Blank keys are rendered with debug_grid when enabled."""
         deck._device = mock_streamdeck_device
-        p = deck.page("main")
+        p = deck.screen("main")
         deck._active_page = p
         deck.debug_grid = True
 
@@ -154,7 +154,7 @@ class TestDeckDebugGrid:
     ):
         """Touchscreen renders with debug_grid overlay."""
         deck._device = mock_streamdeck_device
-        p = deck.page("main")
+        p = deck.screen("main")
         deck._active_page = p
         deck.debug_grid = True
 
@@ -176,35 +176,35 @@ class TestDeckSetPage:
         assert deck.active_screen.name == "main"
 
     async def test_nonexistent_page_raises(self, deck):
-        with pytest.raises(DeckError, match="Page 'missing' does not exist"):
-            await deck.set_page("missing")
+        with pytest.raises(DeckError, match="Screen 'missing' does not exist"):
+            await deck.set_screen("missing")
 
     async def test_sets_active_page(self, deck):
-        deck.page("main")
+        deck.screen("main")
         # Patch rendering methods since no device
         deck._render_all_buttons = AsyncMock()
         deck._render_touchscreen = AsyncMock()
 
-        await deck.set_page("main")
-        assert deck.active_page is not None
-        assert deck.active_page.name == "main"
+        await deck.set_screen("main")
+        assert deck.active_screen is not None
+        assert deck.active_screen.name == "main"
 
     async def test_calls_render(self, deck):
-        deck.page("main")
+        deck.screen("main")
         deck._render_all_buttons = AsyncMock()
         deck._render_touchscreen = AsyncMock()
 
-        await deck.set_page("main")
+        await deck.set_screen("main")
         deck._render_all_buttons.assert_awaited_once()
         deck._render_touchscreen.assert_awaited_once()
 
 
-# ── Deck.active_page ────────────────────────────────────────────────────
+# ── Deck.active_screen ────────────────────────────────────────────────────
 
 
 class TestDeckActivePage:
     def test_initially_none(self, deck):
-        assert deck.active_page is None
+        assert deck.active_screen is None
 
 
 # ── Deck.refresh ────────────────────────────────────────────────────────
@@ -216,8 +216,8 @@ class TestDeckRefresh:
         await deck.refresh()  # Should not raise
 
     async def test_renders_dirty_buttons(self, deck):
-        p = deck.page("main")
-        p.button(0).set_icon("mdi:home")
+        p = deck.screen("main")
+        p.key(0).set_icon("mdi:home")
 
         deck._active_page = p
         deck._render_button = AsyncMock()
@@ -227,8 +227,8 @@ class TestDeckRefresh:
         deck._render_button.assert_awaited_once()
 
     async def test_renders_dirty_touchscreen(self, deck):
-        p = deck.page("main")
-        p.widget(0).set_label("test")
+        p = deck.screen("main")
+        p.card(0).set_label("test")
 
         deck._active_page = p
         deck._render_button = AsyncMock()
@@ -238,8 +238,8 @@ class TestDeckRefresh:
         deck._render_touchscreen.assert_awaited_once()
 
     async def test_skips_clean_buttons(self, deck):
-        p = deck.page("main")
-        b = p.button(0)
+        p = deck.screen("main")
+        b = p.key(0)
         b.set_icon("mdi:home")
         b.mark_clean()  # Make it clean
 
@@ -247,15 +247,15 @@ class TestDeckRefresh:
         deck._render_button = AsyncMock()
         deck._render_touchscreen = AsyncMock()
         # Mark all widgets clean
-        for w in p.widgets:
+        for w in p.cards:
             w.mark_clean()
 
         await deck.refresh()
         deck._render_button.assert_not_awaited()
 
     async def test_skips_clean_touchscreen(self, deck):
-        p = deck.page("main")
-        for w in p.widgets:
+        p = deck.screen("main")
+        for w in p.cards:
             w.mark_clean()
 
         deck._active_page = p
@@ -276,18 +276,18 @@ class TestDeckDispatch:
         await deck._dispatch(event)  # Should not raise
 
     async def test_key_press_dispatches(self, deck):
-        p = deck.page("main")
+        p = deck.screen("main")
         handler = AsyncMock()
-        p.button(0).on_press(handler)
+        p.key(0).on_press(handler)
         deck._active_page = p
 
         await deck._dispatch(KeyEvent(key=0, pressed=True))
         handler.assert_awaited_once()
 
     async def test_key_release_dispatches(self, deck):
-        p = deck.page("main")
+        p = deck.screen("main")
         handler = AsyncMock()
-        p.button(0).on_release(handler)
+        p.key(0).on_release(handler)
         deck._active_page = p
 
         await deck._dispatch(KeyEvent(key=0, pressed=False))
@@ -295,51 +295,51 @@ class TestDeckDispatch:
 
     async def test_key_press_no_handler(self, deck):
         """No error when button has no handler."""
-        p = deck.page("main")
-        p.button(0)  # No handler registered
+        p = deck.screen("main")
+        p.key(0)  # No handler registered
         deck._active_page = p
 
         await deck._dispatch(KeyEvent(key=0, pressed=True))  # Should not raise
 
     async def test_key_event_unknown_button(self, deck):
         """No error when event targets a button that doesn't exist on the page."""
-        p = deck.page("main")
+        p = deck.screen("main")
         deck._active_page = p
 
         await deck._dispatch(KeyEvent(key=7, pressed=True))  # No button 7
 
     async def test_dial_turn_dispatches(self, deck):
-        p = deck.page("main")
+        p = deck.screen("main")
         handler = AsyncMock()
-        p.dial(1).on_turn(handler)
+        p.encoder(1).on_turn(handler)
         deck._active_page = p
 
         await deck._dispatch(DialTurnEvent(dial=1, direction=3))
         handler.assert_awaited_once_with(3)
 
     async def test_dial_turn_no_handler(self, deck):
-        p = deck.page("main")
-        p.dial(1)
+        p = deck.screen("main")
+        p.encoder(1)
         deck._active_page = p
 
         await deck._dispatch(DialTurnEvent(dial=1, direction=1))
 
     async def test_dial_turn_unknown_dial(self, deck):
-        p = deck.page("main")
+        p = deck.screen("main")
         deck._active_page = p
 
         await deck._dispatch(DialTurnEvent(dial=2, direction=1))
 
-    async def test_dial_turn_updates_widget_slider(self, deck):
+    async def test_dial_turn_updates_card_slider(self, deck):
         """Dial turn forwards to widget sliders and triggers refresh."""
         from deckboard.widgets.volume import VolumeSlider
-        from deckboard.widgets.slider_widget import SliderWidget
+        from deckboard.widgets.touch_panel import StackCard
 
-        p = deck.page("main")
-        sw = SliderWidget(1)
+        p = deck.screen("main")
+        sw = StackCard(1)
         slider = VolumeSlider()
-        sw.add_slider(slider)
-        p.set_widget(1, sw)
+        sw.add_control(slider)
+        p.set_card(1, sw)
         deck._active_page = p
 
         with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
@@ -348,77 +348,77 @@ class TestDeckDispatch:
         assert slider.value == 5  # default 0 + 5
 
     async def test_dial_press_dispatches(self, deck):
-        p = deck.page("main")
+        p = deck.screen("main")
         handler = AsyncMock()
-        p.dial(0).on_press(handler)
+        p.encoder(0).on_press(handler)
         deck._active_page = p
 
         await deck._dispatch(DialPressEvent(dial=0, pressed=True))
         handler.assert_awaited_once()
 
     async def test_dial_release_dispatches(self, deck):
-        p = deck.page("main")
+        p = deck.screen("main")
         handler = AsyncMock()
-        p.dial(0).on_release(handler)
+        p.encoder(0).on_release(handler)
         deck._active_page = p
 
         await deck._dispatch(DialPressEvent(dial=0, pressed=False))
         handler.assert_awaited_once()
 
     async def test_dial_press_no_handler(self, deck):
-        p = deck.page("main")
-        p.dial(0)
+        p = deck.screen("main")
+        p.encoder(0)
         deck._active_page = p
 
         await deck._dispatch(DialPressEvent(dial=0, pressed=True))
 
     async def test_dial_press_unknown_dial(self, deck):
-        p = deck.page("main")
+        p = deck.screen("main")
         deck._active_page = p
 
         await deck._dispatch(DialPressEvent(dial=3, pressed=True))
 
-    async def test_dial_press_cycles_widget_slider(self, deck):
+    async def test_dial_press_cycles_card_slider(self, deck):
         """Dial press cycles active slider on the widget and triggers refresh."""
         from deckboard.widgets.volume import VolumeSlider
         from deckboard.widgets.brightness import BrightnessSlider
-        from deckboard.widgets.slider_widget import SliderWidget
+        from deckboard.widgets.touch_panel import StackCard
 
-        p = deck.page("main")
-        sw = SliderWidget(0)
-        sw.add_slider(VolumeSlider())
-        sw.add_slider(BrightnessSlider())
-        p.set_widget(0, sw)
+        p = deck.screen("main")
+        sw = StackCard(0)
+        sw.add_control(VolumeSlider())
+        sw.add_control(BrightnessSlider())
+        p.set_card(0, sw)
         deck._active_page = p
 
-        assert sw._active_slider_index == 0
+        assert sw._active_control_index == 0
         with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
             await deck._dispatch(DialPressEvent(dial=0, pressed=True))
             mock_refresh.assert_awaited_once()
-        assert sw._active_slider_index == 1
+        assert sw._active_control_index == 1
 
     async def test_touch_short_dispatches(self, deck):
-        p = deck.page("main")
+        p = deck.screen("main")
         handler = AsyncMock()
-        p.widget(0).on_tap(handler)
+        p.card(0).on_tap(handler)
         deck._active_page = p
 
         await deck._dispatch(TouchEvent(event_type=EventType.TOUCH_SHORT, x=50, y=50))
         handler.assert_awaited_once()
 
     async def test_touch_long_dispatches(self, deck):
-        p = deck.page("main")
+        p = deck.screen("main")
         handler = AsyncMock()
-        p.widget(1).on_long_press(handler)
+        p.card(1).on_long_press(handler)
         deck._active_page = p
 
         await deck._dispatch(TouchEvent(event_type=EventType.TOUCH_LONG, x=300, y=50))
         handler.assert_awaited_once()
 
     async def test_touch_drag_dispatches(self, deck):
-        p = deck.page("main")
+        p = deck.screen("main")
         handler = AsyncMock()
-        p.widget(2).on_drag(handler)
+        p.card(2).on_drag(handler)
         deck._active_page = p
 
         await deck._dispatch(
@@ -433,16 +433,16 @@ class TestDeckDispatch:
         handler.assert_awaited_once_with(450, 20, 550, 80)
 
     async def test_touch_no_handler(self, deck):
-        p = deck.page("main")
+        p = deck.screen("main")
         deck._active_page = p
 
         await deck._dispatch(TouchEvent(event_type=EventType.TOUCH_SHORT, x=50, y=50))
 
     async def test_touch_zone_calculation(self, deck):
         """Touch at x=600 should dispatch to widget zone 3."""
-        p = deck.page("main")
+        p = deck.screen("main")
         handler = AsyncMock()
-        p.widget(3).on_tap(handler)
+        p.card(3).on_tap(handler)
         deck._active_page = p
 
         await deck._dispatch(TouchEvent(event_type=EventType.TOUCH_SHORT, x=700, y=50))
@@ -455,13 +455,13 @@ class TestDeckDispatch:
 class TestDeckDispatchWidgetCallbacks:
     """Tests for widget-level dial decorators and slider on_change callbacks."""
 
-    async def test_dial_turn_calls_widget_dial_turn_handler(self, deck):
-        """Widget on_dial_turn handler is called on DialTurnEvent."""
-        from deckboard.widgets.slider_widget import SliderWidget
+    async def test_dial_turn_calls_card_dial_turn_handler(self, deck):
+        """Card on_dial_turn handler is called on DialTurnEvent."""
+        from deckboard.widgets.touch_panel import StackCard
 
-        p = deck.page("main")
-        sw = SliderWidget(0)
-        p.set_widget(0, sw)
+        p = deck.screen("main")
+        sw = StackCard(0)
+        p.set_card(0, sw)
         deck._active_page = p
 
         handler = AsyncMock()
@@ -472,16 +472,16 @@ class TestDeckDispatchWidgetCallbacks:
 
         handler.assert_awaited_once_with(3)
 
-    async def test_dial_press_calls_widget_dial_press_handler(self, deck):
-        """Widget on_dial_press handler is called on DialPressEvent."""
-        from deckboard.widgets.slider_widget import SliderWidget
+    async def test_dial_press_calls_card_dial_press_handler(self, deck):
+        """Card on_dial_press handler is called on DialPressEvent."""
+        from deckboard.widgets.touch_panel import StackCard
         from deckboard.widgets.volume import VolumeSlider
 
-        p = deck.page("main")
-        sw = SliderWidget(0)
-        sw.add_slider(VolumeSlider())
-        sw.add_slider(VolumeSlider())
-        p.set_widget(0, sw)
+        p = deck.screen("main")
+        sw = StackCard(0)
+        sw.add_control(VolumeSlider())
+        sw.add_control(VolumeSlider())
+        p.set_card(0, sw)
         deck._active_page = p
 
         handler = AsyncMock()
@@ -492,13 +492,13 @@ class TestDeckDispatchWidgetCallbacks:
 
         handler.assert_awaited_once()
 
-    async def test_dial_press_release_does_not_call_widget_handler(self, deck):
-        """Widget on_dial_press is NOT called for release events."""
-        from deckboard.widgets.slider_widget import SliderWidget
+    async def test_dial_press_release_does_not_call_card_handler(self, deck):
+        """Card on_dial_press is NOT called for release events."""
+        from deckboard.widgets.touch_panel import StackCard
 
-        p = deck.page("main")
-        sw = SliderWidget(0)
-        p.set_widget(0, sw)
+        p = deck.screen("main")
+        sw = StackCard(0)
+        p.set_card(0, sw)
         deck._active_page = p
 
         handler = AsyncMock()
@@ -509,14 +509,14 @@ class TestDeckDispatchWidgetCallbacks:
 
     async def test_dial_turn_drains_slider_on_change(self, deck):
         """Slider on_change callback is awaited after dial turn adjusts value."""
-        from deckboard.widgets.slider_widget import SliderWidget
+        from deckboard.widgets.touch_panel import StackCard
         from deckboard.widgets.volume import VolumeSlider
 
-        p = deck.page("main")
-        sw = SliderWidget(0)
+        p = deck.screen("main")
+        sw = StackCard(0)
         vol = VolumeSlider(value=50, step=5)
-        sw.add_slider(vol)
-        p.set_widget(0, sw)
+        sw.add_control(vol)
+        p.set_card(0, sw)
         deck._active_page = p
 
         change_handler = AsyncMock()
@@ -527,22 +527,22 @@ class TestDeckDispatchWidgetCallbacks:
 
         change_handler.assert_awaited_once_with(55.0)
 
-    async def test_dial_turn_order_dial_then_widget_then_change(self, deck):
+    async def test_dial_turn_order_dial_then_card_then_change(self, deck):
         """Dispatch order: dial handler → widget dial handler → slider on_change."""
-        from deckboard.widgets.slider_widget import SliderWidget
+        from deckboard.widgets.touch_panel import StackCard
         from deckboard.widgets.volume import VolumeSlider
 
-        p = deck.page("main")
-        sw = SliderWidget(0)
+        p = deck.screen("main")
+        sw = StackCard(0)
         vol = VolumeSlider(value=50, step=5)
-        sw.add_slider(vol)
-        p.set_widget(0, sw)
+        sw.add_control(vol)
+        p.set_card(0, sw)
         deck._active_page = p
 
         call_order = []
 
         dial_handler = AsyncMock(side_effect=lambda d: call_order.append("dial"))
-        p.dial(0).on_turn(dial_handler)
+        p.encoder(0).on_turn(dial_handler)
 
         widget_handler = AsyncMock(side_effect=lambda d: call_order.append("widget"))
         sw.on_dial_turn(widget_handler)
@@ -557,14 +557,14 @@ class TestDeckDispatchWidgetCallbacks:
 
     async def test_refresh_drains_pending_callbacks(self, deck):
         """Programmatic set_value + refresh drains on_change callbacks."""
-        from deckboard.widgets.slider_widget import SliderWidget
+        from deckboard.widgets.touch_panel import StackCard
         from deckboard.widgets.volume import VolumeSlider
 
-        p = deck.page("main")
-        sw = SliderWidget(0)
+        p = deck.screen("main")
+        sw = StackCard(0)
         vol = VolumeSlider(value=50)
-        sw.add_slider(vol)
-        p.set_widget(0, sw)
+        sw.add_control(vol)
+        p.set_card(0, sw)
         deck._active_page = p
         deck._render_button = AsyncMock()
         deck._render_touchscreen = AsyncMock()
@@ -580,14 +580,14 @@ class TestDeckDispatchWidgetCallbacks:
 
     async def test_no_on_change_when_value_unchanged_via_dial(self, deck):
         """No on_change callback when dial turn doesn't change value (at max)."""
-        from deckboard.widgets.slider_widget import SliderWidget
+        from deckboard.widgets.touch_panel import StackCard
         from deckboard.widgets.volume import VolumeSlider
 
-        p = deck.page("main")
-        sw = SliderWidget(0)
+        p = deck.screen("main")
+        sw = StackCard(0)
         vol = VolumeSlider(value=100, max_value=100, step=5)
-        sw.add_slider(vol)
-        p.set_widget(0, sw)
+        sw.add_control(vol)
+        p.set_card(0, sw)
         deck._active_page = p
 
         change_handler = AsyncMock()
@@ -598,11 +598,11 @@ class TestDeckDispatchWidgetCallbacks:
 
         change_handler.assert_not_awaited()
 
-    async def test_drain_widget_callbacks_helper(self, deck):
-        """_drain_widget_callbacks awaits all pending callbacks in order."""
-        from deckboard.widgets.slider_widget import SliderWidget
+    async def test_drain_card_callbacks_helper(self, deck):
+        """_drain_card_callbacks awaits all pending callbacks in order."""
+        from deckboard.widgets.touch_panel import StackCard
 
-        sw = SliderWidget(0)
+        sw = StackCard(0)
         results = []
 
         async def h1(v: float):
@@ -614,7 +614,7 @@ class TestDeckDispatchWidgetCallbacks:
         sw.queue_pending_callback(h1, (1.0,))
         sw.queue_pending_callback(h2, (2.0,))
 
-        await deck._drain_widget_callbacks(sw)
+        await deck._drain_card_callbacks(sw)
         assert results == [("h1", 1.0), ("h2", 2.0)]
         # Queue should be empty after drain
         assert sw.drain_pending_callbacks() == []
@@ -626,12 +626,12 @@ class TestDeckDispatchWidgetCallbacks:
 class TestDeckRenderAllButtons:
     async def test_no_device(self, deck):
         """No-op when device is None."""
-        deck._active_page = deck.page("main")
+        deck._active_page = deck.screen("main")
         await deck._render_all_buttons()  # Should not raise
 
     async def test_renders_with_device(self, deck, mock_streamdeck_device):
         deck._device = mock_streamdeck_device
-        p = deck.page("main")
+        p = deck.screen("main")
         deck._active_page = p
 
         await deck._render_all_buttons()
@@ -640,8 +640,8 @@ class TestDeckRenderAllButtons:
 
     async def test_renders_configured_button(self, deck, mock_streamdeck_device):
         deck._device = mock_streamdeck_device
-        p = deck.page("main")
-        p.button(0).set_icon("mdi:home")
+        p = deck.screen("main")
+        p.key(0).set_icon("mdi:home")
         deck._active_page = p
 
         # Mock icon fetch
@@ -698,23 +698,23 @@ class TestDeckRenderButton:
 class TestDeckRenderTouchscreen:
     async def test_no_device(self, deck):
         """No-op when device is None."""
-        deck._active_page = deck.page("main")
+        deck._active_page = deck.screen("main")
         await deck._render_touchscreen()  # Should not raise
 
     async def test_renders_with_device(self, deck, mock_streamdeck_device):
         deck._device = mock_streamdeck_device
-        p = deck.page("main")
+        p = deck.screen("main")
         deck._active_page = p
 
         await deck._render_touchscreen()
         mock_streamdeck_device.set_touchscreen_image.assert_called_once()
 
-    async def test_renders_widgets_with_icons(self, deck, mock_streamdeck_device):
+    async def test_renders_cards_with_icons(self, deck, mock_streamdeck_device):
         from PIL import Image
 
         deck._device = mock_streamdeck_device
-        p = deck.page("main")
-        p.widget(0).set_icon("mdi:volume-high").set_label("Vol").set_value("75%")
+        p = deck.screen("main")
+        p.card(0).set_icon("mdi:volume-high").set_label("Vol").set_value("75%")
         deck._active_page = p
 
         fake_img = Image.new("RGBA", (80, 80))
@@ -873,14 +873,14 @@ class TestDeckCheckTimeouts:
         """No refresh when no widget has an expired timeout."""
         from deckboard.widgets.volume import VolumeSlider
         from deckboard.widgets.brightness import BrightnessSlider
-        from deckboard.widgets.slider_widget import SliderWidget
+        from deckboard.widgets.touch_panel import StackCard
 
-        p = deck.page("main")
-        sw = SliderWidget(0)
-        sw.add_slider(VolumeSlider(), default=True)
-        sw.add_slider(BrightnessSlider())
+        p = deck.screen("main")
+        sw = StackCard(0)
+        sw.add_control(VolumeSlider(), default=True)
+        sw.add_control(BrightnessSlider())
         sw.set_selection_timeout(5)
-        p.set_widget(0, sw)
+        p.set_card(0, sw)
         deck._active_page = p
 
         with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
@@ -892,19 +892,19 @@ class TestDeckCheckTimeouts:
         import time
         from deckboard.widgets.volume import VolumeSlider
         from deckboard.widgets.brightness import BrightnessSlider
-        from deckboard.widgets.slider_widget import SliderWidget
+        from deckboard.widgets.touch_panel import StackCard
 
-        p = deck.page("main")
-        sw = SliderWidget(0)
-        sw.add_slider(VolumeSlider(), default=True)
-        sw.add_slider(BrightnessSlider())
+        p = deck.screen("main")
+        sw = StackCard(0)
+        sw.add_control(VolumeSlider(), default=True)
+        sw.add_control(BrightnessSlider())
         sw.set_selection_timeout(1)
-        p.set_widget(0, sw)
+        p.set_card(0, sw)
         deck._active_page = p
 
         # Select non-default slider, then simulate timeout expiry
-        sw.cycle_active_slider()
-        assert sw.active_slider_index == 1
+        sw.cycle_active_control()
+        assert sw.active_control_index == 1
         sw._last_selection_time = time.monotonic() - 2.0
 
         with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
@@ -912,33 +912,33 @@ class TestDeckCheckTimeouts:
             mock_refresh.assert_awaited_once()
 
         # Should have reverted to default
-        assert sw.active_slider_index == 0
+        assert sw.active_control_index == 0
 
-    async def test_multiple_widgets_only_expired_triggers(self, deck):
+    async def test_multiple_cards_only_expired_triggers(self, deck):
         """Only widgets with expired timeouts cause a refresh."""
         import time
         from deckboard.widgets.volume import VolumeSlider
         from deckboard.widgets.brightness import BrightnessSlider
-        from deckboard.widgets.slider_widget import SliderWidget
+        from deckboard.widgets.touch_panel import StackCard
 
-        p = deck.page("main")
+        p = deck.screen("main")
 
-        # Widget 0: not expired
-        sw0 = SliderWidget(0)
-        sw0.add_slider(VolumeSlider(), default=True)
-        sw0.add_slider(BrightnessSlider())
+        # Card 0: not expired
+        sw0 = StackCard(0)
+        sw0.add_control(VolumeSlider(), default=True)
+        sw0.add_control(BrightnessSlider())
         sw0.set_selection_timeout(10)
-        sw0.cycle_active_slider()
-        p.set_widget(0, sw0)
+        sw0.cycle_active_control()
+        p.set_card(0, sw0)
 
-        # Widget 1: expired
-        sw1 = SliderWidget(1)
-        sw1.add_slider(VolumeSlider(), default=True)
-        sw1.add_slider(BrightnessSlider())
+        # Card 1: expired
+        sw1 = StackCard(1)
+        sw1.add_control(VolumeSlider(), default=True)
+        sw1.add_control(BrightnessSlider())
         sw1.set_selection_timeout(1)
-        sw1.cycle_active_slider()
+        sw1.cycle_active_control()
         sw1._last_selection_time = time.monotonic() - 2.0
-        p.set_widget(1, sw1)
+        p.set_card(1, sw1)
 
         deck._active_page = p
 
@@ -947,8 +947,8 @@ class TestDeckCheckTimeouts:
             mock_refresh.assert_awaited_once()
 
         # sw0 unchanged, sw1 reverted
-        assert sw0.active_slider_index == 1
-        assert sw1.active_slider_index == 0
+        assert sw0.active_control_index == 1
+        assert sw1.active_control_index == 0
 
 
 class TestDeckEventLoop:
@@ -1012,7 +1012,7 @@ class TestDeckEventLoop:
         transport.queue = asyncio.Queue()
         deck._transport = transport
         deck._running = True
-        deck._active_page = deck.page("main")
+        deck._active_page = deck.screen("main")
 
         # Make _dispatch raise an exception
         deck._dispatch = AsyncMock(side_effect=ValueError("handler error"))

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from ..touchscreen import TouchScreen
+from ..touchscreen import TouchStrip
 
-TouchStrip = TouchScreen
-
-__all__ = ["TouchScreen", "TouchStrip"]
+__all__ = ["TouchStrip"]

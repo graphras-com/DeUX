@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from PIL import Image
 
-from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH, get_large_font
+from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH, get_large_font
 from deckboard.widgets.text import LargeText, SmallText, _truncate_text
-from deckboard.widgets.touch_panel import TouchPanel
+from deckboard.widgets.touch_panel import StackCard
 
 
 # ── _truncate_text helper ────────────────────────────────────────────────
@@ -90,7 +90,7 @@ class TestLargeTextSetText:
         assert t.text == "new"
 
     def test_marks_widget_dirty(self):
-        panel = TouchPanel(0)
+        panel = StackCard(0)
         t = LargeText("old")
         panel.add_element(t)
         panel.mark_clean()
@@ -111,7 +111,7 @@ class TestLargeTextSetColor:
         assert t.color == "#00ff00"
 
     def test_marks_widget_dirty(self):
-        panel = TouchPanel(0)
+        panel = StackCard(0)
         t = LargeText("Hi")
         panel.add_element(t)
         panel.mark_clean()
@@ -128,34 +128,34 @@ class TestLargeTextSetColor:
 class TestLargeTextRender:
     def test_renders_onto_image(self):
         t = LargeText("Volume: 75%")
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        t.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        t.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_empty_text(self):
         t = LargeText("")
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        t.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        t.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_long_text_truncated(self):
         t = LargeText("A" * 200)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        t.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        t.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_active_ignored(self):
         t = LargeText("Test")
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
         # active=True should not cause errors; it's ignored for text
-        t.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2, active=True)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        t.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2, active=True)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_with_custom_color(self):
         t = LargeText("Red Text", color="#ff0000")
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        t.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        t.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
 
 # ── SmallText ────────────────────────────────────────────────────────────
@@ -188,7 +188,7 @@ class TestSmallTextSetText:
         assert t.text == "new"
 
     def test_marks_widget_dirty(self):
-        panel = TouchPanel(0)
+        panel = StackCard(0)
         t = SmallText("old")
         panel.add_element(t)
         panel.mark_clean()
@@ -209,7 +209,7 @@ class TestSmallTextSetColor:
         assert t.color == "#ff00ff"
 
     def test_marks_widget_dirty(self):
-        panel = TouchPanel(0)
+        panel = StackCard(0)
         t = SmallText()
         panel.add_element(t)
         panel.mark_clean()
@@ -226,33 +226,33 @@ class TestSmallTextSetColor:
 class TestSmallTextRender:
     def test_renders_onto_image(self):
         t = SmallText("Online")
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        t.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        t.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_empty_text(self):
         t = SmallText("")
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        t.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        t.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_long_text_truncated(self):
         t = SmallText("A" * 200)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        t.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        t.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_active_ignored(self):
         t = SmallText("Value")
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        t.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4, active=True)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        t.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4, active=True)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_with_custom_color(self):
         t = SmallText("Green", color="#00ff00")
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        t.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        t.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
 
 # ── get_large_font ───────────────────────────────────────────────────────

@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-from .audio import BalanceSlider, EqualizerSlider, EqualizerWidget, VolumeSlider
+from .audio import BalanceSlider, EqualizerCard, EqualizerSlider, VolumeSlider
 from .climate import TemperatureSlider
 from .lighting import BrightnessSlider, KelvinSlider
-from .sensors import IconWidget, LargeDualValue, SmallDualValue
+from .sensors import LargeDualValue, SmallDualValue, StatusCard
 
 __all__ = [
     "BalanceSlider",
     "BrightnessSlider",
     "EqualizerSlider",
-    "EqualizerWidget",
-    "IconWidget",
+    "EqualizerCard",
     "KelvinSlider",
     "LargeDualValue",
     "SmallDualValue",
+    "StatusCard",
     "TemperatureSlider",
     "VolumeSlider",
 ]

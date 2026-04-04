@@ -19,8 +19,8 @@ from .image import (
     render_blank_key,
     render_key_image,
 )
-from .page import Page, Screen
-from .touchscreen import Widget
+from .page import Screen
+from .touchscreen import Card
 from .types import (
     DeckEvent,
     DeviceInfo,
@@ -48,14 +48,14 @@ class Deck:
     Usage::
 
         async with Deck() as deck:
-            main = deck.page("main")
-            main.button(0).set_icon("mdi:home")
+            main = deck.screen("main")
+            main.key(0).set_icon("mdi:home")
 
-            @main.button(0).on_press
+            @main.key(0).on_press
             async def on_home():
                 print("Home pressed!")
 
-            await deck.set_page("main")
+            await deck.set_screen("main")
             await deck.wait_closed()
 
     Or without context manager::
@@ -97,10 +97,10 @@ class Deck:
         self._debug_grid = False
 
         # Screens
-        self._pages: dict[str, Page] = {}
-        self._active_page: Page | None = None
-        self._screens = self._pages
+        self._screens: dict[str, Screen] = {}
         self._active_screen: Screen | None = None
+        self._pages = self._screens
+        self._active_page: Screen | None = None
 
     # -- Async context manager ---------------------------------------------
 
@@ -268,13 +268,9 @@ class Deck:
         Returns:
             The Screen instance.
         """
-        if name not in self._pages:
-            self._pages[name] = Screen(name)
-        return self._pages[name]
-
-    def page(self, name: str) -> Page:
-        """Compatibility alias for :meth:`screen`."""
-        return self.screen(name)
+        if name not in self._screens:
+            self._screens[name] = Screen(name)
+        return self._screens[name]
 
     async def set_screen(self, name: str) -> None:
         """Switch to a named screen, rendering all keys and cards.
@@ -282,44 +278,36 @@ class Deck:
         Args:
             name: Screen name (must already exist via ``deck.screen(name)``).
         """
-        if name not in self._pages:
+        if name not in self._screens:
             raise DeckError(f"Screen '{name}' does not exist")
 
-        self._active_page = self._pages[name]
-        self._active_screen = self._active_page
+        self._active_screen = self._screens[name]
+        self._active_page = self._active_screen
         logger.info("Switching to screen: %s", name)
 
         # Render all keys and cards for this screen
         await self._render_all_buttons()
         await self._render_touchscreen()
 
-    async def set_page(self, name: str) -> None:
-        """Compatibility alias for :meth:`set_screen`."""
-        try:
-            await self.set_screen(name)
-        except DeckError as exc:
-            message = str(exc).replace("Screen", "Page").replace("screen", "page")
-            raise DeckError(message) from exc
-
     @property
     def active_screen(self) -> Screen | None:
         return self._active_screen
 
-    @property
-    def active_page(self) -> Page | None:
-        return self._active_page
+    def _current_screen(self) -> Screen | None:
+        return self._active_screen or self._active_page
 
     # -- Rendering ---------------------------------------------------------
 
     async def _render_all_buttons(self) -> None:
-        """Render and push all button images for the active page."""
-        if not self._device or not self._active_page:
+        """Render and push all button images for the active screen."""
+        screen = self._current_screen()
+        if not self._device or not screen:
             return
 
         loop = asyncio.get_running_loop()
 
         for key_index in range(_KEY_COUNT):
-            button = self._active_page.keys.get(key_index)
+            button = screen.keys.get(key_index)
             if button and (button.icon_name or button.label):
                 await self._render_button(button)
             else:
@@ -357,24 +345,25 @@ class Deck:
         )
 
     async def _render_touchscreen(self) -> None:
-        """Render and push the full touchscreen image for the active page."""
-        if not self._device or not self._active_page:
+        """Render and push the full touch-strip image for the active screen."""
+        screen = self._current_screen()
+        if not self._device or not screen:
             return
 
         card_images = []
-        for card in self._active_page.cards:
+        for card in screen.cards:
             await card.prepare_assets(self.icons)
             img = card.render()
             card.set_rendered(img)
             card_images.append(img)
 
-        touchscreen_bytes = compose_touchstrip(card_images, debug_grid=self._debug_grid)
+        touchstrip_bytes = compose_touchstrip(card_images, debug_grid=self._debug_grid)
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             self._executor,
             self._device.set_touchscreen_image,
-            touchscreen_bytes,
+            touchstrip_bytes,
             0,
             0,
             TOUCHSCREEN_WIDTH,
@@ -382,50 +371,46 @@ class Deck:
         )
 
     async def refresh(self) -> None:
-        """Re-render and push all dirty buttons and widgets on the active page.
+        """Re-render and push all dirty controls on the active screen.
 
-        Call this after changing button icons/labels or widget values
-        if you need immediate updates outside of ``set_page()``.
+        Call this after changing button icons/labels or card values
+        if you need immediate updates outside of ``set_screen()``.
         Also drains any pending callbacks queued by programmatic
-        ``set_value()`` calls on sliders.
+        ``set_value()`` calls on range controls.
         """
-        if not self._active_page:
+        screen = self._current_screen()
+        if not screen:
             return
 
         # Drain pending callbacks from all cards (programmatic set_value)
-        for card in self._active_page.cards:
-            await self._drain_widget_callbacks(card)
+        for card in screen.cards:
+            await self._drain_card_callbacks(card)
 
         # Render dirty keys
-        for button in self._active_page.keys.values():
+        for button in screen.keys.values():
             if button.is_dirty:
                 await self._render_button(button)
 
         # Render the touch strip if any card is dirty
-        if self._active_page.touch_strip.any_dirty:
+        if screen.touch_strip.any_dirty:
             await self._render_touchscreen()
 
     # -- Event dispatch loop -----------------------------------------------
 
     async def _check_timeouts(self) -> None:
-        """Check all widget selection timeouts on the active page.
-
-        If any widget's active slider reverts to its default because the
-        timeout elapsed, a refresh is triggered so the display updates.
-        """
-        page = self._active_page
-        if not page:
+        """Check all card selection timeouts on the active screen."""
+        screen = self._current_screen()
+        if not screen:
             return
         any_changed = False
-        for card in page.cards:
+        for card in screen.cards:
             if card.check_selection_timeout():
                 any_changed = True
         if any_changed:
             await self.refresh()
 
     async def _event_loop(self) -> None:
-        """Main event dispatch loop: reads events from the transport queue
-        and dispatches them to the active page's handlers."""
+        """Dispatch transport events to the active screen handlers."""
         if not self._transport:
             return
 
@@ -439,7 +424,7 @@ class Deck:
                     await self._check_timeouts()
                     continue
 
-                if not self._active_page:
+                if not self._current_screen():
                     continue
 
                 try:
@@ -454,49 +439,53 @@ class Deck:
         finally:
             self._closed_event.set()
 
-    async def _drain_widget_callbacks(self, widget: Widget) -> None:
-        """Drain and await all pending callbacks queued on a widget.
+    async def _drain_card_callbacks(self, card: Card) -> None:
+        """Drain and await all pending callbacks queued on a card.
 
-        Callbacks are enqueued by child elements (e.g. sliders) when
+        Callbacks are enqueued by child elements (e.g. range controls) when
         their value changes synchronously.  This method pops them all
         and awaits each in order.
         """
-        for handler, args in widget.drain_pending_callbacks():
+        for handler, args in card.drain_pending_callbacks():
             await handler(*args)
 
+    async def _drain_widget_callbacks(self, card: Card) -> None:
+        """Backward-compatible private helper used by existing tests."""
+        await self._drain_card_callbacks(card)
+
     async def _dispatch(self, event: DeckEvent) -> None:
-        """Dispatch a single event to the appropriate handler on the active page."""
-        page = self._active_page
-        if not page:
+        """Dispatch a single event to the appropriate handler on the active screen."""
+        screen = self._current_screen()
+        if not screen:
             return
 
         if isinstance(event, KeyEvent):
-            button = page.keys.get(event.key)
+            button = screen.keys.get(event.key)
             if button:
                 await button.dispatch(event.pressed)
 
         elif isinstance(event, DialTurnEvent):
-            dial = page.encoders.get(event.dial)
+            dial = screen.encoders.get(event.dial)
             if dial:
                 await dial.dispatch_turn(event.direction)
-            card = page.touch_strip.card(event.dial)
+            card = screen.touch_strip.card(event.dial)
             await card.dispatch_dial_turn(event.direction)
-            await self._drain_widget_callbacks(card)
+            await self._drain_card_callbacks(card)
             if card.is_dirty:
                 await self.refresh()
 
         elif isinstance(event, DialPressEvent):
-            dial = page.encoders.get(event.dial)
+            dial = screen.encoders.get(event.dial)
             if dial:
                 await dial.dispatch_press(event.pressed)
             if event.pressed:
-                card = page.touch_strip.card(event.dial)
+                card = screen.touch_strip.card(event.dial)
                 await card.dispatch_dial_press()
-                await self._drain_widget_callbacks(card)
+                await self._drain_card_callbacks(card)
                 if card.is_dirty:
                     await self.refresh()
 
         elif isinstance(event, TouchEvent):
             zone = event.zone
-            card = page.touch_strip.card(zone)
+            card = screen.touch_strip.card(zone)
             await card.dispatch_touch(event)

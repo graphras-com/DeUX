@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PIL import Image
 
-from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH
+from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
 from deckboard.widgets.equalizer import EqualizerSlider
 
 
@@ -27,21 +27,21 @@ class TestEqualizerSliderInit:
 class TestEqualizerSliderRender:
     def test_render_at_zero(self):
         s = EqualizerSlider("Sub", value=0)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
 
     def test_render_at_half(self):
         s = EqualizerSlider("Bass", value=50)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_render_at_max(self):
         s = EqualizerSlider("Treble", value=100)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
 
     def test_render_active(self):
         s = EqualizerSlider("Sub", value=50)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4, active=True)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4, active=True)

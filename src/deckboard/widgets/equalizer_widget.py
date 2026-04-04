@@ -1,23 +1,23 @@
-"""EqualizerWidget — pre-configured TouchPanel with EQ bands and balance."""
+"""Equalizer card preset with EQ bands and balance."""
 
 from __future__ import annotations
 
 from .balance import BalanceSlider
 from .equalizer import EqualizerSlider
-from .touch_panel import TouchPanel
+from .touch_panel import StackCard
 
 
-class EqualizerWidget(TouchPanel):
-    """A ready-to-use equalizer widget with Sub, Bass, Treble, and Balance.
+class EqualizerCard(StackCard):
+    """A ready-to-use equalizer card with sub, bass, treble, and balance.
 
     Combines three :class:`EqualizerSlider` bands (Sub, Bass, Treble) and
-    one :class:`BalanceSlider` into a single :class:`TouchPanel`.  The Sub
+    one :class:`BalanceSlider` into a single :class:`StackCard`.  The Sub
     slider is the default active slider.
 
     All parameters are optional — sensible defaults are applied.
 
     Args:
-        index: Widget zone index (0–3).
+        index: Card zone index (0–3).
         sub: Initial Sub value.  Defaults to 0.
         bass: Initial Bass value.  Defaults to 0.
         treble: Initial Treble value.  Defaults to 0.
@@ -25,9 +25,9 @@ class EqualizerWidget(TouchPanel):
 
     Usage::
 
-        from deckboard.widgets import EqualizerWidget
+        from deckboard import EqualizerCard
 
-        eq = EqualizerWidget(0)
+        eq = EqualizerCard(0)
         eq.sub.set_value(75)
         eq.bass.set_value(60)
         eq.treble.set_value(40)

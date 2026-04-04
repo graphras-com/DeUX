@@ -10,9 +10,9 @@ from .controls.range import LargeSlider, RangeControl, Slider, SmallSlider
 from .elements.base import Element
 from .elements.metrics import LargeDualValue, SmallDualValue
 from .elements.text import LargeText, SmallText
-from .screen import Page, Screen
+from .screen import Screen
 from .slots import EncoderSlot, KeySlot
-from .touch_strip import TouchScreen, TouchStrip
+from .touch_strip import TouchStrip
 
 __all__ = [
     "Card",
@@ -23,7 +23,6 @@ __all__ = [
     "LargeDualValue",
     "LargeSlider",
     "LargeText",
-    "Page",
     "RangeControl",
     "Screen",
     "Slider",
@@ -32,6 +31,5 @@ __all__ = [
     "SmallText",
     "StackCard",
     "StatusCard",
-    "TouchScreen",
     "TouchStrip",
 ]

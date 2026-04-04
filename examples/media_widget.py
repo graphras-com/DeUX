@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Media widget — ready-to-use media panel with title display and volume control.
 
-Shows how ``MediaWidget`` bundles a title text and volume slider into a
+Shows how ``MediaCard`` bundles a title text and volume slider into a
 single widget zone with built-in mute toggling on dial press.
 
 Layout::
@@ -27,7 +27,7 @@ Run with::
 import asyncio
 import logging
 
-from deckboard import Deck, MediaWidget
+from deckboard import Deck, MediaCard
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -48,24 +48,24 @@ async def main() -> None:
 
         page = deck.screen("media_widget")
 
-        # -- MediaWidget on zone 3 (dial 3) -------------------------------
+        # -- MediaCard on zone 3 (dial 3) -------------------------------
 
-        media = MediaWidget(3, title=PLAYLIST[0], volume=65)
+        media = MediaCard(3, title=PLAYLIST[0], volume=65)
         page.set_card(3, media)
 
         # -- Transport buttons (row 1) ------------------------------------
 
-        page.button(0).set_icon("mdi:skip-previous").set_label("Prev")
-        page.button(1).set_icon("mdi:play").set_label("Play")
-        page.button(2).set_icon("mdi:skip-next").set_label("Next")
-        page.button(3).set_icon("mdi:volume-high").set_label("Mute")
+        page.key(0).set_icon("mdi:skip-previous").set_label("Prev")
+        page.key(1).set_icon("mdi:play").set_label("Play")
+        page.key(2).set_icon("mdi:skip-next").set_label("Next")
+        page.key(3).set_icon("mdi:volume-high").set_label("Mute")
 
         # -- Utility buttons (row 2) --------------------------------------
 
-        page.button(4).set_icon("mdi:shuffle-variant").set_label("Shuffle")
-        page.button(5).set_icon("mdi:repeat").set_label("Repeat")
-        page.button(6).set_icon("mdi:heart-outline").set_label("Like")
-        page.button(7).set_icon("mdi:printer").set_label("Print")
+        page.key(4).set_icon("mdi:shuffle-variant").set_label("Shuffle")
+        page.key(5).set_icon("mdi:repeat").set_label("Repeat")
+        page.key(6).set_icon("mdi:heart-outline").set_label("Like")
+        page.key(7).set_icon("mdi:printer").set_label("Print")
 
         # -- Playback state ------------------------------------------------
 
@@ -74,12 +74,12 @@ async def main() -> None:
 
         async def update_mute_button() -> None:
             if media.muted:
-                page.button(3).set_icon("mdi:volume-off").set_label("Unmute")
+                page.key(3).set_icon("mdi:volume-off").set_label("Unmute")
             else:
-                page.button(3).set_icon("mdi:volume-high").set_label("Mute")
+                page.key(3).set_icon("mdi:volume-high").set_label("Mute")
             await deck.refresh()
 
-        @page.button(0).on_press
+        @page.key(0).on_press
         async def on_prev() -> None:
             nonlocal track_index
             track_index = (track_index - 1) % len(PLAYLIST)
@@ -87,19 +87,19 @@ async def main() -> None:
             print(f"Now playing: {PLAYLIST[track_index]}")
             await deck.refresh()
 
-        @page.button(1).on_press
+        @page.key(1).on_press
         async def on_play_pause() -> None:
             nonlocal playing
             playing = not playing
             if playing:
-                page.button(1).set_icon("mdi:pause").set_label("Pause")
+                page.key(1).set_icon("mdi:pause").set_label("Pause")
                 print(f"Playing: {PLAYLIST[track_index]}")
             else:
-                page.button(1).set_icon("mdi:play").set_label("Play")
+                page.key(1).set_icon("mdi:play").set_label("Play")
                 print("Paused")
             await deck.refresh()
 
-        @page.button(2).on_press
+        @page.key(2).on_press
         async def on_next() -> None:
             nonlocal track_index
             track_index = (track_index + 1) % len(PLAYLIST)
@@ -107,7 +107,7 @@ async def main() -> None:
             print(f"Now playing: {PLAYLIST[track_index]}")
             await deck.refresh()
 
-        @page.button(3).on_press
+        @page.key(3).on_press
         async def on_mute_button() -> None:
             media.toggle_mute()
             if media.muted:
@@ -118,16 +118,16 @@ async def main() -> None:
 
         liked = False
 
-        @page.button(6).on_press
+        @page.key(6).on_press
         async def on_like() -> None:
             nonlocal liked
             liked = not liked
             icon = "mdi:heart" if liked else "mdi:heart-outline"
-            page.button(6).set_icon(icon)
+            page.key(6).set_icon(icon)
             print("Liked!" if liked else "Unliked")
             await deck.refresh()
 
-        @page.button(7).on_press
+        @page.key(7).on_press
         async def on_print() -> None:
             print(
                 f"Track: {media.title_text.text}, "

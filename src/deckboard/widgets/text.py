@@ -5,7 +5,7 @@ The hierarchy is::
     LargeText   (full-width single-line text, same height as LargeSlider)
     SmallText   (compact single-line text, same height as SmallSlider)
 
-Text elements are non-selectable: they render inside a :class:`TouchPanel`
+Text elements are non-selectable: they render inside a :class:`StackCard`
 alongside sliders but are skipped when the dial cycles through active
 elements.
 """
@@ -20,7 +20,7 @@ from ..image import get_font, get_large_font, get_small_font
 from ..ui.elements.base import Element
 
 if TYPE_CHECKING:
-    from ..touchscreen import Widget  # abstract base — any Widget subclass
+    from ..touchscreen import Card  # abstract base — any Card subclass
 
 # ── Layout constants (matching slider.py dimensions) ─────────────────────
 

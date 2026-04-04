@@ -1,4 +1,4 @@
-"""Touchscreen and Widget classes for the Stream Deck+ LCD strip."""
+"""Touch-strip card primitives for the Stream Deck+ LCD strip."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from PIL import Image
 
-from .image import WIDGET_COUNT, WIDGET_HEIGHT, WIDGET_WIDTH
+from .render.metrics import PANEL_COUNT, PANEL_HEIGHT, PANEL_WIDTH
 from .types import AsyncHandler, EventType, TouchEvent
 
 if TYPE_CHECKING:
@@ -17,8 +17,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class Widget(ABC):
-    """Abstract base for a single touchscreen zone (195x78px) under a dial.
+class Card(ABC):
+    """Abstract base for a single touch-strip zone under a dial.
 
     The Stream Deck+ touchscreen (800x100) is divided into 4 zones,
     each aligned with one of the 4 dials.  A margin is applied around
@@ -31,17 +31,17 @@ class Widget(ABC):
 
     Usage::
 
-        class MyWidget(Widget):
+        class MyCard(Card):
             def render(self) -> Image.Image:
-                img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
+                img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
                 # ... draw custom content ...
                 return img
 
     Event handlers are registered with decorators::
 
-        @widget.on_tap
+        @card.on_tap
         async def handle():
-            print("Widget tapped!")
+            print("Card tapped!")
     """
 
     def __init__(self, index: int) -> None:
@@ -163,7 +163,7 @@ class Widget(ABC):
         self._dirty = False
 
     def mark_dirty(self) -> None:
-        """Flag this widget for re-rendering on the next refresh."""
+        """Flag this card for re-rendering on the next refresh."""
         self._dirty = True
 
     @property
@@ -204,10 +204,10 @@ class Widget(ABC):
 
     @abstractmethod
     def render(self) -> Image.Image:
-        """Render this widget zone as a WIDGET_WIDTH x WIDGET_HEIGHT PIL Image.
+        """Render this card as a PANEL_WIDTH x PANEL_HEIGHT PIL Image.
 
         Returns:
-            A WIDGET_WIDTH x WIDGET_HEIGHT RGB :class:`~PIL.Image.Image`.
+            A PANEL_WIDTH x PANEL_HEIGHT RGB :class:`~PIL.Image.Image`.
         """
 
     # -- Dial interaction hooks (default no-ops) ---------------------------
@@ -236,55 +236,43 @@ class Widget(ABC):
         return False
 
 
-class TouchScreen:
-    """Manages the 4 widget zones on the Stream Deck+ touchscreen."""
+class TouchStrip:
+    """Manage the 4 card zones on the Stream Deck+ touch strip."""
 
     def __init__(self) -> None:
         # Import here to avoid circular imports at module level
-        from .widgets.icon_widget import IconWidget
+        from .widgets.icon_widget import StatusCard
 
-        self._widgets: list[Widget] = [IconWidget(i) for i in range(WIDGET_COUNT)]
+        self._cards: list[Card] = [StatusCard(i) for i in range(PANEL_COUNT)]
 
-    def widget(self, index: int) -> Widget:
-        """Get a widget zone by index (0-3)."""
-        if not 0 <= index < WIDGET_COUNT:
-            raise IndexError(f"Widget index must be 0-{WIDGET_COUNT - 1}, got {index}")
-        return self._widgets[index]
-
-    def card(self, index: int) -> Widget:
+    def card(self, index: int) -> Card:
         """Get a card zone by index (0-3)."""
-        return self.widget(index)
+        if not 0 <= index < PANEL_COUNT:
+            raise IndexError(f"Card index must be 0-{PANEL_COUNT - 1}, got {index}")
+        return self._cards[index]
 
-    def set_widget(self, index: int, widget: Widget) -> None:
-        """Replace the widget at *index* with a custom widget.
+    def set_card(self, index: int, card: Card) -> None:
+        """Replace the card at *index* with a custom card.
 
         Args:
-            index: Widget zone index (0-3).
-            widget: A :class:`Widget` subclass instance.
+            index: Card zone index (0-3).
+            card: A :class:`Card` subclass instance.
 
         Raises:
             IndexError: If *index* is out of range.
-            TypeError: If *widget* is not a :class:`Widget` instance.
+            TypeError: If *card* is not a :class:`Card` instance.
         """
-        if not 0 <= index < WIDGET_COUNT:
-            raise IndexError(f"Widget index must be 0-{WIDGET_COUNT - 1}, got {index}")
-        if not isinstance(widget, Widget):
-            msg = f"Expected a Widget instance, got {type(widget).__name__}"
+        if not 0 <= index < PANEL_COUNT:
+            raise IndexError(f"Card index must be 0-{PANEL_COUNT - 1}, got {index}")
+        if not isinstance(card, Card):
+            msg = f"Expected a Card instance, got {type(card).__name__}"
             raise TypeError(msg)
-        self._widgets[index] = widget
-
-    def set_card(self, index: int, card: Widget) -> None:
-        """Replace the card at *index* with a custom card."""
-        self.set_widget(index, card)
+        self._cards[index] = card
 
     @property
-    def widgets(self) -> list[Widget]:
-        return self._widgets
-
-    @property
-    def cards(self) -> list[Widget]:
-        return self._widgets
+    def cards(self) -> list[Card]:
+        return self._cards
 
     @property
     def any_dirty(self) -> bool:
-        return any(w.is_dirty for w in self._widgets)
+        return any(card.is_dirty for card in self._cards)

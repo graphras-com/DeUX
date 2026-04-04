@@ -66,14 +66,14 @@ class TestPresetPackages:
         from deckboard.presets.audio import (
             BalanceSlider,
             EqualizerSlider,
-            EqualizerWidget,
+            EqualizerCard,
             VolumeSlider,
         )
 
         assert VolumeSlider is deckboard.VolumeSlider
         assert EqualizerSlider is deckboard.EqualizerSlider
         assert BalanceSlider is deckboard.BalanceSlider
-        assert EqualizerWidget is deckboard.EqualizerWidget
+        assert EqualizerCard is deckboard.EqualizerCard
 
     def test_lighting_presets_importable(self):
         from deckboard.presets.lighting import BrightnessSlider, KelvinSlider
@@ -87,9 +87,9 @@ class TestPresetPackages:
         assert TemperatureSlider is deckboard.TemperatureSlider
 
     def test_sensor_presets_importable(self):
-        from deckboard.presets.sensors import IconWidget, LargeDualValue, SmallDualValue
+        from deckboard.presets.sensors import StatusCard, LargeDualValue, SmallDualValue
 
-        assert IconWidget is deckboard.IconWidget
+        assert StatusCard is deckboard.StatusCard
         assert LargeDualValue is deckboard.LargeDualValue
         assert SmallDualValue is deckboard.SmallDualValue
 

@@ -18,7 +18,7 @@ from ..ui.controls.base import Control
 from ..image import get_font
 
 if TYPE_CHECKING:
-    from ..touchscreen import Widget  # abstract base — any Widget subclass
+    from ..touchscreen import Card  # abstract base — any Card subclass
     from ..types import AsyncHandler
 
 # ── Layout constants (derived from the reference SVG) ────────────────────
