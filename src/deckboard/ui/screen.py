@@ -1,7 +1,108 @@
-"""Screen layout types for deckboard navigation."""
+"""Screen layout class for deckboard navigation."""
 
 from __future__ import annotations
 
-from ..page import Screen
+import logging
 
-__all__ = ["Screen"]
+from .cards.base import Card
+from .controls.encoder_slot import EncoderSlot
+from .controls.key_slot import KeySlot
+from .touch_strip import TouchStrip
+
+logger = logging.getLogger(__name__)
+
+# Stream Deck+ constants
+_KEY_COUNT = 8
+_DIAL_COUNT = 4
+
+
+class Screen:
+    """A named layout containing keys, encoders, and touch-strip cards.
+
+    Screens allow you to define multiple layouts and switch between them.
+    When a screen is activated, all key images, touch-strip cards, and
+    event handlers swap atomically.
+
+    Usage::
+
+        main = deck.screen("main")
+        main.key(0).set_icon("mdi:home")
+
+        @main.key(0).on_press
+        async def handle():
+            await deck.set_screen("settings")
+    """
+
+    def __init__(self, name: str) -> None:
+        self._name = name
+        self._buttons: dict[int, KeySlot] = {}
+        self._dials: dict[int, EncoderSlot] = {}
+        self._touch_strip = TouchStrip()
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def key(self, index: int) -> KeySlot:
+        """Get or create a key slot by index (0-7 for Stream Deck+).
+
+        Args:
+            index: Key index.
+
+        Returns:
+            The KeySlot instance for this key on this screen.
+        """
+        if not 0 <= index < _KEY_COUNT:
+            raise IndexError(f"Button index must be 0-{_KEY_COUNT - 1}, got {index}")
+
+        if index not in self._buttons:
+            self._buttons[index] = KeySlot(index)
+        return self._buttons[index]
+
+    def encoder(self, index: int) -> EncoderSlot:
+        """Get or create an encoder slot by index (0-3 for Stream Deck+).
+
+        Args:
+            index: Dial index.
+
+        Returns:
+            The EncoderSlot instance for this encoder on this screen.
+        """
+        if not 0 <= index < _DIAL_COUNT:
+            raise IndexError(f"Dial index must be 0-{_DIAL_COUNT - 1}, got {index}")
+
+        if index not in self._dials:
+            self._dials[index] = EncoderSlot(index)
+        return self._dials[index]
+
+    def card(self, index: int) -> Card:
+        """Get a touch-strip card zone by index (0-3)."""
+        return self._touch_strip.card(index)
+
+    def set_card(self, index: int, card: Card) -> None:
+        """Replace the card at *index* with a custom card."""
+        self._touch_strip.set_card(index, card)
+
+    @property
+    def buttons(self) -> dict[int, KeySlot]:
+        return self._buttons
+
+    @property
+    def keys(self) -> dict[int, KeySlot]:
+        return self._buttons
+
+    @property
+    def dials(self) -> dict[int, EncoderSlot]:
+        return self._dials
+
+    @property
+    def encoders(self) -> dict[int, EncoderSlot]:
+        return self._dials
+
+    @property
+    def touch_strip(self) -> TouchStrip:
+        return self._touch_strip
+
+    @property
+    def cards(self) -> list[Card]:
+        return self._touch_strip.cards

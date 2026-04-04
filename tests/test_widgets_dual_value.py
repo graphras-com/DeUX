@@ -1,16 +1,16 @@
-"""Tests for deckboard.widgets.dual_value — LargeDualValue, SmallDualValue."""
+"""Tests for deckboard.ui.elements.metrics — LargeDualValue, SmallDualValue."""
 
 from __future__ import annotations
 
 from PIL import Image
 
-from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
-from deckboard.widgets.dual_value import (
+from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from deckboard.ui.elements.metrics import (
     LargeDualValue,
     SmallDualValue,
     _truncate_value,
 )
-from deckboard.widgets.touch_panel import StackCard
+from deckboard.ui.cards.stack import StackCard
 
 
 # ── _truncate_value helper ───────────────────────────────────────────────
@@ -20,7 +20,7 @@ class TestTruncateValue:
     def test_short_text_unchanged(self):
         from PIL import ImageDraw
 
-        from deckboard.image import get_font
+        from deckboard.render.fonts import get_font
 
         img = Image.new("RGB", (200, 50))
         draw = ImageDraw.Draw(img)
@@ -31,7 +31,7 @@ class TestTruncateValue:
     def test_long_text_gets_ellipsis(self):
         from PIL import ImageDraw
 
-        from deckboard.image import get_font
+        from deckboard.render.fonts import get_font
 
         img = Image.new("RGB", (200, 50))
         draw = ImageDraw.Draw(img)
@@ -44,7 +44,7 @@ class TestTruncateValue:
     def test_empty_text(self):
         from PIL import ImageDraw
 
-        from deckboard.image import get_font
+        from deckboard.render.fonts import get_font
 
         img = Image.new("RGB", (200, 50))
         draw = ImageDraw.Draw(img)
@@ -55,7 +55,7 @@ class TestTruncateValue:
     def test_zero_width_returns_ellipsis(self):
         from PIL import ImageDraw
 
-        from deckboard.image import get_font
+        from deckboard.render.fonts import get_font
 
         img = Image.new("RGB", (200, 50))
         draw = ImageDraw.Draw(img)
@@ -541,7 +541,7 @@ class TestDualValueTouchPanelIntegration:
         assert panel._selectable_indices() == []
 
     def test_mixed_with_slider(self):
-        from deckboard.widgets.volume import VolumeSlider
+        from deckboard.ui.controls.volume import VolumeSlider
 
         panel = StackCard(0)
         dv = LargeDualValue("22°C", "45%")
@@ -574,7 +574,7 @@ class TestDualValueTouchPanelIntegration:
         assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_panel_render_mixed_dual_value_and_slider(self):
-        from deckboard.widgets.volume import VolumeSlider
+        from deckboard.ui.controls.volume import VolumeSlider
 
         panel = StackCard(0)
         dv = LargeDualValue("22°C", "45%")
@@ -609,8 +609,8 @@ class TestDualValueTouchPanelIntegration:
 
 
 class TestDualValuePublicAPI:
-    def test_importable_from_cards(self):
-        from deckboard.widgets import LargeDualValue, SmallDualValue
+    def test_importable_from_ui(self):
+        from deckboard.ui import LargeDualValue, SmallDualValue
 
         assert LargeDualValue is not None
         assert SmallDualValue is not None

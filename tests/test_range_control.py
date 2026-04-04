@@ -1,14 +1,14 @@
-"""Tests for deckboard.widgets.slider — Slider, LargeSlider, SmallSlider."""
+"""Tests for deckboard.ui.controls.range_control — Slider, LargeSlider, SmallSlider."""
 
 from __future__ import annotations
 
 import pytest
 from PIL import Image
 
-from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
-from deckboard.touchscreen import Card
-from deckboard.widgets.slider import LargeSlider, Slider, SmallSlider
-from deckboard.widgets.touch_panel import StackCard
+from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from deckboard.ui.cards.base import Card
+from deckboard.ui.controls.range_control import LargeSlider, Slider, SmallSlider
+from deckboard.ui.cards.stack import StackCard
 
 
 # ── Concrete test subclasses (since the bases are abstract) ──────────────

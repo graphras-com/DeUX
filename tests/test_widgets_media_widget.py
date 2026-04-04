@@ -1,13 +1,13 @@
-"""Tests for deckboard.widgets.media_widget — MediaCard."""
+"""Tests for deckboard.presets.media — MediaCard."""
 
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
-from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
-from deckboard.widgets.media_widget import MediaCard
-from deckboard.widgets.text import LargeText
-from deckboard.widgets.volume import VolumeSlider
+from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from deckboard.presets.media import MediaCard
+from deckboard.ui.elements.text import LargeText
+from deckboard.ui.controls.volume import VolumeSlider
 
 
 class TestMediaWidgetInit:
@@ -198,13 +198,13 @@ class TestMediaWidgetRender:
 
 class TestMediaWidgetIsSubclassOfTouchPanel:
     def test_is_card(self):
-        from deckboard.touchscreen import Card
+        from deckboard.ui.cards.base import Card
 
         w = MediaCard(0)
         assert isinstance(w, Card)
 
     def test_is_touch_panel(self):
-        from deckboard.widgets.touch_panel import StackCard
+        from deckboard.ui.cards.stack import StackCard
 
         w = MediaCard(0)
         assert isinstance(w, StackCard)

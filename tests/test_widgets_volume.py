@@ -1,11 +1,11 @@
-"""Tests for deckboard.widgets.volume — VolumeSlider."""
+"""Tests for deckboard.ui.controls.volume — VolumeSlider."""
 
 from __future__ import annotations
 
 from PIL import Image
 
-from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
-from deckboard.widgets.volume import VolumeSlider
+from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from deckboard.ui.controls.volume import VolumeSlider
 
 
 class TestVolumeSliderInit:

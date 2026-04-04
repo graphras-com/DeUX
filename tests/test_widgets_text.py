@@ -1,12 +1,13 @@
-"""Tests for deckboard.widgets.text — LargeText, SmallText."""
+"""Tests for deckboard.ui.elements.text — LargeText, SmallText."""
 
 from __future__ import annotations
 
 from PIL import Image
 
-from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH, get_large_font
-from deckboard.widgets.text import LargeText, SmallText, _truncate_text
-from deckboard.widgets.touch_panel import StackCard
+from deckboard.render.fonts import get_large_font
+from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from deckboard.ui.elements.text import LargeText, SmallText, _truncate_text
+from deckboard.ui.cards.stack import StackCard
 
 
 # ── _truncate_text helper ────────────────────────────────────────────────
@@ -18,7 +19,7 @@ class TestTruncateText:
 
         img = Image.new("RGB", (200, 50))
         draw = ImageDraw.Draw(img)
-        from deckboard.image import get_font
+        from deckboard.render.fonts import get_font
 
         font = get_font()
         result = _truncate_text("Hi", font, 200, draw)
@@ -29,7 +30,7 @@ class TestTruncateText:
 
         img = Image.new("RGB", (200, 50))
         draw = ImageDraw.Draw(img)
-        from deckboard.image import get_font
+        from deckboard.render.fonts import get_font
 
         font = get_font()
         long_text = "A" * 200
@@ -42,7 +43,7 @@ class TestTruncateText:
 
         img = Image.new("RGB", (200, 50))
         draw = ImageDraw.Draw(img)
-        from deckboard.image import get_font
+        from deckboard.render.fonts import get_font
 
         font = get_font()
         result = _truncate_text("", font, 50, draw)
@@ -53,7 +54,7 @@ class TestTruncateText:
 
         img = Image.new("RGB", (200, 50))
         draw = ImageDraw.Draw(img)
-        from deckboard.image import get_font
+        from deckboard.render.fonts import get_font
 
         font = get_font()
         result = _truncate_text("Hello World", font, 0, draw)

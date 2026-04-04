@@ -1,10 +1,12 @@
-"""Base slider classes for touchscreen widget sub-elements.
+"""Base range-control classes for touchscreen card sub-elements.
 
 The hierarchy is::
 
-    Slider            (abstract base — value, clamping, drawing primitives)
+    RangeControl      (abstract base — value, clamping, drawing primitives)
     ├── LargeSlider   (full-width bar with label + value text above)
     └── SmallSlider   (compact bar with label to the left, no value text)
+
+``Slider`` is a backward-compatible alias for ``RangeControl``.
 """
 
 from __future__ import annotations
@@ -14,12 +16,12 @@ from typing import TYPE_CHECKING
 
 from PIL import Image, ImageDraw, ImageFont
 
-from ..ui.controls.base import Control
-from ..image import get_font
+from .base import Control
+from ...render.fonts import get_font
 
 if TYPE_CHECKING:
-    from ..touchscreen import Card  # abstract base — any Card subclass
-    from ..types import AsyncHandler
+    from ..cards.base import Card
+    from ...runtime.events import AsyncHandler
 
 # ── Layout constants (derived from the reference SVG) ────────────────────
 
@@ -49,10 +51,10 @@ _HIGHLIGHT_COLOR = "#5599ff"
 _NORMAL_STROKE_COLOR = "white"
 
 
-class Slider(Control, ABC):
+class RangeControl(Control, ABC):
     """Abstract base for all slider / progressbar sub-elements.
 
-    A slider holds a numeric value within a ``[min_value, max_value]``
+    A range control holds a numeric value within a ``[min_value, max_value]``
     range and knows how to render itself onto a PIL image.
     """
 
@@ -233,7 +235,11 @@ class Slider(Control, ABC):
         img.paste(grad, (x, y), mask)
 
 
-class LargeSlider(Slider, ABC):
+# Backward-compatible alias
+Slider = RangeControl
+
+
+class LargeSlider(RangeControl, ABC):
     """A full-width slider with label and value text above the bar.
 
     Two ``LargeSlider`` instances stack vertically inside one widget zone.
@@ -312,7 +318,7 @@ class LargeSlider(Slider, ABC):
         self._draw_bar_contents(draw, img, ix, iy, iw, ih)
 
 
-class SmallSlider(Slider, ABC):
+class SmallSlider(RangeControl, ABC):
     """A compact slider with the label to the left and no value text.
 
     Four ``SmallSlider`` instances stack vertically inside one widget zone.

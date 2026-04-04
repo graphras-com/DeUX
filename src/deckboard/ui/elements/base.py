@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ...touchscreen import Card
+    from ..cards.base import Card
 
 
 class Element:

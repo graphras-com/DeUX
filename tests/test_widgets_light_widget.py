@@ -1,13 +1,13 @@
-"""Tests for deckboard.widgets.light_widget — LightCard."""
+"""Tests for deckboard.presets.lighting — LightCard."""
 
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
-from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
-from deckboard.widgets.brightness import BrightnessSlider
-from deckboard.widgets.kelvin import KelvinSlider
-from deckboard.widgets.light_widget import LightCard
+from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from deckboard.ui.controls.brightness import BrightnessSlider
+from deckboard.ui.controls.kelvin import KelvinSlider
+from deckboard.presets.lighting import LightCard
 
 
 class TestLightWidgetInit:
@@ -153,7 +153,7 @@ class TestLightWidgetSelectionTimeout:
             call_count += 1
             return t
 
-        with patch("deckboard.widgets.touch_panel.time") as mock_time:
+        with patch("deckboard.ui.cards.stack.time") as mock_time:
             mock_time.monotonic = fake_monotonic
             w.handle_dial_press()  # move to kelvin, records time=100.0
             assert w.active_control is w.kelvin
@@ -169,13 +169,13 @@ class TestLightWidgetSelectionTimeout:
 
 class TestLightWidgetIsSubclassOfTouchPanel:
     def test_is_card(self):
-        from deckboard.touchscreen import Card
+        from deckboard.ui.cards.base import Card
 
         w = LightCard(0)
         assert isinstance(w, Card)
 
     def test_is_touch_panel(self):
-        from deckboard.widgets.touch_panel import StackCard
+        from deckboard.ui.cards.stack import StackCard
 
         w = LightCard(0)
         assert isinstance(w, StackCard)

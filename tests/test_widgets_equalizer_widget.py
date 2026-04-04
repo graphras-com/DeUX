@@ -1,13 +1,13 @@
-"""Tests for deckboard.widgets.equalizer_widget — EqualizerCard."""
+"""Tests for deckboard.presets.audio — EqualizerCard."""
 
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
-from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
-from deckboard.widgets.balance import BalanceSlider
-from deckboard.widgets.equalizer import EqualizerSlider
-from deckboard.widgets.equalizer_widget import EqualizerCard
+from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from deckboard.ui.controls.balance import BalanceSlider
+from deckboard.ui.controls.equalizer import EqualizerSlider
+from deckboard.presets.audio import EqualizerCard
 
 
 class TestEqualizerWidgetInit:
@@ -155,7 +155,7 @@ class TestEqualizerWidgetSelectionTimeout:
             call_count += 1
             return t
 
-        with patch("deckboard.widgets.touch_panel.time") as mock_time:
+        with patch("deckboard.ui.cards.stack.time") as mock_time:
             mock_time.monotonic = fake_monotonic
             w.handle_dial_press()  # move to bass, records time=100.0
             assert w.active_control is w.bass
@@ -171,13 +171,13 @@ class TestEqualizerWidgetSelectionTimeout:
 
 class TestEqualizerWidgetIsSubclassOfTouchPanel:
     def test_is_card(self):
-        from deckboard.touchscreen import Card
+        from deckboard.ui.cards.base import Card
 
         w = EqualizerCard(0)
         assert isinstance(w, Card)
 
     def test_is_touch_panel(self):
-        from deckboard.widgets.touch_panel import StackCard
+        from deckboard.ui.cards.stack import StackCard
 
         w = EqualizerCard(0)
         assert isinstance(w, StackCard)

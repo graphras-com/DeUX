@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from ..widgets.temperature import TemperatureSlider
+from ..ui.controls.temperature import TemperatureSlider
 
 __all__ = ["TemperatureSlider"]

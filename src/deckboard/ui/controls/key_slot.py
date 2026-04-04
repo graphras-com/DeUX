@@ -1,20 +1,20 @@
-"""Button class: wraps a physical key on the Stream Deck."""
+"""KeySlot class: wraps a physical key on the Stream Deck."""
 
 from __future__ import annotations
 
 import logging
 
-from .types import AsyncHandler
+from ...runtime.events import AsyncHandler
 
 logger = logging.getLogger(__name__)
 
 
-class Button:
+class KeySlot:
     """Represents a single physical key on the Stream Deck.
 
     Use decorators to register event handlers::
 
-        @button.on_press
+        @key.on_press
         async def handle():
             print("pressed!")
     """
@@ -47,7 +47,7 @@ class Button:
 
     # -- Configuration methods (return self for chaining) ------------------
 
-    def set_icon(self, name: str, color: str = "white") -> Button:
+    def set_icon(self, name: str, color: str = "white") -> KeySlot:
         """Set the icon by Iconify name (e.g. ``mdi:home``).
 
         Args:
@@ -62,7 +62,7 @@ class Button:
         self._dirty = True
         return self
 
-    def set_label(self, label: str | None) -> Button:
+    def set_label(self, label: str | None) -> KeySlot:
         """Set a text label displayed below the icon.
 
         Args:
@@ -75,7 +75,7 @@ class Button:
         self._dirty = True
         return self
 
-    def clear(self) -> Button:
+    def clear(self) -> KeySlot:
         """Clear the icon and label, resetting to a blank key."""
         self._icon_name = None
         self._label = None
@@ -132,3 +132,7 @@ class Button:
     @property
     def image_bytes(self) -> bytes | None:
         return self._image_bytes
+
+
+# Backward-compatible alias
+Button = KeySlot

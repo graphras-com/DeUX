@@ -1,4 +1,4 @@
-"""Tests for deckboard.deck — Deck class."""
+"""Tests for deckboard.runtime.deck — Deck class."""
 
 from __future__ import annotations
 
@@ -7,10 +7,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from deckboard.deck import Deck, DeckError, _KEY_COUNT
-from deckboard.icon import IconManager
-from deckboard.page import Screen
-from deckboard.types import (
+from deckboard.runtime.deck import Deck, DeckError, _KEY_COUNT
+from deckboard.render.icons import IconManager
+from deckboard.ui.screen import Screen
+from deckboard.runtime.events import (
     DialPressEvent,
     DialTurnEvent,
     EventType,
@@ -139,7 +139,7 @@ class TestDeckDebugGrid:
         from PIL import Image as PILImage
 
         deck._device = mock_streamdeck_device
-        from deckboard.button import Button
+        from deckboard.ui.controls.key_slot import Button
 
         b = Button(0)
         b.set_label("Test")
@@ -332,8 +332,8 @@ class TestDeckDispatch:
 
     async def test_dial_turn_updates_card_slider(self, deck):
         """Dial turn forwards to widget sliders and triggers refresh."""
-        from deckboard.widgets.volume import VolumeSlider
-        from deckboard.widgets.touch_panel import StackCard
+        from deckboard.ui.controls.volume import VolumeSlider
+        from deckboard.ui.cards.stack import StackCard
 
         p = deck.screen("main")
         sw = StackCard(1)
@@ -380,9 +380,9 @@ class TestDeckDispatch:
 
     async def test_dial_press_cycles_card_slider(self, deck):
         """Dial press cycles active slider on the widget and triggers refresh."""
-        from deckboard.widgets.volume import VolumeSlider
-        from deckboard.widgets.brightness import BrightnessSlider
-        from deckboard.widgets.touch_panel import StackCard
+        from deckboard.ui.controls.volume import VolumeSlider
+        from deckboard.ui.controls.brightness import BrightnessSlider
+        from deckboard.ui.cards.stack import StackCard
 
         p = deck.screen("main")
         sw = StackCard(0)
@@ -457,7 +457,7 @@ class TestDeckDispatchWidgetCallbacks:
 
     async def test_dial_turn_calls_card_dial_turn_handler(self, deck):
         """Card on_dial_turn handler is called on DialTurnEvent."""
-        from deckboard.widgets.touch_panel import StackCard
+        from deckboard.ui.cards.stack import StackCard
 
         p = deck.screen("main")
         sw = StackCard(0)
@@ -474,8 +474,8 @@ class TestDeckDispatchWidgetCallbacks:
 
     async def test_dial_press_calls_card_dial_press_handler(self, deck):
         """Card on_dial_press handler is called on DialPressEvent."""
-        from deckboard.widgets.touch_panel import StackCard
-        from deckboard.widgets.volume import VolumeSlider
+        from deckboard.ui.cards.stack import StackCard
+        from deckboard.ui.controls.volume import VolumeSlider
 
         p = deck.screen("main")
         sw = StackCard(0)
@@ -494,7 +494,7 @@ class TestDeckDispatchWidgetCallbacks:
 
     async def test_dial_press_release_does_not_call_card_handler(self, deck):
         """Card on_dial_press is NOT called for release events."""
-        from deckboard.widgets.touch_panel import StackCard
+        from deckboard.ui.cards.stack import StackCard
 
         p = deck.screen("main")
         sw = StackCard(0)
@@ -509,8 +509,8 @@ class TestDeckDispatchWidgetCallbacks:
 
     async def test_dial_turn_drains_slider_on_change(self, deck):
         """Slider on_change callback is awaited after dial turn adjusts value."""
-        from deckboard.widgets.touch_panel import StackCard
-        from deckboard.widgets.volume import VolumeSlider
+        from deckboard.ui.cards.stack import StackCard
+        from deckboard.ui.controls.volume import VolumeSlider
 
         p = deck.screen("main")
         sw = StackCard(0)
@@ -529,8 +529,8 @@ class TestDeckDispatchWidgetCallbacks:
 
     async def test_dial_turn_order_dial_then_card_then_change(self, deck):
         """Dispatch order: dial handler → widget dial handler → slider on_change."""
-        from deckboard.widgets.touch_panel import StackCard
-        from deckboard.widgets.volume import VolumeSlider
+        from deckboard.ui.cards.stack import StackCard
+        from deckboard.ui.controls.volume import VolumeSlider
 
         p = deck.screen("main")
         sw = StackCard(0)
@@ -557,8 +557,8 @@ class TestDeckDispatchWidgetCallbacks:
 
     async def test_refresh_drains_pending_callbacks(self, deck):
         """Programmatic set_value + refresh drains on_change callbacks."""
-        from deckboard.widgets.touch_panel import StackCard
-        from deckboard.widgets.volume import VolumeSlider
+        from deckboard.ui.cards.stack import StackCard
+        from deckboard.ui.controls.volume import VolumeSlider
 
         p = deck.screen("main")
         sw = StackCard(0)
@@ -580,8 +580,8 @@ class TestDeckDispatchWidgetCallbacks:
 
     async def test_no_on_change_when_value_unchanged_via_dial(self, deck):
         """No on_change callback when dial turn doesn't change value (at max)."""
-        from deckboard.widgets.touch_panel import StackCard
-        from deckboard.widgets.volume import VolumeSlider
+        from deckboard.ui.cards.stack import StackCard
+        from deckboard.ui.controls.volume import VolumeSlider
 
         p = deck.screen("main")
         sw = StackCard(0)
@@ -600,7 +600,7 @@ class TestDeckDispatchWidgetCallbacks:
 
     async def test_drain_card_callbacks_helper(self, deck):
         """_drain_card_callbacks awaits all pending callbacks in order."""
-        from deckboard.widgets.touch_panel import StackCard
+        from deckboard.ui.cards.stack import StackCard
 
         sw = StackCard(0)
         results = []
@@ -657,7 +657,7 @@ class TestDeckRenderAllButtons:
 class TestDeckRenderButton:
     async def test_no_device(self, deck):
         """No-op when device is None."""
-        from deckboard.button import Button
+        from deckboard.ui.controls.key_slot import Button
 
         b = Button(0)
         b.set_icon("mdi:home")
@@ -667,7 +667,7 @@ class TestDeckRenderButton:
         from PIL import Image
 
         deck._device = mock_streamdeck_device
-        from deckboard.button import Button
+        from deckboard.ui.controls.key_slot import Button
 
         b = Button(0)
         b.set_icon("mdi:home")
@@ -683,7 +683,7 @@ class TestDeckRenderButton:
 
     async def test_renders_button_without_icon(self, deck, mock_streamdeck_device):
         deck._device = mock_streamdeck_device
-        from deckboard.button import Button
+        from deckboard.ui.controls.key_slot import Button
 
         b = Button(0)
         b.set_label("Test")
@@ -751,7 +751,7 @@ class TestDeckInfo:
 
 class TestDeckStart:
     async def test_no_devices_found(self, deck):
-        with patch("deckboard.deck.DeviceManager") as mock_dm:
+        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = []
             with pytest.raises(DeckError, match="No Stream Deck devices found"):
                 await deck.start()
@@ -759,7 +759,7 @@ class TestDeckStart:
     async def test_no_matching_type(self, deck):
         mock_dev = MagicMock()
         mock_dev.DECK_TYPE = "Stream Deck Mini"
-        with patch("deckboard.deck.DeviceManager") as mock_dm:
+        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_dev]
             with pytest.raises(DeckError, match="No 'Stream Deck \\+' found"):
                 await deck.start()
@@ -768,13 +768,13 @@ class TestDeckStart:
         deck._device_index = 5
         mock_dev = MagicMock()
         mock_dev.DECK_TYPE = "Stream Deck +"
-        with patch("deckboard.deck.DeviceManager") as mock_dm:
+        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_dev]
             with pytest.raises(DeckError, match="Device index 5 out of range"):
                 await deck.start()
 
     async def test_successful_start(self, deck, mock_streamdeck_device):
-        with patch("deckboard.deck.DeviceManager") as mock_dm:
+        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
             await deck.start()
             assert deck._running is True
@@ -784,7 +784,7 @@ class TestDeckStart:
             await deck.stop()
 
     async def test_already_running_noop(self, deck, mock_streamdeck_device):
-        with patch("deckboard.deck.DeviceManager") as mock_dm:
+        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
             await deck.start()
             # Second call should be no-op
@@ -803,7 +803,7 @@ class TestDeckStop:
         await deck.stop()  # Should not raise
 
     async def test_stop_closes_device(self, deck, mock_streamdeck_device):
-        with patch("deckboard.deck.DeviceManager") as mock_dm:
+        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
             await deck.start()
             await deck.stop()
@@ -813,7 +813,7 @@ class TestDeckStop:
             mock_streamdeck_device.close.assert_called()
 
     async def test_stop_sets_closed_event(self, deck, mock_streamdeck_device):
-        with patch("deckboard.deck.DeviceManager") as mock_dm:
+        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
             await deck.start()
             await deck.stop()
@@ -822,7 +822,7 @@ class TestDeckStop:
     async def test_stop_handles_device_error(self, deck, mock_streamdeck_device):
         """stop() handles errors during device close gracefully."""
         mock_streamdeck_device.close.side_effect = OSError("HID error")
-        with patch("deckboard.deck.DeviceManager") as mock_dm:
+        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
             await deck.start()
             await deck.stop()  # Should not raise
@@ -833,7 +833,7 @@ class TestDeckStop:
 
 class TestDeckContextManager:
     async def test_aenter_aexit(self, deck, mock_streamdeck_device):
-        with patch("deckboard.deck.DeviceManager") as mock_dm:
+        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
             async with deck as d:
                 assert d is deck
@@ -846,7 +846,7 @@ class TestDeckContextManager:
 
 class TestDeckWaitClosed:
     async def test_wait_closed_resolves_after_stop(self, deck, mock_streamdeck_device):
-        with patch("deckboard.deck.DeviceManager") as mock_dm:
+        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
             await deck.start()
 
@@ -871,9 +871,9 @@ class TestDeckCheckTimeouts:
 
     async def test_no_expired_timeouts_no_refresh(self, deck):
         """No refresh when no widget has an expired timeout."""
-        from deckboard.widgets.volume import VolumeSlider
-        from deckboard.widgets.brightness import BrightnessSlider
-        from deckboard.widgets.touch_panel import StackCard
+        from deckboard.ui.controls.volume import VolumeSlider
+        from deckboard.ui.controls.brightness import BrightnessSlider
+        from deckboard.ui.cards.stack import StackCard
 
         p = deck.screen("main")
         sw = StackCard(0)
@@ -890,9 +890,9 @@ class TestDeckCheckTimeouts:
     async def test_expired_timeout_triggers_refresh(self, deck):
         """Expired selection timeout reverts slider and triggers refresh."""
         import time
-        from deckboard.widgets.volume import VolumeSlider
-        from deckboard.widgets.brightness import BrightnessSlider
-        from deckboard.widgets.touch_panel import StackCard
+        from deckboard.ui.controls.volume import VolumeSlider
+        from deckboard.ui.controls.brightness import BrightnessSlider
+        from deckboard.ui.cards.stack import StackCard
 
         p = deck.screen("main")
         sw = StackCard(0)
@@ -917,9 +917,9 @@ class TestDeckCheckTimeouts:
     async def test_multiple_cards_only_expired_triggers(self, deck):
         """Only widgets with expired timeouts cause a refresh."""
         import time
-        from deckboard.widgets.volume import VolumeSlider
-        from deckboard.widgets.brightness import BrightnessSlider
-        from deckboard.widgets.touch_panel import StackCard
+        from deckboard.ui.controls.volume import VolumeSlider
+        from deckboard.ui.controls.brightness import BrightnessSlider
+        from deckboard.ui.cards.stack import StackCard
 
         p = deck.screen("main")
 
@@ -1024,7 +1024,7 @@ class TestDeckEventLoop:
             deck._running = False
 
         asyncio.create_task(stop_after_delay())
-        with patch("deckboard.deck.logger") as mock_logger:
+        with patch("deckboard.runtime.deck.logger") as mock_logger:
             await deck._event_loop()
             mock_logger.exception.assert_called_with("Error in event handler")
         assert deck._closed_event.is_set()
@@ -1044,7 +1044,7 @@ class TestDeckEventLoop:
         transport.queue = MagicMock()
         transport.queue.get = exploding_get
 
-        with patch("deckboard.deck.logger") as mock_logger:
+        with patch("deckboard.runtime.deck.logger") as mock_logger:
             await deck._event_loop()
             mock_logger.exception.assert_called_with("Event loop crashed")
         # finally block should still set the closed event

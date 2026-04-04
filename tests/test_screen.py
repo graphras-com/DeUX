@@ -1,15 +1,16 @@
-"""Tests for deckboard.page — Screen class."""
+"""Tests for deckboard.ui.screen — Screen class."""
 
 from __future__ import annotations
 
 import pytest
 
-from deckboard.button import Button
-from deckboard.dial import Dial
-from deckboard.page import Screen, Screen
-from deckboard.touchscreen import TouchStrip, Card
-from deckboard.widgets.icon_widget import StatusCard
-from deckboard.widgets.touch_panel import StackCard
+from deckboard.ui.controls.key_slot import Button
+from deckboard.ui.controls.encoder_slot import Dial
+from deckboard.ui.screen import Screen
+from deckboard.ui.touch_strip import TouchStrip
+from deckboard.ui.cards.base import Card
+from deckboard.ui.cards.status import StatusCard
+from deckboard.ui.cards.stack import StackCard
 
 
 class TestPageInit:

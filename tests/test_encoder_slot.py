@@ -1,8 +1,8 @@
-"""Tests for deckboard.dial — Dial class."""
+"""Tests for deckboard.ui.controls.encoder_slot — EncoderSlot (Dial) class."""
 
 from __future__ import annotations
 
-from deckboard.dial import Dial
+from deckboard.ui.controls.encoder_slot import Dial, EncoderSlot
 
 
 class TestDialInit:

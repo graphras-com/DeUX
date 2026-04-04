@@ -9,14 +9,15 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock
 import pytest
 from PIL import Image
 
-from deckboard.button import Button
-from deckboard.dial import Dial
-from deckboard.icon import IconManager
-from deckboard.page import Screen
-from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
-from deckboard.touchscreen import TouchStrip, Card
-from deckboard.widgets.icon_widget import StatusCard
-from deckboard.widgets.touch_panel import StackCard
+from deckboard.ui.controls.key_slot import Button, KeySlot
+from deckboard.ui.controls.encoder_slot import Dial, EncoderSlot
+from deckboard.render.icons import IconManager
+from deckboard.ui.screen import Screen
+from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from deckboard.ui.touch_strip import TouchStrip
+from deckboard.ui.cards.base import Card
+from deckboard.ui.cards.status import StatusCard
+from deckboard.ui.cards.stack import StackCard
 
 
 @pytest.fixture

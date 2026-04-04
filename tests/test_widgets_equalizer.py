@@ -1,11 +1,11 @@
-"""Tests for deckboard.widgets.equalizer — EqualizerSlider."""
+"""Tests for deckboard.ui.controls.equalizer — EqualizerSlider."""
 
 from __future__ import annotations
 
 from PIL import Image
 
-from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
-from deckboard.widgets.equalizer import EqualizerSlider
+from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from deckboard.ui.controls.equalizer import EqualizerSlider
 
 
 class TestEqualizerSliderInit:

@@ -1,11 +1,11 @@
-"""Tests for deckboard.widgets.brightness — BrightnessSlider."""
+"""Tests for deckboard.ui.controls.brightness — BrightnessSlider."""
 
 from __future__ import annotations
 
 from PIL import Image
 
-from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
-from deckboard.widgets.brightness import BrightnessSlider
+from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from deckboard.ui.controls.brightness import BrightnessSlider
 
 
 class TestBrightnessSliderInit:

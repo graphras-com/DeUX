@@ -1,12 +1,12 @@
-"""Tests for deckboard.widgets.balance — BalanceSlider."""
+"""Tests for deckboard.ui.controls.balance — BalanceSlider."""
 
 from __future__ import annotations
 
 import pytest
 from PIL import Image
 
-from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
-from deckboard.widgets.balance import BalanceSlider
+from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from deckboard.ui.controls.balance import BalanceSlider
 
 
 class TestBalanceSliderInit:
