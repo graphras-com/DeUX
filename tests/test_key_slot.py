@@ -1,10 +1,10 @@
-"""Tests for deckboard.button — Button class."""
+"""Tests for deckboard.ui.controls.key_slot — KeySlot (Button) class."""
 
 from __future__ import annotations
 
 import pytest
 
-from deckboard.button import Button
+from deckboard.ui.controls.key_slot import Button, KeySlot
 
 
 class TestButtonInit:

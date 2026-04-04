@@ -1,11 +1,11 @@
-"""Tests for deckboard.widgets.temperature — TemperatureSlider."""
+"""Tests for deckboard.ui.controls.temperature — TemperatureSlider."""
 
 from __future__ import annotations
 
 from PIL import Image
 
-from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
-from deckboard.widgets.temperature import TemperatureSlider
+from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from deckboard.ui.controls.temperature import TemperatureSlider
 
 
 class TestTemperatureSliderInit:

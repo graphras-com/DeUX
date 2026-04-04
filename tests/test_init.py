@@ -25,25 +25,22 @@ class TestPublicAPI:
             "DialTurnEvent",
             "Element",
             "EncoderSlot",
-            "EqualizerSlider",
             "EqualizerCard",
+            "EqualizerSlider",
             "EventType",
             "IconError",
             "IconManager",
-            "StatusCard",
-            "KeySlot",
             "KelvinSlider",
             "KeyEvent",
+            "KeySlot",
             "LargeDualValue",
             "LargeSlider",
             "LargeText",
             "LightCard",
             "MediaCard",
-            "Screen",
             "RangeControl",
             "Screen",
             "Slider",
-            "StackCard",
             "SmallDualValue",
             "SmallSlider",
             "SmallText",
@@ -51,11 +48,8 @@ class TestPublicAPI:
             "StatusCard",
             "TemperatureSlider",
             "TouchEvent",
-            "StackCard",
-            "TouchStrip",
             "TouchStrip",
             "VolumeSlider",
-            "Card",
         }
         assert set(deckboard.__all__) == expected
 
@@ -101,18 +95,15 @@ class TestPublicAPI:
         assert IconManager is not None
         assert IconError is not None
 
-    def test_page_importable(self):
-        from deckboard import Screen, Screen
+    def test_screen_importable(self):
+        from deckboard import Screen
 
-        assert Screen is not None
         assert Screen is not None
 
     def test_touchscreen_importable(self):
-        from deckboard import Card, TouchStrip, TouchStrip, Card
+        from deckboard import Card, TouchStrip
 
         assert TouchStrip is not None
-        assert TouchStrip is not None
-        assert Card is not None
         assert Card is not None
 
     def test_device_info_importable(self):
@@ -128,21 +119,21 @@ class TestPublicAPI:
             Element,
             EncoderSlot,
             EqualizerSlider,
-            StatusCard,
-            KeySlot,
             KelvinSlider,
+            KeySlot,
+            LargeDualValue,
             LargeSlider,
             LargeText,
             RangeControl,
             Screen,
             Slider,
-            StackCard,
+            SmallDualValue,
             SmallSlider,
             SmallText,
             StackCard,
             StatusCard,
             TemperatureSlider,
-            StackCard,
+            TouchStrip,
             VolumeSlider,
         )
 
@@ -162,9 +153,16 @@ class TestPublicAPI:
         assert EqualizerSlider is not None
         assert BalanceSlider is not None
         assert StatusCard is not None
-        assert StatusCard is not None
-        assert StackCard is not None
-        assert StackCard is not None
         assert StackCard is not None
         assert LargeText is not None
         assert SmallText is not None
+        assert LargeDualValue is not None
+        assert SmallDualValue is not None
+        assert TouchStrip is not None
+
+    def test_preset_cards_importable(self):
+        from deckboard import EqualizerCard, LightCard, MediaCard
+
+        assert EqualizerCard is not None
+        assert LightCard is not None
+        assert MediaCard is not None

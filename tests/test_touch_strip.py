@@ -1,4 +1,4 @@
-"""Tests for deckboard.touchscreen — Card (abstract), StatusCard, StackCard, StackCard, and TouchStrip."""
+"""Tests for deckboard.ui — Card (abstract), StatusCard, StackCard, and TouchStrip."""
 
 from __future__ import annotations
 
@@ -8,16 +8,16 @@ from unittest.mock import patch
 import pytest
 from PIL import Image
 
-from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
-from deckboard.touchscreen import TouchStrip, Card
-from deckboard.widgets.icon_widget import StatusCard
-from deckboard.widgets.touch_panel import StackCard
-from deckboard.widgets.touch_panel import StackCard
-from deckboard.widgets.text import LargeText, SmallText
-from deckboard.widgets.volume import VolumeSlider
-from deckboard.widgets.brightness import BrightnessSlider
-from deckboard.widgets.equalizer import EqualizerSlider
-from deckboard.widgets.balance import BalanceSlider
+from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from deckboard.ui.touch_strip import TouchStrip
+from deckboard.ui.cards.base import Card
+from deckboard.ui.cards.status import StatusCard
+from deckboard.ui.cards.stack import StackCard
+from deckboard.ui.elements.text import LargeText, SmallText
+from deckboard.ui.controls.volume import VolumeSlider
+from deckboard.ui.controls.brightness import BrightnessSlider
+from deckboard.ui.controls.equalizer import EqualizerSlider
+from deckboard.ui.controls.balance import BalanceSlider
 
 
 # ── Card (abstract base) ──────────────────────────────────────────────
@@ -637,7 +637,9 @@ class TestStackCardHandleDialTurn:
         slider_widget.add_control(bri)
 
         # Active slider is already the default (index 0)
-        assert slider_widget.active_control_index == slider_widget._default_control_index
+        assert (
+            slider_widget.active_control_index == slider_widget._default_control_index
+        )
         assert slider_widget._last_selection_time is None
 
         slider_widget.handle_dial_turn(1)

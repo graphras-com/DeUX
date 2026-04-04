@@ -17,7 +17,7 @@ class TestRuntimePackage:
 
 
 class TestUiSubpackages:
-    def test_cards_lazy_exports(self):
+    def test_cards_exports(self):
         import deckboard.ui.cards as cards
 
         assert cards.Card is deckboard.Card

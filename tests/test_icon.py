@@ -1,4 +1,4 @@
-"""Tests for deckboard.icon — IconManager and _svg_to_png."""
+"""Tests for deckboard.render.icons — IconManager and _svg_to_png."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import httpx
 import pytest
 from PIL import Image
 
-from deckboard.icon import IconError, IconManager, _svg_to_png
+from deckboard.render.icons import IconError, IconManager, _svg_to_png
 
 
 # ── _svg_to_png ─────────────────────────────────────────────────────────
@@ -36,7 +36,7 @@ class TestSvgToPng:
     def test_cairosvg_fallback_to_rsvg(self):
         """When cairosvg import fails, try rsvg-convert."""
         with patch.dict("sys.modules", {"cairosvg": None}):
-            with patch("deckboard.icon.subprocess.run") as mock_run:
+            with patch("deckboard.render.icons.subprocess.run") as mock_run:
                 # Create a fake PNG (1x1 pixel)
                 fake_png = BytesIO()
                 Image.new("RGBA", (80, 80)).save(fake_png, "PNG")
@@ -50,7 +50,7 @@ class TestSvgToPng:
         """When all SVG renderers fail, raise IconError."""
         with patch("builtins.__import__", side_effect=ImportError("no cairosvg")):
             with patch(
-                "deckboard.icon.subprocess.run",
+                "deckboard.render.icons.subprocess.run",
                 side_effect=FileNotFoundError("no rsvg"),
             ):
                 with pytest.raises(IconError, match="No SVG renderer available"):
@@ -60,7 +60,7 @@ class TestSvgToPng:
         """When cairosvg fails and rsvg-convert returns error, raise IconError."""
         with patch("builtins.__import__", side_effect=ImportError("no cairosvg")):
             with patch(
-                "deckboard.icon.subprocess.run",
+                "deckboard.render.icons.subprocess.run",
                 side_effect=subprocess.SubprocessError("failed"),
             ):
                 with pytest.raises(IconError, match="No SVG renderer available"):
@@ -276,7 +276,8 @@ class TestIconManagerGet:
         icon_manager._client = mock_client
 
         with patch(
-            "deckboard.icon._svg_to_png", side_effect=RuntimeError("render failed")
+            "deckboard.render.icons._svg_to_png",
+            side_effect=RuntimeError("render failed"),
         ):
             with pytest.raises(IconError, match="Failed to convert SVG to PNG"):
                 await icon_manager.get("mdi:home")

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PIL import Image, ImageDraw
 
-from .slider import LargeSlider, _LARGE_INDICATOR_W, _LARGE_INNER_RX
+from .range_control import LargeSlider, _LARGE_INDICATOR_W, _LARGE_INNER_RX
 
 
 class KelvinSlider(LargeSlider):

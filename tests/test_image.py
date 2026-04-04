@@ -1,4 +1,4 @@
-"""Tests for deckboard.image — rendering helpers."""
+"""Tests for deckboard.render — rendering helpers."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from PIL import Image, ImageFont
 
-from deckboard.image import (
+from deckboard.render.metrics import (
     ICON_SIZE,
     KEY_SIZE,
     TOUCHSCREEN_HEIGHT,
@@ -15,17 +15,25 @@ from deckboard.image import (
     PANEL_COUNT,
     PANEL_HEIGHT,
     PANEL_WIDTH,
+)
+from deckboard.render.key_renderer import (
     _encode_jpeg,
+    render_blank_key,
+    render_key_image,
+)
+from deckboard.render.fonts import (
     _get_font,
-    compose_touchstrip,
-    draw_key_grid,
-    draw_touchscreen_grid,
     get_font,
     get_small_font,
-    render_blank_key,
+)
+from deckboard.render.touch_renderer import (
+    compose_touchstrip,
     render_blank_touchscreen,
-    render_key_image,
     render_status_card_image,
+)
+from deckboard.render.debug_grid import (
+    draw_key_grid,
+    draw_touchscreen_grid,
 )
 
 

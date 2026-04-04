@@ -1,4 +1,4 @@
-"""Tests for deckboard._transport — AsyncTransport class."""
+"""Tests for deckboard.runtime.transport — AsyncTransport class."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, call
 
 import pytest
 
-from deckboard._transport import AsyncTransport
-from deckboard.types import (
+from deckboard.runtime.transport import AsyncTransport
+from deckboard.runtime.events import (
     DialPressEvent,
     DialTurnEvent,
     EventType,

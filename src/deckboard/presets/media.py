@@ -1,10 +1,12 @@
-"""Media card preset with title text and volume range control."""
+"""Media-focused preset cards."""
 
 from __future__ import annotations
 
-from .text import LargeText
-from .touch_panel import StackCard
-from .volume import VolumeSlider
+from ..ui.cards.stack import StackCard
+from ..ui.controls.volume import VolumeSlider
+from ..ui.elements.text import LargeText
+
+__all__ = ["MediaCard"]
 
 
 class MediaCard(StackCard):

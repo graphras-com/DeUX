@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PIL import Image, ImageDraw
 
-from .slider import SmallSlider, _SMALL_INNER_RX
+from .range_control import SmallSlider, _SMALL_INNER_RX
 
 
 class BalanceSlider(SmallSlider):
