@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from ...touchscreen import Widget
-
-Card = Widget
+from ...touchscreen import Card
 
 __all__ = ["Card"]

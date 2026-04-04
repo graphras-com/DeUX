@@ -31,16 +31,16 @@ async def main():
         main_page = deck.screen("main")
 
         # Row 1: navigation icons
-        main_page.button(0).set_icon("mdi:home").set_label("Home")
-        main_page.button(1).set_icon("mdi:music").set_label("Music")
-        main_page.button(2).set_icon("mdi:lightbulb-outline").set_label("Lights")
-        main_page.button(3).set_icon("mdi:thermometer").set_label("Climate")
+        main_page.key(0).set_icon("mdi:home").set_label("Home")
+        main_page.key(1).set_icon("mdi:music").set_label("Music")
+        main_page.key(2).set_icon("mdi:lightbulb-outline").set_label("Lights")
+        main_page.key(3).set_icon("mdi:thermometer").set_label("Climate")
 
         # Row 2: actions
-        main_page.button(4).set_icon("mdi:play")
-        main_page.button(5).set_icon("mdi:pause")
-        main_page.button(6).set_icon("mdi:skip-next")
-        main_page.button(7).set_icon("mdi:cog").set_label("Settings")
+        main_page.key(4).set_icon("mdi:play")
+        main_page.key(5).set_icon("mdi:pause")
+        main_page.key(6).set_icon("mdi:skip-next")
+        main_page.key(7).set_icon("mdi:cog").set_label("Settings")
 
         # Touchscreen widgets (under each dial)
         main_page.card(0).set_icon("mdi:volume-high").set_label("Volume").set_value(
@@ -57,29 +57,29 @@ async def main():
         # Button event handlers
         volume = 50
 
-        @main_page.button(0).on_press
+        @main_page.key(0).on_press
         async def on_home():
             print("Home pressed!")
 
-        @main_page.button(7).on_press
+        @main_page.key(7).on_press
         async def on_settings():
             print("Switching to settings page")
             await deck.set_screen("settings")
 
-        @main_page.button(4).on_press
+        @main_page.key(4).on_press
         async def on_play():
             print("Play!")
 
-        @main_page.button(5).on_press
+        @main_page.key(5).on_press
         async def on_pause():
             print("Pause!")
 
-        @main_page.button(6).on_press
+        @main_page.key(6).on_press
         async def on_skip():
             print("Skip!")
 
         # Dial handlers
-        @main_page.dial(0).on_turn
+        @main_page.encoder(0).on_turn
         async def on_volume_turn(direction: int):
             nonlocal volume
             volume = max(0, min(100, volume + direction * 5))
@@ -87,18 +87,18 @@ async def main():
             main_page.card(0).set_value(f"{volume}%")
             await deck.refresh()
 
-        @main_page.dial(0).on_press
+        @main_page.encoder(0).on_press
         async def on_volume_mute():
             print("Volume muted!")
             main_page.card(0).set_icon("mdi:volume-off").set_value("Muted")
             await deck.refresh()
 
-        @main_page.dial(0).on_release
+        @main_page.encoder(0).on_release
         async def on_volume_unmute():
             main_page.card(0).set_icon("mdi:volume-high").set_value(f"{volume}%")
             await deck.refresh()
 
-        # Widget touch handlers
+        # Card touch handlers
         @main_page.card(0).on_tap
         async def on_volume_tap():
             print("Volume widget tapped!")
@@ -107,19 +107,19 @@ async def main():
 
         settings = deck.screen("settings")
 
-        settings.button(0).set_icon("mdi:arrow-left").set_label("Back")
-        settings.button(1).set_icon("mdi:brightness-6").set_label("Bright")
-        settings.button(2).set_icon("mdi:information-outline").set_label("Info")
+        settings.key(0).set_icon("mdi:arrow-left").set_label("Back")
+        settings.key(1).set_icon("mdi:brightness-6").set_label("Bright")
+        settings.key(2).set_icon("mdi:information-outline").set_label("Info")
 
         settings.card(0).set_label("Settings")
         settings.card(3).set_icon("mdi:close").set_label("Exit")
 
-        @settings.button(0).on_press
+        @settings.key(0).on_press
         async def on_back():
             print("Back to main page")
             await deck.set_screen("main")
 
-        @settings.dial(0).on_turn
+        @settings.encoder(0).on_turn
         async def on_brightness_turn(direction: int):
             new_brightness = deck.brightness + direction * 10
             await deck.set_brightness(new_brightness)

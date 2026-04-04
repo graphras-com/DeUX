@@ -1,31 +1,31 @@
-"""LightWidget — pre-configured TouchPanel with Brightness and Kelvin sliders."""
+"""Light card preset with brightness and kelvin range controls."""
 
 from __future__ import annotations
 
 from .brightness import BrightnessSlider
 from .kelvin import KelvinSlider
-from .touch_panel import TouchPanel
+from .touch_panel import StackCard
 
 
-class LightWidget(TouchPanel):
-    """A ready-to-use light control widget with Brightness and Kelvin.
+class LightCard(StackCard):
+    """A ready-to-use light control card with brightness and kelvin.
 
     Combines one :class:`BrightnessSlider` (on top) and one
-    :class:`KelvinSlider` (below) into a single :class:`TouchPanel`.
+    :class:`KelvinSlider` (below) into a single :class:`StackCard`.
     The Brightness slider is the default active slider.
 
     All parameters are optional — sensible defaults are applied.
 
     Args:
-        index: Widget zone index (0–3).
+        index: Card zone index (0–3).
         brightness: Initial brightness value (0–100).  Defaults to 100.
         kelvin: Initial colour temperature in Kelvin.  Defaults to 4000.
 
     Usage::
 
-        from deckboard.widgets import LightWidget
+        from deckboard import LightCard
 
-        light = LightWidget(0)
+        light = LightCard(0)
         light.brightness.set_value(80)
         light.kelvin.set_value(3200)
     """

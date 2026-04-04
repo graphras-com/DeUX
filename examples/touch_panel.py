@@ -56,9 +56,9 @@ async def main() -> None:
 
         # -- Buttons -------------------------------------------------------
 
-        page.button(0).set_icon("mdi:restore").set_label("Reset All")
-        page.button(1).set_icon("mdi:printer").set_label("Values")
-        page.button(7).set_icon("mdi:close-circle").set_label("Exit")
+        page.key(0).set_icon("mdi:restore").set_label("Reset All")
+        page.key(1).set_icon("mdi:printer").set_label("Values")
+        page.key(7).set_icon("mdi:close-circle").set_label("Exit")
 
         # -- Zone 0: Large text header + brightness slider -----------------
         #    The text shows a room name; the slider controls brightness.
@@ -120,7 +120,7 @@ async def main() -> None:
 
         # -- Dial handler: update volume readout on turn -------------------
 
-        @page.dial(1).on_turn
+        @page.encoder(1).on_turn
         async def on_vol_turn(direction: int) -> None:
             # The slider value is adjusted automatically by StackCard;
             # we just need to sync the text readout.
@@ -129,7 +129,7 @@ async def main() -> None:
 
         # -- Button handlers -----------------------------------------------
 
-        @page.button(0).on_press
+        @page.key(0).on_press
         async def on_reset() -> None:
             """Reset every slider to its default value."""
             bright.set_value(80)
@@ -146,7 +146,7 @@ async def main() -> None:
             await deck.refresh()
             print("All values reset.")
 
-        @page.button(1).on_press
+        @page.key(1).on_press
         async def on_print() -> None:
             """Print current values to the console."""
             print(
@@ -161,7 +161,7 @@ async def main() -> None:
                 f"Footer={footer.text}"
             )
 
-        @page.button(7).on_press
+        @page.key(7).on_press
         async def on_exit() -> None:
             print("Exiting...")
             await deck.stop()

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Equalizer widget — ready-to-use EQ panel with Sub, Bass, Treble, and Balance.
 
-Shows how ``EqualizerWidget`` replaces manual slider assembly with a single
+Shows how ``EqualizerCard`` replaces manual slider assembly with a single
 class that bundles three EQ bands and a balance control.  Compare this with
 the manual setup in ``slider_widgets.py`` (zone 3) or ``media_controller.py``.
 
@@ -28,7 +28,7 @@ Run with::
 import asyncio
 import logging
 
-from deckboard import Deck, EqualizerWidget
+from deckboard import Deck, EqualizerCard
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -40,25 +40,25 @@ async def main() -> None:
 
         page = deck.screen("equalizer")
 
-        # -- EqualizerWidget on zone 3 (dial 3) ---------------------------
+        # -- EqualizerCard on zone 3 (dial 3) ---------------------------
         #    One line instead of creating four sliders + a StackCard.
 
-        eq = EqualizerWidget(3, sub=50, bass=50, treble=50, balance=50)
+        eq = EqualizerCard(3, sub=50, bass=50, treble=50, balance=50)
         page.set_card(3, eq)
 
         # -- Buttons (row 1) — actions ------------------------------------
 
-        page.button(0).set_icon("mdi:restore").set_label("Reset")
-        page.button(1).set_icon("mdi:tune-vertical").set_label("Flat")
-        page.button(2).set_icon("mdi:printer").set_label("Values")
-        page.button(3).set_icon("mdi:close-circle").set_label("Exit")
+        page.key(0).set_icon("mdi:restore").set_label("Reset")
+        page.key(1).set_icon("mdi:tune-vertical").set_label("Flat")
+        page.key(2).set_icon("mdi:printer").set_label("Values")
+        page.key(3).set_icon("mdi:close-circle").set_label("Exit")
 
         # -- Buttons (row 2) — EQ presets ----------------------------------
 
-        page.button(4).set_icon("mdi:speaker").set_label("Bass+")
-        page.button(5).set_icon("mdi:alpha-v-box").set_label("V-Shape")
-        page.button(6).set_icon("mdi:microphone").set_label("Vocal")
-        page.button(7).set_icon("mdi:weather-sunny").set_label("Warm")
+        page.key(4).set_icon("mdi:speaker").set_label("Bass+")
+        page.key(5).set_icon("mdi:alpha-v-box").set_label("V-Shape")
+        page.key(6).set_icon("mdi:microphone").set_label("Vocal")
+        page.key(7).set_icon("mdi:weather-sunny").set_label("Warm")
 
         # -- Helper to apply a preset and refresh --------------------------
 
@@ -74,15 +74,15 @@ async def main() -> None:
 
         # -- Button handlers -----------------------------------------------
 
-        @page.button(0).on_press
+        @page.key(0).on_press
         async def on_reset() -> None:
             await apply_preset(50, 50, 50, 50, "Reset")
 
-        @page.button(1).on_press
+        @page.key(1).on_press
         async def on_flat() -> None:
             await apply_preset(0, 0, 0, 50, "Flat")
 
-        @page.button(2).on_press
+        @page.key(2).on_press
         async def on_print() -> None:
             print(
                 f"Sub={eq.sub.format_value()}, "
@@ -91,26 +91,26 @@ async def main() -> None:
                 f"Balance={eq.balance.format_value()}"
             )
 
-        @page.button(3).on_press
+        @page.key(3).on_press
         async def on_exit() -> None:
             print("Exiting...")
             await deck.stop()
 
         # -- EQ presets ----------------------------------------------------
 
-        @page.button(4).on_press
+        @page.key(4).on_press
         async def on_bass_boost() -> None:
             await apply_preset(80, 75, 30, 50, "Bass Boost")
 
-        @page.button(5).on_press
+        @page.key(5).on_press
         async def on_v_shape() -> None:
             await apply_preset(70, 65, 70, 50, "V-Shape")
 
-        @page.button(6).on_press
+        @page.key(6).on_press
         async def on_vocal() -> None:
             await apply_preset(20, 40, 60, 50, "Vocal")
 
-        @page.button(7).on_press
+        @page.key(7).on_press
         async def on_warm() -> None:
             await apply_preset(60, 55, 25, 45, "Warm")
 

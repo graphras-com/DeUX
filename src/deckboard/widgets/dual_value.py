@@ -10,7 +10,7 @@ section displays a small icon followed by a left-aligned value string.
 There is no visible divider, no frame, and no label.
 
 Dual-value elements are non-selectable: they render inside a
-:class:`TouchPanel` alongside sliders but are skipped when the dial
+:class:`StackCard` alongside sliders but are skipped when the dial
 cycles through active elements.
 """
 
@@ -24,16 +24,16 @@ from ..image import get_large_font, get_small_font
 from ..ui.elements.base import Element
 
 if TYPE_CHECKING:
-    from ..touchscreen import Widget  # abstract base — any Widget subclass
+    from ..touchscreen import Card  # abstract base — any Card subclass
 
 # ── Layout constants ─────────────────────────────────────────────────────
 
-# Large dual-value — same slot height as LargeSlider (WIDGET_HEIGHT // 2)
+# Large dual-value — same slot height as LargeSlider (PANEL_HEIGHT // 2)
 _LARGE_ICON_SIZE = 26
 _LARGE_ICON_MARGIN_LEFT = 4
 _LARGE_ICON_GAP = 4  # gap between icon column and value text
 
-# Small dual-value — same slot height as SmallSlider (WIDGET_HEIGHT // 4)
+# Small dual-value — same slot height as SmallSlider (PANEL_HEIGHT // 4)
 _SMALL_ICON_SIZE = 13
 _SMALL_ICON_MARGIN_LEFT = 4
 _SMALL_ICON_GAP = 3  # gap between icon column and value text

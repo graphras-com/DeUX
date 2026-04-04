@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from PIL import Image
 
-from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH
+from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
 from deckboard.widgets.balance import BalanceSlider
 
 
@@ -32,36 +32,36 @@ class TestBalanceSliderRender:
     def test_render_at_centre(self):
         """Both speakers full when centred (value=50)."""
         s = BalanceSlider(value=50)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_render_full_left(self):
         """Only left speaker at value=0."""
         s = BalanceSlider(value=0)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
 
     def test_render_full_right(self):
         """Only right speaker at value=100."""
         s = BalanceSlider(value=100)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
 
     def test_render_active(self):
         s = BalanceSlider(value=50)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4, active=True)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4, active=True)
 
     def test_centre_line_drawn(self):
         """The centre line should produce a dark pixel at the midpoint."""
         s = BalanceSlider(value=50)
-        slot_h = WIDGET_HEIGHT // 4
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "white")
-        s.render_onto(img, 0, 0, WIDGET_WIDTH, slot_h)
+        slot_h = PANEL_HEIGHT // 4
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "white")
+        s.render_onto(img, 0, 0, PANEL_WIDTH, slot_h)
         # The centre of the bar area should have the black centre line
-        # bar_x starts at ~56, bar_w = WIDGET_WIDTH - 56, centre ≈ 56 + bar_w/2
-        centre_x = 56 + (WIDGET_WIDTH - 56) // 2
+        # bar_x starts at ~56, bar_w = PANEL_WIDTH - 56, centre ≈ 56 + bar_w/2
+        centre_x = 56 + (PANEL_WIDTH - 56) // 2
         found_dark = False
         for y_px in range(0, slot_h):
             px = img.getpixel((centre_x, y_px))

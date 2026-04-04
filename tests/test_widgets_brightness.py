@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PIL import Image
 
-from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH
+from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
 from deckboard.widgets.brightness import BrightnessSlider
 
 
@@ -27,35 +27,35 @@ class TestBrightnessSliderInit:
 class TestBrightnessSliderRender:
     def test_render_at_zero(self):
         s = BrightnessSlider(value=0)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2)
 
     def test_render_at_half(self):
         s = BrightnessSlider(value=50)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_render_at_max(self):
         s = BrightnessSlider(value=100)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2)
 
     def test_render_active(self):
         s = BrightnessSlider(value=50)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2, active=True)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2, active=True)
 
     def test_has_gradient(self):
         """The gradient should produce non-black pixels in the bar area."""
         s = BrightnessSlider(value=50)
-        slot_h = WIDGET_HEIGHT // 2
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        s.render_onto(img, 0, slot_h, WIDGET_WIDTH, slot_h)
+        slot_h = PANEL_HEIGHT // 2
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        s.render_onto(img, 0, slot_h, PANEL_WIDTH, slot_h)
         # Check that there are some non-black pixels in the lower area
         has_non_black = False
-        for x_px in range(WIDGET_WIDTH):
-            for y_px in range(slot_h, WIDGET_HEIGHT):
+        for x_px in range(PANEL_WIDTH):
+            for y_px in range(slot_h, PANEL_HEIGHT):
                 if img.getpixel((x_px, y_px)) != (0, 0, 0):
                     has_non_black = True
                     break

@@ -12,12 +12,12 @@ from deckboard.image import (
     KEY_SIZE,
     TOUCHSCREEN_HEIGHT,
     TOUCHSCREEN_WIDTH,
-    WIDGET_COUNT,
-    WIDGET_HEIGHT,
-    WIDGET_WIDTH,
+    PANEL_COUNT,
+    PANEL_HEIGHT,
+    PANEL_WIDTH,
     _encode_jpeg,
     _get_font,
-    compose_touchscreen,
+    compose_touchstrip,
     draw_key_grid,
     draw_touchscreen_grid,
     get_font,
@@ -25,7 +25,7 @@ from deckboard.image import (
     render_blank_key,
     render_blank_touchscreen,
     render_key_image,
-    render_widget_image,
+    render_status_card_image,
 )
 
 
@@ -165,58 +165,58 @@ class TestRenderKeyImage:
         assert img.size == KEY_SIZE
 
 
-# ── render_widget_image ─────────────────────────────────────────────────
+# ── render_status_card_image ─────────────────────────────────────────────────
 
 
 class TestRenderWidgetImage:
     def test_blank_returns_image(self):
-        result = render_widget_image()
+        result = render_status_card_image()
         assert isinstance(result, Image.Image)
-        assert result.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
         assert result.mode == "RGB"
 
     def test_with_icon(self, sample_icon):
-        result = render_widget_image(icon=sample_icon)
-        assert result.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        result = render_status_card_image(icon=sample_icon)
+        assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_with_rgb_icon(self, sample_rgb_icon):
-        result = render_widget_image(icon=sample_rgb_icon)
-        assert result.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        result = render_status_card_image(icon=sample_rgb_icon)
+        assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_with_label_only(self):
-        result = render_widget_image(label="Volume")
-        assert result.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        result = render_status_card_image(label="Volume")
+        assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_with_value_only(self):
-        result = render_widget_image(value="75%")
-        assert result.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        result = render_status_card_image(value="75%")
+        assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_with_label_and_value(self):
-        result = render_widget_image(label="Volume", value="75%")
-        assert result.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        result = render_status_card_image(label="Volume", value="75%")
+        assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_with_all(self, sample_icon):
-        result = render_widget_image(icon=sample_icon, label="Vol", value="50%")
-        assert result.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        result = render_status_card_image(icon=sample_icon, label="Vol", value="50%")
+        assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
 
-# ── compose_touchscreen ─────────────────────────────────────────────────
+# ── compose_touchstrip ─────────────────────────────────────────────────
 
 
 class TestComposeTouchscreen:
     def test_all_none(self):
-        result = compose_touchscreen([None, None, None, None])
+        result = compose_touchstrip([None, None, None, None])
         img = _decode_jpeg(result)
         assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
 
     def test_with_images(self, sample_widget_image):
         images = [sample_widget_image] * 4
-        result = compose_touchscreen(images)
+        result = compose_touchstrip(images)
         img = _decode_jpeg(result)
         assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
 
     def test_mixed_none_and_images(self, sample_widget_image):
-        result = compose_touchscreen(
+        result = compose_touchstrip(
             [sample_widget_image, None, sample_widget_image, None]
         )
         img = _decode_jpeg(result)
@@ -225,21 +225,21 @@ class TestComposeTouchscreen:
     def test_more_than_four_ignored(self, sample_widget_image):
         """Extra images beyond 4 are silently ignored."""
         images = [sample_widget_image] * 6
-        result = compose_touchscreen(images)
+        result = compose_touchstrip(images)
         img = _decode_jpeg(result)
         assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
 
     def test_empty_list(self):
-        result = compose_touchscreen([])
+        result = compose_touchstrip([])
         img = _decode_jpeg(result)
         assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
 
     def test_is_jpeg(self, sample_widget_image):
-        result = compose_touchscreen([sample_widget_image] * 4)
+        result = compose_touchstrip([sample_widget_image] * 4)
         assert result[:2] == b"\xff\xd8"
 
     def test_debug_grid(self, sample_widget_image):
-        """compose_touchscreen with debug_grid=True is not implemented via wrapper."""
+        """compose_touchstrip with debug_grid=True is not implemented via wrapper."""
         # The compatibility wrapper does not forward debug_grid,
         # but compose_touchstrip (the underlying function) does.
         from deckboard.render.touch_renderer import compose_touchstrip

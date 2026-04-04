@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from ..page import Page, Screen
+from ..page import Screen
 
-__all__ = ["Page", "Screen"]
+__all__ = ["Screen"]

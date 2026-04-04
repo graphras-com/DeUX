@@ -57,17 +57,17 @@ def build_room_page(
 
     # -- Row 1: scenes & navigation ----------------------------------------
 
-    page.button(0).set_icon(icon).set_label(name)
-    page.button(1).set_icon("mdi:movie-open").set_label("Movie")
-    page.button(2).set_icon("mdi:white-balance-sunny").set_label("Bright")
-    page.button(3).set_icon(other_icon).set_label(f"{other_page} →")
+    page.key(0).set_icon(icon).set_label(name)
+    page.key(1).set_icon("mdi:movie-open").set_label("Movie")
+    page.key(2).set_icon("mdi:white-balance-sunny").set_label("Bright")
+    page.key(3).set_icon(other_icon).set_label(f"{other_page} →")
 
     # -- Row 2: device toggles ---------------------------------------------
 
-    page.button(4).set_icon("mdi:lamp").set_label("Lamp")
-    page.button(5).set_icon("mdi:fan").set_label("Fan")
-    page.button(6).set_icon("mdi:air-conditioner").set_label("AC")
-    page.button(7).set_icon("mdi:power").set_label("All Off")
+    page.key(4).set_icon("mdi:lamp").set_label("Lamp")
+    page.key(5).set_icon("mdi:fan").set_label("Fan")
+    page.key(6).set_icon("mdi:air-conditioner").set_label("AC")
+    page.key(7).set_icon("mdi:power").set_label("All Off")
 
     # -- Touchscreen sliders -----------------------------------------------
 
@@ -77,40 +77,40 @@ def build_room_page(
     bal = BalanceSlider("Fan Spd", value=50)
 
     sw0 = StackCard(0)
-    sw0.add_slider(bright)
+    sw0.add_control(bright)
     page.set_card(0, sw0)
 
     sw1 = StackCard(1)
-    sw1.add_slider(kelvin)
+    sw1.add_control(kelvin)
     page.set_card(1, sw1)
 
     sw2 = StackCard(2)
-    sw2.add_slider(temp)
+    sw2.add_control(temp)
     page.set_card(2, sw2)
 
     sw3 = StackCard(3)
-    sw3.add_slider(bal)
+    sw3.add_control(bal)
     page.set_card(3, sw3)
 
     # -- Scene handlers (set slider values in one shot) --------------------
 
-    @page.button(1).on_press
+    @page.key(1).on_press
     async def on_movie() -> None:
         bright.set_value(20)
         kelvin.set_value(2700)
         print(f"[{name}] Movie scene: dim warm light")
         await deck.refresh()
 
-    @page.button(2).on_press
+    @page.key(2).on_press
     async def on_bright() -> None:
         bright.set_value(100)
         kelvin.set_value(6500)
         print(f"[{name}] Bright scene: full cool light")
         await deck.refresh()
 
-    # -- Page navigation ---------------------------------------------------
+    # -- Screen navigation ---------------------------------------------------
 
-    @page.button(3).on_press
+    @page.key(3).on_press
     async def on_switch() -> None:
         print(f"Switching to {other_page}")
         await deck.set_screen(other_page)
@@ -119,25 +119,25 @@ def build_room_page(
 
     devices = {"lamp": True, "fan": True, "ac": True}
 
-    @page.button(4).on_press
+    @page.key(4).on_press
     async def on_lamp() -> None:
         devices["lamp"] = not devices["lamp"]
         state = "ON" if devices["lamp"] else "OFF"
         print(f"[{name}] Lamp: {state}")
 
-    @page.button(5).on_press
+    @page.key(5).on_press
     async def on_fan() -> None:
         devices["fan"] = not devices["fan"]
         state = "ON" if devices["fan"] else "OFF"
         print(f"[{name}] Fan: {state}")
 
-    @page.button(6).on_press
+    @page.key(6).on_press
     async def on_ac() -> None:
         devices["ac"] = not devices["ac"]
         state = "ON" if devices["ac"] else "OFF"
         print(f"[{name}] AC: {state}")
 
-    @page.button(7).on_press
+    @page.key(7).on_press
     async def on_all_off() -> None:
         for key in devices:
             devices[key] = False

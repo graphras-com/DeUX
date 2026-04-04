@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ...touchscreen import Widget
+    from ...touchscreen import Card
 
 
 class Element:
@@ -14,10 +14,8 @@ class Element:
     selectable: bool = False
 
     def __init__(self) -> None:
-        self._card: Widget | None = None
-        self._widget: Widget | None = None
+        self._card: Card | None = None
 
-    def bind_to_card(self, card: Widget) -> None:
+    def bind_to_card(self, card: Card) -> None:
         """Attach this element to a parent card."""
         self._card = card
-        self._widget = card

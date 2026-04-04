@@ -1,4 +1,4 @@
-"""Screen and Page classes for deckboard navigable layouts."""
+"""Screen layout class for deckboard navigation."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import logging
 
 from .button import Button
 from .dial import Dial
-from .touchscreen import TouchScreen, Widget
+from .touchscreen import Card, TouchStrip
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class Screen:
         self._name = name
         self._buttons: dict[int, Button] = {}
         self._dials: dict[int, Dial] = {}
-        self._touchscreen = TouchScreen()
+        self._touch_strip = TouchStrip()
 
     @property
     def name(self) -> str:
@@ -47,7 +47,7 @@ class Screen:
             index: Key index.
 
         Returns:
-            The Button instance for this key on this page.
+            The Button instance for this key on this screen.
         """
         if not 0 <= index < _KEY_COUNT:
             raise IndexError(f"Button index must be 0-{_KEY_COUNT - 1}, got {index}")
@@ -56,10 +56,6 @@ class Screen:
             self._buttons[index] = Button(index)
         return self._buttons[index]
 
-    def button(self, index: int) -> Button:
-        """Compatibility alias for :meth:`key`."""
-        return self.key(index)
-
     def encoder(self, index: int) -> Dial:
         """Get or create an encoder slot by index (0-3 for Stream Deck+).
 
@@ -67,7 +63,7 @@ class Screen:
             index: Dial index.
 
         Returns:
-            The Dial instance for this dial on this page.
+            The Dial instance for this encoder on this screen.
         """
         if not 0 <= index < _DIAL_COUNT:
             raise IndexError(f"Dial index must be 0-{_DIAL_COUNT - 1}, got {index}")
@@ -76,25 +72,13 @@ class Screen:
             self._dials[index] = Dial(index)
         return self._dials[index]
 
-    def dial(self, index: int) -> Dial:
-        """Compatibility alias for :meth:`encoder`."""
-        return self.encoder(index)
-
-    def card(self, index: int) -> Widget:
+    def card(self, index: int) -> Card:
         """Get a touch-strip card zone by index (0-3)."""
-        return self._touchscreen.card(index)
+        return self._touch_strip.card(index)
 
-    def widget(self, index: int) -> Widget:
-        """Compatibility alias for :meth:`card`."""
-        return self.card(index)
-
-    def set_card(self, index: int, card: Widget) -> None:
+    def set_card(self, index: int, card: Card) -> None:
         """Replace the card at *index* with a custom card."""
-        self._touchscreen.set_card(index, card)
-
-    def set_widget(self, index: int, widget: Widget) -> None:
-        """Compatibility alias for :meth:`set_card`."""
-        self.set_card(index, widget)
+        self._touch_strip.set_card(index, card)
 
     @property
     def buttons(self) -> dict[int, Button]:
@@ -113,20 +97,9 @@ class Screen:
         return self._dials
 
     @property
-    def touchscreen(self) -> TouchScreen:
-        return self._touchscreen
+    def touch_strip(self) -> TouchStrip:
+        return self._touch_strip
 
     @property
-    def touch_strip(self) -> TouchScreen:
-        return self._touchscreen
-
-    @property
-    def widgets(self) -> list[Widget]:
-        return self._touchscreen.widgets
-
-    @property
-    def cards(self) -> list[Widget]:
-        return self._touchscreen.cards
-
-
-Page = Screen
+    def cards(self) -> list[Card]:
+        return self._touch_strip.cards

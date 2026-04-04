@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from PIL import Image
 
-from deckboard.image import WIDGET_HEIGHT, WIDGET_WIDTH
+from deckboard.image import PANEL_HEIGHT, PANEL_WIDTH
 from deckboard.widgets.dual_value import (
     LargeDualValue,
     SmallDualValue,
     _truncate_value,
 )
-from deckboard.widgets.touch_panel import TouchPanel
+from deckboard.widgets.touch_panel import StackCard
 
 
 # ── _truncate_value helper ───────────────────────────────────────────────
@@ -104,8 +104,8 @@ class TestLargeDualValueSetLeftValue:
         dv.set_left_value("new")
         assert dv.left_value == "new"
 
-    def test_marks_widget_dirty(self):
-        panel = TouchPanel(0)
+    def test_marks_card_dirty(self):
+        panel = StackCard(0)
         dv = LargeDualValue("old", "other")
         panel.add_element(dv)
         panel.mark_clean()
@@ -113,7 +113,7 @@ class TestLargeDualValueSetLeftValue:
         dv.set_left_value("new")
         assert panel.is_dirty is True
 
-    def test_without_widget_does_not_raise(self):
+    def test_without_card_does_not_raise(self):
         dv = LargeDualValue("old", "other")
         dv.set_left_value("new")
         assert dv.left_value == "new"
@@ -125,8 +125,8 @@ class TestLargeDualValueSetRightValue:
         dv.set_right_value("new")
         assert dv.right_value == "new"
 
-    def test_marks_widget_dirty(self):
-        panel = TouchPanel(0)
+    def test_marks_card_dirty(self):
+        panel = StackCard(0)
         dv = LargeDualValue("left", "old")
         panel.add_element(dv)
         panel.mark_clean()
@@ -134,7 +134,7 @@ class TestLargeDualValueSetRightValue:
         dv.set_right_value("new")
         assert panel.is_dirty is True
 
-    def test_without_widget_does_not_raise(self):
+    def test_without_card_does_not_raise(self):
         dv = LargeDualValue("left", "old")
         dv.set_right_value("new")
         assert dv.right_value == "new"
@@ -153,8 +153,8 @@ class TestLargeDualValueSetLeftIcon:
         dv.set_left_icon(None)
         assert dv.left_icon is None
 
-    def test_marks_widget_dirty(self):
-        panel = TouchPanel(0)
+    def test_marks_card_dirty(self):
+        panel = StackCard(0)
         dv = LargeDualValue()
         panel.add_element(dv)
         panel.mark_clean()
@@ -163,7 +163,7 @@ class TestLargeDualValueSetLeftIcon:
         dv.set_left_icon(icon)
         assert panel.is_dirty is True
 
-    def test_without_widget_does_not_raise(self):
+    def test_without_card_does_not_raise(self):
         dv = LargeDualValue()
         icon = Image.new("RGBA", (24, 24), (255, 0, 0, 255))
         dv.set_left_icon(icon)
@@ -183,8 +183,8 @@ class TestLargeDualValueSetRightIcon:
         dv.set_right_icon(None)
         assert dv.right_icon is None
 
-    def test_marks_widget_dirty(self):
-        panel = TouchPanel(0)
+    def test_marks_card_dirty(self):
+        panel = StackCard(0)
         dv = LargeDualValue()
         panel.add_element(dv)
         panel.mark_clean()
@@ -193,7 +193,7 @@ class TestLargeDualValueSetRightIcon:
         dv.set_right_icon(icon)
         assert panel.is_dirty is True
 
-    def test_without_widget_does_not_raise(self):
+    def test_without_card_does_not_raise(self):
         dv = LargeDualValue()
         icon = Image.new("RGBA", (24, 24), (0, 255, 0, 255))
         dv.set_right_icon(icon)
@@ -206,8 +206,8 @@ class TestLargeDualValueSetColor:
         dv.set_color("#00ff00")
         assert dv.color == "#00ff00"
 
-    def test_marks_widget_dirty(self):
-        panel = TouchPanel(0)
+    def test_marks_card_dirty(self):
+        panel = StackCard(0)
         dv = LargeDualValue()
         panel.add_element(dv)
         panel.mark_clean()
@@ -215,7 +215,7 @@ class TestLargeDualValueSetColor:
         dv.set_color("red")
         assert panel.is_dirty is True
 
-    def test_without_widget_does_not_raise(self):
+    def test_without_card_does_not_raise(self):
         dv = LargeDualValue()
         dv.set_color("red")
         assert dv.color == "red"
@@ -224,69 +224,69 @@ class TestLargeDualValueSetColor:
 class TestLargeDualValueRender:
     def test_renders_onto_image(self):
         dv = LargeDualValue("22°C", "45%")
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_empty_values(self):
         dv = LargeDualValue()
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_long_text_truncated(self):
         dv = LargeDualValue("A" * 200, "B" * 200)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_active_ignored(self):
         dv = LargeDualValue("22°C", "45%")
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2, active=True)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2, active=True)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_with_custom_color(self):
         dv = LargeDualValue("22°C", "45%", color="#ff0000")
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_with_rgba_icons(self):
         left = Image.new("RGBA", (48, 48), (255, 0, 0, 255))
         right = Image.new("RGBA", (48, 48), (0, 255, 0, 255))
         dv = LargeDualValue("22°C", "45%", left_icon=left, right_icon=right)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_with_rgb_icons(self):
         left = Image.new("RGB", (48, 48), (255, 0, 0))
         right = Image.new("RGB", (48, 48), (0, 255, 0))
         dv = LargeDualValue("22°C", "45%", left_icon=left, right_icon=right)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_with_left_icon_only(self):
         left = Image.new("RGBA", (48, 48), (255, 0, 0, 255))
         dv = LargeDualValue("22°C", "45%", left_icon=left)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_with_right_icon_only(self):
         right = Image.new("RGBA", (48, 48), (0, 255, 0, 255))
         dv = LargeDualValue("22°C", "45%", right_icon=right)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 2)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 2)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_at_offset(self):
         dv = LargeDualValue("22°C", "45%")
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 10, 20, WIDGET_WIDTH - 10, WIDGET_HEIGHT // 2)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 10, 20, PANEL_WIDTH - 10, PANEL_HEIGHT // 2)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
 
 # ── SmallDualValue ──────────────────────────────────────────────────────
@@ -329,8 +329,8 @@ class TestSmallDualValueSetLeftValue:
         dv.set_left_value("new")
         assert dv.left_value == "new"
 
-    def test_marks_widget_dirty(self):
-        panel = TouchPanel(0)
+    def test_marks_card_dirty(self):
+        panel = StackCard(0)
         dv = SmallDualValue("old", "other")
         panel.add_element(dv)
         panel.mark_clean()
@@ -338,7 +338,7 @@ class TestSmallDualValueSetLeftValue:
         dv.set_left_value("new")
         assert panel.is_dirty is True
 
-    def test_without_widget_does_not_raise(self):
+    def test_without_card_does_not_raise(self):
         dv = SmallDualValue("old", "other")
         dv.set_left_value("new")
         assert dv.left_value == "new"
@@ -350,8 +350,8 @@ class TestSmallDualValueSetRightValue:
         dv.set_right_value("new")
         assert dv.right_value == "new"
 
-    def test_marks_widget_dirty(self):
-        panel = TouchPanel(0)
+    def test_marks_card_dirty(self):
+        panel = StackCard(0)
         dv = SmallDualValue("left", "old")
         panel.add_element(dv)
         panel.mark_clean()
@@ -359,7 +359,7 @@ class TestSmallDualValueSetRightValue:
         dv.set_right_value("new")
         assert panel.is_dirty is True
 
-    def test_without_widget_does_not_raise(self):
+    def test_without_card_does_not_raise(self):
         dv = SmallDualValue("left", "old")
         dv.set_right_value("new")
         assert dv.right_value == "new"
@@ -378,8 +378,8 @@ class TestSmallDualValueSetLeftIcon:
         dv.set_left_icon(None)
         assert dv.left_icon is None
 
-    def test_marks_widget_dirty(self):
-        panel = TouchPanel(0)
+    def test_marks_card_dirty(self):
+        panel = StackCard(0)
         dv = SmallDualValue()
         panel.add_element(dv)
         panel.mark_clean()
@@ -388,7 +388,7 @@ class TestSmallDualValueSetLeftIcon:
         dv.set_left_icon(icon)
         assert panel.is_dirty is True
 
-    def test_without_widget_does_not_raise(self):
+    def test_without_card_does_not_raise(self):
         dv = SmallDualValue()
         icon = Image.new("RGBA", (12, 12), (255, 0, 0, 255))
         dv.set_left_icon(icon)
@@ -408,8 +408,8 @@ class TestSmallDualValueSetRightIcon:
         dv.set_right_icon(None)
         assert dv.right_icon is None
 
-    def test_marks_widget_dirty(self):
-        panel = TouchPanel(0)
+    def test_marks_card_dirty(self):
+        panel = StackCard(0)
         dv = SmallDualValue()
         panel.add_element(dv)
         panel.mark_clean()
@@ -418,7 +418,7 @@ class TestSmallDualValueSetRightIcon:
         dv.set_right_icon(icon)
         assert panel.is_dirty is True
 
-    def test_without_widget_does_not_raise(self):
+    def test_without_card_does_not_raise(self):
         dv = SmallDualValue()
         icon = Image.new("RGBA", (12, 12), (0, 255, 0, 255))
         dv.set_right_icon(icon)
@@ -431,8 +431,8 @@ class TestSmallDualValueSetColor:
         dv.set_color("#ff00ff")
         assert dv.color == "#ff00ff"
 
-    def test_marks_widget_dirty(self):
-        panel = TouchPanel(0)
+    def test_marks_card_dirty(self):
+        panel = StackCard(0)
         dv = SmallDualValue()
         panel.add_element(dv)
         panel.mark_clean()
@@ -440,7 +440,7 @@ class TestSmallDualValueSetColor:
         dv.set_color("red")
         assert panel.is_dirty is True
 
-    def test_without_widget_does_not_raise(self):
+    def test_without_card_does_not_raise(self):
         dv = SmallDualValue()
         dv.set_color("red")
         assert dv.color == "red"
@@ -449,77 +449,77 @@ class TestSmallDualValueSetColor:
 class TestSmallDualValueRender:
     def test_renders_onto_image(self):
         dv = SmallDualValue("95 Mb", "48 Mb")
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_empty_values(self):
         dv = SmallDualValue()
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_long_text_truncated(self):
         dv = SmallDualValue("A" * 200, "B" * 200)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_active_ignored(self):
         dv = SmallDualValue("95 Mb", "48 Mb")
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4, active=True)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4, active=True)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_with_custom_color(self):
         dv = SmallDualValue("95 Mb", "48 Mb", color="#00ff00")
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_with_rgba_icons(self):
         left = Image.new("RGBA", (24, 24), (255, 0, 0, 255))
         right = Image.new("RGBA", (24, 24), (0, 255, 0, 255))
         dv = SmallDualValue("95 Mb", "48 Mb", left_icon=left, right_icon=right)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_with_rgb_icons(self):
         left = Image.new("RGB", (24, 24), (255, 0, 0))
         right = Image.new("RGB", (24, 24), (0, 255, 0))
         dv = SmallDualValue("95 Mb", "48 Mb", left_icon=left, right_icon=right)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_with_left_icon_only(self):
         left = Image.new("RGBA", (24, 24), (255, 0, 0, 255))
         dv = SmallDualValue("95 Mb", "48 Mb", left_icon=left)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_with_right_icon_only(self):
         right = Image.new("RGBA", (24, 24), (0, 255, 0, 255))
         dv = SmallDualValue("95 Mb", "48 Mb", right_icon=right)
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 0, 0, WIDGET_WIDTH, WIDGET_HEIGHT // 4)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 0, 0, PANEL_WIDTH, PANEL_HEIGHT // 4)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_renders_at_offset(self):
         dv = SmallDualValue("95 Mb", "48 Mb")
-        img = Image.new("RGB", (WIDGET_WIDTH, WIDGET_HEIGHT), "black")
-        dv.render_onto(img, 10, 20, WIDGET_WIDTH - 10, WIDGET_HEIGHT // 4)
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        dv.render_onto(img, 10, 20, PANEL_WIDTH - 10, PANEL_HEIGHT // 4)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
 
-# ── TouchPanel integration ──────────────────────────────────────────────
+# ── StackCard integration ──────────────────────────────────────────────
 
 
 class TestDualValueTouchPanelIntegration:
     def test_large_dual_value_accepted_by_add_element(self):
-        panel = TouchPanel(0)
+        panel = StackCard(0)
         dv = LargeDualValue("22°C", "45%")
         result = panel.add_element(dv)
         assert result is panel
@@ -527,7 +527,7 @@ class TestDualValueTouchPanelIntegration:
         assert panel.elements[0] is dv
 
     def test_small_dual_value_accepted_by_add_element(self):
-        panel = TouchPanel(0)
+        panel = StackCard(0)
         dv = SmallDualValue("95 Mb", "48 Mb")
         result = panel.add_element(dv)
         assert result is panel
@@ -535,7 +535,7 @@ class TestDualValueTouchPanelIntegration:
         assert panel.elements[0] is dv
 
     def test_dual_value_not_in_selectable(self):
-        panel = TouchPanel(0)
+        panel = StackCard(0)
         dv = LargeDualValue("22°C", "45%")
         panel.add_element(dv)
         assert panel._selectable_indices() == []
@@ -543,25 +543,25 @@ class TestDualValueTouchPanelIntegration:
     def test_mixed_with_slider(self):
         from deckboard.widgets.volume import VolumeSlider
 
-        panel = TouchPanel(0)
+        panel = StackCard(0)
         dv = LargeDualValue("22°C", "45%")
         vol = VolumeSlider(value=50)
         panel.add_element(dv)
         panel.add_element(vol)
         assert len(panel.elements) == 2
-        assert panel.active_slider is vol
+        assert panel.active_control is vol
 
     def test_panel_render_with_large_dual_value(self):
-        panel = TouchPanel(0)
+        panel = StackCard(0)
         dv1 = LargeDualValue("22°C", "45%")
         dv2 = LargeDualValue("1013hPa", "3.2m/s")
         panel.add_element(dv1)
         panel.add_element(dv2)
         img = panel.render()
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_panel_render_with_small_dual_value(self):
-        panel = TouchPanel(0)
+        panel = StackCard(0)
         dv1 = SmallDualValue("95 Mb", "48 Mb")
         dv2 = SmallDualValue("-42dBm", "12ms")
         dv3 = SmallDualValue("5 GHz", "WPA3")
@@ -571,34 +571,34 @@ class TestDualValueTouchPanelIntegration:
         panel.add_element(dv3)
         panel.add_element(dv4)
         img = panel.render()
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_panel_render_mixed_dual_value_and_slider(self):
         from deckboard.widgets.volume import VolumeSlider
 
-        panel = TouchPanel(0)
+        panel = StackCard(0)
         dv = LargeDualValue("22°C", "45%")
         vol = VolumeSlider(value=65)
         panel.add_element(dv)
         panel.add_element(vol)
         img = panel.render()
-        assert img.size == (WIDGET_WIDTH, WIDGET_HEIGHT)
+        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
     def test_invalid_element_rejected(self):
         import pytest
 
-        panel = TouchPanel(0)
+        panel = StackCard(0)
         with pytest.raises(TypeError, match="got str"):
             panel.add_element("not a valid element")  # type: ignore[arg-type]
 
     def test_back_reference_set(self):
-        panel = TouchPanel(0)
+        panel = StackCard(0)
         dv = LargeDualValue("22°C", "45%")
         panel.add_element(dv)
-        assert dv._widget is panel
+        assert dv._card is panel
 
     def test_marks_panel_dirty_on_add(self):
-        panel = TouchPanel(0)
+        panel = StackCard(0)
         panel.mark_clean()
         dv = LargeDualValue("22°C", "45%")
         panel.add_element(dv)
@@ -609,7 +609,7 @@ class TestDualValueTouchPanelIntegration:
 
 
 class TestDualValuePublicAPI:
-    def test_importable_from_widgets(self):
+    def test_importable_from_cards(self):
         from deckboard.widgets import LargeDualValue, SmallDualValue
 
         assert LargeDualValue is not None

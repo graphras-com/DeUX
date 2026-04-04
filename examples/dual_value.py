@@ -70,8 +70,8 @@ async def main() -> None:
 
         # -- Buttons -------------------------------------------------------
 
-        page.button(0).set_icon("mdi:refresh").set_label("Refresh")
-        page.button(7).set_icon("mdi:close-circle").set_label("Exit")
+        page.key(0).set_icon("mdi:refresh").set_label("Refresh")
+        page.key(7).set_icon("mdi:close-circle").set_label("Exit")
 
         # -- Zone 0: Two large dual-value rows (climate) -------------------
         #    Each row shows a pair of readings side by side.
@@ -145,7 +145,7 @@ async def main() -> None:
 
         # -- Button handlers -----------------------------------------------
 
-        @page.button(0).on_press
+        @page.key(0).on_press
         async def on_refresh() -> None:
             """Simulate refreshing sensor values."""
             climate1.set_left_value("23°C")
@@ -156,7 +156,7 @@ async def main() -> None:
             await deck.refresh()
             print("Values refreshed.")
 
-        @page.button(7).on_press
+        @page.key(7).on_press
         async def on_exit() -> None:
             print("Exiting...")
             await deck.stop()
