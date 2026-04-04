@@ -1,11 +1,11 @@
-"""Tests for deckboard.ui.elements.metrics — LargeDualValue, SmallDualValue."""
+"""Tests for deckboard.ui.elements.dual_value — LargeDualValue, SmallDualValue."""
 
 from __future__ import annotations
 
 from PIL import Image
 
 from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
-from deckboard.ui.elements.metrics import (
+from deckboard.ui.elements.dual_value import (
     LargeDualValue,
     SmallDualValue,
     _truncate_value,

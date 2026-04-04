@@ -13,7 +13,7 @@ def __getattr__(name: str):
 
         return {"LargeText": LargeText, "SmallText": SmallText}[name]
     if name in {"LargeDualValue", "SmallDualValue"}:
-        from .metrics import LargeDualValue, SmallDualValue
+        from .dual_value import LargeDualValue, SmallDualValue
 
         return {
             "LargeDualValue": LargeDualValue,
