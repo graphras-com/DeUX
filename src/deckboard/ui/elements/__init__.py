@@ -3,20 +3,7 @@
 from __future__ import annotations
 
 from .base import Element
+from .dual_value import LargeDualValue, SmallDualValue
+from .text import LargeText, SmallText
 
-__all__ = ["Element", "LargeDualValue", "SmallDualValue", "LargeText", "SmallText"]
-
-
-def __getattr__(name: str):
-    if name in {"LargeText", "SmallText"}:
-        from .text import LargeText, SmallText
-
-        return {"LargeText": LargeText, "SmallText": SmallText}[name]
-    if name in {"LargeDualValue", "SmallDualValue"}:
-        from .dual_value import LargeDualValue, SmallDualValue
-
-        return {
-            "LargeDualValue": LargeDualValue,
-            "SmallDualValue": SmallDualValue,
-        }[name]
-    raise AttributeError(name)
+__all__ = ["Element", "LargeDualValue", "LargeText", "SmallDualValue", "SmallText"]
