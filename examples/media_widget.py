@@ -2,7 +2,7 @@
 """Media widget — ready-to-use media panel with title display and volume control.
 
 Shows how ``MediaCard`` bundles a title text and volume slider into a
-single widget zone with built-in mute toggling on dial press.
+single widget zone with built-in mute toggling on encoder press.
 
 Layout::
 
@@ -15,9 +15,9 @@ Layout::
     │          │          │          │  Title   │   ← touchscreen
     │          │          │          │  Volume  │
     └──────────┴──────────┴──────────┴──────────┘
-        dial 0     dial 1     dial 2     dial 3
+        enc 0      enc 1      enc 2      enc 3
 
-    Dial 3: turn to adjust volume, press to toggle mute.
+    Encoder 3: turn to adjust volume, press to toggle mute.
 
 Run with::
 
@@ -141,14 +141,16 @@ async def main() -> None:
         async def on_volume_change(value: float) -> None:
             print(f"Volume: {media.volume.format_value()}")
 
-        # -- Dial 3 press also updates the mute button --------------------
+        # -- Encoder 3 press also updates the mute button --------------------
 
-        @media.on_dial_press
-        async def on_dial_mute() -> None:
+        @media.on_encoder_press
+        async def on_encoder_mute() -> None:
             if media.muted:
-                print("Muted via dial press")
+                print("Muted via encoder press")
             else:
-                print(f"Unmuted via dial press — Volume: {media.volume.format_value()}")
+                print(
+                    f"Unmuted via encoder press — Volume: {media.volume.format_value()}"
+                )
             await update_mute_button()
 
         # -- Activate and run ----------------------------------------------
@@ -156,8 +158,8 @@ async def main() -> None:
         await deck.set_screen("media_widget")
         print("\nMedia widget ready!")
         print(f"  Now playing: {PLAYLIST[0]}")
-        print("  Turn dial 3 to adjust volume.")
-        print("  Press dial 3 to toggle mute.")
+        print("  Turn encoder 3 to adjust volume.")
+        print("  Press encoder 3 to toggle mute.")
         print("  Row 1: Prev, Play/Pause, Next, Mute.")
         print("  Row 2: Shuffle, Repeat, Like, Print status.\n")
 

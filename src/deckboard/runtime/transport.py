@@ -10,8 +10,8 @@ from StreamDeck.Devices.StreamDeck import DialEventType, TouchscreenEventType
 
 from .events import (
     DeckEvent,
-    DialPressEvent,
-    DialTurnEvent,
+    EncoderPressEvent,
+    EncoderTurnEvent,
     EventType,
     KeyEvent,
     TouchEvent,
@@ -40,7 +40,7 @@ class AsyncTransport:
         """Register callbacks on the low-level device."""
         self._running = True
         self._device.set_key_callback(self._on_key)
-        self._device.set_dial_callback(self._on_dial)
+        self._device.set_dial_callback(self._on_encoder)
         self._device.set_touchscreen_callback(self._on_touch)
 
     def stop(self) -> None:
@@ -62,16 +62,16 @@ class AsyncTransport:
         except Exception:
             logger.exception("Error in key callback (key=%d)", key)
 
-    def _on_dial(
-        self, deck: StreamDeck, dial: int, event: DialEventType, value: object
+    def _on_encoder(
+        self, deck: StreamDeck, encoder: int, event: DialEventType, value: object
     ) -> None:
         try:
             if event == DialEventType.PUSH:
-                self._enqueue(DialPressEvent(dial=dial, pressed=bool(value)))
+                self._enqueue(EncoderPressEvent(encoder=encoder, pressed=bool(value)))
             elif event == DialEventType.TURN:
-                self._enqueue(DialTurnEvent(dial=dial, direction=int(value)))
+                self._enqueue(EncoderTurnEvent(encoder=encoder, direction=int(value)))
         except Exception:
-            logger.exception("Error in dial callback (dial=%d)", dial)
+            logger.exception("Error in encoder callback (encoder=%d)", encoder)
 
     def _on_touch(
         self, deck: StreamDeck, evt_type: TouchscreenEventType, value: dict

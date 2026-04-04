@@ -17,8 +17,8 @@ from ..render.touch_renderer import compose_touchstrip
 from .device_info import DeviceInfo
 from .events import (
     DeckEvent,
-    DialPressEvent,
-    DialTurnEvent,
+    EncoderPressEvent,
+    EncoderTurnEvent,
     EventType,
     KeyEvent,
     TouchEvent,
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 # Stream Deck+ constants
 _KEY_COUNT = 8
-_DIAL_COUNT = 4
+_ENCODER_COUNT = 4
 
 
 class DeckError(Exception):
@@ -220,7 +220,7 @@ class Deck:
             firmware=self._device.get_firmware_version(),
             key_count=self._device.key_count(),
             key_layout=self._device.key_layout(),
-            dial_count=self._device.dial_count(),
+            encoder_count=self._device.dial_count(),
             key_pixel_size=(
                 self._device.KEY_PIXEL_WIDTH,
                 self._device.KEY_PIXEL_HEIGHT,
@@ -290,7 +290,7 @@ class Deck:
         logger.info("Switching to screen: %s", name)
 
         # Render all keys and cards for this screen
-        await self._render_all_buttons()
+        await self._render_all_keys()
         await self._render_touchscreen()
 
     @property
@@ -302,8 +302,8 @@ class Deck:
 
     # -- Rendering ---------------------------------------------------------
 
-    async def _render_all_buttons(self) -> None:
-        """Render and push all button images for the active screen."""
+    async def _render_all_keys(self) -> None:
+        """Render and push all key images for the active screen."""
         screen = self._current_screen()
         if not self._device or not screen:
             return
@@ -311,9 +311,9 @@ class Deck:
         loop = asyncio.get_running_loop()
 
         for key_index in range(_KEY_COUNT):
-            button = screen.keys.get(key_index)
-            if button and (button.icon_name or button.label):
-                await self._render_button(button)
+            key_slot = screen.keys.get(key_index)
+            if key_slot and (key_slot.icon_name or key_slot.label):
+                await self._render_key(key_slot)
             else:
                 # Blank key
                 image_bytes = render_blank_key(debug_grid=self._debug_grid)
@@ -324,27 +324,29 @@ class Deck:
                     image_bytes,
                 )
 
-    async def _render_button(self, button: KeySlot) -> None:
-        """Render a single button and push to the device."""
+    async def _render_key(self, key_slot: KeySlot) -> None:
+        """Render a single key and push to the device."""
         if not self._device:
             return
 
         icon_img = None
-        if button.icon_name:
-            icon_img = await self.icons.get(button.icon_name, color=button.icon_color)
+        if key_slot.icon_name:
+            icon_img = await self.icons.get(
+                key_slot.icon_name, color=key_slot.icon_color
+            )
 
         image_bytes = render_key_image(
             icon=icon_img,
-            label=button.label,
+            label=key_slot.label,
             debug_grid=self._debug_grid,
         )
-        button.set_rendered_image(image_bytes)
+        key_slot.set_rendered_image(image_bytes)
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             self._executor,
             self._device.set_key_image,
-            button.index,
+            key_slot.index,
             image_bytes,
         )
 
@@ -377,7 +379,7 @@ class Deck:
     async def refresh(self) -> None:
         """Re-render and push all dirty controls on the active screen.
 
-        Call this after changing button icons/labels or card values
+        Call this after changing key icons/labels or card values
         if you need immediate updates outside of ``set_screen()``.
         Also drains any pending callbacks queued by programmatic
         ``set_value()`` calls on range controls.
@@ -391,9 +393,9 @@ class Deck:
             await self._drain_card_callbacks(card)
 
         # Render dirty keys
-        for button in screen.keys.values():
-            if button.is_dirty:
-                await self._render_button(button)
+        for key_slot in screen.keys.values():
+            if key_slot.is_dirty:
+                await self._render_key(key_slot)
 
         # Render the touch strip if any card is dirty
         if screen.touch_strip.any_dirty:
@@ -464,27 +466,27 @@ class Deck:
             return
 
         if isinstance(event, KeyEvent):
-            button = screen.keys.get(event.key)
-            if button:
-                await button.dispatch(event.pressed)
+            key_slot = screen.keys.get(event.key)
+            if key_slot:
+                await key_slot.dispatch(event.pressed)
 
-        elif isinstance(event, DialTurnEvent):
-            dial = screen.encoders.get(event.dial)
-            if dial:
-                await dial.dispatch_turn(event.direction)
-            card = screen.touch_strip.card(event.dial)
-            await card.dispatch_dial_turn(event.direction)
+        elif isinstance(event, EncoderTurnEvent):
+            encoder = screen.encoders.get(event.encoder)
+            if encoder:
+                await encoder.dispatch_turn(event.direction)
+            card = screen.touch_strip.card(event.encoder)
+            await card.dispatch_encoder_turn(event.direction)
             await self._drain_card_callbacks(card)
             if card.is_dirty:
                 await self.refresh()
 
-        elif isinstance(event, DialPressEvent):
-            dial = screen.encoders.get(event.dial)
-            if dial:
-                await dial.dispatch_press(event.pressed)
+        elif isinstance(event, EncoderPressEvent):
+            encoder = screen.encoders.get(event.encoder)
+            if encoder:
+                await encoder.dispatch_press(event.pressed)
             if event.pressed:
-                card = screen.touch_strip.card(event.dial)
-                await card.dispatch_dial_press()
+                card = screen.touch_strip.card(event.encoder)
+                await card.dispatch_encoder_press()
                 await self._drain_card_callbacks(card)
                 if card.is_dirty:
                     await self.refresh()

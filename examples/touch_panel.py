@@ -3,8 +3,8 @@
 
 Demonstrates the :class:`StackCard` container with :class:`LargeText`,
 :class:`SmallText`, and slider sub-elements.  Text elements display
-read-only information while sliders remain interactive.  Pressing a
-dial cycles only through the sliders; text elements are skipped.
+read-only information while sliders remain interactive.  Pressing an
+encoder cycles only through the sliders; text elements are skipped.
 
 Layout::
 
@@ -19,7 +19,7 @@ Layout::
     │          │          │ "EQ"     │ Balance  │
     │          │          │ Balance  │ "OK"     │
     └──────────┴──────────┴──────────┴──────────┘
-        dial 0     dial 1     dial 2     dial 3
+        enc 0      enc 1      enc 2      enc 3
 
 Zone 0: Large text header + large slider underneath.
 Zone 1: Large slider on top + large text readout below.
@@ -42,7 +42,7 @@ from deckboard import (
     StackCard,
     VolumeSlider,
 )
-from deckboard.widgets.text import LargeText, SmallText
+from deckboard.ui.elements.text import LargeText, SmallText
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -62,7 +62,7 @@ async def main() -> None:
 
         # -- Zone 0: Large text header + brightness slider -----------------
         #    The text shows a room name; the slider controls brightness.
-        #    Only one selectable element → dial press does nothing extra.
+        #    Only one selectable element → encoder press does nothing extra.
 
         header0 = LargeText("Room", color="#aaaaaa")
         bright = BrightnessSlider(value=80)
@@ -74,7 +74,7 @@ async def main() -> None:
 
         # -- Zone 1: Volume slider + text readout --------------------------
         #    The slider adjusts volume; the text shows the formatted value
-        #    and is updated programmatically on every dial turn.
+        #    and is updated programmatically on every encoder turn.
 
         vol = VolumeSlider(value=65)
         readout = LargeText(vol.format_value(), color="#5599ff")
@@ -85,7 +85,7 @@ async def main() -> None:
         page.set_card(1, panel1)
 
         # -- Zone 2: Two EQ sliders + text label + balance slider ----------
-        #    Press dial 2 to cycle among the three sliders (Bass, Treble,
+        #    Press encoder 2 to cycle among the three sliders (Bass, Treble,
         #    Balance).  The text label "EQ" is decorative and skipped.
 
         bass = EqualizerSlider("Bass", value=50)
@@ -102,7 +102,7 @@ async def main() -> None:
         page.set_card(2, panel2)
 
         # -- Zone 3: Status text + two sliders + footer text ---------------
-        #    Demonstrates text at both ends of the stack.  Pressing dial 3
+        #    Demonstrates text at both ends of the stack.  Pressing encoder 3
         #    cycles between Sub and Balance only.
 
         status = SmallText("Online", color="#00cc66")
@@ -118,7 +118,7 @@ async def main() -> None:
         panel3.set_selection_timeout(4)
         page.set_card(3, panel3)
 
-        # -- Dial handler: update volume readout on turn -------------------
+        # -- Encoder handler: update volume readout on turn -------------------
 
         @page.encoder(1).on_turn
         async def on_vol_turn(direction: int) -> None:
@@ -172,8 +172,10 @@ async def main() -> None:
         print("\nTouch panel showcase ready!")
         print("  Zone 0: 'Room' header + Brightness slider.")
         print("  Zone 1: Volume slider + live text readout.")
-        print("  Zone 2: Bass + Treble + 'EQ' label + Balance (press dial to cycle).")
-        print("  Zone 3: Status + Sub + Balance + footer (press dial to cycle).")
+        print(
+            "  Zone 2: Bass + Treble + 'EQ' label + Balance (press encoder to cycle)."
+        )
+        print("  Zone 3: Status + Sub + Balance + footer (press encoder to cycle).")
         print("  Button 0 = Reset All, Button 1 = Print Values, Button 7 = Exit.\n")
 
         await deck.wait_closed()

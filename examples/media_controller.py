@@ -2,7 +2,7 @@
 """Media controller — music player with volume, EQ, and balance sliders.
 
 A practical example that turns the Stream Deck+ into a media controller:
-transport buttons on row 1, playlist navigation on row 2, and dial-
+transport buttons on row 1, playlist navigation on row 2, and encoder-
 controlled volume/EQ/balance on the touchscreen.
 
 Layout::
@@ -15,7 +15,7 @@ Layout::
     ├──────────┼──────────┼──────────┼──────────┤
     │ Volume   │  Bass    │  Treble  │ Balance  │   ← touchscreen
     └──────────┴──────────┴──────────┴──────────┘
-        dial 0     dial 1     dial 2     dial 3
+        enc 0      enc 1      enc 2      enc 3
 
 Run with::
 
@@ -132,17 +132,19 @@ async def main() -> None:
         async def on_queue() -> None:
             print("📋 Queue (not implemented in this example)")
 
-        # Dial 0 press: toggle mute (same as button 3)
+        # Encoder 0 press: toggle mute (same as button 3)
         @page.encoder(0).on_press
-        async def on_dial_mute() -> None:
+        async def on_encoder_mute() -> None:
             await on_mute()
 
         # -- Activate and run -----------------------------------------------
 
         await deck.set_screen("media")
         print("\nMedia controller ready!")
-        print("  Dial 0: Volume | Dial 1: Bass | Dial 2: Treble | Dial 3: Balance")
-        print("  Press dial 0 to toggle mute.")
+        print(
+            "  Encoder 0: Volume | Encoder 1: Bass | Encoder 2: Treble | Encoder 3: Balance"
+        )
+        print("  Press encoder 0 to toggle mute.")
         print("  Button 1 = Play/Pause, Button 3 = Mute.")
         print("  Ctrl+C to exit.\n")
 

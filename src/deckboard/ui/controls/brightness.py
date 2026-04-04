@@ -18,7 +18,7 @@ class BrightnessSlider(LargeSlider):
         value: Initial value.  Defaults to 0.
         min_value: Minimum value.  Defaults to 0.
         max_value: Maximum value.  Defaults to 100.
-        step: Dial-turn increment.  Defaults to 1.
+        step: Encoder-turn increment.  Defaults to 1.
     """
 
     def __init__(

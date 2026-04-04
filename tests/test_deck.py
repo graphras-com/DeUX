@@ -11,8 +11,8 @@ from deckboard.runtime.deck import Deck, DeckError, _KEY_COUNT
 from deckboard.render.icons import IconManager
 from deckboard.ui.screen import Screen
 from deckboard.runtime.events import (
-    DialPressEvent,
-    DialTurnEvent,
+    EncoderPressEvent,
+    EncoderTurnEvent,
     EventType,
     KeyEvent,
     TouchEvent,
@@ -122,32 +122,30 @@ class TestDeckDebugGrid:
         deck.debug_grid = False
         assert deck.debug_grid is False
 
-    async def test_render_all_buttons_uses_debug_grid(
-        self, deck, mock_streamdeck_device
-    ):
+    async def test_render_all_keys_uses_debug_grid(self, deck, mock_streamdeck_device):
         """Blank keys are rendered with debug_grid when enabled."""
         deck._device = mock_streamdeck_device
         p = deck.screen("main")
         deck._active_page = p
         deck.debug_grid = True
 
-        await deck._render_all_buttons()
+        await deck._render_all_keys()
         assert mock_streamdeck_device.set_key_image.call_count == _KEY_COUNT
 
-    async def test_render_button_uses_debug_grid(self, deck, mock_streamdeck_device):
-        """Configured button renders with debug_grid overlay."""
+    async def test_render_key_uses_debug_grid(self, deck, mock_streamdeck_device):
+        """Configured key renders with debug_grid overlay."""
         from PIL import Image as PILImage
 
         deck._device = mock_streamdeck_device
-        from deckboard.ui.controls.key_slot import Button
+        from deckboard.ui.controls.key_slot import KeySlot
 
-        b = Button(0)
-        b.set_label("Test")
+        k = KeySlot(0)
+        k.set_label("Test")
         deck.debug_grid = True
 
-        await deck._render_button(b)
+        await deck._render_key(k)
         mock_streamdeck_device.set_key_image.assert_called_once()
-        assert b.image_bytes is not None
+        assert k.image_bytes is not None
 
     async def test_render_touchscreen_uses_debug_grid(
         self, deck, mock_streamdeck_device
@@ -168,7 +166,7 @@ class TestDeckDebugGrid:
 class TestDeckSetPage:
     async def test_sets_active_screen(self, deck):
         deck.screen("main")
-        deck._render_all_buttons = AsyncMock()
+        deck._render_all_keys = AsyncMock()
         deck._render_touchscreen = AsyncMock()
 
         await deck.set_screen("main")
@@ -182,7 +180,7 @@ class TestDeckSetPage:
     async def test_sets_active_page(self, deck):
         deck.screen("main")
         # Patch rendering methods since no device
-        deck._render_all_buttons = AsyncMock()
+        deck._render_all_keys = AsyncMock()
         deck._render_touchscreen = AsyncMock()
 
         await deck.set_screen("main")
@@ -191,11 +189,11 @@ class TestDeckSetPage:
 
     async def test_calls_render(self, deck):
         deck.screen("main")
-        deck._render_all_buttons = AsyncMock()
+        deck._render_all_keys = AsyncMock()
         deck._render_touchscreen = AsyncMock()
 
         await deck.set_screen("main")
-        deck._render_all_buttons.assert_awaited_once()
+        deck._render_all_keys.assert_awaited_once()
         deck._render_touchscreen.assert_awaited_once()
 
 
@@ -215,43 +213,43 @@ class TestDeckRefresh:
         """refresh() is a no-op when no active page."""
         await deck.refresh()  # Should not raise
 
-    async def test_renders_dirty_buttons(self, deck):
+    async def test_renders_dirty_keys(self, deck):
         p = deck.screen("main")
         p.key(0).set_icon("mdi:home")
 
         deck._active_page = p
-        deck._render_button = AsyncMock()
+        deck._render_key = AsyncMock()
         deck._render_touchscreen = AsyncMock()
 
         await deck.refresh()
-        deck._render_button.assert_awaited_once()
+        deck._render_key.assert_awaited_once()
 
     async def test_renders_dirty_touchscreen(self, deck):
         p = deck.screen("main")
         p.card(0).set_label("test")
 
         deck._active_page = p
-        deck._render_button = AsyncMock()
+        deck._render_key = AsyncMock()
         deck._render_touchscreen = AsyncMock()
 
         await deck.refresh()
         deck._render_touchscreen.assert_awaited_once()
 
-    async def test_skips_clean_buttons(self, deck):
+    async def test_skips_clean_keys(self, deck):
         p = deck.screen("main")
-        b = p.key(0)
-        b.set_icon("mdi:home")
-        b.mark_clean()  # Make it clean
+        k = p.key(0)
+        k.set_icon("mdi:home")
+        k.mark_clean()  # Make it clean
 
         deck._active_page = p
-        deck._render_button = AsyncMock()
+        deck._render_key = AsyncMock()
         deck._render_touchscreen = AsyncMock()
         # Mark all widgets clean
         for w in p.cards:
             w.mark_clean()
 
         await deck.refresh()
-        deck._render_button.assert_not_awaited()
+        deck._render_key.assert_not_awaited()
 
     async def test_skips_clean_touchscreen(self, deck):
         p = deck.screen("main")
@@ -259,7 +257,7 @@ class TestDeckRefresh:
             w.mark_clean()
 
         deck._active_page = p
-        deck._render_button = AsyncMock()
+        deck._render_key = AsyncMock()
         deck._render_touchscreen = AsyncMock()
 
         await deck.refresh()
@@ -294,44 +292,44 @@ class TestDeckDispatch:
         handler.assert_awaited_once()
 
     async def test_key_press_no_handler(self, deck):
-        """No error when button has no handler."""
+        """No error when key has no handler."""
         p = deck.screen("main")
         p.key(0)  # No handler registered
         deck._active_page = p
 
         await deck._dispatch(KeyEvent(key=0, pressed=True))  # Should not raise
 
-    async def test_key_event_unknown_button(self, deck):
-        """No error when event targets a button that doesn't exist on the page."""
+    async def test_key_event_unknown_key(self, deck):
+        """No error when event targets a key that doesn't exist on the page."""
         p = deck.screen("main")
         deck._active_page = p
 
-        await deck._dispatch(KeyEvent(key=7, pressed=True))  # No button 7
+        await deck._dispatch(KeyEvent(key=7, pressed=True))  # No key 7
 
-    async def test_dial_turn_dispatches(self, deck):
+    async def test_encoder_turn_dispatches(self, deck):
         p = deck.screen("main")
         handler = AsyncMock()
         p.encoder(1).on_turn(handler)
         deck._active_page = p
 
-        await deck._dispatch(DialTurnEvent(dial=1, direction=3))
+        await deck._dispatch(EncoderTurnEvent(encoder=1, direction=3))
         handler.assert_awaited_once_with(3)
 
-    async def test_dial_turn_no_handler(self, deck):
+    async def test_encoder_turn_no_handler(self, deck):
         p = deck.screen("main")
         p.encoder(1)
         deck._active_page = p
 
-        await deck._dispatch(DialTurnEvent(dial=1, direction=1))
+        await deck._dispatch(EncoderTurnEvent(encoder=1, direction=1))
 
-    async def test_dial_turn_unknown_dial(self, deck):
+    async def test_encoder_turn_unknown_encoder(self, deck):
         p = deck.screen("main")
         deck._active_page = p
 
-        await deck._dispatch(DialTurnEvent(dial=2, direction=1))
+        await deck._dispatch(EncoderTurnEvent(encoder=2, direction=1))
 
-    async def test_dial_turn_updates_card_slider(self, deck):
-        """Dial turn forwards to widget sliders and triggers refresh."""
+    async def test_encoder_turn_updates_card_slider(self, deck):
+        """Encoder turn forwards to widget sliders and triggers refresh."""
         from deckboard.ui.controls.volume import VolumeSlider
         from deckboard.ui.cards.stack import StackCard
 
@@ -343,43 +341,43 @@ class TestDeckDispatch:
         deck._active_page = p
 
         with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
-            await deck._dispatch(DialTurnEvent(dial=1, direction=5))
+            await deck._dispatch(EncoderTurnEvent(encoder=1, direction=5))
             mock_refresh.assert_awaited_once()
         assert slider.value == 5  # default 0 + 5
 
-    async def test_dial_press_dispatches(self, deck):
+    async def test_encoder_press_dispatches(self, deck):
         p = deck.screen("main")
         handler = AsyncMock()
         p.encoder(0).on_press(handler)
         deck._active_page = p
 
-        await deck._dispatch(DialPressEvent(dial=0, pressed=True))
+        await deck._dispatch(EncoderPressEvent(encoder=0, pressed=True))
         handler.assert_awaited_once()
 
-    async def test_dial_release_dispatches(self, deck):
+    async def test_encoder_release_dispatches(self, deck):
         p = deck.screen("main")
         handler = AsyncMock()
         p.encoder(0).on_release(handler)
         deck._active_page = p
 
-        await deck._dispatch(DialPressEvent(dial=0, pressed=False))
+        await deck._dispatch(EncoderPressEvent(encoder=0, pressed=False))
         handler.assert_awaited_once()
 
-    async def test_dial_press_no_handler(self, deck):
+    async def test_encoder_press_no_handler(self, deck):
         p = deck.screen("main")
         p.encoder(0)
         deck._active_page = p
 
-        await deck._dispatch(DialPressEvent(dial=0, pressed=True))
+        await deck._dispatch(EncoderPressEvent(encoder=0, pressed=True))
 
-    async def test_dial_press_unknown_dial(self, deck):
+    async def test_encoder_press_unknown_encoder(self, deck):
         p = deck.screen("main")
         deck._active_page = p
 
-        await deck._dispatch(DialPressEvent(dial=3, pressed=True))
+        await deck._dispatch(EncoderPressEvent(encoder=3, pressed=True))
 
-    async def test_dial_press_cycles_card_slider(self, deck):
-        """Dial press cycles active slider on the widget and triggers refresh."""
+    async def test_encoder_press_cycles_card_slider(self, deck):
+        """Encoder press cycles active slider on the widget and triggers refresh."""
         from deckboard.ui.controls.volume import VolumeSlider
         from deckboard.ui.controls.brightness import BrightnessSlider
         from deckboard.ui.cards.stack import StackCard
@@ -393,7 +391,7 @@ class TestDeckDispatch:
 
         assert sw._active_control_index == 0
         with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
-            await deck._dispatch(DialPressEvent(dial=0, pressed=True))
+            await deck._dispatch(EncoderPressEvent(encoder=0, pressed=True))
             mock_refresh.assert_awaited_once()
         assert sw._active_control_index == 1
 
@@ -453,10 +451,10 @@ class TestDeckDispatch:
 
 
 class TestDeckDispatchWidgetCallbacks:
-    """Tests for widget-level dial decorators and slider on_change callbacks."""
+    """Tests for widget-level encoder decorators and slider on_change callbacks."""
 
-    async def test_dial_turn_calls_card_dial_turn_handler(self, deck):
-        """Card on_dial_turn handler is called on DialTurnEvent."""
+    async def test_encoder_turn_calls_card_encoder_turn_handler(self, deck):
+        """Card on_encoder_turn handler is called on EncoderTurnEvent."""
         from deckboard.ui.cards.stack import StackCard
 
         p = deck.screen("main")
@@ -465,15 +463,15 @@ class TestDeckDispatchWidgetCallbacks:
         deck._active_page = p
 
         handler = AsyncMock()
-        sw.on_dial_turn(handler)
+        sw.on_encoder_turn(handler)
 
         with patch.object(deck, "refresh", new_callable=AsyncMock):
-            await deck._dispatch(DialTurnEvent(dial=0, direction=3))
+            await deck._dispatch(EncoderTurnEvent(encoder=0, direction=3))
 
         handler.assert_awaited_once_with(3)
 
-    async def test_dial_press_calls_card_dial_press_handler(self, deck):
-        """Card on_dial_press handler is called on DialPressEvent."""
+    async def test_encoder_press_calls_card_encoder_press_handler(self, deck):
+        """Card on_encoder_press handler is called on EncoderPressEvent."""
         from deckboard.ui.cards.stack import StackCard
         from deckboard.ui.controls.volume import VolumeSlider
 
@@ -485,15 +483,15 @@ class TestDeckDispatchWidgetCallbacks:
         deck._active_page = p
 
         handler = AsyncMock()
-        sw.on_dial_press(handler)
+        sw.on_encoder_press(handler)
 
         with patch.object(deck, "refresh", new_callable=AsyncMock):
-            await deck._dispatch(DialPressEvent(dial=0, pressed=True))
+            await deck._dispatch(EncoderPressEvent(encoder=0, pressed=True))
 
         handler.assert_awaited_once()
 
-    async def test_dial_press_release_does_not_call_card_handler(self, deck):
-        """Card on_dial_press is NOT called for release events."""
+    async def test_encoder_press_release_does_not_call_card_handler(self, deck):
+        """Card on_encoder_press is NOT called for release events."""
         from deckboard.ui.cards.stack import StackCard
 
         p = deck.screen("main")
@@ -502,13 +500,13 @@ class TestDeckDispatchWidgetCallbacks:
         deck._active_page = p
 
         handler = AsyncMock()
-        sw.on_dial_press(handler)
+        sw.on_encoder_press(handler)
 
-        await deck._dispatch(DialPressEvent(dial=0, pressed=False))
+        await deck._dispatch(EncoderPressEvent(encoder=0, pressed=False))
         handler.assert_not_awaited()
 
-    async def test_dial_turn_drains_slider_on_change(self, deck):
-        """Slider on_change callback is awaited after dial turn adjusts value."""
+    async def test_encoder_turn_drains_slider_on_change(self, deck):
+        """Slider on_change callback is awaited after encoder turn adjusts value."""
         from deckboard.ui.cards.stack import StackCard
         from deckboard.ui.controls.volume import VolumeSlider
 
@@ -523,12 +521,12 @@ class TestDeckDispatchWidgetCallbacks:
         vol.on_change(change_handler)
 
         with patch.object(deck, "refresh", new_callable=AsyncMock):
-            await deck._dispatch(DialTurnEvent(dial=0, direction=1))
+            await deck._dispatch(EncoderTurnEvent(encoder=0, direction=1))
 
         change_handler.assert_awaited_once_with(55.0)
 
-    async def test_dial_turn_order_dial_then_card_then_change(self, deck):
-        """Dispatch order: dial handler → widget dial handler → slider on_change."""
+    async def test_encoder_turn_order_encoder_then_card_then_change(self, deck):
+        """Dispatch order: encoder handler -> widget encoder handler -> slider on_change."""
         from deckboard.ui.cards.stack import StackCard
         from deckboard.ui.controls.volume import VolumeSlider
 
@@ -541,19 +539,19 @@ class TestDeckDispatchWidgetCallbacks:
 
         call_order = []
 
-        dial_handler = AsyncMock(side_effect=lambda d: call_order.append("dial"))
-        p.encoder(0).on_turn(dial_handler)
+        encoder_handler = AsyncMock(side_effect=lambda d: call_order.append("encoder"))
+        p.encoder(0).on_turn(encoder_handler)
 
         widget_handler = AsyncMock(side_effect=lambda d: call_order.append("widget"))
-        sw.on_dial_turn(widget_handler)
+        sw.on_encoder_turn(widget_handler)
 
         change_handler = AsyncMock(side_effect=lambda v: call_order.append("change"))
         vol.on_change(change_handler)
 
         with patch.object(deck, "refresh", new_callable=AsyncMock):
-            await deck._dispatch(DialTurnEvent(dial=0, direction=1))
+            await deck._dispatch(EncoderTurnEvent(encoder=0, direction=1))
 
-        assert call_order == ["dial", "widget", "change"]
+        assert call_order == ["encoder", "widget", "change"]
 
     async def test_refresh_drains_pending_callbacks(self, deck):
         """Programmatic set_value + refresh drains on_change callbacks."""
@@ -566,20 +564,20 @@ class TestDeckDispatchWidgetCallbacks:
         sw.add_control(vol)
         p.set_card(0, sw)
         deck._active_page = p
-        deck._render_button = AsyncMock()
+        deck._render_key = AsyncMock()
         deck._render_touchscreen = AsyncMock()
 
         change_handler = AsyncMock()
         vol.on_change(change_handler)
 
-        # Programmatic change (not from dial)
+        # Programmatic change (not from encoder)
         vol.set_value(80)
 
         await deck.refresh()
         change_handler.assert_awaited_once_with(80.0)
 
-    async def test_no_on_change_when_value_unchanged_via_dial(self, deck):
-        """No on_change callback when dial turn doesn't change value (at max)."""
+    async def test_no_on_change_when_value_unchanged_via_encoder(self, deck):
+        """No on_change callback when encoder turn doesn't change value (at max)."""
         from deckboard.ui.cards.stack import StackCard
         from deckboard.ui.controls.volume import VolumeSlider
 
@@ -594,7 +592,7 @@ class TestDeckDispatchWidgetCallbacks:
         vol.on_change(change_handler)
 
         with patch.object(deck, "refresh", new_callable=AsyncMock):
-            await deck._dispatch(DialTurnEvent(dial=0, direction=1))
+            await deck._dispatch(EncoderTurnEvent(encoder=0, direction=1))
 
         change_handler.assert_not_awaited()
 
@@ -620,75 +618,75 @@ class TestDeckDispatchWidgetCallbacks:
         assert sw.drain_pending_callbacks() == []
 
 
-# ── Deck._render_all_buttons ────────────────────────────────────────────
+# ── Deck._render_all_keys ──────────────────────────────────────────────
 
 
-class TestDeckRenderAllButtons:
+class TestDeckRenderAllKeys:
     async def test_no_device(self, deck):
         """No-op when device is None."""
         deck._active_page = deck.screen("main")
-        await deck._render_all_buttons()  # Should not raise
+        await deck._render_all_keys()  # Should not raise
 
     async def test_renders_with_device(self, deck, mock_streamdeck_device):
         deck._device = mock_streamdeck_device
         p = deck.screen("main")
         deck._active_page = p
 
-        await deck._render_all_buttons()
+        await deck._render_all_keys()
         # Should have called set_key_image for all 8 keys (all blank)
         assert mock_streamdeck_device.set_key_image.call_count == _KEY_COUNT
 
-    async def test_renders_configured_button(self, deck, mock_streamdeck_device):
+    async def test_renders_configured_key(self, deck, mock_streamdeck_device):
         deck._device = mock_streamdeck_device
         p = deck.screen("main")
         p.key(0).set_icon("mdi:home")
         deck._active_page = p
 
         # Mock icon fetch
-        deck._render_button = AsyncMock()
+        deck._render_key = AsyncMock()
 
-        await deck._render_all_buttons()
-        deck._render_button.assert_awaited_once()
-
-
-# ── Deck._render_button ─────────────────────────────────────────────────
+        await deck._render_all_keys()
+        deck._render_key.assert_awaited_once()
 
 
-class TestDeckRenderButton:
+# ── Deck._render_key ───────────────────────────────────────────────────
+
+
+class TestDeckRenderKey:
     async def test_no_device(self, deck):
         """No-op when device is None."""
-        from deckboard.ui.controls.key_slot import Button
+        from deckboard.ui.controls.key_slot import KeySlot
 
-        b = Button(0)
-        b.set_icon("mdi:home")
-        await deck._render_button(b)  # Should not raise
+        k = KeySlot(0)
+        k.set_icon("mdi:home")
+        await deck._render_key(k)  # Should not raise
 
-    async def test_renders_button_with_icon(self, deck, mock_streamdeck_device):
+    async def test_renders_key_with_icon(self, deck, mock_streamdeck_device):
         from PIL import Image
 
         deck._device = mock_streamdeck_device
-        from deckboard.ui.controls.key_slot import Button
+        from deckboard.ui.controls.key_slot import KeySlot
 
-        b = Button(0)
-        b.set_icon("mdi:home")
+        k = KeySlot(0)
+        k.set_icon("mdi:home")
 
         # Mock icon manager
         fake_img = Image.new("RGBA", (80, 80))
         deck.icons.get = AsyncMock(return_value=fake_img)
 
-        await deck._render_button(b)
+        await deck._render_key(k)
         mock_streamdeck_device.set_key_image.assert_called_once()
-        assert b.image_bytes is not None
-        assert b.is_dirty is False
+        assert k.image_bytes is not None
+        assert k.is_dirty is False
 
-    async def test_renders_button_without_icon(self, deck, mock_streamdeck_device):
+    async def test_renders_key_without_icon(self, deck, mock_streamdeck_device):
         deck._device = mock_streamdeck_device
-        from deckboard.ui.controls.key_slot import Button
+        from deckboard.ui.controls.key_slot import KeySlot
 
-        b = Button(0)
-        b.set_label("Test")
+        k = KeySlot(0)
+        k.set_label("Test")
 
-        await deck._render_button(b)
+        await deck._render_key(k)
         mock_streamdeck_device.set_key_image.assert_called_once()
 
 
@@ -740,7 +738,7 @@ class TestDeckInfo:
         assert info.firmware == "1.0.0"
         assert info.key_count == 8
         assert info.key_layout == (4, 2)
-        assert info.dial_count == 4
+        assert info.encoder_count == 4
         assert info.key_pixel_size == (120, 120)
         assert info.touchscreen_size == (800, 100)
         assert info.key_image_format == "JPEG"
@@ -952,29 +950,24 @@ class TestDeckCheckTimeouts:
 
 
 class TestDeckEventLoop:
-    """Tests for _event_loop internal paths (lines 382, 391-399, 403-404)."""
+    """Tests for _event_loop internal paths."""
 
     async def test_event_loop_returns_early_without_transport(self, deck):
-        """Line 382: _event_loop returns immediately when _transport is None."""
+        """_event_loop returns immediately when _transport is None."""
         deck._transport = None
         deck._running = True
-        # Should return immediately without blocking
         await deck._event_loop()
-        # _closed_event is NOT set because the finally block is never reached
-        # (early return before the try)
         assert not deck._closed_event.is_set()
 
     async def test_event_loop_timeout_continues(self, deck):
         """TimeoutError calls _check_timeouts then continues."""
-        # Set up a real queue that will time out
         transport = MagicMock()
         transport.queue = asyncio.Queue()
         deck._transport = transport
         deck._running = True
 
-        # After a brief period, stop the loop
         async def stop_after_delay():
-            await asyncio.sleep(0.6)  # Slightly more than 0.5s timeout
+            await asyncio.sleep(0.6)
             deck._running = False
 
         asyncio.create_task(stop_after_delay())
@@ -983,21 +976,18 @@ class TestDeckEventLoop:
         ) as mock_check:
             await deck._event_loop()
             mock_check.assert_awaited()
-        # The loop timed out at least once and then exited
         assert deck._closed_event.is_set()
 
     async def test_event_loop_no_active_page_continues(self, deck):
-        """Lines 393-394: Event received but no active page → continue."""
+        """Event received but no active page -> continue."""
         transport = MagicMock()
         transport.queue = asyncio.Queue()
         deck._transport = transport
         deck._running = True
         deck._active_page = None
 
-        # Put an event in the queue
         await transport.queue.put(KeyEvent(key=0, pressed=True))
 
-        # Stop after the event is consumed
         async def stop_after_delay():
             await asyncio.sleep(0.1)
             deck._running = False
@@ -1007,14 +997,13 @@ class TestDeckEventLoop:
         assert deck._closed_event.is_set()
 
     async def test_event_loop_dispatch_exception_logged(self, deck):
-        """Lines 396-399: Exception in _dispatch is caught and logged."""
+        """Exception in _dispatch is caught and logged."""
         transport = MagicMock()
         transport.queue = asyncio.Queue()
         deck._transport = transport
         deck._running = True
         deck._active_page = deck.screen("main")
 
-        # Make _dispatch raise an exception
         deck._dispatch = AsyncMock(side_effect=ValueError("handler error"))
 
         await transport.queue.put(KeyEvent(key=0, pressed=True))
@@ -1030,14 +1019,12 @@ class TestDeckEventLoop:
         assert deck._closed_event.is_set()
 
     async def test_event_loop_unexpected_crash_logged(self, deck):
-        """Lines 403-404: Unexpected exception crashes the event loop, logged."""
+        """Unexpected exception crashes the event loop, logged."""
         transport = MagicMock()
-        # Make queue.get() raise a non-asyncio exception
         q = asyncio.Queue()
         deck._transport = transport
         deck._running = True
 
-        # Patch the queue's get to raise a RuntimeError
         async def exploding_get():
             raise RuntimeError("unexpected crash")
 
@@ -1047,7 +1034,6 @@ class TestDeckEventLoop:
         with patch("deckboard.runtime.deck.logger") as mock_logger:
             await deck._event_loop()
             mock_logger.exception.assert_called_with("Event loop crashed")
-        # finally block should still set the closed event
         assert deck._closed_event.is_set()
 
 

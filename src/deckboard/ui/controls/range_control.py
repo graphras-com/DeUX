@@ -120,7 +120,7 @@ class RangeControl(Control, ABC):
 
         The handler receives the new ``value`` after clamping.  It is
         invoked asynchronously by the event loop after the value changes
-        (via dial turn or programmatic :meth:`set_value`).
+        (via encoder turn or programmatic :meth:`set_value`).
 
         Usage::
 
@@ -178,7 +178,7 @@ class RangeControl(Control, ABC):
             y: Top edge.
             width: Available width.
             height: Available height.
-            active: If ``True``, highlight the frame to show the dial
+            active: If ``True``, highlight the frame to show the encoder
                 is currently controlling this slider.
         """
 

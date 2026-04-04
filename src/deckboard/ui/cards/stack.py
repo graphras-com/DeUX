@@ -18,9 +18,9 @@ class StackCard(Card):
     """A card that displays stacked sub-elements (controls, text, metrics).
 
     Elements are laid out vertically within the widget zone.  Only
-    *selectable* elements (e.g. sliders) participate in dial-press
+    *selectable* elements (e.g. sliders) participate in encoder-press
     cycling; non-selectable elements (e.g. text) are rendered but
-    skipped when the user pushes the dial.
+    skipped when the user pushes the encoder.
 
     Usage::
 
@@ -102,7 +102,7 @@ class StackCard(Card):
 
     @property
     def active_control(self) -> Control | None:
-        """The control currently attached to the dial, or ``None``."""
+        """The control currently attached to the encoder, or ``None``."""
         selectable = self._selectable_indices()
         if not selectable:
             return None
@@ -133,7 +133,7 @@ class StackCard(Card):
     def cycle_active_control(self) -> None:
         """Advance to the next selectable element (wrapping around).
 
-        Called on dial push.  Non-selectable elements (text) are
+        Called on encoder push.  Non-selectable elements (text) are
         skipped.  Marks the card dirty so the highlight redraws.
         """
         selectable = self._selectable_indices()
@@ -152,7 +152,7 @@ class StackCard(Card):
 
     # -- Card hooks (override base class no-ops) ---------------------------
 
-    def handle_dial_turn(self, direction: int) -> None:
+    def handle_encoder_turn(self, direction: int) -> None:
         """Adjust the active control's value by *direction* steps.
 
         Marks the card dirty so the next render reflects the change.
@@ -167,8 +167,8 @@ class StackCard(Card):
             self._last_selection_time = time.monotonic()
         self._dirty = True
 
-    def handle_dial_press(self) -> None:
-        """Cycle to the next selectable element.  Called on dial push."""
+    def handle_encoder_press(self) -> None:
+        """Cycle to the next selectable element.  Called on encoder push."""
         self.cycle_active_control()
 
     def check_selection_timeout(self) -> bool:

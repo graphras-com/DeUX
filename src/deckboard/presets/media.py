@@ -14,7 +14,7 @@ class MediaCard(StackCard):
 
     Combines a :class:`LargeText` element (showing the currently playing
     media) and a :class:`VolumeSlider` into a single :class:`StackCard`.
-    Pressing the dial toggles mute: the volume is set to 0 and the
+    Pressing the encoder toggles mute: the volume is set to 0 and the
     previous level is restored on the next press.
 
     All parameters are optional — sensible defaults are applied.
@@ -73,7 +73,7 @@ class MediaCard(StackCard):
 
         When muting, the current volume is saved and set to 0.
         When unmuting, the saved volume is restored.  If the volume
-        was changed while muted (e.g. via dial turn), unmuting still
+        was changed while muted (e.g. via encoder turn), unmuting still
         restores the previously saved level.
         """
         if self._muted:
@@ -85,12 +85,12 @@ class MediaCard(StackCard):
             self._muted = True
         self._dirty = True
 
-    # -- Dial interaction overrides ----------------------------------------
+    # -- Encoder interaction overrides -------------------------------------
 
-    def handle_dial_press(self) -> None:
-        """Toggle mute when the dial is pressed.
+    def handle_encoder_press(self) -> None:
+        """Toggle mute when the encoder is pressed.
 
-        Overrides the default :meth:`StackCard.handle_dial_press`
+        Overrides the default :meth:`StackCard.handle_encoder_press`
         behaviour (which cycles active controls) because this card
         has only one slider.
         """

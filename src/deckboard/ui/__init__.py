@@ -6,9 +6,7 @@ from .cards import Card, StackCard, StatusCard
 from .controls import (
     BalanceSlider,
     BrightnessSlider,
-    Button,
     Control,
-    Dial,
     EncoderSlot,
     EqualizerSlider,
     KelvinSlider,
@@ -27,10 +25,8 @@ from .touch_strip import TouchStrip
 __all__ = [
     "BalanceSlider",
     "BrightnessSlider",
-    "Button",
     "Card",
     "Control",
-    "Dial",
     "Element",
     "EncoderSlot",
     "EqualizerSlider",

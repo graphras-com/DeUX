@@ -6,7 +6,7 @@ The hierarchy is::
     SmallText   (compact single-line text, same height as SmallSlider)
 
 Text elements are non-selectable: they render inside a :class:`StackCard`
-alongside sliders but are skipped when the dial cycles through active
+alongside sliders but are skipped when the encoder cycles through active
 elements.
 """
 

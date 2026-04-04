@@ -18,7 +18,7 @@ Layout::
     │          │          │          │+Treble  │
     │          │          │          │+Balance │
     └──────────┴──────────┴──────────┴──────────┘
-        dial 0     dial 1     dial 2     dial 3
+        enc 0      enc 1      enc 2      enc 3
 
 Run with::
 
@@ -118,8 +118,8 @@ async def main() -> None:
 
         await deck.set_screen("equalizer")
         print("\nEqualizer widget ready!")
-        print("  Turn dial 3 to adjust the active band.")
-        print("  Press dial 3 to cycle Sub → Bass → Treble → Balance.")
+        print("  Turn encoder 3 to adjust the active band.")
+        print("  Press encoder 3 to cycle Sub → Bass → Treble → Balance.")
         print("  Row 1: Reset, Flat, Print Values, Exit.")
         print("  Row 2: Bass Boost, V-Shape, Vocal, Warm presets.\n")
 

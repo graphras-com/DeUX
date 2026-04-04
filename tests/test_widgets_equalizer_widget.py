@@ -85,33 +85,33 @@ class TestEqualizerWidgetAccessors:
         assert w.treble.value == 0
 
 
-class TestEqualizerWidgetDialInteraction:
-    def test_dial_turn_adjusts_active_control(self):
+class TestEqualizerWidgetEncoderInteraction:
+    def test_encoder_turn_adjusts_active_control(self):
         w = EqualizerCard(0, sub=50)
-        w.handle_dial_turn(1)
+        w.handle_encoder_turn(1)
         assert w.sub.value == 51
 
-    def test_dial_turn_negative(self):
+    def test_encoder_turn_negative(self):
         w = EqualizerCard(0, sub=50)
-        w.handle_dial_turn(-1)
+        w.handle_encoder_turn(-1)
         assert w.sub.value == 49
 
-    def test_dial_press_cycles_active_control(self):
+    def test_encoder_press_cycles_active_control(self):
         w = EqualizerCard(0)
         assert w.active_control is w.sub
-        w.handle_dial_press()
+        w.handle_encoder_press()
         assert w.active_control is w.bass
-        w.handle_dial_press()
+        w.handle_encoder_press()
         assert w.active_control is w.treble
-        w.handle_dial_press()
+        w.handle_encoder_press()
         assert w.active_control is w.balance
-        w.handle_dial_press()
+        w.handle_encoder_press()
         assert w.active_control is w.sub  # wraps
 
-    def test_dial_turn_after_cycle(self):
+    def test_encoder_turn_after_cycle(self):
         w = EqualizerCard(0, bass=50)
-        w.handle_dial_press()  # now on bass
-        w.handle_dial_turn(5)
+        w.handle_encoder_press()  # now on bass
+        w.handle_encoder_turn(5)
         assert w.bass.value == 55
 
 
@@ -133,11 +133,11 @@ class TestEqualizerWidgetRender:
         _ = w.render()
         # render itself doesn't mark_clean, but it does call check_selection_timeout
 
-    def test_render_after_dial_interaction(self):
+    def test_render_after_encoder_interaction(self):
         w = EqualizerCard(0)
-        w.handle_dial_turn(10)
-        w.handle_dial_press()
-        w.handle_dial_turn(-5)
+        w.handle_encoder_turn(10)
+        w.handle_encoder_press()
+        w.handle_encoder_turn(-5)
         img = w.render()
         assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
@@ -157,7 +157,7 @@ class TestEqualizerWidgetSelectionTimeout:
 
         with patch("deckboard.ui.cards.stack.time") as mock_time:
             mock_time.monotonic = fake_monotonic
-            w.handle_dial_press()  # move to bass, records time=100.0
+            w.handle_encoder_press()  # move to bass, records time=100.0
             assert w.active_control is w.bass
             changed = w.check_selection_timeout()  # elapsed=100.0 >= 0.01
         assert changed is True
@@ -195,11 +195,11 @@ class TestEqualizerWidgetOnChangeIntegration:
         assert len(callbacks) == 1
         assert callbacks[0] == (handler, (75.0,))
 
-    def test_on_change_queued_on_dial_turn(self):
+    def test_on_change_queued_on_encoder_turn(self):
         w = EqualizerCard(0, sub=50)
         handler = AsyncMock()
         w.sub.on_change(handler)
-        w.handle_dial_turn(3)
+        w.handle_encoder_turn(3)
         callbacks = w.drain_pending_callbacks()
         assert len(callbacks) == 1
         assert callbacks[0] == (handler, (53.0,))
@@ -210,7 +210,7 @@ class TestEqualizerWidgetOnChangeIntegration:
         bass_handler = AsyncMock()
         w.sub.on_change(sub_handler)
         w.bass.on_change(bass_handler)
-        w.handle_dial_turn(5)  # sub is active by default
+        w.handle_encoder_turn(5)  # sub is active by default
         callbacks = w.drain_pending_callbacks()
         assert len(callbacks) == 1
         assert callbacks[0][0] is sub_handler
@@ -221,9 +221,9 @@ class TestEqualizerWidgetOnChangeIntegration:
         bass_handler = AsyncMock()
         w.sub.on_change(sub_handler)
         w.bass.on_change(bass_handler)
-        w.handle_dial_press()  # switch to bass
+        w.handle_encoder_press()  # switch to bass
         w.drain_pending_callbacks()  # clear any pending
-        w.handle_dial_turn(2)
+        w.handle_encoder_turn(2)
         callbacks = w.drain_pending_callbacks()
         assert len(callbacks) == 1
         assert callbacks[0][0] is bass_handler
@@ -233,7 +233,7 @@ class TestEqualizerWidgetOnChangeIntegration:
         w = EqualizerCard(0, sub=100)
         handler = AsyncMock()
         w.sub.on_change(handler)
-        w.handle_dial_turn(1)
+        w.handle_encoder_turn(1)
         callbacks = w.drain_pending_callbacks()
         assert len(callbacks) == 0
 
@@ -241,7 +241,7 @@ class TestEqualizerWidgetOnChangeIntegration:
         w = EqualizerCard(0, sub=0)
         handler = AsyncMock()
         w.sub.on_change(handler)
-        w.handle_dial_turn(-1)
+        w.handle_encoder_turn(-1)
         callbacks = w.drain_pending_callbacks()
         assert len(callbacks) == 0
 

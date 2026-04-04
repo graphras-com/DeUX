@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock
 import pytest
 from PIL import Image
 
-from deckboard.ui.controls.key_slot import Button, KeySlot
-from deckboard.ui.controls.encoder_slot import Dial, EncoderSlot
+from deckboard.ui.controls.key_slot import KeySlot
+from deckboard.ui.controls.encoder_slot import EncoderSlot
 from deckboard.render.icons import IconManager
 from deckboard.ui.screen import Screen
 from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
@@ -21,15 +21,15 @@ from deckboard.ui.cards.stack import StackCard
 
 
 @pytest.fixture
-def button():
-    """A fresh Button at index 0."""
-    return Button(0)
+def key_slot():
+    """A fresh KeySlot at index 0."""
+    return KeySlot(0)
 
 
 @pytest.fixture
-def dial():
-    """A fresh Dial at index 0."""
-    return Dial(0)
+def encoder():
+    """A fresh EncoderSlot at index 0."""
+    return EncoderSlot(0)
 
 
 @pytest.fixture

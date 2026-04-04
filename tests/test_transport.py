@@ -9,8 +9,8 @@ import pytest
 
 from deckboard.runtime.transport import AsyncTransport
 from deckboard.runtime.events import (
-    DialPressEvent,
-    DialTurnEvent,
+    EncoderPressEvent,
+    EncoderTurnEvent,
     EventType,
     KeyEvent,
     TouchEvent,
@@ -35,7 +35,7 @@ class TestTransportLifecycle:
         transport = AsyncTransport(mock_device, loop)
         transport.start()
         mock_device.set_key_callback.assert_called_once_with(transport._on_key)
-        mock_device.set_dial_callback.assert_called_once_with(transport._on_dial)
+        mock_device.set_dial_callback.assert_called_once_with(transport._on_encoder)
         mock_device.set_touchscreen_callback.assert_called_once_with(
             transport._on_touch
         )
@@ -108,58 +108,58 @@ class TestTransportOnKey:
         assert event.pressed is False
 
 
-# ── _on_dial ────────────────────────────────────────────────────────────
+# ── _on_encoder ─────────────────────────────────────────────────────────
 
 
-class TestTransportOnDial:
-    async def test_dial_push(self, mock_device):
+class TestTransportOnEncoder:
+    async def test_encoder_push(self, mock_device):
         from StreamDeck.Devices.StreamDeck import DialEventType
 
         loop = asyncio.get_running_loop()
         transport = AsyncTransport(mock_device, loop)
         transport.start()
-        transport._on_dial(mock_device, 1, DialEventType.PUSH, True)
+        transport._on_encoder(mock_device, 1, DialEventType.PUSH, True)
         await asyncio.sleep(0.01)
         event = transport.queue.get_nowait()
-        assert isinstance(event, DialPressEvent)
-        assert event.dial == 1
+        assert isinstance(event, EncoderPressEvent)
+        assert event.encoder == 1
         assert event.pressed is True
 
-    async def test_dial_push_release(self, mock_device):
+    async def test_encoder_push_release(self, mock_device):
         from StreamDeck.Devices.StreamDeck import DialEventType
 
         loop = asyncio.get_running_loop()
         transport = AsyncTransport(mock_device, loop)
         transport.start()
-        transport._on_dial(mock_device, 2, DialEventType.PUSH, False)
+        transport._on_encoder(mock_device, 2, DialEventType.PUSH, False)
         await asyncio.sleep(0.01)
         event = transport.queue.get_nowait()
-        assert isinstance(event, DialPressEvent)
+        assert isinstance(event, EncoderPressEvent)
         assert event.pressed is False
 
-    async def test_dial_turn_clockwise(self, mock_device):
+    async def test_encoder_turn_clockwise(self, mock_device):
         from StreamDeck.Devices.StreamDeck import DialEventType
 
         loop = asyncio.get_running_loop()
         transport = AsyncTransport(mock_device, loop)
         transport.start()
-        transport._on_dial(mock_device, 0, DialEventType.TURN, 3)
+        transport._on_encoder(mock_device, 0, DialEventType.TURN, 3)
         await asyncio.sleep(0.01)
         event = transport.queue.get_nowait()
-        assert isinstance(event, DialTurnEvent)
-        assert event.dial == 0
+        assert isinstance(event, EncoderTurnEvent)
+        assert event.encoder == 0
         assert event.direction == 3
 
-    async def test_dial_turn_counterclockwise(self, mock_device):
+    async def test_encoder_turn_counterclockwise(self, mock_device):
         from StreamDeck.Devices.StreamDeck import DialEventType
 
         loop = asyncio.get_running_loop()
         transport = AsyncTransport(mock_device, loop)
         transport.start()
-        transport._on_dial(mock_device, 1, DialEventType.TURN, -2)
+        transport._on_encoder(mock_device, 1, DialEventType.TURN, -2)
         await asyncio.sleep(0.01)
         event = transport.queue.get_nowait()
-        assert isinstance(event, DialTurnEvent)
+        assert isinstance(event, EncoderTurnEvent)
         assert event.direction == -2
 
 
@@ -262,14 +262,14 @@ class TestTransportErrorHandling:
         # Should not propagate the exception
         assert transport.queue.empty()
 
-    async def test_dial_callback_error_logged(self, mock_device):
+    async def test_encoder_callback_error_logged(self, mock_device):
         from StreamDeck.Devices.StreamDeck import DialEventType
 
         loop = asyncio.get_running_loop()
         transport = AsyncTransport(mock_device, loop)
         transport.start()
         transport._enqueue = MagicMock(side_effect=RuntimeError("test"))
-        transport._on_dial(mock_device, 0, DialEventType.PUSH, True)
+        transport._on_encoder(mock_device, 0, DialEventType.PUSH, True)
         # Should not propagate
 
     async def test_touch_callback_error_logged(self, mock_device):

@@ -13,7 +13,7 @@ AsyncHandler = Callable[..., Coroutine[Any, Any, None]]
 class EventType(Enum):
     """Internal event types for the async bridge."""
 
-    DIAL_TURN = auto()
+    ENCODER_TURN = auto()
     TOUCH_SHORT = auto()
     TOUCH_LONG = auto()
     TOUCH_DRAG = auto()
@@ -28,18 +28,18 @@ class KeyEvent:
 
 
 @dataclass(frozen=True, slots=True)
-class DialTurnEvent:
-    """A dial rotation event."""
+class EncoderTurnEvent:
+    """An encoder rotation event."""
 
-    dial: int
+    encoder: int
     direction: int  # positive = clockwise, negative = counter-clockwise
 
 
 @dataclass(frozen=True, slots=True)
-class DialPressEvent:
-    """A dial push/release event."""
+class EncoderPressEvent:
+    """An encoder push/release event."""
 
-    dial: int
+    encoder: int
     pressed: bool
 
 
@@ -64,4 +64,4 @@ class TouchEvent:
         return max(0, min(zone, 3))
 
 
-DeckEvent = KeyEvent | DialTurnEvent | DialPressEvent | TouchEvent
+DeckEvent = KeyEvent | EncoderTurnEvent | EncoderPressEvent | TouchEvent

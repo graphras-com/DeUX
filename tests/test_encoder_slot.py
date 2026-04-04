@@ -1,70 +1,70 @@
-"""Tests for deckboard.ui.controls.encoder_slot — EncoderSlot (Dial) class."""
+"""Tests for deckboard.ui.controls.encoder_slot — EncoderSlot class."""
 
 from __future__ import annotations
 
-from deckboard.ui.controls.encoder_slot import Dial, EncoderSlot
+from deckboard.ui.controls.encoder_slot import EncoderSlot
 
 
-class TestDialInit:
-    def test_index(self, dial: Dial):
-        assert dial.index == 0
+class TestEncoderSlotInit:
+    def test_index(self, encoder: EncoderSlot):
+        assert encoder.index == 0
 
-    def test_no_handlers_by_default(self, dial: Dial):
-        assert dial._turn_handler is None
-        assert dial._press_handler is None
-        assert dial._release_handler is None
+    def test_no_handlers_by_default(self, encoder: EncoderSlot):
+        assert encoder._turn_handler is None
+        assert encoder._press_handler is None
+        assert encoder._release_handler is None
 
     def test_custom_index(self):
-        d = Dial(3)
-        assert d.index == 3
+        e = EncoderSlot(3)
+        assert e.index == 3
 
 
-class TestDialOnTurn:
-    def test_registers_handler(self, dial: Dial):
+class TestEncoderSlotOnTurn:
+    def test_registers_handler(self, encoder: EncoderSlot):
         async def handler(direction: int):
             pass
 
-        result = dial.on_turn(handler)
-        assert dial._turn_handler is handler
+        result = encoder.on_turn(handler)
+        assert encoder._turn_handler is handler
         assert result is handler
 
-    def test_as_decorator(self, dial: Dial):
-        @dial.on_turn
+    def test_as_decorator(self, encoder: EncoderSlot):
+        @encoder.on_turn
         async def handler(direction: int):
             pass
 
-        assert dial._turn_handler is handler
+        assert encoder._turn_handler is handler
 
 
-class TestDialOnPress:
-    def test_registers_handler(self, dial: Dial):
+class TestEncoderSlotOnPress:
+    def test_registers_handler(self, encoder: EncoderSlot):
         async def handler():
             pass
 
-        result = dial.on_press(handler)
-        assert dial._press_handler is handler
+        result = encoder.on_press(handler)
+        assert encoder._press_handler is handler
         assert result is handler
 
-    def test_as_decorator(self, dial: Dial):
-        @dial.on_press
+    def test_as_decorator(self, encoder: EncoderSlot):
+        @encoder.on_press
         async def handler():
             pass
 
-        assert dial._press_handler is handler
+        assert encoder._press_handler is handler
 
 
-class TestDialOnRelease:
-    def test_registers_handler(self, dial: Dial):
+class TestEncoderSlotOnRelease:
+    def test_registers_handler(self, encoder: EncoderSlot):
         async def handler():
             pass
 
-        result = dial.on_release(handler)
-        assert dial._release_handler is handler
+        result = encoder.on_release(handler)
+        assert encoder._release_handler is handler
         assert result is handler
 
-    def test_as_decorator(self, dial: Dial):
-        @dial.on_release
+    def test_as_decorator(self, encoder: EncoderSlot):
+        @encoder.on_release
         async def handler():
             pass
 
-        assert dial._release_handler is handler
+        assert encoder._release_handler is handler

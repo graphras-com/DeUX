@@ -41,7 +41,7 @@ src/deckboard/              # Library source
     __init__.py             # Re-exports: Deck, DeckError, DeviceInfo, event types, Transport
     deck.py                 # Main Deck class — entry point, event loop, rendering
     device_info.py          # DeviceInfo dataclass
-    events.py               # Event dataclasses (KeyEvent, DialTurnEvent, etc.), EventType enum, type aliases
+    events.py               # Event dataclasses (KeyEvent, EncoderTurnEvent, etc.), EventType enum, type aliases
     transport.py            # Async bridge for HID callbacks (sync thread → asyncio queue)
 
   render/                   # Image rendering, fonts, icons
@@ -67,8 +67,8 @@ src/deckboard/              # Library source
     controls/               # Interactive controls bound to physical inputs
       __init__.py           # Re-exports all control types
       base.py               # Control ABC — abstract base for controls
-      key_slot.py           # KeySlot class (+ Button alias) — wraps a physical key (0-7)
-      encoder_slot.py       # EncoderSlot class (+ Dial alias) — wraps a rotary encoder (0-3)
+      key_slot.py           # KeySlot class — wraps a physical key (0-7)
+      encoder_slot.py       # EncoderSlot class — wraps a rotary encoder (0-3)
       range_control.py      # RangeControl/Slider/LargeSlider/SmallSlider hierarchy
       volume.py             # VolumeSlider
       brightness.py         # BrightnessSlider
@@ -101,16 +101,16 @@ tests/                      # One test file per source module
 
 The canonical class names reflect their hardware role:
 
-| Canonical name   | Backward-compatible alias | Module                          |
-|------------------|---------------------------|---------------------------------|
-| `KeySlot`        | `Button`                  | `ui.controls.key_slot`          |
-| `EncoderSlot`    | `Dial`                    | `ui.controls.encoder_slot`      |
-| `RangeControl`   | `Slider`                  | `ui.controls.range_control`     |
-| `Screen`         | —                         | `ui.screen` (was `Page`)        |
-| `Card`           | —                         | `ui.cards.base` (was `Widget`)  |
-| `TouchStrip`     | —                         | `ui.touch_strip` (was `TouchScreen`) |
+| Class name       | Module                          |
+|------------------|---------------------------------|
+| `KeySlot`        | `ui.controls.key_slot`          |
+| `EncoderSlot`    | `ui.controls.encoder_slot`      |
+| `RangeControl`   | `ui.controls.range_control`     |
+| `Screen`         | `ui.screen` (was `Page`)        |
+| `Card`           | `ui.cards.base` (was `Widget`)  |
+| `TouchStrip`     | `ui.touch_strip` (was `TouchScreen`) |
 
-Both canonical names and aliases are exported from `deckboard.__init__`.
+All classes are exported from `deckboard.__init__`. There are no backward-compatible aliases.
 
 ## Build / lint / test commands
 
@@ -195,8 +195,8 @@ if TYPE_CHECKING:
 ### Patterns used throughout
 
 - **Async context manager** for resource lifecycle (`Deck.__aenter__`/`__aexit__`).
-- **Decorator-based event registration** — `@button.on_press`, `@dial.on_turn`.
-- **Method chaining** — mutators return `self` (e.g., `button.set_icon(...).set_label(...)`).
+- **Decorator-based event registration** — `@key.on_press`, `@encoder.on_turn`.
+- **Method chaining** — mutators return `self` (e.g., `key.set_icon(...).set_label(...)`).
 - **Dirty tracking** — `is_dirty` / `mark_clean()` / `mark_dirty()` on cards and key slots.
 - **Abstract base classes** — `Card(ABC)` with `@abstractmethod render()`.
 - **Thread-safe bridge** — `runtime/transport.py` uses `loop.call_soon_threadsafe()` to enqueue events from the HID reader thread.
