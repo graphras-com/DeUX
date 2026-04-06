@@ -210,16 +210,20 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def _find_and_open_device() -> object:
-    """Discover, open, and return the first Stream Deck+ device."""
+    """Discover, open, and return the first Stream Deck+ device.
+
+    Prints an error and exits if no device is found.
+    """
     from StreamDeck.DeviceManager import DeviceManager  # type: ignore[import-untyped]
 
     devices = DeviceManager().enumerate()
     if not devices:
-        logger.error("No Stream Deck devices found")
+        print("ERROR: No Stream Deck devices found", file=sys.stderr)  # noqa: T201
         sys.exit(1)
 
     deck = devices[0]
     deck.open()
+    logger.debug("Opened device: %s", deck.deck_type())
     return deck
 
 
@@ -256,7 +260,7 @@ async def push_to_device(
             TOUCHSCREEN_HEIGHT,
         )
 
-        logger.info("Preview pushed — press Ctrl+C to exit")
+        print("Preview pushed — press Ctrl+C to exit", file=sys.stderr)  # noqa: T201
         await loop.run_in_executor(None, _wait_forever)
     except KeyboardInterrupt:
         pass
@@ -290,21 +294,25 @@ def render_preview(
         svg_path: Path | None = getattr(args, f"key{i}", None)
         if svg_path is not None:
             if not svg_path.exists():
-                logger.error("Key SVG not found: %s", svg_path)
+                print(f"ERROR: Key SVG not found: {svg_path}", file=sys.stderr)  # noqa: T201
                 sys.exit(1)
             img = load_svg(svg_path, ICON_SIZE, ICON_SIZE)
             key_images[i] = compose_key_image(img)
-            logger.debug("Rendered key %d from %s", i, svg_path)
+            logger.info(
+                "Rendered key %d from %s (%dx%d)", i, svg_path, img.width, img.height
+            )
 
     for i in range(PANEL_COUNT):
         svg_path = getattr(args, f"card{i}", None)
         if svg_path is not None:
             if not svg_path.exists():
-                logger.error("Card SVG not found: %s", svg_path)
+                print(f"ERROR: Card SVG not found: {svg_path}", file=sys.stderr)  # noqa: T201
                 sys.exit(1)
             img = load_svg(svg_path, PANEL_WIDTH, PANEL_HEIGHT)
             card_images[i] = compose_card_image(img)
-            logger.debug("Rendered card %d from %s", i, svg_path)
+            logger.info(
+                "Rendered card %d from %s (%dx%d)", i, svg_path, img.width, img.height
+            )
 
     touchstrip_bytes = compose_touchstrip(card_images)
     return key_images, touchstrip_bytes
@@ -319,3 +327,7 @@ def main(argv: list[str] | None = None) -> None:
 
     key_images, touchstrip_bytes = render_preview(args)
     asyncio.run(push_to_device(key_images, touchstrip_bytes))
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()

@@ -290,15 +290,21 @@ class TestRenderPreview:
         assert 3 in key_images
         assert isinstance(touchstrip, bytes)
 
-    def test_missing_key_svg_exits(self, tmp_path: Path):
+    def test_missing_key_svg_exits(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ):
         args = parse_args(["--key0", str(tmp_path / "nonexistent.svg")])
         with pytest.raises(SystemExit):
             render_preview(args)
+        assert "Key SVG not found" in capsys.readouterr().err
 
-    def test_missing_card_svg_exits(self, tmp_path: Path):
+    def test_missing_card_svg_exits(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ):
         args = parse_args(["--card0", str(tmp_path / "nonexistent.svg")])
         with pytest.raises(SystemExit):
             render_preview(args)
+        assert "Card SVG not found" in capsys.readouterr().err
 
 
 # -- main / push_to_device ---------------------------------------------------
@@ -423,7 +429,7 @@ class TestSvgToPngFit:
 
 
 class TestFindAndOpenDevice:
-    def test_no_devices_exits(self):
+    def test_no_devices_exits(self, capsys: pytest.CaptureFixture[str]):
         from deckboard.tools.preview import _find_and_open_device
 
         mock_dm = MagicMock()
@@ -434,6 +440,7 @@ class TestFindAndOpenDevice:
         ):
             with pytest.raises(SystemExit):
                 _find_and_open_device()
+        assert "No Stream Deck devices found" in capsys.readouterr().err
 
     def test_opens_first_device(self):
         from deckboard.tools.preview import _find_and_open_device
