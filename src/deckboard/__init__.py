@@ -22,7 +22,7 @@ Example::
 
 from __future__ import annotations
 
-from .presets import EqualizerCard, LightCard, MediaCard
+from .presets import EqualizerCard, HaMediaCard, LightCard, MediaCard
 from .render import IconError, IconManager
 from .runtime import (
     Deck,
@@ -77,6 +77,7 @@ __all__ = [
     "EqualizerCard",
     "EqualizerSlider",
     "EventType",
+    "HaMediaCard",
     "IconError",
     "IconManager",
     "KelvinSlider",
