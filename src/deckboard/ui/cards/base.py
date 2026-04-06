@@ -51,9 +51,11 @@ class Card(ABC):
         self._drag_handler: AsyncHandler | None = None
         self._encoder_turn_handler: AsyncHandler | None = None
         self._encoder_press_handler: AsyncHandler | None = None
+        self._encoder_release_handler: AsyncHandler | None = None
         self._pending_callbacks: list[tuple[AsyncHandler, tuple[float]]] = []
         self._rendered: Image.Image | None = None
         self._dirty = True
+        self._request_refresh: AsyncHandler | None = None
 
     @property
     def index(self) -> int:
@@ -127,6 +129,38 @@ class Card(ABC):
         self._encoder_press_handler = handler
         return handler
 
+    def on_encoder_release(self, handler: AsyncHandler) -> AsyncHandler:
+        """Decorator to register a handler for encoder release events on this widget.
+
+        Usage::
+
+            @widget.on_encoder_release
+            async def handle():
+                ...
+        """
+        self._encoder_release_handler = handler
+        return handler
+
+    # -- Refresh callback (set by Deck) ------------------------------------
+
+    def set_refresh_callback(self, callback: AsyncHandler) -> None:
+        """Register an async callback the card can invoke to request a refresh.
+
+        This is set automatically by :class:`~deckboard.runtime.deck.Deck`
+        when dispatching events so that cards with internal timers (e.g.
+        long-press detection) can trigger a re-render without a direct
+        reference to the deck.
+        """
+        self._request_refresh = callback
+
+    async def request_refresh(self) -> None:
+        """Ask the deck to re-render this card.
+
+        No-op if no refresh callback has been registered.
+        """
+        if self._request_refresh is not None:
+            await self._request_refresh()
+
     # -- Pending callbacks (deferred async invocation) ---------------------
 
     def queue_pending_callback(self, handler: AsyncHandler, args: tuple[float]) -> None:
@@ -189,6 +223,12 @@ class Card(ABC):
             await self._encoder_press_handler()
         self.handle_encoder_press()
 
+    async def dispatch_encoder_release(self) -> None:
+        """Dispatch an encoder-release event to the card."""
+        if self._encoder_release_handler is not None:
+            await self._encoder_release_handler()
+        self.handle_encoder_release()
+
     async def dispatch_touch(self, event: TouchEvent) -> None:
         """Dispatch a touch gesture to the card."""
         if event.event_type == EventType.TOUCH_SHORT:
@@ -224,6 +264,12 @@ class Card(ABC):
         """Called when the encoder above this widget is pressed.
 
         Override to handle encoder presses.  The default is a no-op.
+        """
+
+    def handle_encoder_release(self) -> None:
+        """Called when the encoder above this widget is released.
+
+        Override to handle encoder releases.  The default is a no-op.
         """
 
     def check_selection_timeout(self) -> bool:

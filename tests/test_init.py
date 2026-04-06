@@ -26,6 +26,7 @@ class TestPublicAPI:
             "EqualizerCard",
             "EqualizerSlider",
             "EventType",
+            "HaMediaCard",
             "IconError",
             "IconManager",
             "KelvinSlider",
@@ -159,8 +160,9 @@ class TestPublicAPI:
         assert TouchStrip is not None
 
     def test_preset_cards_importable(self):
-        from deckboard import EqualizerCard, LightCard, MediaCard
+        from deckboard import EqualizerCard, HaMediaCard, LightCard, MediaCard
 
         assert EqualizerCard is not None
+        assert HaMediaCard is not None
         assert LightCard is not None
         assert MediaCard is not None

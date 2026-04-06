@@ -484,12 +484,15 @@ class Deck:
             encoder = screen.encoders.get(event.encoder)
             if encoder:
                 await encoder.dispatch_press(event.pressed)
+            card = screen.touch_strip.card(event.encoder)
+            card.set_refresh_callback(self.refresh)
             if event.pressed:
-                card = screen.touch_strip.card(event.encoder)
                 await card.dispatch_encoder_press()
-                await self._drain_card_callbacks(card)
-                if card.is_dirty:
-                    await self.refresh()
+            else:
+                await card.dispatch_encoder_release()
+            await self._drain_card_callbacks(card)
+            if card.is_dirty:
+                await self.refresh()
 
         elif isinstance(event, TouchEvent):
             zone = event.zone
