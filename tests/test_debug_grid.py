@@ -85,12 +85,14 @@ class TestDrawTouchscreenGrid:
         result = draw_touchscreen_grid(img)
 
         # Pixels outside the margin rectangle should remain black
-        # Above the top margin on the left margin column
-        assert result.getpixel((MARGIN_LEFT, 0)) == (0, 0, 0)
+        if MARGIN_TOP > 0:
+            # Above the top margin on the left margin column
+            assert result.getpixel((MARGIN_LEFT, 0)) == (0, 0, 0)
         # Below the bottom margin on the left margin column
         assert result.getpixel((MARGIN_LEFT, TOUCHSCREEN_HEIGHT - 1)) == (0, 0, 0)
-        # Left of the left margin on the top margin row
-        assert result.getpixel((0, MARGIN_TOP)) == (0, 0, 0)
+        if MARGIN_LEFT > 1:
+            # Left of the left margin on the top margin row
+            assert result.getpixel((0, MARGIN_TOP)) == (0, 0, 0)
         # Right of the right margin on the top margin row
         assert result.getpixel((TOUCHSCREEN_WIDTH - 1, MARGIN_TOP)) == (0, 0, 0)
 
@@ -106,7 +108,7 @@ class TestDrawTouchscreenGrid:
         usable_w = right - left
         usable_h = bottom - top
 
-        # Vertical grid line at column 2 (midpoint of 4 columns)
+        # Vertical grid line at column 2
         col_step = usable_w / _GRID_COLS
         x = round(left + 2 * col_step)
         mid_y = (top + bottom) // 2
@@ -135,8 +137,9 @@ class TestDrawTouchscreenGrid:
         col_step = usable_w / _GRID_COLS
         x = round(left + 1 * col_step)
 
-        # The pixel above the top margin on that column should be black
-        assert result.getpixel((x, 0)) == (0, 0, 0)
+        if MARGIN_TOP > 0:
+            # The pixel above the top margin on that column should be black
+            assert result.getpixel((x, 0)) == (0, 0, 0)
         # The pixel below the bottom margin on that column should be black
         assert result.getpixel((x, TOUCHSCREEN_HEIGHT - 1)) == (0, 0, 0)
 

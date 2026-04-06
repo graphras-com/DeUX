@@ -22,8 +22,8 @@ class Card(ABC):
 
     The Stream Deck+ touchscreen (800x100) is divided into 4 zones,
     each aligned with one of the 4 encoders.  A margin is applied around
-    the usable area (top=4, bottom=18, left=4, right=4) and widgets
-    are separated by a 4px gap, giving each zone 195x78 usable pixels.
+    the usable area (top=0, bottom=2, left=2, right=2) and cards
+    are separated by a 2px gap, giving each zone 197x98 usable pixels.
 
     Subclass this to build custom widgets.  At minimum, implement
     :meth:`render`.  Override the ``handle_encoder_*`` and

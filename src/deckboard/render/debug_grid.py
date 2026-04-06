@@ -13,8 +13,8 @@ from .metrics import (
     TOUCHSCREEN_WIDTH,
 )
 
-# Grid density: 4 columns x 4 rows within the usable (margin-bounded) area.
-_GRID_COLS = 4
+# Grid density: 32 columns x 4 rows within the usable (margin-bounded) area.
+_GRID_COLS = 32
 _GRID_ROWS = 4
 
 # Colours — margin lines are brighter so they stand out.
@@ -23,7 +23,7 @@ _GRID_COLOR = (50, 50, 50)  # subtle dark grey for inner grid lines
 
 
 def draw_touchscreen_grid(img: Image.Image) -> Image.Image:
-    """Draw a 4x4 debug grid within the margin boundaries of a touchscreen image.
+    """Draw a 32x4 debug grid within the margin boundaries of a touchscreen image.
 
     Margin boundaries (top/bottom/left/right) are drawn with a
     brighter line so they are easy to distinguish from the evenly

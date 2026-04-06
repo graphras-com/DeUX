@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 class StatusCard(Card):
     """A card displaying an icon, label, and value in the classic layout.
 
-    Layout (195x86):
+    Layout (197x98):
       - Left side: 55x55 icon (centered vertically, 8px from left)
       - Right side: label on top, value below
 
