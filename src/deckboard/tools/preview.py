@@ -193,6 +193,14 @@ def build_parser() -> argparse.ArgumentParser:
             help=f"SVG file for card slot {i}",
         )
     parser.add_argument(
+        "-b",
+        "--brightness",
+        type=int,
+        default=80,
+        metavar="PCT",
+        help="Screen brightness 0-100 (default: 80)",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -230,16 +238,25 @@ def _find_and_open_device() -> object:
 async def push_to_device(
     key_images: dict[int, bytes],
     touchstrip_bytes: bytes,
+    brightness: int = 80,
 ) -> None:
     """Push rendered images to the physical Stream Deck+.
 
     *key_images* maps key indices to JPEG bytes.  *touchstrip_bytes* is
-    the full 800x100 touchscreen JPEG.
+    the full 800x100 touchscreen JPEG.  *brightness* sets the screen
+    brightness (0-100).
     """
     loop = asyncio.get_running_loop()
     deck = await loop.run_in_executor(None, _find_and_open_device)
 
     try:
+        brightness = max(0, min(100, brightness))
+        await loop.run_in_executor(
+            None,
+            deck.set_brightness,
+            brightness,  # type: ignore[union-attr]
+        )
+
         for key_index in range(_KEY_COUNT):
             jpeg = key_images.get(key_index)
             if jpeg is not None:
@@ -326,7 +343,7 @@ def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
 
     key_images, touchstrip_bytes = render_preview(args)
-    asyncio.run(push_to_device(key_images, touchstrip_bytes))
+    asyncio.run(push_to_device(key_images, touchstrip_bytes, args.brightness))
 
 
 if __name__ == "__main__":  # pragma: no cover

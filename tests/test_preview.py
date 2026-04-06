@@ -240,6 +240,18 @@ class TestParser:
         for i in range(PANEL_COUNT):
             assert getattr(args, f"card{i}") == tmp_path / f"c{i}.svg"
 
+    def test_brightness_default(self):
+        args = parse_args([])
+        assert args.brightness == 80
+
+    def test_brightness_custom(self):
+        args = parse_args(["--brightness", "50"])
+        assert args.brightness == 50
+
+    def test_brightness_short(self):
+        args = parse_args(["-b", "30"])
+        assert args.brightness == 30
+
     def test_verbose_flag(self):
         args = parse_args(["-v"])
         assert args.verbose is True
@@ -315,14 +327,22 @@ class TestMain:
     def test_main_calls_push(self, mock_push: AsyncMock, square_svg: Path):
         main(["--key0", str(square_svg)])
         mock_push.assert_awaited_once()
-        key_images, touchstrip = mock_push.call_args[0]
+        key_images, touchstrip, brightness = mock_push.call_args[0]
         assert 0 in key_images
         assert isinstance(touchstrip, bytes)
+        assert brightness == 80
 
     @patch("deckboard.tools.preview.push_to_device", new_callable=AsyncMock)
-    def test_main_no_args(self, mock_push: AsyncMock):
+    def test_main_default_brightness(self, mock_push: AsyncMock):
         main([])
-        mock_push.assert_awaited_once()
+        _, _, brightness = mock_push.call_args[0]
+        assert brightness == 80
+
+    @patch("deckboard.tools.preview.push_to_device", new_callable=AsyncMock)
+    def test_main_custom_brightness(self, mock_push: AsyncMock):
+        main(["--brightness", "40"])
+        _, _, brightness = mock_push.call_args[0]
+        assert brightness == 40
 
     @patch("deckboard.tools.preview.push_to_device", new_callable=AsyncMock)
     def test_main_verbose(self, mock_push: AsyncMock):
@@ -363,8 +383,9 @@ class TestPushToDevice:
                 )
                 mock_loop.return_value = loop_instance
 
-                await push_to_device({0: key_jpeg}, ts_jpeg)
+                await push_to_device({0: key_jpeg}, ts_jpeg, brightness=60)
 
+        mock_streamdeck_device.set_brightness.assert_called_once_with(60)
         mock_streamdeck_device.set_key_image.assert_called_once_with(0, key_jpeg)
         mock_streamdeck_device.set_touchscreen_image.assert_called_once_with(
             ts_jpeg,
@@ -375,6 +396,36 @@ class TestPushToDevice:
         )
         mock_streamdeck_device.reset.assert_called_once()
         mock_streamdeck_device.close.assert_called_once()
+
+    async def test_brightness_clamped(self, mock_streamdeck_device: MagicMock):
+        """Values outside 0-100 are clamped."""
+        from deckboard.tools.preview import _wait_forever, push_to_device
+
+        blank_ts = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), "black")
+        buf = io.BytesIO()
+        blank_ts.save(buf, format="JPEG")
+        ts_jpeg = buf.getvalue()
+
+        with patch(
+            "deckboard.tools.preview._find_and_open_device",
+            return_value=mock_streamdeck_device,
+        ):
+
+            async def mock_executor(executor, fn, *args):
+                if fn is _wait_forever:
+                    raise KeyboardInterrupt
+                return fn(*args)
+
+            with patch("asyncio.get_running_loop") as mock_loop:
+                loop_instance = MagicMock()
+                loop_instance.run_in_executor = AsyncMock(
+                    side_effect=mock_executor,
+                )
+                mock_loop.return_value = loop_instance
+
+                await push_to_device({}, ts_jpeg, brightness=150)
+
+        mock_streamdeck_device.set_brightness.assert_called_once_with(100)
 
 
 # -- _svg_to_png_fit ---------------------------------------------------------
