@@ -62,7 +62,7 @@ def compose_touchstrip(
 
     Args:
         cards: Up to 4 card images (or ``None`` for blank slots).
-        debug_grid: When ``True``, overlay a 10x10 alignment grid.
+        debug_grid: When ``True``, overlay a 32x4 alignment grid.
     """
     img = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), "black")
 
