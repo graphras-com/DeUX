@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import io
+import os
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -352,7 +354,7 @@ class TestMain:
 
 class TestPushToDevice:
     async def test_push_opens_and_pushes(self, mock_streamdeck_device: MagicMock):
-        from deckboard.tools.preview import _wait_forever, push_to_device
+        from deckboard.tools.preview import push_to_device
 
         # Create minimal key image and touchstrip
         blank_key = Image.new("RGB", KEY_SIZE, "black")
@@ -365,25 +367,17 @@ class TestPushToDevice:
         blank_ts.save(buf2, format="JPEG")
         ts_jpeg = buf2.getvalue()
 
-        with patch(
-            "deckboard.tools.preview._find_and_open_device",
-            return_value=mock_streamdeck_device,
+        with (
+            patch(
+                "deckboard.tools.preview._find_and_open_device",
+                return_value=mock_streamdeck_device,
+            ),
+            patch(
+                "deckboard.tools.preview._wait_for_interrupt",
+                new_callable=AsyncMock,
+            ),
         ):
-
-            async def mock_executor(executor, fn, *args):
-                # Let device calls through, interrupt on _wait_forever
-                if fn is _wait_forever:
-                    raise KeyboardInterrupt
-                return fn(*args)
-
-            with patch("asyncio.get_running_loop") as mock_loop:
-                loop_instance = MagicMock()
-                loop_instance.run_in_executor = AsyncMock(
-                    side_effect=mock_executor,
-                )
-                mock_loop.return_value = loop_instance
-
-                await push_to_device({0: key_jpeg}, ts_jpeg, brightness=60)
+            await push_to_device({0: key_jpeg}, ts_jpeg, brightness=60)
 
         mock_streamdeck_device.set_brightness.assert_called_once_with(60)
         mock_streamdeck_device.set_key_image.assert_called_once_with(0, key_jpeg)
@@ -399,33 +393,57 @@ class TestPushToDevice:
 
     async def test_brightness_clamped(self, mock_streamdeck_device: MagicMock):
         """Values outside 0-100 are clamped."""
-        from deckboard.tools.preview import _wait_forever, push_to_device
+        from deckboard.tools.preview import push_to_device
 
         blank_ts = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), "black")
         buf = io.BytesIO()
         blank_ts.save(buf, format="JPEG")
         ts_jpeg = buf.getvalue()
 
-        with patch(
-            "deckboard.tools.preview._find_and_open_device",
-            return_value=mock_streamdeck_device,
+        with (
+            patch(
+                "deckboard.tools.preview._find_and_open_device",
+                return_value=mock_streamdeck_device,
+            ),
+            patch(
+                "deckboard.tools.preview._wait_for_interrupt",
+                new_callable=AsyncMock,
+            ),
         ):
-
-            async def mock_executor(executor, fn, *args):
-                if fn is _wait_forever:
-                    raise KeyboardInterrupt
-                return fn(*args)
-
-            with patch("asyncio.get_running_loop") as mock_loop:
-                loop_instance = MagicMock()
-                loop_instance.run_in_executor = AsyncMock(
-                    side_effect=mock_executor,
-                )
-                mock_loop.return_value = loop_instance
-
-                await push_to_device({}, ts_jpeg, brightness=150)
+            await push_to_device({}, ts_jpeg, brightness=150)
 
         mock_streamdeck_device.set_brightness.assert_called_once_with(100)
+
+
+# -- _wait_for_interrupt ------------------------------------------------------
+
+
+class TestWaitForInterrupt:
+    async def test_returns_on_sigint(self):
+        """The coroutine completes when SIGINT is delivered."""
+        import signal
+
+        from deckboard.tools.preview import _wait_for_interrupt
+
+        loop = asyncio.get_running_loop()
+
+        # Schedule SIGINT delivery shortly after the wait starts.
+        loop.call_later(0.05, os.kill, os.getpid(), signal.SIGINT)
+        await asyncio.wait_for(_wait_for_interrupt(), timeout=1.0)
+
+    async def test_signal_handler_removed_after_return(self):
+        """The SIGINT handler is cleaned up after _wait_for_interrupt returns."""
+        import signal
+
+        from deckboard.tools.preview import _wait_for_interrupt
+
+        loop = asyncio.get_running_loop()
+        loop.call_later(0.05, os.kill, os.getpid(), signal.SIGINT)
+        await asyncio.wait_for(_wait_for_interrupt(), timeout=1.0)
+
+        # After returning, the default handler should be restored, meaning
+        # remove_signal_handler returns False (nothing left to remove).
+        assert loop.remove_signal_handler(signal.SIGINT) is False
 
 
 # -- _svg_to_png_fit ---------------------------------------------------------

@@ -18,6 +18,7 @@ import io
 import logging
 import os
 import platform
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -278,20 +279,25 @@ async def push_to_device(
         )
 
         print("Preview pushed — press Ctrl+C to exit", file=sys.stderr)  # noqa: T201
-        await loop.run_in_executor(None, _wait_forever)
-    except KeyboardInterrupt:
-        pass
+        await _wait_for_interrupt()
     finally:
         await loop.run_in_executor(None, deck.reset)  # type: ignore[union-attr]
         await loop.run_in_executor(None, deck.close)  # type: ignore[union-attr]
 
 
-def _wait_forever() -> None:  # pragma: no cover
-    """Block until interrupted (runs in executor thread)."""
-    import threading
+async def _wait_for_interrupt() -> None:
+    """Wait until the process receives SIGINT (Ctrl+C).
 
-    evt = threading.Event()
-    evt.wait()
+    Uses an :class:`asyncio.Event` set by a signal handler so the event
+    loop stays responsive and shuts down cleanly on the first Ctrl+C.
+    """
+    loop = asyncio.get_running_loop()
+    stop = asyncio.Event()
+    loop.add_signal_handler(signal.SIGINT, stop.set)
+    try:
+        await stop.wait()
+    finally:
+        loop.remove_signal_handler(signal.SIGINT)
 
 
 # -- Orchestration ------------------------------------------------------------
