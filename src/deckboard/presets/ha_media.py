@@ -37,7 +37,7 @@ _MUTE_ICON_COLOR = "#ffffff"
 
 _MUTE_ICON_SIZE = 16
 _MUTE_ICON_RIGHT_MARGIN = 5
-_MUTE_ICON_Y = 66
+_MUTE_ICON_Y = 70
 _STATE_TEXT_Y = 52
 
 # ── Gradient mask (pre-built once) ───────────────────────────────────────
