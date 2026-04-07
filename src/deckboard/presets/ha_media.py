@@ -314,12 +314,16 @@ class HaMediaCard(Card):
         Overrides :meth:`Card.dispatch_encoder_press` to defer the
         short-press action (mute/unmute) until release, so the card
         can distinguish between a short press and a long hold.
+
+        The internal state change (starting the timer) happens *before*
+        the user handler so that any callback registered via
+        :meth:`~Card.on_encoder_press` sees up-to-date state.
         """
-        if self._encoder_press_handler is not None:
-            await self._encoder_press_handler()
         self._long_press_fired = False
         self._cancel_long_press()
         self._long_press_task = asyncio.ensure_future(self._long_press_timer())
+        if self._encoder_press_handler is not None:
+            await self._encoder_press_handler()
 
     async def dispatch_encoder_release(self) -> None:
         """Handle encoder release: mute/unmute if short, no-op if long.
@@ -328,12 +332,16 @@ class HaMediaCard(Card):
         long-press timer already fired, the release is a no-op (the
         play/pause toggle has already happened).  Otherwise the timer
         is cancelled and mute/unmute is toggled.
+
+        The internal state change (toggle mute) happens *before* the
+        user handler so that any callback registered via
+        :meth:`~Card.on_encoder_release` sees up-to-date state.
         """
-        if self._encoder_release_handler is not None:
-            await self._encoder_release_handler()
         self._cancel_long_press()
         if not self._long_press_fired:
             self.toggle_mute()
+        if self._encoder_release_handler is not None:
+            await self._encoder_release_handler()
 
     # ── Rendering ─────────────────────────────────────────────────────
 
