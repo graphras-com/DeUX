@@ -91,29 +91,6 @@ class TestEqualizerWidgetMinMax:
         w.sub.set_range(10, 90)
         assert w.is_dirty is True
 
-    def test_set_eq_range(self):
-        w = EqualizerCard(0, sub=50, bass=50, treble=50)
-        w.set_eq_range(10, 90)
-        assert w.sub.min_value == 10
-        assert w.sub.max_value == 90
-        assert w.bass.min_value == 10
-        assert w.bass.max_value == 90
-        assert w.treble.min_value == 10
-        assert w.treble.max_value == 90
-
-    def test_set_eq_range_clamps_values(self):
-        w = EqualizerCard(0, sub=5, bass=95, treble=50)
-        w.set_eq_range(20, 80)
-        assert w.sub.value == 20
-        assert w.bass.value == 80
-        assert w.treble.value == 50
-
-    def test_set_eq_range_marks_dirty(self):
-        w = EqualizerCard(0, sub=50)
-        w.mark_clean()
-        w.set_eq_range(10, 90)
-        assert w.is_dirty is True
-
     def test_set_balance_range(self):
         w = EqualizerCard(0, balance=50)
         w.set_balance_range(20, 80)
@@ -130,6 +107,112 @@ class TestEqualizerWidgetMinMax:
         w.mark_clean()
         w.set_balance_range(20, 80)
         assert w.is_dirty is True
+
+    # -- Per-band constructor params ---------------------------------------
+
+    def test_per_band_min_max_overrides_eq(self):
+        w = EqualizerCard(
+            0,
+            eq_min=0,
+            eq_max=100,
+            sub_min=10,
+            sub_max=90,
+            bass_min=20,
+            bass_max=80,
+            treble_min=30,
+            treble_max=70,
+        )
+        assert w.sub.min_value == 10
+        assert w.sub.max_value == 90
+        assert w.bass.min_value == 20
+        assert w.bass.max_value == 80
+        assert w.treble.min_value == 30
+        assert w.treble.max_value == 70
+
+    def test_per_band_falls_back_to_eq(self):
+        w = EqualizerCard(0, eq_min=5, eq_max=95, sub_min=10)
+        assert w.sub.min_value == 10
+        assert w.sub.max_value == 95  # falls back to eq_max
+        assert w.bass.min_value == 5  # falls back to eq_min
+        assert w.bass.max_value == 95
+
+    def test_per_band_clamps_value(self):
+        w = EqualizerCard(0, sub=50, sub_min=60, sub_max=100)
+        assert w.sub.value == 60
+
+    # -- Per-band setters --------------------------------------------------
+
+    def test_set_sub_range(self):
+        w = EqualizerCard(0, sub=50)
+        w.set_sub_range(10, 80)
+        assert w.sub.min_value == 10
+        assert w.sub.max_value == 80
+        # bass/treble unchanged
+        assert w.bass.min_value == 0
+        assert w.bass.max_value == 100
+
+    def test_set_sub_range_clamps_value(self):
+        w = EqualizerCard(0, sub=90)
+        w.set_sub_range(0, 70)
+        assert w.sub.value == 70
+
+    def test_set_sub_range_marks_dirty(self):
+        w = EqualizerCard(0, sub=50)
+        w.mark_clean()
+        w.set_sub_range(10, 90)
+        assert w.is_dirty is True
+
+    def test_set_bass_range(self):
+        w = EqualizerCard(0, bass=50)
+        w.set_bass_range(20, 70)
+        assert w.bass.min_value == 20
+        assert w.bass.max_value == 70
+        # sub/treble unchanged
+        assert w.sub.min_value == 0
+        assert w.sub.max_value == 100
+
+    def test_set_bass_range_clamps_value(self):
+        w = EqualizerCard(0, bass=5)
+        w.set_bass_range(10, 90)
+        assert w.bass.value == 10
+
+    def test_set_bass_range_marks_dirty(self):
+        w = EqualizerCard(0, bass=50)
+        w.mark_clean()
+        w.set_bass_range(10, 90)
+        assert w.is_dirty is True
+
+    def test_set_treble_range(self):
+        w = EqualizerCard(0, treble=50)
+        w.set_treble_range(15, 85)
+        assert w.treble.min_value == 15
+        assert w.treble.max_value == 85
+        # sub/bass unchanged
+        assert w.sub.min_value == 0
+        assert w.sub.max_value == 100
+
+    def test_set_treble_range_clamps_value(self):
+        w = EqualizerCard(0, treble=95)
+        w.set_treble_range(0, 80)
+        assert w.treble.value == 80
+
+    def test_set_treble_range_marks_dirty(self):
+        w = EqualizerCard(0, treble=50)
+        w.mark_clean()
+        w.set_treble_range(10, 90)
+        assert w.is_dirty is True
+
+    def test_per_band_setters_independent(self):
+        w = EqualizerCard(0, sub=50, bass=50, treble=50)
+        w.set_sub_range(10, 60)
+        w.set_bass_range(20, 70)
+        w.set_treble_range(30, 80)
+        assert w.sub.min_value == 10
+        assert w.sub.max_value == 60
+        assert w.bass.min_value == 20
+        assert w.bass.max_value == 70
+        assert w.treble.min_value == 30
+        assert w.treble.max_value == 80
 
 
 class TestEqualizerWidgetAccessors:
