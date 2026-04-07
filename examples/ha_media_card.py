@@ -4,12 +4,16 @@
 Shows how ``HaMediaCard`` renders a media player panel with album art,
 artist/title text, playback state, and a volume bar.
 
-Encoder interaction is handled automatically by the card:
+Encoder gestures emit intent callbacks — the card does **not** update
+its own display state.  This example simulates a backend by applying
+the requested changes immediately, but in a real integration you would
+call Home Assistant first and then update the card with the confirmed
+state.
 
-* **Turn** — adjust volume.
-* **Short press** (press and release quickly) — toggle mute/unmute.
-* **Long press** (hold for 2 seconds) — toggle play/pause.  The state
-  changes while the encoder is still held — no need to release first.
+* **Turn** — emits :meth:`on_volume_change` with the requested volume.
+* **Short press** — flips the muted flag and emits :meth:`on_mute_toggle`.
+* **Long press** (hold 2 s) — emits :meth:`on_play_pause_toggle` with
+  the requested playing state.
 
 Layout::
 
@@ -132,11 +136,28 @@ async def main() -> None:
                 f"Muted: {card.muted}"
             )
 
-        # -- Encoder callbacks (for logging / syncing buttons) -------------
+        # -- Encoder callbacks (emit-only: apply confirmed state) ----------
 
         @card.on_volume_change
         async def on_vol(volume: float) -> None:
+            # In a real integration, call HA first, then apply confirmed value.
+            card.set_volume(volume)
             print(f"Volume: {volume:.0f}%")
+            await deck.refresh()
+
+        @card.on_mute_toggle
+        async def on_mute(muted: bool) -> None:
+            print(f"Muted: {muted}")
+            await sync_buttons()
+            await deck.refresh()
+
+        @card.on_play_pause_toggle
+        async def on_play_pause_toggle(playing: bool) -> None:
+            # In a real integration, call HA first, then apply confirmed state.
+            card.set_state("Playing" if playing else "Paused")
+            print(f"State: {card.state}")
+            await sync_buttons()
+            await deck.refresh()
 
         @card.on_encoder_release
         async def on_enc_release() -> None:
@@ -148,9 +169,9 @@ async def main() -> None:
         await deck.set_screen("ha_media")
         print("\nHA Media Card ready!")
         print(f"  Now playing: {PLAYLIST[0][0]} — {PLAYLIST[0][1]}")
-        print("  Turn encoder 3 to adjust volume.")
+        print("  Turn encoder 3 to request volume change.")
         print("  Short press encoder 3 to toggle mute.")
-        print("  Hold encoder 3 for 2s to toggle play/pause.")
+        print("  Hold encoder 3 for 2s to request play/pause.")
         print("  Row 1: Prev, Play/Pause, Next, Mute.")
         print("  Row 2: Shuffle, Repeat, Like, Print status.\n")
 

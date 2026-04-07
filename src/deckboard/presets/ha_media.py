@@ -82,14 +82,21 @@ class HaMediaCard(Card):
     transparency gradient, plus artist name, media title, playback
     state, and a thin volume bar at the bottom.
 
-    Encoder interaction:
+    **Emit-only interaction model**
 
-    * **Turn** — adjust volume (0–100).
+    Encoder gestures do **not** modify the card's display state
+    directly.  Instead, each gesture emits a callback that the
+    integration layer should handle — typically by calling the
+    backend and then updating the card with the confirmed state
+    via :meth:`set_volume`, :meth:`set_state`, etc.
+
+    * **Turn** — emits :meth:`on_volume_change` with the *requested*
+      volume.  The card's volume is unchanged.
     * **Short press** (press and release within the hold threshold) —
-      toggle mute/unmute.
-    * **Long press** (hold for :attr:`long_press_seconds`) — toggle
-      play/pause.  The state changes while the encoder is still held,
-      so the user sees the update before releasing.
+      flips :attr:`muted` and emits :meth:`on_mute_toggle`.
+    * **Long press** (hold for :attr:`long_press_seconds`) — emits
+      :meth:`on_play_pause_toggle` with the *requested* playing
+      state.  The card's state is unchanged.
 
     Args:
         index: Card zone index (0–3).
@@ -132,12 +139,14 @@ class HaMediaCard(Card):
         self._title = title
         self._state = state
         self._volume = max(0.0, min(100.0, float(volume)))
+        self._requested_volume: float = self._volume
         self._entity_picture = entity_picture
         self._muted = False
-        self._saved_volume: float = self._volume
         self._playing = state.lower() == "playing"
         self._volume_step: float = 1.0
         self._volume_change_handler: AsyncHandler | None = None
+        self._mute_toggle_handler: AsyncHandler | None = None
+        self._play_pause_toggle_handler: AsyncHandler | None = None
         self._long_press_seconds = max(0.0, float(long_press_seconds))
         self._long_press_task: asyncio.Task[None] | None = None
         self._long_press_fired = False
@@ -161,8 +170,17 @@ class HaMediaCard(Card):
 
     @property
     def volume(self) -> float:
-        """Current volume level (0–100)."""
+        """Current confirmed volume level (0–100)."""
         return self._volume
+
+    @property
+    def requested_volume(self) -> float:
+        """The most recently requested volume from encoder turns.
+
+        This accumulates encoder ticks until the backend confirms the
+        change via :meth:`set_volume`.  Starts equal to :attr:`volume`.
+        """
+        return self._requested_volume
 
     @property
     def volume_normalized(self) -> float:
@@ -216,15 +234,17 @@ class HaMediaCard(Card):
         return self
 
     def set_volume(self, volume: float) -> None:
-        """Set the volume, clamping to 0–100.
+        """Set the confirmed volume, clamping to 0–100.
 
-        Fires the :meth:`on_volume_change` callback if the value changes.
+        This is intended to be called by the integration layer after
+        the backend has acknowledged the volume change.  No callback
+        is emitted.  The :attr:`requested_volume` accumulator is
+        reset to match so that subsequent encoder ticks start from
+        the confirmed value.
         """
-        old = self._volume
         self._volume = max(0.0, min(100.0, float(volume)))
+        self._requested_volume = self._volume
         self._dirty = True
-        if self._volume_change_handler is not None and self._volume != old:
-            self.queue_pending_callback(self._volume_change_handler, (self._volume,))
 
     def set_volume_step(self, step: float) -> HaMediaCard:
         """Set the encoder-turn increment for volume."""
@@ -245,17 +265,56 @@ class HaMediaCard(Card):
     # ── Volume change callback ────────────────────────────────────────
 
     def on_volume_change(self, handler: AsyncHandler) -> AsyncHandler:
-        """Decorator to register a handler for volume changes.
+        """Decorator to register a handler for volume change requests.
 
-        The handler receives the new ``volume`` value (0–100).
+        Fired when the encoder is turned.  The handler receives the
+        *requested* volume (0–100).  The card's actual volume is
+        **not** modified — call :meth:`set_volume` to apply the
+        confirmed value from the backend.
 
         Usage::
 
             @card.on_volume_change
             async def handle(volume: float):
-                print(f"Volume: {volume}")
+                print(f"Requested volume: {volume}")
         """
         self._volume_change_handler = handler
+        return handler
+
+    # ── Mute toggle callback ──────────────────────────────────────────
+
+    def on_mute_toggle(self, handler: AsyncHandler) -> AsyncHandler:
+        """Decorator to register a handler for mute state changes.
+
+        The handler receives the new ``muted`` value (``True`` or
+        ``False``).
+
+        Usage::
+
+            @card.on_mute_toggle
+            async def handle(muted: bool):
+                print(f"Muted: {muted}")
+        """
+        self._mute_toggle_handler = handler
+        return handler
+
+    # ── Play/pause toggle callback ────────────────────────────────────
+
+    def on_play_pause_toggle(self, handler: AsyncHandler) -> AsyncHandler:
+        """Decorator to register a handler for play/pause requests.
+
+        The handler receives the *requested* ``playing`` state
+        (``True`` for play, ``False`` for pause).  The card does
+        **not** change its own state — call :meth:`set_state` to
+        apply the confirmed state from the backend.
+
+        Usage::
+
+            @card.on_play_pause_toggle
+            async def handle(playing: bool):
+                print(f"Requested: {'play' if playing else 'pause'}")
+        """
+        self._play_pause_toggle_handler = handler
         return handler
 
     # ── Mute control ──────────────────────────────────────────────────
@@ -263,17 +322,15 @@ class HaMediaCard(Card):
     def toggle_mute(self) -> None:
         """Toggle mute on/off.
 
-        When muting, the current volume is saved and set to 0.
-        When unmuting, the saved volume is restored.
+        Flips the :attr:`muted` flag and queues the
+        :meth:`on_mute_toggle` callback with the new state.  Volume
+        is **not** modified — the caller (or callback handler) is
+        responsible for any volume save/restore logic.
         """
-        if self._muted:
-            self.set_volume(self._saved_volume)
-            self._muted = False
-        else:
-            self._saved_volume = self._volume
-            self.set_volume(0)
-            self._muted = True
+        self._muted = not self._muted
         self._dirty = True
+        if self._mute_toggle_handler is not None:
+            self.queue_pending_callback(self._mute_toggle_handler, (self._muted,))
 
     # ── Play/Pause control ────────────────────────────────────────────
 
@@ -287,8 +344,29 @@ class HaMediaCard(Card):
     # ── Encoder interaction overrides ─────────────────────────────────
 
     def handle_encoder_turn(self, direction: int) -> None:
-        """Adjust volume by *direction* × :attr:`volume_step`."""
-        self.set_volume(self._volume + direction * self._volume_step)
+        """Emit a volume-change request without altering the confirmed volume.
+
+        Successive encoder ticks accumulate on :attr:`requested_volume`
+        so that rapid turns produce increasing/decreasing values rather
+        than repeating the same stale number.  The :meth:`on_volume_change`
+        callback is queued with the accumulated *requested* volume
+        (clamped to 0–100).
+
+        The confirmed :attr:`volume` is **not** modified — call
+        :meth:`set_volume` to apply the backend-confirmed value (which
+        also resets the accumulator).
+        """
+        old_requested = self._requested_volume
+        self._requested_volume = max(
+            0.0, min(100.0, self._requested_volume + direction * self._volume_step)
+        )
+        if (
+            self._volume_change_handler is not None
+            and self._requested_volume != old_requested
+        ):
+            self.queue_pending_callback(
+                self._volume_change_handler, (self._requested_volume,)
+            )
 
     def _cancel_long_press(self) -> None:
         """Cancel a pending long-press timer, if any."""
@@ -297,15 +375,23 @@ class HaMediaCard(Card):
         self._long_press_task = None
 
     async def _long_press_timer(self) -> None:
-        """Sleep for :attr:`long_press_seconds`, then toggle play/pause.
+        """Sleep for :attr:`long_press_seconds`, then emit play/pause.
 
         Runs as an ``asyncio.Task`` started on encoder press.  If the
         encoder is released before the timer fires, the task is
         cancelled and mute/unmute is performed instead.
+
+        The card does **not** change its own playing state — the
+        :meth:`on_play_pause_toggle` callback is queued with the
+        *requested* state so the integration layer can confirm it.
         """
         await asyncio.sleep(self._long_press_seconds)
         self._long_press_fired = True
-        self.toggle_play_pause()
+        requested_playing = not self._playing
+        if self._play_pause_toggle_handler is not None:
+            self.queue_pending_callback(
+                self._play_pause_toggle_handler, (requested_playing,)
+            )
         await self.request_refresh()
 
     async def dispatch_encoder_press(self) -> None:
