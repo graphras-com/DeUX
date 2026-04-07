@@ -19,14 +19,24 @@ class EqualizerCard(StackCard):
 
     All parameters are optional — sensible defaults are applied.
 
+    Each EQ band accepts its own ``*_min`` / ``*_max`` range.  The
+    ``eq_min`` / ``eq_max`` shorthand sets the same range for all three
+    bands but is overridden by any per-band value.
+
     Args:
         index: Card zone index (0–3).
         sub: Initial Sub value.  Defaults to 0.
         bass: Initial Bass value.  Defaults to 0.
         treble: Initial Treble value.  Defaults to 0.
         balance: Initial Balance value.  Defaults to 50 (centre).
-        eq_min: Minimum value for all three EQ band sliders.  Defaults to 0.
-        eq_max: Maximum value for all three EQ band sliders.  Defaults to 100.
+        eq_min: Shared minimum for all EQ bands.  Defaults to 0.
+        eq_max: Shared maximum for all EQ bands.  Defaults to 100.
+        sub_min: Minimum for the Sub band (overrides *eq_min*).
+        sub_max: Maximum for the Sub band (overrides *eq_max*).
+        bass_min: Minimum for the Bass band (overrides *eq_min*).
+        bass_max: Maximum for the Bass band (overrides *eq_max*).
+        treble_min: Minimum for the Treble band (overrides *eq_min*).
+        treble_max: Maximum for the Treble band (overrides *eq_max*).
         balance_min: Minimum value for the balance slider.  Defaults to 0.
         balance_max: Maximum value for the balance slider.  Defaults to 100.
 
@@ -51,6 +61,12 @@ class EqualizerCard(StackCard):
         balance: float = 50,
         eq_min: float = 0,
         eq_max: float = 100,
+        sub_min: float | None = None,
+        sub_max: float | None = None,
+        bass_min: float | None = None,
+        bass_max: float | None = None,
+        treble_min: float | None = None,
+        treble_max: float | None = None,
         balance_min: float = 0,
         balance_max: float = 100,
     ) -> None:
@@ -58,20 +74,20 @@ class EqualizerCard(StackCard):
         self._sub = EqualizerSlider(
             "Sub",
             value=sub,
-            min_value=eq_min,
-            max_value=eq_max,
+            min_value=sub_min if sub_min is not None else eq_min,
+            max_value=sub_max if sub_max is not None else eq_max,
         )
         self._bass = EqualizerSlider(
             "Bass",
             value=bass,
-            min_value=eq_min,
-            max_value=eq_max,
+            min_value=bass_min if bass_min is not None else eq_min,
+            max_value=bass_max if bass_max is not None else eq_max,
         )
         self._treble = EqualizerSlider(
             "Treble",
             value=treble,
-            min_value=eq_min,
-            max_value=eq_max,
+            min_value=treble_min if treble_min is not None else eq_min,
+            max_value=treble_max if treble_max is not None else eq_max,
         )
         self._balance = BalanceSlider(
             "Balance",
@@ -109,8 +125,20 @@ class EqualizerCard(StackCard):
 
     # -- Range setters -----------------------------------------------------
 
+    def set_sub_range(self, min_value: float, max_value: float) -> None:
+        """Set the min/max range for the Sub band slider."""
+        self._sub.set_range(min_value, max_value)
+
+    def set_bass_range(self, min_value: float, max_value: float) -> None:
+        """Set the min/max range for the Bass band slider."""
+        self._bass.set_range(min_value, max_value)
+
+    def set_treble_range(self, min_value: float, max_value: float) -> None:
+        """Set the min/max range for the Treble band slider."""
+        self._treble.set_range(min_value, max_value)
+
     def set_eq_range(self, min_value: float, max_value: float) -> None:
-        """Set the min/max range for all three EQ band sliders.
+        """Set the min/max range for all three EQ band sliders at once.
 
         Each band's current value is re-clamped to the new range and
         the card is marked dirty.
