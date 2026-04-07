@@ -479,6 +479,64 @@ class TestHaMediaCardLongPress:
         await c.dispatch_encoder_release()
         handler.assert_awaited_once()
 
+    async def test_release_handler_sees_muted_state(self):
+        """The on_encoder_release handler must see the post-toggle state.
+
+        This is the core of the mute/unmute ordering fix: toggle_mute()
+        must run *before* the user's release handler so that sync logic
+        (e.g. updating key icons) reads the correct muted state.
+        """
+        observed: dict[str, bool | float] = {}
+
+        c = HaMediaCard(0, volume=60, long_press_seconds=10.0)
+
+        @c.on_encoder_release
+        async def capture_state() -> None:
+            observed["muted"] = c.muted
+            observed["volume"] = c.volume
+
+        await c.dispatch_encoder_press()
+        await c.dispatch_encoder_release()
+        assert observed["muted"] is True
+        assert observed["volume"] == 0
+
+    async def test_release_handler_sees_unmuted_state(self):
+        """Second short press: handler must see unmuted state."""
+        observed: dict[str, bool | float] = {}
+
+        c = HaMediaCard(0, volume=60, long_press_seconds=10.0)
+
+        @c.on_encoder_release
+        async def capture_state() -> None:
+            observed["muted"] = c.muted
+            observed["volume"] = c.volume
+
+        # First short press → mute
+        await c.dispatch_encoder_press()
+        await c.dispatch_encoder_release()
+        assert observed["muted"] is True
+
+        # Second short press → unmute
+        await c.dispatch_encoder_press()
+        await c.dispatch_encoder_release()
+        assert observed["muted"] is False
+        assert observed["volume"] == 60
+
+    async def test_press_handler_runs_after_timer_starts(self):
+        """The on_encoder_press handler runs after the long-press timer
+        has been started, so the task exists when the handler fires."""
+        observed: dict[str, object] = {}
+
+        c = HaMediaCard(0, long_press_seconds=10.0)
+
+        @c.on_encoder_press
+        async def capture_state() -> None:
+            observed["task_exists"] = c._long_press_task is not None
+
+        await c.dispatch_encoder_press()
+        assert observed["task_exists"] is True
+        await c.dispatch_encoder_release()
+
 
 # ── Rendering ────────────────────────────────────────────────────────────
 
