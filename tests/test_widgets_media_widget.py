@@ -70,6 +70,23 @@ class TestMediaWidgetMinMax:
         w.toggle_mute()
         assert w.volume.value == 10  # clamped to min
 
+    def test_set_volume_range(self):
+        w = MediaCard(0, volume=50)
+        w.set_volume_range(10, 90)
+        assert w.volume.min_value == 10
+        assert w.volume.max_value == 90
+
+    def test_set_volume_range_clamps_value(self):
+        w = MediaCard(0, volume=100)
+        w.set_volume_range(10, 80)
+        assert w.volume.value == 80
+
+    def test_set_volume_range_marks_dirty(self):
+        w = MediaCard(0, volume=50)
+        w.mark_clean()
+        w.set_volume_range(10, 90)
+        assert w.is_dirty is True
+
 
 class TestMediaWidgetAccessors:
     def test_title_text_set_text(self):

@@ -190,6 +190,8 @@ class HaMediaCard(Card):
         title: str = "No Media",
         state: str = "Idle",
         volume: float = 50,
+        volume_min: float = 0,
+        volume_max: float = 100,
         entity_picture: Image.Image | None = None,
         long_press_seconds: float = 2.0,
     ) -> None:
@@ -197,7 +199,9 @@ class HaMediaCard(Card):
         self._artist = artist
         self._title = title
         self._state = state
-        self._volume = max(0.0, min(100.0, float(volume)))
+        self._volume_min = float(volume_min)
+        self._volume_max = float(volume_max)
+        self._volume = max(self._volume_min, min(self._volume_max, float(volume)))
         self._requested_volume: float = self._volume
         self._entity_picture = entity_picture
         self._muted = False
@@ -229,8 +233,18 @@ class HaMediaCard(Card):
 
     @property
     def volume(self) -> float:
-        """Current confirmed volume level (0–100)."""
+        """Current confirmed volume level."""
         return self._volume
+
+    @property
+    def volume_min(self) -> float:
+        """Minimum volume level."""
+        return self._volume_min
+
+    @property
+    def volume_max(self) -> float:
+        """Maximum volume level."""
+        return self._volume_max
 
     @property
     def requested_volume(self) -> float:
@@ -243,8 +257,11 @@ class HaMediaCard(Card):
 
     @property
     def volume_normalized(self) -> float:
-        """Volume mapped to 0.0 – 1.0."""
-        return self._volume / 100.0
+        """Volume mapped to 0.0 – 1.0 within the min/max range."""
+        span = self._volume_max - self._volume_min
+        if span <= 0:
+            return 0.0
+        return max(0.0, min(1.0, (self._volume - self._volume_min) / span))
 
     @property
     def muted(self) -> bool:
@@ -293,7 +310,7 @@ class HaMediaCard(Card):
         return self
 
     def set_volume(self, volume: float) -> None:
-        """Set the confirmed volume, clamping to 0–100.
+        """Set the confirmed volume, clamping to ``[volume_min, volume_max]``.
 
         This is intended to be called by the integration layer after
         the backend has acknowledged the volume change.  No callback
@@ -301,8 +318,27 @@ class HaMediaCard(Card):
         reset to match so that subsequent encoder ticks start from
         the confirmed value.
         """
-        self._volume = max(0.0, min(100.0, float(volume)))
+        self._volume = max(self._volume_min, min(self._volume_max, float(volume)))
         self._requested_volume = self._volume
+        self._dirty = True
+
+    def set_volume_range(self, min_value: float, max_value: float) -> None:
+        """Set both minimum and maximum volume in one call.
+
+        The confirmed volume and requested volume are re-clamped to
+        the new range and the card is marked dirty when either bound
+        actually changes.
+        """
+        min_value = float(min_value)
+        max_value = float(max_value)
+        if min_value == self._volume_min and max_value == self._volume_max:
+            return
+        self._volume_min = min_value
+        self._volume_max = max_value
+        self._volume = max(self._volume_min, min(self._volume_max, self._volume))
+        self._requested_volume = max(
+            self._volume_min, min(self._volume_max, self._requested_volume)
+        )
         self._dirty = True
 
     def set_volume_step(self, step: float) -> HaMediaCard:
@@ -427,7 +463,10 @@ class HaMediaCard(Card):
         """
         old_requested = self._requested_volume
         self._requested_volume = max(
-            0.0, min(100.0, self._requested_volume + direction * self._volume_step)
+            self._volume_min,
+            min(
+                self._volume_max, self._requested_volume + direction * self._volume_step
+            ),
         )
         if (
             self._volume_change_handler is not None

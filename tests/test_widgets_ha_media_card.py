@@ -102,6 +102,25 @@ class TestHaMediaCardInit:
         c = HaMediaCard(0, long_press_seconds=-5)
         assert c.long_press_seconds == 0.0
 
+    def test_volume_min_max_defaults(self):
+        c = HaMediaCard(0)
+        assert c.volume_min == 0
+        assert c.volume_max == 100
+
+    def test_custom_volume_range(self):
+        c = HaMediaCard(0, volume=50, volume_min=10, volume_max=80)
+        assert c.volume_min == 10
+        assert c.volume_max == 80
+        assert c.volume == 50
+
+    def test_volume_clamped_to_custom_range_high(self):
+        c = HaMediaCard(0, volume=100, volume_min=10, volume_max=80)
+        assert c.volume == 80
+
+    def test_volume_clamped_to_custom_range_low(self):
+        c = HaMediaCard(0, volume=5, volume_min=10, volume_max=80)
+        assert c.volume == 10
+
 
 # ── Accessors ────────────────────────────────────────────────────────────
 
@@ -231,6 +250,65 @@ class TestHaMediaCardMutators:
         c = HaMediaCard(0)
         c.set_long_press_seconds(-1)
         assert c.long_press_seconds == 0.0
+
+
+# ── Volume range setters ─────────────────────────────────────────────────
+
+
+class TestHaMediaCardVolumeRange:
+    def test_set_volume_range(self):
+        c = HaMediaCard(0, volume=50)
+        c.set_volume_range(10, 90)
+        assert c.volume_min == 10
+        assert c.volume_max == 90
+
+    def test_set_volume_range_clamps_volume(self):
+        c = HaMediaCard(0, volume=100)
+        c.set_volume_range(10, 80)
+        assert c.volume == 80
+
+    def test_set_volume_range_clamps_volume_low(self):
+        c = HaMediaCard(0, volume=5)
+        c.set_volume_range(10, 80)
+        assert c.volume == 10
+
+    def test_set_volume_range_clamps_requested_volume(self):
+        c = HaMediaCard(0, volume=50)
+        c.handle_encoder_turn(40)  # requested_volume = 90
+        c.set_volume_range(10, 80)
+        assert c.requested_volume == 80
+
+    def test_set_volume_range_marks_dirty(self):
+        c = HaMediaCard(0, volume=50)
+        c.mark_clean()
+        c.set_volume_range(10, 90)
+        assert c.is_dirty is True
+
+    def test_set_volume_range_no_dirty_when_same(self):
+        c = HaMediaCard(0, volume=50)
+        c.mark_clean()
+        c.set_volume_range(0, 100)
+        assert c.is_dirty is False
+
+    def test_set_volume_clamps_to_new_range(self):
+        c = HaMediaCard(0, volume=50)
+        c.set_volume_range(20, 80)
+        c.set_volume(100)
+        assert c.volume == 80
+
+    def test_encoder_turn_clamps_to_new_range(self):
+        c = HaMediaCard(0, volume=75)
+        c.set_volume_range(0, 80)
+        c.handle_encoder_turn(10)
+        assert c.requested_volume == 80
+
+    def test_volume_normalized_custom_range(self):
+        c = HaMediaCard(0, volume=50, volume_min=0, volume_max=200)
+        assert c.volume_normalized == 0.25
+
+    def test_volume_normalized_zero_span(self):
+        c = HaMediaCard(0, volume=50, volume_min=50, volume_max=50)
+        assert c.volume_normalized == 0.0
 
 
 # ── Mute control (direct method calls) ───────────────────────────────────

@@ -75,6 +75,16 @@ class MediaCard(StackCard):
         """Whether the volume is currently muted."""
         return self._muted
 
+    # -- Range setters -----------------------------------------------------
+
+    def set_volume_range(self, min_value: float, max_value: float) -> None:
+        """Set the min/max range for the volume slider.
+
+        The current value is re-clamped to the new range and the card
+        is marked dirty.
+        """
+        self._volume.set_range(min_value, max_value)
+
     # -- Mute control ------------------------------------------------------
 
     def toggle_mute(self) -> None:
