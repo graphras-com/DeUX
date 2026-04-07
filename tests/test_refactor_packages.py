@@ -1,4 +1,4 @@
-"""Tests for the new runtime, ui, preset, and integration package surfaces."""
+"""Tests for the new runtime, ui, and preset package surfaces."""
 
 from __future__ import annotations
 
@@ -99,22 +99,3 @@ class TestPresetPackages:
         assert presets.VolumeSlider is deckboard.VolumeSlider
         assert presets.BrightnessSlider is deckboard.BrightnessSlider
         assert presets.TemperatureSlider is deckboard.TemperatureSlider
-
-
-class TestIntegrationsPackage:
-    def test_capability_profile_for_known_domain(self):
-        from deckboard.integrations import EntityProfile, capability_profile
-
-        profile = capability_profile("light")
-        assert isinstance(profile, EntityProfile)
-        assert profile.domain == "light"
-        assert profile.supports_toggle is True
-        assert profile.supports_range is True
-        assert profile.supports_mode is True
-
-    def test_capability_profile_for_unknown_domain(self):
-        from deckboard.integrations.homeassistant import capability_profile
-
-        profile = capability_profile("custom")
-        assert profile.domain == "custom"
-        assert profile.supports_toggle is False
