@@ -106,6 +106,160 @@ class TestSliderSetValue:
         assert s.value == 90
 
 
+class TestSliderSetMinValue:
+    def test_set_min_value(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        s.set_min_value(10)
+        assert s.min_value == 10
+
+    def test_clamps_value_upward(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=5)
+        s.set_min_value(20)
+        assert s.value == 20
+
+    def test_no_clamp_when_value_above_new_min(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        s.set_min_value(10)
+        assert s.value == 50
+
+    def test_marks_card_dirty(self):
+        w = StackCard(0)
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        w.add_control(s)
+        w.mark_clean()
+        s.set_min_value(10)
+        assert w.is_dirty is True
+
+    def test_no_dirty_when_same_value(self):
+        w = StackCard(0)
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        w.add_control(s)
+        w.mark_clean()
+        s.set_min_value(0)
+        assert w.is_dirty is False
+
+    def test_without_card_does_not_raise(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        s.set_min_value(10)
+        assert s.min_value == 10
+
+
+class TestSliderSetMaxValue:
+    def test_set_max_value(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        s.set_max_value(80)
+        assert s.max_value == 80
+
+    def test_clamps_value_downward(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=90)
+        s.set_max_value(50)
+        assert s.value == 50
+
+    def test_no_clamp_when_value_below_new_max(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=30)
+        s.set_max_value(80)
+        assert s.value == 30
+
+    def test_marks_card_dirty(self):
+        w = StackCard(0)
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        w.add_control(s)
+        w.mark_clean()
+        s.set_max_value(80)
+        assert w.is_dirty is True
+
+    def test_no_dirty_when_same_value(self):
+        w = StackCard(0)
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        w.add_control(s)
+        w.mark_clean()
+        s.set_max_value(100)
+        assert w.is_dirty is False
+
+    def test_without_card_does_not_raise(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        s.set_max_value(80)
+        assert s.max_value == 80
+
+
+class TestSliderSetRange:
+    def test_set_range(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        s.set_range(10, 90)
+        assert s.min_value == 10
+        assert s.max_value == 90
+
+    def test_clamps_value_to_new_range_low(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=5)
+        s.set_range(20, 80)
+        assert s.value == 20
+
+    def test_clamps_value_to_new_range_high(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=95)
+        s.set_range(20, 80)
+        assert s.value == 80
+
+    def test_no_clamp_when_value_in_range(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        s.set_range(10, 90)
+        assert s.value == 50
+
+    def test_marks_card_dirty(self):
+        w = StackCard(0)
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        w.add_control(s)
+        w.mark_clean()
+        s.set_range(10, 90)
+        assert w.is_dirty is True
+
+    def test_no_dirty_when_same_range(self):
+        w = StackCard(0)
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        w.add_control(s)
+        w.mark_clean()
+        s.set_range(0, 100)
+        assert w.is_dirty is False
+
+    def test_dirty_when_only_min_changes(self):
+        w = StackCard(0)
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        w.add_control(s)
+        w.mark_clean()
+        s.set_range(10, 100)
+        assert w.is_dirty is True
+
+    def test_dirty_when_only_max_changes(self):
+        w = StackCard(0)
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        w.add_control(s)
+        w.mark_clean()
+        s.set_range(0, 90)
+        assert w.is_dirty is True
+
+    def test_without_card_does_not_raise(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        s.set_range(10, 90)
+        assert s.min_value == 10
+        assert s.max_value == 90
+
+    def test_normalized_updates_after_set_range(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        s.set_range(0, 200)
+        assert s.normalized == pytest.approx(0.25)
+
+    def test_set_value_uses_new_range(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50)
+        s.set_range(0, 200)
+        s.set_value(150)
+        assert s.value == 150
+
+    def test_adjust_respects_new_range(self):
+        s = _ConcreteLargeSlider("X", min_value=0, max_value=100, value=50, step=10)
+        s.set_max_value(55)
+        s.adjust(1)
+        assert s.value == 55
+
+
 class TestSliderAdjust:
     def test_positive_direction(self):
         s = _ConcreteLargeSlider("X", value=50, step=5)
@@ -143,7 +297,7 @@ class TestSliderFormatValue:
         assert s.format_value() == "20.5\u00b0C"
 
     def test_kelvin(self):
-        s = _ConcreteLargeSlider("X", value=3000, unit="K")
+        s = _ConcreteLargeSlider("X", value=3000, max_value=6500, unit="K")
         assert s.format_value() == "3000K"
 
     def test_no_unit(self):
