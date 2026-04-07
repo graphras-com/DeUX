@@ -52,7 +52,7 @@ class Card(ABC):
         self._encoder_turn_handler: AsyncHandler | None = None
         self._encoder_press_handler: AsyncHandler | None = None
         self._encoder_release_handler: AsyncHandler | None = None
-        self._pending_callbacks: list[tuple[AsyncHandler, tuple[float]]] = []
+        self._pending_callbacks: list[tuple[AsyncHandler, tuple[object, ...]]] = []
         self._rendered: Image.Image | None = None
         self._dirty = True
         self._request_refresh: AsyncHandler | None = None
@@ -163,7 +163,9 @@ class Card(ABC):
 
     # -- Pending callbacks (deferred async invocation) ---------------------
 
-    def queue_pending_callback(self, handler: AsyncHandler, args: tuple[float]) -> None:
+    def queue_pending_callback(
+        self, handler: AsyncHandler, args: tuple[object, ...]
+    ) -> None:
         """Enqueue a callback for deferred async invocation.
 
         Called by child elements (e.g. sliders) when their value changes
@@ -176,7 +178,7 @@ class Card(ABC):
         """
         self._pending_callbacks.append((handler, args))
 
-    def drain_pending_callbacks(self) -> list[tuple[AsyncHandler, tuple[float]]]:
+    def drain_pending_callbacks(self) -> list[tuple[AsyncHandler, tuple[object, ...]]]:
         """Remove and return all pending callbacks.
 
         Returns:

@@ -44,6 +44,7 @@ class TestHaMediaCardInit:
         assert c.title == "No Media"
         assert c.state == "Idle"
         assert c.volume == 50
+        assert c.requested_volume == 50
         assert c.muted is False
         assert c.playing is False
         assert c.entity_picture is None
@@ -228,26 +229,22 @@ class TestHaMediaCardMutators:
 
 
 class TestHaMediaCardMute:
-    def test_toggle_mute_sets_volume_to_zero(self):
+    def test_toggle_mute_sets_muted_flag(self):
         c = HaMediaCard(0, volume=75)
         c.toggle_mute()
         assert c.muted is True
-        assert c.volume == 0
 
-    def test_toggle_mute_restores_volume(self):
+    def test_toggle_mute_does_not_change_volume(self):
+        c = HaMediaCard(0, volume=75)
+        c.toggle_mute()
+        assert c.volume == 75
+
+    def test_toggle_mute_twice_clears_muted(self):
         c = HaMediaCard(0, volume=75)
         c.toggle_mute()
         c.toggle_mute()
         assert c.muted is False
         assert c.volume == 75
-
-    def test_toggle_mute_saves_current_volume(self):
-        c = HaMediaCard(0, volume=60)
-        c.set_volume(80)
-        c.toggle_mute()
-        assert c.volume == 0
-        c.toggle_mute()
-        assert c.volume == 80
 
     def test_toggle_mute_marks_dirty(self):
         c = HaMediaCard(0, volume=50)
@@ -266,13 +263,13 @@ class TestHaMediaCardMute:
         c = HaMediaCard(0, volume=65)
         c.toggle_mute()
         assert c.muted is True
-        assert c.volume == 0
+        assert c.volume == 65
         c.toggle_mute()
         assert c.muted is False
         assert c.volume == 65
         c.toggle_mute()
         assert c.muted is True
-        assert c.volume == 0
+        assert c.volume == 65
 
     def test_mute_preserves_zero_volume(self):
         c = HaMediaCard(0, volume=0)
@@ -324,43 +321,113 @@ class TestHaMediaCardPlayPause:
 
 
 class TestHaMediaCardEncoderTurn:
-    def test_encoder_turn_adjusts_volume(self):
+    def test_encoder_turn_does_not_change_volume(self):
         c = HaMediaCard(0, volume=50)
         c.handle_encoder_turn(1)
-        assert c.volume == 51
+        assert c.volume == 50
 
-    def test_encoder_turn_negative(self):
+    def test_encoder_turn_accumulates_requested_volume(self):
         c = HaMediaCard(0, volume=50)
+        c.handle_encoder_turn(1)
+        assert c.requested_volume == 51
+        c.handle_encoder_turn(1)
+        assert c.requested_volume == 52
+
+    def test_encoder_turn_emits_requested_volume(self):
+        c = HaMediaCard(0, volume=50)
+        handler = AsyncMock()
+        c.on_volume_change(handler)
+        c.handle_encoder_turn(1)
+        callbacks = c.drain_pending_callbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0] == (handler, (51.0,))
+
+    def test_rapid_turns_emit_accumulated_values(self):
+        c = HaMediaCard(0, volume=50)
+        handler = AsyncMock()
+        c.on_volume_change(handler)
+        c.handle_encoder_turn(1)
+        c.handle_encoder_turn(1)
+        c.handle_encoder_turn(1)
+        callbacks = c.drain_pending_callbacks()
+        assert len(callbacks) == 3
+        assert callbacks[0] == (handler, (51.0,))
+        assert callbacks[1] == (handler, (52.0,))
+        assert callbacks[2] == (handler, (53.0,))
+
+    def test_encoder_turn_negative_emits(self):
+        c = HaMediaCard(0, volume=50)
+        handler = AsyncMock()
+        c.on_volume_change(handler)
         c.handle_encoder_turn(-1)
-        assert c.volume == 49
+        callbacks = c.drain_pending_callbacks()
+        assert callbacks[0] == (handler, (49.0,))
 
     def test_encoder_turn_clamps_high(self):
         c = HaMediaCard(0, volume=100)
+        handler = AsyncMock()
+        c.on_volume_change(handler)
         c.handle_encoder_turn(1)
-        assert c.volume == 100
+        callbacks = c.drain_pending_callbacks()
+        assert len(callbacks) == 0
+        assert c.requested_volume == 100
 
     def test_encoder_turn_clamps_low(self):
         c = HaMediaCard(0, volume=0)
+        handler = AsyncMock()
+        c.on_volume_change(handler)
         c.handle_encoder_turn(-1)
-        assert c.volume == 0
+        callbacks = c.drain_pending_callbacks()
+        assert len(callbacks) == 0
+        assert c.requested_volume == 0
 
     def test_encoder_turn_custom_step(self):
         c = HaMediaCard(0, volume=50)
+        handler = AsyncMock()
+        c.on_volume_change(handler)
         c.set_volume_step(5)
         c.handle_encoder_turn(1)
-        assert c.volume == 55
+        callbacks = c.drain_pending_callbacks()
+        assert callbacks[0] == (handler, (55.0,))
 
-    def test_encoder_turn_marks_dirty(self):
+    def test_encoder_turn_no_handler_no_callback(self):
         c = HaMediaCard(0, volume=50)
-        c.mark_clean()
         c.handle_encoder_turn(1)
-        assert c.is_dirty is True
+        callbacks = c.drain_pending_callbacks()
+        assert len(callbacks) == 0
+        # requested_volume still accumulates even without handler
+        assert c.requested_volume == 51
 
     def test_encoder_turn_while_muted(self):
         c = HaMediaCard(0, volume=50)
+        handler = AsyncMock()
+        c.on_volume_change(handler)
         c.toggle_mute()
+        c.drain_pending_callbacks()
         c.handle_encoder_turn(5)
-        assert c.volume == 5
+        callbacks = c.drain_pending_callbacks()
+        assert callbacks[0] == (handler, (55.0,))
+        assert c.volume == 50
+
+    def test_set_volume_resets_requested_volume(self):
+        c = HaMediaCard(0, volume=50)
+        c.handle_encoder_turn(3)
+        assert c.requested_volume == 53
+        c.set_volume(53)
+        assert c.requested_volume == 53
+        assert c.volume == 53
+
+    def test_set_volume_resets_accumulator_to_confirmed(self):
+        """Backend may confirm a different value than requested."""
+        c = HaMediaCard(0, volume=50)
+        c.handle_encoder_turn(10)
+        assert c.requested_volume == 60
+        # Backend clamps or adjusts to a different value
+        c.set_volume(55)
+        assert c.requested_volume == 55
+        # Next turn starts from 55
+        c.handle_encoder_turn(1)
+        assert c.requested_volume == 56
 
 
 # ── Encoder short press → mute (async dispatch) ─────────────────────────
@@ -373,7 +440,7 @@ class TestHaMediaCardShortPress:
         c = HaMediaCard(0, volume=75, long_press_seconds=2.0)
         await _short_press(c)
         assert c.muted is True
-        assert c.volume == 0
+        assert c.volume == 75
 
     async def test_short_press_unmutes(self):
         c = HaMediaCard(0, volume=75, long_press_seconds=2.0)
@@ -393,19 +460,23 @@ class TestHaMediaCardShortPress:
 
 
 class TestHaMediaCardLongPress:
-    """Holding the encoder past the threshold toggles play/pause."""
+    """Holding the encoder past the threshold emits play/pause toggle."""
 
-    async def test_long_press_toggles_play_pause(self):
-        # Use a very short threshold so the test runs fast
+    async def test_long_press_emits_play_pause(self):
         c = HaMediaCard(0, state="Paused", long_press_seconds=0.05)
         c.set_refresh_callback(AsyncMock())
+        handler = AsyncMock()
+        c.on_play_pause_toggle(handler)
         await c.dispatch_encoder_press()
-        await asyncio.sleep(0.1)  # wait past threshold
+        await asyncio.sleep(0.1)
         assert c._long_press_fired is True
-        assert c.playing is True
-        assert c.state == "Playing"
+        # State is NOT changed — emit only
+        assert c.playing is False
+        assert c.state == "Paused"
+        callbacks = c.drain_pending_callbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0] == (handler, (True,))
         await c.dispatch_encoder_release()
-        # Still playing — release after long press is a no-op for mute
         assert c.muted is False
 
     async def test_long_press_does_not_mute(self):
@@ -417,12 +488,25 @@ class TestHaMediaCardLongPress:
         assert c.muted is False
         assert c.volume == 75
 
-    async def test_long_press_pauses(self):
+    async def test_long_press_does_not_change_state(self):
         c = HaMediaCard(0, state="Playing", long_press_seconds=0.05)
         c.set_refresh_callback(AsyncMock())
         await c.dispatch_encoder_press()
         await asyncio.sleep(0.1)
-        assert c.state == "Paused"
+        assert c.state == "Playing"
+        assert c.playing is True
+        await c.dispatch_encoder_release()
+
+    async def test_long_press_emits_pause_request(self):
+        c = HaMediaCard(0, state="Playing", long_press_seconds=0.05)
+        c.set_refresh_callback(AsyncMock())
+        handler = AsyncMock()
+        c.on_play_pause_toggle(handler)
+        await c.dispatch_encoder_press()
+        await asyncio.sleep(0.1)
+        callbacks = c.drain_pending_callbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0] == (handler, (False,))
         await c.dispatch_encoder_release()
 
     async def test_long_press_requests_refresh(self):
@@ -460,7 +544,18 @@ class TestHaMediaCardLongPress:
         c = HaMediaCard(0, state="Paused", long_press_seconds=0.05)
         await c.dispatch_encoder_press()
         await asyncio.sleep(0.1)
-        assert c.playing is True
+        # State is unchanged — emit only
+        assert c.playing is False
+        await c.dispatch_encoder_release()
+
+    async def test_long_press_no_handler_no_callback(self):
+        """Long press without an on_play_pause_toggle handler is fine."""
+        c = HaMediaCard(0, state="Paused", long_press_seconds=0.05)
+        c.set_refresh_callback(AsyncMock())
+        await c.dispatch_encoder_press()
+        await asyncio.sleep(0.1)
+        callbacks = c.drain_pending_callbacks()
+        assert len(callbacks) == 0
         await c.dispatch_encoder_release()
 
     async def test_encoder_press_handler_called(self):
@@ -498,7 +593,7 @@ class TestHaMediaCardLongPress:
         await c.dispatch_encoder_press()
         await c.dispatch_encoder_release()
         assert observed["muted"] is True
-        assert observed["volume"] == 0
+        assert observed["volume"] == 60
 
     async def test_release_handler_sees_unmuted_state(self):
         """Second short press: handler must see unmuted state."""
@@ -602,14 +697,14 @@ class TestHaMediaCardRender:
 
 
 class TestHaMediaCardOnVolumeChange:
-    def test_on_volume_change_queued_on_set_volume(self):
+    def test_on_volume_change_not_queued_on_set_volume(self):
+        """set_volume is a confirmed setter — no callback emitted."""
         c = HaMediaCard(0, volume=50)
         handler = AsyncMock()
         c.on_volume_change(handler)
         c.set_volume(75)
         callbacks = c.drain_pending_callbacks()
-        assert len(callbacks) == 1
-        assert callbacks[0] == (handler, (75.0,))
+        assert len(callbacks) == 0
 
     def test_on_volume_change_queued_on_encoder_turn(self):
         c = HaMediaCard(0, volume=50)
@@ -620,16 +715,17 @@ class TestHaMediaCardOnVolumeChange:
         assert len(callbacks) == 1
         assert callbacks[0] == (handler, (53.0,))
 
-    def test_on_volume_change_queued_on_mute(self):
+    def test_on_volume_change_not_queued_on_mute(self):
         c = HaMediaCard(0, volume=75)
         handler = AsyncMock()
         c.on_volume_change(handler)
         c.toggle_mute()
         callbacks = c.drain_pending_callbacks()
-        assert len(callbacks) == 1
-        assert callbacks[0] == (handler, (0.0,))
+        # Only the mute_toggle callback should be present, not volume
+        vol_callbacks = [cb for cb in callbacks if cb[0] is handler]
+        assert len(vol_callbacks) == 0
 
-    def test_on_volume_change_queued_on_unmute(self):
+    def test_on_volume_change_not_queued_on_unmute(self):
         c = HaMediaCard(0, volume=75)
         handler = AsyncMock()
         c.on_volume_change(handler)
@@ -637,8 +733,8 @@ class TestHaMediaCardOnVolumeChange:
         c.drain_pending_callbacks()
         c.toggle_mute()
         callbacks = c.drain_pending_callbacks()
-        assert len(callbacks) == 1
-        assert callbacks[0] == (handler, (75.0,))
+        vol_callbacks = [cb for cb in callbacks if cb[0] is handler]
+        assert len(vol_callbacks) == 0
 
     def test_on_volume_change_not_queued_when_clamped_at_max(self):
         c = HaMediaCard(0, volume=100)
@@ -660,16 +756,126 @@ class TestHaMediaCardOnVolumeChange:
         c = HaMediaCard(0, volume=50)
         handler = AsyncMock()
         c.on_volume_change(handler)
-        c.set_volume(60)
+        c.handle_encoder_turn(10)
         c.drain_pending_callbacks()
         callbacks = c.drain_pending_callbacks()
         assert len(callbacks) == 0
 
     def test_no_handler_no_callback(self):
         c = HaMediaCard(0, volume=50)
-        c.set_volume(60)
+        c.handle_encoder_turn(10)
         callbacks = c.drain_pending_callbacks()
         assert len(callbacks) == 0
+
+
+# ── on_mute_toggle callbacks ─────────────────────────────────────────────
+
+
+class TestHaMediaCardOnMuteToggle:
+    def test_on_mute_toggle_queued_on_mute(self):
+        c = HaMediaCard(0, volume=75)
+        handler = AsyncMock()
+        c.on_mute_toggle(handler)
+        c.toggle_mute()
+        callbacks = c.drain_pending_callbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0] == (handler, (True,))
+
+    def test_on_mute_toggle_queued_on_unmute(self):
+        c = HaMediaCard(0, volume=75)
+        handler = AsyncMock()
+        c.on_mute_toggle(handler)
+        c.toggle_mute()
+        c.drain_pending_callbacks()
+        c.toggle_mute()
+        callbacks = c.drain_pending_callbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0] == (handler, (False,))
+
+    def test_on_mute_toggle_not_queued_without_handler(self):
+        c = HaMediaCard(0, volume=75)
+        c.toggle_mute()
+        callbacks = c.drain_pending_callbacks()
+        assert len(callbacks) == 0
+
+    def test_on_mute_toggle_returns_handler(self):
+        c = HaMediaCard(0)
+        handler = AsyncMock()
+        result = c.on_mute_toggle(handler)
+        assert result is handler
+
+    async def test_on_mute_toggle_queued_on_short_press(self):
+        c = HaMediaCard(0, volume=75, long_press_seconds=10.0)
+        handler = AsyncMock()
+        c.on_mute_toggle(handler)
+        await _short_press(c)
+        callbacks = c.drain_pending_callbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0] == (handler, (True,))
+
+    async def test_on_mute_toggle_not_queued_on_long_press(self):
+        c = HaMediaCard(0, volume=75, long_press_seconds=0.05)
+        c.set_refresh_callback(AsyncMock())
+        handler = AsyncMock()
+        c.on_mute_toggle(handler)
+        await c.dispatch_encoder_press()
+        await asyncio.sleep(0.1)
+        await c.dispatch_encoder_release()
+        callbacks = c.drain_pending_callbacks()
+        assert len(callbacks) == 0
+
+
+# ── on_play_pause_toggle callbacks ───────────────────────────────────────
+
+
+class TestHaMediaCardOnPlayPauseToggle:
+    def test_on_play_pause_toggle_returns_handler(self):
+        c = HaMediaCard(0)
+        handler = AsyncMock()
+        result = c.on_play_pause_toggle(handler)
+        assert result is handler
+
+    async def test_on_play_pause_toggle_queued_on_long_press_from_paused(self):
+        c = HaMediaCard(0, state="Paused", long_press_seconds=0.05)
+        c.set_refresh_callback(AsyncMock())
+        handler = AsyncMock()
+        c.on_play_pause_toggle(handler)
+        await c.dispatch_encoder_press()
+        await asyncio.sleep(0.1)
+        callbacks = c.drain_pending_callbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0] == (handler, (True,))
+        await c.dispatch_encoder_release()
+
+    async def test_on_play_pause_toggle_queued_on_long_press_from_playing(self):
+        c = HaMediaCard(0, state="Playing", long_press_seconds=0.05)
+        c.set_refresh_callback(AsyncMock())
+        handler = AsyncMock()
+        c.on_play_pause_toggle(handler)
+        await c.dispatch_encoder_press()
+        await asyncio.sleep(0.1)
+        callbacks = c.drain_pending_callbacks()
+        assert len(callbacks) == 1
+        assert callbacks[0] == (handler, (False,))
+        await c.dispatch_encoder_release()
+
+    async def test_on_play_pause_toggle_not_queued_on_short_press(self):
+        c = HaMediaCard(0, state="Paused", long_press_seconds=10.0)
+        handler = AsyncMock()
+        c.on_play_pause_toggle(handler)
+        await _short_press(c)
+        callbacks = c.drain_pending_callbacks()
+        pp_callbacks = [cb for cb in callbacks if cb[0] is handler]
+        assert len(pp_callbacks) == 0
+
+    async def test_on_play_pause_toggle_not_queued_without_handler(self):
+        c = HaMediaCard(0, state="Paused", long_press_seconds=0.05)
+        c.set_refresh_callback(AsyncMock())
+        await c.dispatch_encoder_press()
+        await asyncio.sleep(0.1)
+        callbacks = c.drain_pending_callbacks()
+        assert len(callbacks) == 0
+        await c.dispatch_encoder_release()
 
 
 # ── Gradient mask ────────────────────────────────────────────────────────
