@@ -74,7 +74,8 @@ class RangeControl(Control, ABC):
         self._label = label
         self._min = float(min_value)
         self._max = float(max_value)
-        self._value = float(value) if value is not None else self._min
+        v = float(value) if value is not None else self._min
+        self._value = max(self._min, min(self._max, v))
         self._unit = unit
         self._step = float(step)
         self._change_handler: AsyncHandler | None = None
@@ -130,6 +131,56 @@ class RangeControl(Control, ABC):
         """
         self._change_handler = handler
         return handler
+
+    def set_min_value(self, v: float) -> None:
+        """Set the minimum value.
+
+        If the current value is below the new minimum it is clamped
+        upward.  The parent card is marked dirty when the minimum
+        actually changes.
+        """
+        v = float(v)
+        if v == self._min:
+            return
+        self._min = v
+        self._clamp_value_to_range()
+        if self._card is not None:
+            self._card.mark_dirty()
+
+    def set_max_value(self, v: float) -> None:
+        """Set the maximum value.
+
+        If the current value exceeds the new maximum it is clamped
+        downward.  The parent card is marked dirty when the maximum
+        actually changes.
+        """
+        v = float(v)
+        if v == self._max:
+            return
+        self._max = v
+        self._clamp_value_to_range()
+        if self._card is not None:
+            self._card.mark_dirty()
+
+    def set_range(self, min_value: float, max_value: float) -> None:
+        """Set both minimum and maximum in one call.
+
+        The current value is re-clamped to the new range and the
+        parent card is marked dirty when either bound actually changes.
+        """
+        min_value = float(min_value)
+        max_value = float(max_value)
+        if min_value == self._min and max_value == self._max:
+            return
+        self._min = min_value
+        self._max = max_value
+        self._clamp_value_to_range()
+        if self._card is not None:
+            self._card.mark_dirty()
+
+    def _clamp_value_to_range(self) -> None:
+        """Re-clamp the current value to ``[min, max]``."""
+        self._value = max(self._min, min(self._max, self._value))
 
     def set_value(self, v: float) -> None:
         """Set the value, clamping to ``[min_value, max_value]``.

@@ -22,6 +22,10 @@ class LightCard(StackCard):
         index: Card zone index (0–3).
         brightness: Initial brightness value (0–100).  Defaults to 100.
         kelvin: Initial colour temperature in Kelvin.  Defaults to 4000.
+        brightness_min: Minimum brightness.  Defaults to 0.
+        brightness_max: Maximum brightness.  Defaults to 100.
+        kelvin_min: Minimum colour temperature in Kelvin.  Defaults to 2000.
+        kelvin_max: Maximum colour temperature in Kelvin.  Defaults to 6500.
 
     Usage::
 
@@ -38,10 +42,24 @@ class LightCard(StackCard):
         *,
         brightness: float = 100,
         kelvin: float = 4000,
+        brightness_min: float = 0,
+        brightness_max: float = 100,
+        kelvin_min: float = 2000,
+        kelvin_max: float = 6500,
     ) -> None:
         super().__init__(index)
-        self._brightness = BrightnessSlider("Brightness", value=brightness)
-        self._kelvin = KelvinSlider("Kelvin", value=kelvin)
+        self._brightness = BrightnessSlider(
+            "Brightness",
+            value=brightness,
+            min_value=brightness_min,
+            max_value=brightness_max,
+        )
+        self._kelvin = KelvinSlider(
+            "Kelvin",
+            value=kelvin,
+            min_value=kelvin_min,
+            max_value=kelvin_max,
+        )
 
         self.add_element(self._brightness, default=True)
         self.add_element(self._kelvin)
@@ -57,3 +75,21 @@ class LightCard(StackCard):
     def kelvin(self) -> KelvinSlider:
         """The Kelvin (colour temperature) slider."""
         return self._kelvin
+
+    # -- Range setters -----------------------------------------------------
+
+    def set_brightness_range(self, min_value: float, max_value: float) -> None:
+        """Set the min/max range for the brightness slider.
+
+        The current value is re-clamped to the new range and the card
+        is marked dirty.
+        """
+        self._brightness.set_range(min_value, max_value)
+
+    def set_kelvin_range(self, min_value: float, max_value: float) -> None:
+        """Set the min/max range for the kelvin slider.
+
+        The current value is re-clamped to the new range and the card
+        is marked dirty.
+        """
+        self._kelvin.set_range(min_value, max_value)

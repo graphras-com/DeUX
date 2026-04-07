@@ -42,6 +42,78 @@ class TestLightWidgetInit:
         assert w.active_control is w.brightness
 
 
+class TestLightWidgetMinMax:
+    def test_custom_brightness_range(self):
+        w = LightCard(0, brightness_min=10, brightness_max=90)
+        assert w.brightness.min_value == 10
+        assert w.brightness.max_value == 90
+
+    def test_custom_kelvin_range(self):
+        w = LightCard(0, kelvin_min=2700, kelvin_max=5000)
+        assert w.kelvin.min_value == 2700
+        assert w.kelvin.max_value == 5000
+
+    def test_brightness_range_clamps_value(self):
+        w = LightCard(0, brightness=100, brightness_max=80)
+        assert w.brightness.value == 80
+
+    def test_kelvin_range_clamps_value(self):
+        w = LightCard(0, kelvin=6000, kelvin_max=5000)
+        assert w.kelvin.value == 5000
+
+    def test_set_range_on_brightness(self):
+        w = LightCard(0, brightness=50)
+        w.brightness.set_range(10, 90)
+        assert w.brightness.min_value == 10
+        assert w.brightness.max_value == 90
+
+    def test_set_range_on_kelvin(self):
+        w = LightCard(0, kelvin=4000)
+        w.kelvin.set_range(3000, 5500)
+        assert w.kelvin.min_value == 3000
+        assert w.kelvin.max_value == 5500
+
+    def test_set_range_marks_dirty(self):
+        w = LightCard(0, brightness=50)
+        w.mark_clean()
+        w.brightness.set_range(10, 90)
+        assert w.is_dirty is True
+
+    def test_set_brightness_range(self):
+        w = LightCard(0, brightness=50)
+        w.set_brightness_range(10, 90)
+        assert w.brightness.min_value == 10
+        assert w.brightness.max_value == 90
+
+    def test_set_brightness_range_clamps_value(self):
+        w = LightCard(0, brightness=100)
+        w.set_brightness_range(10, 80)
+        assert w.brightness.value == 80
+
+    def test_set_brightness_range_marks_dirty(self):
+        w = LightCard(0, brightness=50)
+        w.mark_clean()
+        w.set_brightness_range(10, 90)
+        assert w.is_dirty is True
+
+    def test_set_kelvin_range(self):
+        w = LightCard(0, kelvin=4000)
+        w.set_kelvin_range(3000, 5500)
+        assert w.kelvin.min_value == 3000
+        assert w.kelvin.max_value == 5500
+
+    def test_set_kelvin_range_clamps_value(self):
+        w = LightCard(0, kelvin=6000)
+        w.set_kelvin_range(3000, 5000)
+        assert w.kelvin.value == 5000
+
+    def test_set_kelvin_range_marks_dirty(self):
+        w = LightCard(0, kelvin=4000)
+        w.mark_clean()
+        w.set_kelvin_range(3000, 5500)
+        assert w.is_dirty is True
+
+
 class TestLightWidgetAccessors:
     def test_brightness_set_value(self):
         w = LightCard(0)

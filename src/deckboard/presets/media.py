@@ -23,6 +23,8 @@ class MediaCard(StackCard):
         index: Card zone index (0–3).
         title: Initial media title text.  Defaults to ``"No Media"``.
         volume: Initial volume level.  Defaults to 50.
+        volume_min: Minimum volume.  Defaults to 0.
+        volume_max: Maximum volume.  Defaults to 100.
 
     Usage::
 
@@ -39,10 +41,17 @@ class MediaCard(StackCard):
         *,
         title: str = "No Media",
         volume: float = 50,
+        volume_min: float = 0,
+        volume_max: float = 100,
     ) -> None:
         super().__init__(index)
         self._title_text = LargeText(title)
-        self._volume = VolumeSlider("Volume", value=volume)
+        self._volume = VolumeSlider(
+            "Volume",
+            value=volume,
+            min_value=volume_min,
+            max_value=volume_max,
+        )
         self._muted = False
         self._saved_volume: float = volume
 
@@ -65,6 +74,16 @@ class MediaCard(StackCard):
     def muted(self) -> bool:
         """Whether the volume is currently muted."""
         return self._muted
+
+    # -- Range setters -----------------------------------------------------
+
+    def set_volume_range(self, min_value: float, max_value: float) -> None:
+        """Set the min/max range for the volume slider.
+
+        The current value is re-clamped to the new range and the card
+        is marked dirty.
+        """
+        self._volume.set_range(min_value, max_value)
 
     # -- Mute control ------------------------------------------------------
 
