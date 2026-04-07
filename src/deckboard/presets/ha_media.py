@@ -31,10 +31,69 @@ _VOL_BAR_COLOR = "#68b1ff"
 _ARTIST_COLOR = "#69b1ff"
 _TITLE_COLOR = "#f8ab3c"
 _STATE_COLOR = "#69b1ff"
+_MUTE_ICON_COLOR = "#ffffff"
+
+# ── Mute icon layout constants ───────────────────────────────────────
+
+_MUTE_ICON_SIZE = 16
+_MUTE_ICON_RIGHT_MARGIN = 5
+_MUTE_ICON_Y = 70
+_STATE_TEXT_Y = 52
 
 # ── Gradient mask (pre-built once) ───────────────────────────────────────
 
 _gradient_mask: Image.Image | None = None
+
+
+def _draw_mute_icon(draw: ImageDraw.ImageDraw, x: int, y: int, size: int) -> None:
+    """Draw a speaker-off (muted) icon using PIL drawing primitives.
+
+    The icon consists of a speaker body (polygon), a cone (polygon),
+    and an "×" mark to indicate muted.  All parts are drawn at *size*
+    pixels inside a bounding box starting at (*x*, *y*).
+
+    Args:
+        draw: The :class:`~PIL.ImageDraw.ImageDraw` context.
+        x: Left edge of the icon bounding box.
+        y: Top edge of the icon bounding box.
+        size: Width and height of the icon in pixels.
+    """
+    s = size / 16.0  # scale factor relative to a 16×16 design grid
+
+    # Speaker body (rectangular part)
+    draw.rectangle(
+        (
+            int(x + 1 * s),
+            int(y + 5 * s),
+            int(x + 4 * s),
+            int(y + 11 * s),
+        ),
+        fill=_MUTE_ICON_COLOR,
+    )
+
+    # Speaker cone (triangular part)
+    draw.polygon(
+        [
+            (int(x + 4 * s), int(y + 5 * s)),
+            (int(x + 8 * s), int(y + 1 * s)),
+            (int(x + 8 * s), int(y + 15 * s)),
+            (int(x + 4 * s), int(y + 11 * s)),
+        ],
+        fill=_MUTE_ICON_COLOR,
+    )
+
+    # "×" mark (two diagonal lines)
+    lw = max(1, int(1.5 * s))
+    draw.line(
+        [(int(x + 10 * s), int(y + 4 * s)), (int(x + 15 * s), int(y + 12 * s))],
+        fill=_MUTE_ICON_COLOR,
+        width=lw,
+    )
+    draw.line(
+        [(int(x + 15 * s), int(y + 4 * s)), (int(x + 10 * s), int(y + 12 * s))],
+        fill=_MUTE_ICON_COLOR,
+        width=lw,
+    )
 
 
 def _build_gradient_mask() -> Image.Image:
@@ -492,11 +551,16 @@ class HaMediaCard(Card):
             bbox = draw.textbbox((0, 0), state_text, font=font)
             text_w = bbox[2] - bbox[0]
             draw.text(
-                (PANEL_WIDTH - text_w - 5, 60),
+                (PANEL_WIDTH - text_w - 5, _STATE_TEXT_Y),
                 state_text,
                 fill=_STATE_COLOR,
                 font=font,
             )
+
+        # 5b. Mute icon (only when muted) ──────────────────────────────
+        if self._muted:
+            icon_x = PANEL_WIDTH - _MUTE_ICON_SIZE - _MUTE_ICON_RIGHT_MARGIN
+            _draw_mute_icon(draw, icon_x, _MUTE_ICON_Y, _MUTE_ICON_SIZE)
 
         # 6. Volume bar background ──────────────────────────────────────
         draw.rectangle(
