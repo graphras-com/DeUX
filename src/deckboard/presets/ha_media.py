@@ -23,7 +23,7 @@ __all__ = ["HaMediaCard"]
 # ── Volume bar layout constants ──────────────────────────────────────────
 
 _VOL_BAR_HEIGHT = 5
-_VOL_BAR_Y = PANEL_HEIGHT - _VOL_BAR_HEIGHT - 2
+_VOL_BAR_Y = PANEL_HEIGHT - _VOL_BAR_HEIGHT
 _VOL_BAR_COLOR = "#68b1ff"
 
 # ── Text colours ─────────────────────────────────────────────────────────
@@ -40,22 +40,34 @@ _gradient_mask: Image.Image | None = None
 def _build_gradient_mask() -> Image.Image:
     """Build the left-to-right transparency gradient for the entity picture.
 
-    The gradient goes from fully transparent on the left to fully opaque
-    on the right, allowing the album art to blend smoothly into the
-    black card background.
+    The gradient covers roughly the left half of the panel, ramping from
+    fully transparent on the far left to fully opaque black.  The right
+    half is solid black so text is always readable.
+
+    Gradient stops (normalised to the panel width):
+
+    * ``0%`` → alpha **0** (album art fully visible)
+    * ``~30%`` → alpha **173** (68 % black overlay)
+    * ``~53%`` → alpha **255** (fully opaque black)
+    * ``53 %–100 %`` → alpha **255** (stays solid black)
     """
     global _gradient_mask  # noqa: PLW0603
     if _gradient_mask is not None:
         return _gradient_mask
 
     mask = Image.new("L", (PANEL_WIDTH, PANEL_HEIGHT), 0)
+    # The gradient occupies roughly 53 % of the panel width; beyond
+    # that the mask is fully opaque so text draws on pure black.
+    grad_end = 0.53
+    mid_stop = 0.30  # 58 % of grad_end ≈ 0.30 of panel
     for x in range(PANEL_WIDTH):
         t = x / max(PANEL_WIDTH - 1, 1)
-        # Opacity ramps from 0 at x=0 to ~173 at 58% then 255 at 100%
-        if t < 0.58:
-            alpha = int(t / 0.58 * 173)
+        if t >= grad_end:
+            alpha = 255
+        elif t < mid_stop:
+            alpha = int(t / mid_stop * 173)
         else:
-            alpha = int(173 + (t - 0.58) / 0.42 * (255 - 173))
+            alpha = int(173 + (t - mid_stop) / (grad_end - mid_stop) * (255 - 173))
         for y in range(PANEL_HEIGHT):
             mask.putpixel((x, y), alpha)
 
@@ -348,13 +360,27 @@ class HaMediaCard(Card):
         img = Image.composite(black, img, mask)
         draw = ImageDraw.Draw(img)
 
-        # 3. Artist text (top area, small font) ────────────────────────
+        # 3. Artist text (top area, right-aligned) ─────────────────────
         if self._artist:
-            draw.text((37, 14), self._artist, fill=_ARTIST_COLOR, font=font)
+            bbox_a = draw.textbbox((0, 0), self._artist, font=font)
+            artist_w = bbox_a[2] - bbox_a[0]
+            draw.text(
+                (PANEL_WIDTH - artist_w - 5, 14),
+                self._artist,
+                fill=_ARTIST_COLOR,
+                font=font,
+            )
 
-        # 4. Title text (middle area, smaller font) ─────────────────────
+        # 4. Title text (middle area, right-aligned) ────────────────────
         if self._title:
-            draw.text((37, 34), self._title, fill=_TITLE_COLOR, font=small_font)
+            bbox_t = draw.textbbox((0, 0), self._title, font=small_font)
+            title_w = bbox_t[2] - bbox_t[0]
+            draw.text(
+                (PANEL_WIDTH - title_w - 5, 34),
+                self._title,
+                fill=_TITLE_COLOR,
+                font=small_font,
+            )
 
         # 5. State text (lower-right, standard font) ───────────────────
         state_text = self._state.capitalize() if self._state else ""
