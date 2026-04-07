@@ -5,9 +5,17 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from deckboard.presets.ha_media import HaMediaCard
+from deckboard.presets.ha_media import (
+    _MUTE_ICON_COLOR,
+    _MUTE_ICON_RIGHT_MARGIN,
+    _MUTE_ICON_SIZE,
+    _MUTE_ICON_Y,
+    _STATE_TEXT_Y,
+    _draw_mute_icon,
+)
 from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
 from deckboard.ui.cards.base import Card
 
@@ -721,6 +729,152 @@ class TestHaMediaCardRender:
         c = HaMediaCard(0)
         img = c.render()
         assert img.mode == "RGB"
+
+
+# ── Mute icon rendering ─────────────────────────────────────────────────
+
+
+class TestHaMediaCardMuteIconRender:
+    """Verify the mute icon is drawn only when muted and occupies the
+    expected region of the card image."""
+
+    def _icon_region_pixels(self, img: Image.Image) -> list[tuple[int, int, int]]:
+        """Extract pixels from the mute-icon bounding box."""
+        icon_x = PANEL_WIDTH - _MUTE_ICON_SIZE - _MUTE_ICON_RIGHT_MARGIN
+        pixels = []
+        for y in range(_MUTE_ICON_Y, _MUTE_ICON_Y + _MUTE_ICON_SIZE):
+            for x in range(icon_x, icon_x + _MUTE_ICON_SIZE):
+                pixels.append(img.getpixel((x, y)))
+        return pixels
+
+    def test_mute_icon_drawn_when_muted(self):
+        """When muted, non-black pixels must appear in the icon area."""
+        c = HaMediaCard(0, volume=75, state="")
+        c.toggle_mute()
+        img = c.render()
+        pixels = self._icon_region_pixels(img)
+        non_black = [p for p in pixels if p != (0, 0, 0)]
+        assert len(non_black) > 0, "Expected mute icon pixels but found none"
+
+    def test_mute_icon_not_drawn_when_unmuted(self):
+        """When not muted and no state text overlaps, the icon area is black."""
+        c = HaMediaCard(0, volume=75, state="")
+        img = c.render()
+        pixels = self._icon_region_pixels(img)
+        non_black = [p for p in pixels if p != (0, 0, 0)]
+        assert len(non_black) == 0, "Expected no mute icon pixels when unmuted"
+
+    def test_mute_icon_uses_white_color(self):
+        """The mute icon should be drawn in white (#ffffff)."""
+        c = HaMediaCard(0, volume=75, state="")
+        c.toggle_mute()
+        img = c.render()
+        pixels = self._icon_region_pixels(img)
+        white_pixels = [p for p in pixels if p == (255, 255, 255)]
+        assert len(white_pixels) > 0, "Expected white pixels in mute icon"
+
+    def test_mute_icon_disappears_after_unmute(self):
+        """Toggling mute off should remove the icon from the render."""
+        c = HaMediaCard(0, volume=75, state="")
+        c.toggle_mute()
+        img_muted = c.render()
+        muted_pixels = self._icon_region_pixels(img_muted)
+        assert any(p != (0, 0, 0) for p in muted_pixels)
+
+        c.toggle_mute()
+        img_unmuted = c.render()
+        unmuted_pixels = self._icon_region_pixels(img_unmuted)
+        non_black = [p for p in unmuted_pixels if p != (0, 0, 0)]
+        assert len(non_black) == 0
+
+    def test_set_muted_true_shows_icon(self):
+        """Using set_muted(True) should also draw the mute icon."""
+        c = HaMediaCard(0, volume=75, state="")
+        c.set_muted(True)
+        img = c.render()
+        pixels = self._icon_region_pixels(img)
+        non_black = [p for p in pixels if p != (0, 0, 0)]
+        assert len(non_black) > 0
+
+
+# ── _draw_mute_icon unit tests ───────────────────────────────────────────
+
+
+class TestDrawMuteIcon:
+    """Direct unit tests for the _draw_mute_icon helper function."""
+
+    @staticmethod
+    def _all_pixels(img: Image.Image) -> list[tuple[int, int, int]]:
+        """Return all pixels from the image without using deprecated getdata."""
+        w, h = img.size
+        return [img.getpixel((x, y)) for y in range(h) for x in range(w)]
+
+    def test_draws_non_black_pixels(self):
+        img = Image.new("RGB", (24, 24), "black")
+        draw = ImageDraw.Draw(img)
+        _draw_mute_icon(draw, 4, 4, 16)
+        pixels = self._all_pixels(img)
+        non_black = [p for p in pixels if p != (0, 0, 0)]
+        assert len(non_black) > 0
+
+    def test_draws_white_pixels(self):
+        img = Image.new("RGB", (24, 24), "black")
+        draw = ImageDraw.Draw(img)
+        _draw_mute_icon(draw, 4, 4, 16)
+        pixels = self._all_pixels(img)
+        white = [p for p in pixels if p == (255, 255, 255)]
+        assert len(white) > 0
+
+    def test_icon_stays_within_bounds(self):
+        """All drawn pixels must lie within the declared bounding box."""
+        size = 16
+        padding = 4
+        total = size + 2 * padding
+        img = Image.new("RGB", (total, total), "black")
+        draw = ImageDraw.Draw(img)
+        _draw_mute_icon(draw, padding, padding, size)
+
+        # Check that the outside border rows/cols are still black
+        for x in range(total):
+            assert img.getpixel((x, 0)) == (0, 0, 0)
+            assert img.getpixel((x, total - 1)) == (0, 0, 0)
+        for y in range(total):
+            assert img.getpixel((0, y)) == (0, 0, 0)
+            assert img.getpixel((total - 1, y)) == (0, 0, 0)
+
+    def test_different_sizes(self):
+        """The icon should scale to different sizes without errors."""
+        for size in (8, 12, 16, 24, 32):
+            img = Image.new("RGB", (size + 8, size + 8), "black")
+            draw = ImageDraw.Draw(img)
+            _draw_mute_icon(draw, 4, 4, size)
+            pixels = self._all_pixels(img)
+            non_black = [p for p in pixels if p != (0, 0, 0)]
+            assert len(non_black) > 0, f"No pixels drawn at size={size}"
+
+
+# ── State text Y-position ────────────────────────────────────────────────
+
+
+class TestHaMediaCardStateTextPosition:
+    """Verify the state text has moved higher to make room for the mute icon."""
+
+    def test_state_text_y_constant(self):
+        """The state text Y position should be 52 (moved from 60)."""
+        assert _STATE_TEXT_Y == 52
+
+    def test_mute_icon_y_below_state_text(self):
+        """The mute icon Y position should be below the state text."""
+        assert _MUTE_ICON_Y > _STATE_TEXT_Y
+
+    def test_mute_icon_color_is_white(self):
+        assert _MUTE_ICON_COLOR == "#ffffff"
+
+    def test_mute_icon_size(self):
+        assert _MUTE_ICON_SIZE == 16
+
+    def test_mute_icon_right_margin(self):
+        assert _MUTE_ICON_RIGHT_MARGIN == 5
 
 
 # ── on_volume_change callbacks ───────────────────────────────────────────
