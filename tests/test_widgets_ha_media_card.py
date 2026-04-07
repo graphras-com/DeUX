@@ -280,6 +280,36 @@ class TestHaMediaCardMute:
         assert c.muted is False
         assert c.volume == 0
 
+    def test_set_muted_true(self):
+        c = HaMediaCard(0)
+        c.set_muted(True)
+        assert c.muted is True
+
+    def test_set_muted_false(self):
+        c = HaMediaCard(0)
+        c.toggle_mute()
+        c.set_muted(False)
+        assert c.muted is False
+
+    def test_set_muted_marks_dirty(self):
+        c = HaMediaCard(0)
+        c.mark_clean()
+        c.set_muted(True)
+        assert c.is_dirty is True
+
+    def test_set_muted_does_not_emit_callback(self):
+        c = HaMediaCard(0)
+        handler = AsyncMock()
+        c.on_mute_toggle(handler)
+        c.set_muted(True)
+        callbacks = c.drain_pending_callbacks()
+        assert len(callbacks) == 0
+
+    def test_set_muted_does_not_change_volume(self):
+        c = HaMediaCard(0, volume=75)
+        c.set_muted(True)
+        assert c.volume == 75
+
 
 # ── Play/Pause control (direct method calls) ─────────────────────────────
 

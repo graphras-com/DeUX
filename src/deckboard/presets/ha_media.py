@@ -319,6 +319,16 @@ class HaMediaCard(Card):
 
     # ── Mute control ──────────────────────────────────────────────────
 
+    def set_muted(self, muted: bool) -> None:
+        """Set the confirmed mute state.
+
+        This is intended to be called by the integration layer to sync
+        the mute state from the backend (e.g. on initial load or after
+        a confirmed toggle).  No callback is emitted.
+        """
+        self._muted = bool(muted)
+        self._dirty = True
+
     def toggle_mute(self) -> None:
         """Toggle mute on/off.
 
