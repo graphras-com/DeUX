@@ -91,29 +91,6 @@ class TestEqualizerWidgetMinMax:
         w.sub.set_range(10, 90)
         assert w.is_dirty is True
 
-    def test_set_eq_range(self):
-        w = EqualizerCard(0, sub=50, bass=50, treble=50)
-        w.set_eq_range(10, 90)
-        assert w.sub.min_value == 10
-        assert w.sub.max_value == 90
-        assert w.bass.min_value == 10
-        assert w.bass.max_value == 90
-        assert w.treble.min_value == 10
-        assert w.treble.max_value == 90
-
-    def test_set_eq_range_clamps_values(self):
-        w = EqualizerCard(0, sub=5, bass=95, treble=50)
-        w.set_eq_range(20, 80)
-        assert w.sub.value == 20
-        assert w.bass.value == 80
-        assert w.treble.value == 50
-
-    def test_set_eq_range_marks_dirty(self):
-        w = EqualizerCard(0, sub=50)
-        w.mark_clean()
-        w.set_eq_range(10, 90)
-        assert w.is_dirty is True
-
     def test_set_balance_range(self):
         w = EqualizerCard(0, balance=50)
         w.set_balance_range(20, 80)

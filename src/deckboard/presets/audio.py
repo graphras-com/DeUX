@@ -137,16 +137,6 @@ class EqualizerCard(StackCard):
         """Set the min/max range for the Treble band slider."""
         self._treble.set_range(min_value, max_value)
 
-    def set_eq_range(self, min_value: float, max_value: float) -> None:
-        """Set the min/max range for all three EQ band sliders at once.
-
-        Each band's current value is re-clamped to the new range and
-        the card is marked dirty.
-        """
-        self._sub.set_range(min_value, max_value)
-        self._bass.set_range(min_value, max_value)
-        self._treble.set_range(min_value, max_value)
-
     def set_balance_range(self, min_value: float, max_value: float) -> None:
         """Set the min/max range for the balance slider.
 
