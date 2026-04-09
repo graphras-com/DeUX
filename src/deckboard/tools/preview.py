@@ -3,11 +3,13 @@
 Run with::
 
     python -m deckboard.tools.preview \\
-        --card0 my_card.svg --key0 my_key.svg
+        --card0 my_card.svg --key0 my_key.svg \\
+        --background "#1a2b3c"
 
 Only the specified slots are updated; unspecified keys and cards are
-left blank (black).  SVGs are scaled to fit the target area while
-preserving aspect ratio and centred on a black background.
+left blank (black unless ``--background`` is given).  SVGs are scaled to
+fit the target area while preserving aspect ratio and centred on the
+background colour.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ import io
 import logging
 import os
 import platform
+import re
 import signal
 import subprocess
 import sys
@@ -44,6 +47,23 @@ from deckboard.render.metrics import (
 logger = logging.getLogger(__name__)
 
 _KEY_COUNT = 8
+
+_HEX_RE = re.compile(r"^#?([0-9a-fA-F]{6})$")
+
+
+def parse_hex_color(value: str) -> str:
+    """Validate and normalise a hex colour string to ``#RRGGBB``.
+
+    Accepts ``RRGGBB`` or ``#RRGGBB`` (case-insensitive).  Raises
+    :class:`argparse.ArgumentTypeError` for invalid values so that
+    ``argparse`` can produce a user-friendly error message.
+    """
+    m = _HEX_RE.match(value)
+    if m is None:
+        raise argparse.ArgumentTypeError(
+            f"invalid hex colour: {value!r} (expected '#RRGGBB' or 'RRGGBB')"
+        )
+    return f"#{m.group(1).lower()}"
 
 
 # -- SVG loading -------------------------------------------------------------
@@ -144,9 +164,16 @@ def compose_key_image(svg_img: Image.Image) -> bytes:
     return _encode_jpeg(canvas)
 
 
-def compose_card_image(svg_img: Image.Image) -> Image.Image:
-    """Place *svg_img* centred on a panel-sized black card canvas."""
-    canvas = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+def compose_card_image(
+    svg_img: Image.Image,
+    background: str = "black",
+) -> Image.Image:
+    """Place *svg_img* centred on a panel-sized card canvas.
+
+    *background* sets the canvas fill colour (any PIL-compatible colour
+    string, e.g. ``"black"`` or ``"#1a2b3c"``).
+    """
+    canvas = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), background)
     x = (PANEL_WIDTH - svg_img.width) // 2
     y = (PANEL_HEIGHT - svg_img.height) // 2
     if svg_img.mode == "RGBA":
@@ -156,9 +183,16 @@ def compose_card_image(svg_img: Image.Image) -> Image.Image:
     return canvas
 
 
-def compose_touchstrip(card_images: list[Image.Image | None]) -> bytes:
-    """Compose up to 4 card images into a single 800x100 touchscreen JPEG."""
-    img = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), "black")
+def compose_touchstrip(
+    card_images: list[Image.Image | None],
+    background: str = "black",
+) -> bytes:
+    """Compose up to 4 card images into a single 800x100 touchscreen JPEG.
+
+    *background* fills the entire 800x100 canvas — including the margin
+    and gap areas outside card panels.
+    """
+    img = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), background)
     for index, card_image in enumerate(card_images):
         if index >= PANEL_COUNT:
             break
@@ -200,6 +234,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=80,
         metavar="PCT",
         help="Screen brightness 0-100 (default: 80)",
+    )
+    parser.add_argument(
+        "--background",
+        type=parse_hex_color,
+        default=None,
+        metavar="HEX",
+        help="Background colour for the touchstrip in hex (e.g. '#1a2b3c' or '1a2b3c')",
     )
     parser.add_argument(
         "-v",
@@ -310,6 +351,7 @@ def render_preview(
 
     Returns a ``(key_images, touchstrip_bytes)`` tuple.
     """
+    background: str = getattr(args, "background", None) or "black"
     key_images: dict[int, bytes] = {}
     card_images: list[Image.Image | None] = [None] * PANEL_COUNT
 
@@ -332,12 +374,12 @@ def render_preview(
                 print(f"ERROR: Card SVG not found: {svg_path}", file=sys.stderr)  # noqa: T201
                 sys.exit(1)
             img = load_svg(svg_path, PANEL_WIDTH, PANEL_HEIGHT)
-            card_images[i] = compose_card_image(img)
+            card_images[i] = compose_card_image(img, background=background)
             logger.info(
                 "Rendered card %d from %s (%dx%d)", i, svg_path, img.width, img.height
             )
 
-    touchstrip_bytes = compose_touchstrip(card_images)
+    touchstrip_bytes = compose_touchstrip(card_images, background=background)
     return key_images, touchstrip_bytes
 
 
