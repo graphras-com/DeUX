@@ -19,6 +19,8 @@ class TestPublicAPI:
             "DeckError",
             "DeckEvent",
             "DeviceInfo",
+            "DsuiCard",
+            "DsuiKey",
             "Element",
             "EncoderPressEvent",
             "EncoderSlot",
@@ -37,6 +39,8 @@ class TestPublicAPI:
             "LargeText",
             "LightCard",
             "MediaCard",
+            "PackageError",
+            "PackageSpec",
             "RangeControl",
             "Screen",
             "Slider",
@@ -49,6 +53,8 @@ class TestPublicAPI:
             "TouchEvent",
             "TouchStrip",
             "VolumeSlider",
+            "load_all_packages",
+            "load_package",
         }
         assert set(deckboard.__all__) == expected
 

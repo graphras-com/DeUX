@@ -22,6 +22,14 @@ Example::
 
 from __future__ import annotations
 
+from .dsui import (
+    DsuiCard,
+    DsuiKey,
+    PackageError,
+    PackageSpec,
+    load_all_packages,
+    load_package,
+)
 from .presets import EqualizerCard, HaMediaCard, LightCard, MediaCard
 from .render import IconError, IconManager
 from .runtime import (
@@ -70,6 +78,8 @@ __all__ = [
     "DeckError",
     "DeckEvent",
     "DeviceInfo",
+    "DsuiCard",
+    "DsuiKey",
     "Element",
     "EncoderPressEvent",
     "EncoderSlot",
@@ -88,6 +98,8 @@ __all__ = [
     "LargeText",
     "LightCard",
     "MediaCard",
+    "PackageError",
+    "PackageSpec",
     "RangeControl",
     "Screen",
     "Slider",
@@ -100,6 +112,8 @@ __all__ = [
     "TouchEvent",
     "TouchStrip",
     "VolumeSlider",
+    "load_all_packages",
+    "load_package",
 ]
 
 __version__ = "0.1.0"
