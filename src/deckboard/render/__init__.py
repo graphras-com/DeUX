@@ -26,7 +26,6 @@ from .metrics import (
 from .touch_renderer import (
     compose_touchstrip,
     render_blank_touchscreen,
-    render_status_card_image,
 )
 
 __all__ = [
@@ -56,5 +55,4 @@ __all__ = [
     "render_blank_key",
     "render_blank_touchscreen",
     "render_key_image",
-    "render_status_card_image",
 ]

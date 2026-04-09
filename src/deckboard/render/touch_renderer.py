@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
 from .debug_grid import draw_touchscreen_grid
-from .fonts import get_font, get_small_font
 from .key_renderer import _encode_jpeg
 from .metrics import (
     MARGIN_LEFT,
@@ -17,41 +16,6 @@ from .metrics import (
     TOUCHSCREEN_HEIGHT,
     TOUCHSCREEN_WIDTH,
 )
-
-
-def render_status_card_image(
-    icon: Image.Image | None = None,
-    label: str | None = None,
-    value: str | None = None,
-    background: str = "black",
-) -> Image.Image:
-    """Render a single status card image."""
-    img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), background)
-    draw = ImageDraw.Draw(img)
-    font = get_font()
-    small_font = get_small_font()
-
-    card_icon_size = 55
-    icon_x = 8
-    icon_y = (PANEL_HEIGHT - card_icon_size) // 2
-
-    if icon is not None:
-        sized = icon.resize((card_icon_size, card_icon_size), Image.LANCZOS)
-        if sized.mode == "RGBA":
-            img.paste(sized, (icon_x, icon_y), sized)
-        else:
-            img.paste(sized, (icon_x, icon_y))
-
-    text_x = icon_x + card_icon_size + 10
-    if label and value:
-        draw.text((text_x, 20), label, fill="white", font=font)
-        draw.text((text_x, 44), value, fill="#aaaaaa", font=small_font)
-    elif label:
-        draw.text((text_x, 33), label, fill="white", font=font)
-    elif value:
-        draw.text((text_x, 33), value, fill="#aaaaaa", font=small_font)
-
-    return img
 
 
 def compose_touchstrip(

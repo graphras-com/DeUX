@@ -29,7 +29,6 @@ from deckboard.render.fonts import (
 from deckboard.render.touch_renderer import (
     compose_touchstrip,
     render_blank_touchscreen,
-    render_status_card_image,
 )
 from deckboard.render.debug_grid import (
     draw_key_grid,
@@ -171,41 +170,6 @@ class TestRenderKeyImage:
         result = render_key_image(icon=sample_icon, label="Test", debug_grid=True)
         img = _decode_jpeg(result)
         assert img.size == KEY_SIZE
-
-
-# ── render_status_card_image ─────────────────────────────────────────────────
-
-
-class TestRenderWidgetImage:
-    def test_blank_returns_image(self):
-        result = render_status_card_image()
-        assert isinstance(result, Image.Image)
-        assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
-        assert result.mode == "RGB"
-
-    def test_with_icon(self, sample_icon):
-        result = render_status_card_image(icon=sample_icon)
-        assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
-
-    def test_with_rgb_icon(self, sample_rgb_icon):
-        result = render_status_card_image(icon=sample_rgb_icon)
-        assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
-
-    def test_with_label_only(self):
-        result = render_status_card_image(label="Volume")
-        assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
-
-    def test_with_value_only(self):
-        result = render_status_card_image(value="75%")
-        assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
-
-    def test_with_label_and_value(self):
-        result = render_status_card_image(label="Volume", value="75%")
-        assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
-
-    def test_with_all(self, sample_icon):
-        result = render_status_card_image(icon=sample_icon, label="Vol", value="50%")
-        assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
 
 # ── compose_touchstrip ─────────────────────────────────────────────────

@@ -485,10 +485,6 @@ class Deck:
         for handler, args in card.drain_pending_callbacks():
             await handler(*args)
 
-    async def _drain_widget_callbacks(self, card: Card) -> None:
-        """Backward-compatible private helper used by existing tests."""
-        await self._drain_card_callbacks(card)
-
     async def _dispatch(self, event: DeckEvent) -> None:
         """Dispatch a single event to the appropriate handler on the active screen."""
         screen = self._current_screen()
