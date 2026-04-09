@@ -4,16 +4,14 @@ from __future__ import annotations
 
 from ..render.metrics import PANEL_COUNT
 from .cards.base import Card
+from .cards.blank import BlankCard
 
 
 class TouchStrip:
     """Manage the 4 card zones on the Stream Deck+ touch strip."""
 
     def __init__(self) -> None:
-        # Import here to avoid circular imports at module level
-        from .cards.status import StatusCard
-
-        self._cards: list[Card] = [StatusCard(i) for i in range(PANEL_COUNT)]
+        self._cards: list[Card] = [BlankCard(i) for i in range(PANEL_COUNT)]
 
     def card(self, index: int) -> Card:
         """Get a card zone by index (0-3)."""

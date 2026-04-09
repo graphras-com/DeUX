@@ -16,8 +16,7 @@ from deckboard.ui.screen import Screen
 from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
 from deckboard.ui.touch_strip import TouchStrip
 from deckboard.ui.cards.base import Card
-from deckboard.ui.cards.status import StatusCard
-from deckboard.ui.cards.stack import StackCard
+from deckboard.ui.cards.blank import BlankCard
 
 
 # -- Minimal SVG templates for dsui tests ----------------------------------
@@ -201,20 +200,8 @@ def encoder():
 
 
 @pytest.fixture
-def widget():
-    """A fresh StatusCard at index 0."""
-    return StatusCard(0)
-
-
-@pytest.fixture
-def slider_widget():
-    """A fresh StackCard at index 0."""
-    return StackCard(0)
-
-
-@pytest.fixture
 def touchscreen():
-    """A fresh TouchStrip with 4 widgets."""
+    """A fresh TouchStrip with 4 blank cards."""
     return TouchStrip()
 
 
