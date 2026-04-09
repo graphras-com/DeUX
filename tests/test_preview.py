@@ -36,6 +36,7 @@ from deckboard.tools.preview import (
     load_svg,
     main,
     parse_args,
+    parse_hex_color,
     render_preview,
 )
 
@@ -80,6 +81,49 @@ def wide_svg(tmp_path: Path) -> Path:
     p = tmp_path / "wide.svg"
     p.write_bytes(svg)
     return p
+
+
+# -- parse_hex_color ---------------------------------------------------------
+
+
+class TestParseHexColor:
+    def test_hash_prefix(self):
+        assert parse_hex_color("#1a2b3c") == "#1a2b3c"
+
+    def test_no_hash_prefix(self):
+        assert parse_hex_color("ff00aa") == "#ff00aa"
+
+    def test_uppercase_normalised(self):
+        assert parse_hex_color("#AABBCC") == "#aabbcc"
+
+    def test_mixed_case(self):
+        assert parse_hex_color("AaBbCc") == "#aabbcc"
+
+    def test_all_zeros(self):
+        assert parse_hex_color("000000") == "#000000"
+
+    def test_all_f(self):
+        assert parse_hex_color("FFFFFF") == "#ffffff"
+
+    def test_invalid_too_short(self):
+        with pytest.raises(argparse.ArgumentTypeError, match="invalid hex colour"):
+            parse_hex_color("#abc")
+
+    def test_invalid_too_long(self):
+        with pytest.raises(argparse.ArgumentTypeError, match="invalid hex colour"):
+            parse_hex_color("#1234567")
+
+    def test_invalid_chars(self):
+        with pytest.raises(argparse.ArgumentTypeError, match="invalid hex colour"):
+            parse_hex_color("#gghhii")
+
+    def test_empty_string(self):
+        with pytest.raises(argparse.ArgumentTypeError, match="invalid hex colour"):
+            parse_hex_color("")
+
+    def test_hash_only(self):
+        with pytest.raises(argparse.ArgumentTypeError, match="invalid hex colour"):
+            parse_hex_color("#")
 
 
 # -- load_svg ----------------------------------------------------------------
@@ -172,6 +216,20 @@ class TestComposeCardImage:
         result = compose_card_image(svg_img)
         assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
+    def test_custom_background_colour(self):
+        """A card with no SVG coverage should show the custom background."""
+        svg_img = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
+        result = compose_card_image(svg_img, background="#ff0000")
+        # A corner pixel (outside the tiny transparent SVG) should be red.
+        px = result.getpixel((0, 0))
+        assert px == (255, 0, 0)
+
+    def test_default_background_is_black(self):
+        svg_img = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
+        result = compose_card_image(svg_img)
+        px = result.getpixel((0, 0))
+        assert px == (0, 0, 0)
+
 
 # -- compose_touchstrip ------------------------------------------------------
 
@@ -209,6 +267,35 @@ class TestComposeTouchstrip:
         result = compose_touchstrip(cards)
         decoded = Image.open(io.BytesIO(result))
         assert decoded.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
+
+    def test_custom_background_fills_margins(self):
+        """The background colour should fill areas outside card panels."""
+        cards: list[Image.Image | None] = [None] * PANEL_COUNT
+        result = compose_touchstrip(cards, background="#00ff00")
+        decoded = Image.open(io.BytesIO(result)).convert("RGB")
+        # Top-left corner is in the margin area — should be green.
+        px = decoded.getpixel((0, 0))
+        assert px[1] > 200  # green channel high
+        assert px[0] < 30  # red channel low
+        assert px[2] < 30  # blue channel low
+
+    def test_custom_background_between_panels(self):
+        """The background colour should fill the gap between card panels."""
+        # Use None cards so the entire canvas is background colour.
+        cards: list[Image.Image | None] = [None, None, None, None]
+        result = compose_touchstrip(cards, background="#0000ff")
+        decoded = Image.open(io.BytesIO(result)).convert("RGB")
+        # The gap area between where card 0 and card 1 would be.
+        gap_x = MARGIN_LEFT + PANEL_WIDTH + PANEL_GAP // 2
+        px = decoded.getpixel((gap_x, TOUCHSCREEN_HEIGHT // 2))
+        assert px[2] > 200  # blue channel high
+
+    def test_default_background_is_black(self):
+        cards: list[Image.Image | None] = [None] * PANEL_COUNT
+        result = compose_touchstrip(cards)
+        decoded = Image.open(io.BytesIO(result)).convert("RGB")
+        px = decoded.getpixel((0, 0))
+        assert all(c < 10 for c in px)
 
 
 # -- build_parser / parse_args -----------------------------------------------
@@ -266,6 +353,22 @@ class TestParser:
         parser = build_parser()
         assert isinstance(parser, argparse.ArgumentParser)
 
+    def test_background_default_none(self):
+        args = parse_args([])
+        assert args.background is None
+
+    def test_background_with_hash(self):
+        args = parse_args(["--background", "#1a2b3c"])
+        assert args.background == "#1a2b3c"
+
+    def test_background_without_hash(self):
+        args = parse_args(["--background", "ff00aa"])
+        assert args.background == "#ff00aa"
+
+    def test_background_invalid_exits(self):
+        with pytest.raises(SystemExit):
+            parse_args(["--background", "nope"])
+
 
 # -- render_preview ----------------------------------------------------------
 
@@ -320,6 +423,22 @@ class TestRenderPreview:
             render_preview(args)
         assert "Card SVG not found" in capsys.readouterr().err
 
+    def test_background_applies_to_touchstrip(self, wide_svg: Path):
+        """When --background is given, the touchstrip uses that colour."""
+        args = parse_args(["--card0", str(wide_svg), "--background", "#00ff00"])
+        _, touchstrip = render_preview(args)
+        decoded = Image.open(io.BytesIO(touchstrip)).convert("RGB")
+        # Top-left corner is margin area — should be green.
+        px = decoded.getpixel((0, 0))
+        assert px[1] > 200
+
+    def test_no_background_defaults_black(self):
+        args = parse_args([])
+        _, touchstrip = render_preview(args)
+        decoded = Image.open(io.BytesIO(touchstrip)).convert("RGB")
+        px = decoded.getpixel((0, 0))
+        assert all(c < 10 for c in px)
+
 
 # -- main / push_to_device ---------------------------------------------------
 
@@ -350,6 +469,19 @@ class TestMain:
     def test_main_verbose(self, mock_push: AsyncMock):
         main(["-v"])
         mock_push.assert_awaited_once()
+
+    @patch("deckboard.tools.preview.push_to_device", new_callable=AsyncMock)
+    def test_main_with_background(self, mock_push: AsyncMock):
+        main(["--background", "#aabbcc"])
+        mock_push.assert_awaited_once()
+        _, touchstrip, _ = mock_push.call_args[0]
+        # The touchstrip should contain the background colour.
+        decoded = Image.open(io.BytesIO(touchstrip)).convert("RGB")
+        px = decoded.getpixel((0, 0))
+        # #aabbcc = (170, 187, 204) — allow for JPEG compression.
+        assert px[0] > 150  # R
+        assert px[1] > 160  # G
+        assert px[2] > 180  # B
 
 
 class TestPushToDevice:
