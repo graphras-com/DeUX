@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from .base import Card
-from .stack import StackCard
-from .status import StatusCard
+from .blank import BlankCard
 
-__all__ = ["Card", "StackCard", "StatusCard"]
+__all__ = ["BlankCard", "Card"]

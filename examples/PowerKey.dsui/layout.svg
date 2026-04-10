@@ -1,0 +1,7 @@
+<svg id="PowerKey" xmlns="http://www.w3.org/2000/svg" width="120" height="120">
+    <rect id="background" width="120" height="120" rx="8" fill="#1c1c1c"/>
+    <circle id="ring" cx="60" cy="50" r="28" fill="none" stroke="#444444" stroke-width="3"/>
+    <line id="power_line" x1="60" y1="22" x2="60" y2="42" stroke="#444444" stroke-width="3" stroke-linecap="round"/>
+    <text id="label" x="60" y="100" font-size="12" fill="#888888" text-anchor="middle" font-family="Arial,sans-serif">Power</text>
+    <rect id="indicator" x="45" y="108" width="30" height="3" rx="1.5" fill="#333333"/>
+</svg>

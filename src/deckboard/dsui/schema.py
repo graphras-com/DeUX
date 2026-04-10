@@ -1,0 +1,132 @@
+"""Data model for .dsui package manifests."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import Enum
+
+
+class PackageType(Enum):
+    """Hardware target for a .dsui package."""
+
+    TOUCH_STRIP_CARD = "TouchStripCard"
+    KEY = "Key"
+
+
+class BindingType(Enum):
+    """Supported binding types for SVG node manipulation."""
+
+    TEXT = "text"
+    IMAGE = "image"
+    VISIBILITY = "visibility"
+    COLOR = "color"
+
+
+class OverflowMode(Enum):
+    """Text overflow handling strategy."""
+
+    ELLIPSIS = "ellipsis"
+    CLIP = "clip"
+
+
+class ImageFit(Enum):
+    """Image scaling strategy within the target node dimensions."""
+
+    COVER = "cover"
+    CONTAIN = "contain"
+    FILL = "fill"
+
+
+@dataclass(frozen=True, slots=True)
+class TextBinding:
+    """Bind a value to a <text> SVG element's content."""
+
+    node: str
+    default: str = ""
+    max_width: int | None = None
+    overflow: OverflowMode = OverflowMode.ELLIPSIS
+
+
+@dataclass(frozen=True, slots=True)
+class ImageBinding:
+    """Bind a PIL Image to an <image> SVG element's href."""
+
+    node: str
+    fit: ImageFit = ImageFit.COVER
+    placeholder_node: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class VisibilityBinding:
+    """Toggle the display attribute of an SVG element."""
+
+    node: str
+    default: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class ColorBinding:
+    """Bind a colour value to an SVG element's fill or stroke."""
+
+    node: str
+    attribute: str = "fill"
+    default: str = "#ffffff"
+
+
+Binding = TextBinding | ImageBinding | VisibilityBinding | ColorBinding
+
+# Valid event source names and their physical origins
+VALID_SOURCES = frozenset(
+    {
+        "encoder_press",
+        "encoder_release",
+        "encoder_press_release",
+        "encoder_turn",
+        "encoder_press_turn",
+        "key_press",
+        "key_release",
+        "key_press_release",
+        "tap",
+        "long_press",
+    }
+)
+
+VALID_DIRECTIONS = frozenset({"left", "right"})
+
+VALID_REGION_EVENTS = frozenset({"tap", "long_press"})
+
+
+@dataclass(frozen=True, slots=True)
+class EventMapping:
+    """Map a physical input to a named semantic event."""
+
+    name: str
+    source: str
+    direction: str | None = None
+    max_duration_ms: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Region:
+    """A touchscreen hit-test region for touch events."""
+
+    name: str
+    x: int
+    y: int
+    width: int
+    height: int
+    events: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class PackageSpec:
+    """Fully validated, immutable representation of a loaded .dsui package."""
+
+    name: str
+    type: PackageType
+    version: int
+    svg_source: str
+    bindings: dict[str, Binding] = field(default_factory=dict)
+    events: tuple[EventMapping, ...] = ()
+    regions: tuple[Region, ...] = ()
+    assets: dict[str, bytes] = field(default_factory=dict)

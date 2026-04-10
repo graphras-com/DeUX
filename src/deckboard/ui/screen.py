@@ -59,6 +59,22 @@ class Screen:
             self._keys[index] = KeySlot(index)
         return self._keys[index]
 
+    def set_key(self, index: int, key: KeySlot) -> None:
+        """Replace the key slot at *index* with a custom key.
+
+        This is used to install a :class:`~deckboard.dsui.key.DsuiKey`
+        (or any ``KeySlot`` subclass) at a specific position.
+
+        Args:
+            index: Key index (0-7).
+            key: The key slot to install.
+        """
+        if not 0 <= index < _KEY_COUNT:
+            raise IndexError(f"Key index must be 0-{_KEY_COUNT - 1}, got {index}")
+        if not isinstance(key, KeySlot):
+            raise TypeError(f"Expected KeySlot, got {type(key).__name__}")
+        self._keys[index] = key
+
     def encoder(self, index: int) -> EncoderSlot:
         """Get or create an encoder slot by index (0-3 for Stream Deck+).
 

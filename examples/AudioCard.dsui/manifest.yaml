@@ -1,0 +1,64 @@
+name: AudioCard
+type: TouchStripCard
+version: 1
+layout: layout.svg
+
+bindings:
+  artist:
+    type: text
+    node: artist
+    default: ""
+    max_width: 90
+    overflow: ellipsis
+
+  title:
+    type: text
+    node: title
+    default: ""
+    max_width: 90
+    overflow: ellipsis
+
+  album:
+    type: text
+    node: album
+    default: ""
+    max_width: 90
+    overflow: ellipsis
+
+  state:
+    type: text
+    node: state
+    default: "Stopped"
+
+  cover:
+    type: image
+    node: cover
+    fit: cover
+    placeholder_node: cover_placeholder
+
+  progress_color:
+    type: color
+    node: progress_bar
+    attribute: fill
+    default: "#f2b23a"
+
+events:
+  - name: toggle_play_pause
+    source: encoder_press_release
+    max_duration_ms: 250
+
+  - name: previous
+    source: encoder_turn
+    direction: left
+
+  - name: next
+    source: encoder_turn
+    direction: right
+
+regions:
+  card:
+    x: 0
+    y: 0
+    width: 197
+    height: 98
+    events: [tap, long_press]

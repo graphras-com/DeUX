@@ -6,10 +6,14 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from PIL import Image
 
 from deckboard.runtime.deck import Deck, DeckError, _KEY_COUNT
 from deckboard.render.icons import IconManager
+from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
 from deckboard.ui.screen import Screen
+from deckboard.ui.cards.base import Card
+from deckboard.ui.cards.blank import BlankCard
 from deckboard.runtime.events import (
     EncoderPressEvent,
     EncoderTurnEvent,
@@ -17,6 +21,13 @@ from deckboard.runtime.events import (
     KeyEvent,
     TouchEvent,
 )
+
+
+class _TestCard(Card):
+    """Minimal concrete card for testing deck dispatch without legacy widgets."""
+
+    def render(self) -> Image.Image:
+        return Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
 
 
 @pytest.fixture
@@ -134,8 +145,6 @@ class TestDeckDebugGrid:
 
     async def test_render_key_uses_debug_grid(self, deck, mock_streamdeck_device):
         """Configured key renders with debug_grid overlay."""
-        from PIL import Image as PILImage
-
         deck._device = mock_streamdeck_device
         from deckboard.ui.controls.key_slot import KeySlot
 
@@ -226,8 +235,7 @@ class TestDeckRefresh:
 
     async def test_renders_dirty_touchscreen(self, deck):
         p = deck.screen("main")
-        p.card(0).set_label("test")
-
+        # BlankCards start dirty, so touch strip is dirty by default
         deck._active_page = p
         deck._render_key = AsyncMock()
         deck._render_touchscreen = AsyncMock()
@@ -244,7 +252,7 @@ class TestDeckRefresh:
         deck._active_page = p
         deck._render_key = AsyncMock()
         deck._render_touchscreen = AsyncMock()
-        # Mark all widgets clean
+        # Mark all cards clean
         for w in p.cards:
             w.mark_clean()
 
@@ -328,22 +336,20 @@ class TestDeckDispatch:
 
         await deck._dispatch(EncoderTurnEvent(encoder=2, direction=1))
 
-    async def test_encoder_turn_updates_card_slider(self, deck):
-        """Encoder turn forwards to widget sliders and triggers refresh."""
-        from deckboard.ui.controls.volume import VolumeSlider
-        from deckboard.ui.cards.stack import StackCard
-
+    async def test_encoder_turn_dispatches_to_card(self, deck):
+        """Encoder turn is forwarded to the card at that zone."""
         p = deck.screen("main")
-        sw = StackCard(1)
-        slider = VolumeSlider()
-        sw.add_control(slider)
-        p.set_card(1, sw)
+        card = _TestCard(1)
+        p.set_card(1, card)
         deck._active_page = p
 
-        with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
+        turn_handler = AsyncMock()
+        card.on_encoder_turn(turn_handler)
+
+        with patch.object(deck, "refresh", new_callable=AsyncMock):
             await deck._dispatch(EncoderTurnEvent(encoder=1, direction=5))
-            mock_refresh.assert_awaited_once()
-        assert slider.value == 5  # default 0 + 5
+
+        turn_handler.assert_awaited_once_with(5)
 
     async def test_encoder_press_dispatches(self, deck):
         p = deck.screen("main")
@@ -376,24 +382,46 @@ class TestDeckDispatch:
 
         await deck._dispatch(EncoderPressEvent(encoder=3, pressed=True))
 
-    async def test_encoder_press_cycles_card_slider(self, deck):
-        """Encoder press cycles active slider on the widget and triggers refresh."""
-        from deckboard.ui.controls.volume import VolumeSlider
-        from deckboard.ui.controls.brightness import BrightnessSlider
-        from deckboard.ui.cards.stack import StackCard
-
+    async def test_encoder_press_dispatches_to_card(self, deck):
+        """Encoder press is forwarded to the card's dispatch_encoder_press."""
         p = deck.screen("main")
-        sw = StackCard(0)
-        sw.add_control(VolumeSlider())
-        sw.add_control(BrightnessSlider())
-        p.set_card(0, sw)
+        card = _TestCard(0)
+        p.set_card(0, card)
         deck._active_page = p
 
-        assert sw._active_control_index == 0
-        with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
+        press_handler = AsyncMock()
+        card.on_encoder_press(press_handler)
+
+        with patch.object(deck, "refresh", new_callable=AsyncMock):
             await deck._dispatch(EncoderPressEvent(encoder=0, pressed=True))
-            mock_refresh.assert_awaited_once()
-        assert sw._active_control_index == 1
+
+        press_handler.assert_awaited_once()
+
+    async def test_encoder_release_dispatches_to_card(self, deck):
+        """Encoder release is forwarded to the card's dispatch_encoder_release."""
+        p = deck.screen("main")
+        card = _TestCard(0)
+        p.set_card(0, card)
+        deck._active_page = p
+
+        release_handler = AsyncMock()
+        card.on_encoder_release(release_handler)
+
+        await deck._dispatch(EncoderPressEvent(encoder=0, pressed=False))
+        release_handler.assert_awaited_once()
+
+    async def test_encoder_press_release_does_not_call_press_handler(self, deck):
+        """Card on_encoder_press is NOT called for release events."""
+        p = deck.screen("main")
+        card = _TestCard(0)
+        p.set_card(0, card)
+        deck._active_page = p
+
+        handler = AsyncMock()
+        card.on_encoder_press(handler)
+
+        await deck._dispatch(EncoderPressEvent(encoder=0, pressed=False))
+        handler.assert_not_awaited()
 
     async def test_touch_short_dispatches(self, deck):
         p = deck.screen("main")
@@ -437,7 +465,7 @@ class TestDeckDispatch:
         await deck._dispatch(TouchEvent(event_type=EventType.TOUCH_SHORT, x=50, y=50))
 
     async def test_touch_zone_calculation(self, deck):
-        """Touch at x=600 should dispatch to widget zone 3."""
+        """Touch at x=700 should dispatch to widget zone 3."""
         p = deck.screen("main")
         handler = AsyncMock()
         p.card(3).on_tap(handler)
@@ -447,94 +475,32 @@ class TestDeckDispatch:
         handler.assert_awaited_once()
 
 
-# ── Deck._dispatch — widget event callbacks ─────────────────────────────
+# ── Deck._dispatch — card event callbacks ────────────────────────────────
 
 
-class TestDeckDispatchWidgetCallbacks:
-    """Tests for widget-level encoder decorators and slider on_change callbacks."""
+class TestDeckDispatchCardCallbacks:
+    """Tests for card-level encoder decorators and pending callback draining."""
 
     async def test_encoder_turn_calls_card_encoder_turn_handler(self, deck):
         """Card on_encoder_turn handler is called on EncoderTurnEvent."""
-        from deckboard.ui.cards.stack import StackCard
-
         p = deck.screen("main")
-        sw = StackCard(0)
-        p.set_card(0, sw)
+        card = _TestCard(0)
+        p.set_card(0, card)
         deck._active_page = p
 
         handler = AsyncMock()
-        sw.on_encoder_turn(handler)
+        card.on_encoder_turn(handler)
 
         with patch.object(deck, "refresh", new_callable=AsyncMock):
             await deck._dispatch(EncoderTurnEvent(encoder=0, direction=3))
 
         handler.assert_awaited_once_with(3)
 
-    async def test_encoder_press_calls_card_encoder_press_handler(self, deck):
-        """Card on_encoder_press handler is called on EncoderPressEvent."""
-        from deckboard.ui.cards.stack import StackCard
-        from deckboard.ui.controls.volume import VolumeSlider
-
+    async def test_encoder_turn_order_encoder_then_card(self, deck):
+        """Dispatch order: encoder handler -> card encoder handler."""
         p = deck.screen("main")
-        sw = StackCard(0)
-        sw.add_control(VolumeSlider())
-        sw.add_control(VolumeSlider())
-        p.set_card(0, sw)
-        deck._active_page = p
-
-        handler = AsyncMock()
-        sw.on_encoder_press(handler)
-
-        with patch.object(deck, "refresh", new_callable=AsyncMock):
-            await deck._dispatch(EncoderPressEvent(encoder=0, pressed=True))
-
-        handler.assert_awaited_once()
-
-    async def test_encoder_press_release_does_not_call_card_handler(self, deck):
-        """Card on_encoder_press is NOT called for release events."""
-        from deckboard.ui.cards.stack import StackCard
-
-        p = deck.screen("main")
-        sw = StackCard(0)
-        p.set_card(0, sw)
-        deck._active_page = p
-
-        handler = AsyncMock()
-        sw.on_encoder_press(handler)
-
-        await deck._dispatch(EncoderPressEvent(encoder=0, pressed=False))
-        handler.assert_not_awaited()
-
-    async def test_encoder_turn_drains_slider_on_change(self, deck):
-        """Slider on_change callback is awaited after encoder turn adjusts value."""
-        from deckboard.ui.cards.stack import StackCard
-        from deckboard.ui.controls.volume import VolumeSlider
-
-        p = deck.screen("main")
-        sw = StackCard(0)
-        vol = VolumeSlider(value=50, step=5)
-        sw.add_control(vol)
-        p.set_card(0, sw)
-        deck._active_page = p
-
-        change_handler = AsyncMock()
-        vol.on_change(change_handler)
-
-        with patch.object(deck, "refresh", new_callable=AsyncMock):
-            await deck._dispatch(EncoderTurnEvent(encoder=0, direction=1))
-
-        change_handler.assert_awaited_once_with(55.0)
-
-    async def test_encoder_turn_order_encoder_then_card_then_change(self, deck):
-        """Dispatch order: encoder handler -> widget encoder handler -> slider on_change."""
-        from deckboard.ui.cards.stack import StackCard
-        from deckboard.ui.controls.volume import VolumeSlider
-
-        p = deck.screen("main")
-        sw = StackCard(0)
-        vol = VolumeSlider(value=50, step=5)
-        sw.add_control(vol)
-        p.set_card(0, sw)
+        card = _TestCard(0)
+        p.set_card(0, card)
         deck._active_page = p
 
         call_order = []
@@ -542,65 +508,17 @@ class TestDeckDispatchWidgetCallbacks:
         encoder_handler = AsyncMock(side_effect=lambda d: call_order.append("encoder"))
         p.encoder(0).on_turn(encoder_handler)
 
-        widget_handler = AsyncMock(side_effect=lambda d: call_order.append("widget"))
-        sw.on_encoder_turn(widget_handler)
-
-        change_handler = AsyncMock(side_effect=lambda v: call_order.append("change"))
-        vol.on_change(change_handler)
+        card_handler = AsyncMock(side_effect=lambda d: call_order.append("card"))
+        card.on_encoder_turn(card_handler)
 
         with patch.object(deck, "refresh", new_callable=AsyncMock):
             await deck._dispatch(EncoderTurnEvent(encoder=0, direction=1))
 
-        assert call_order == ["encoder", "widget", "change"]
-
-    async def test_refresh_drains_pending_callbacks(self, deck):
-        """Programmatic set_value + refresh drains on_change callbacks."""
-        from deckboard.ui.cards.stack import StackCard
-        from deckboard.ui.controls.volume import VolumeSlider
-
-        p = deck.screen("main")
-        sw = StackCard(0)
-        vol = VolumeSlider(value=50)
-        sw.add_control(vol)
-        p.set_card(0, sw)
-        deck._active_page = p
-        deck._render_key = AsyncMock()
-        deck._render_touchscreen = AsyncMock()
-
-        change_handler = AsyncMock()
-        vol.on_change(change_handler)
-
-        # Programmatic change (not from encoder)
-        vol.set_value(80)
-
-        await deck.refresh()
-        change_handler.assert_awaited_once_with(80.0)
-
-    async def test_no_on_change_when_value_unchanged_via_encoder(self, deck):
-        """No on_change callback when encoder turn doesn't change value (at max)."""
-        from deckboard.ui.cards.stack import StackCard
-        from deckboard.ui.controls.volume import VolumeSlider
-
-        p = deck.screen("main")
-        sw = StackCard(0)
-        vol = VolumeSlider(value=100, max_value=100, step=5)
-        sw.add_control(vol)
-        p.set_card(0, sw)
-        deck._active_page = p
-
-        change_handler = AsyncMock()
-        vol.on_change(change_handler)
-
-        with patch.object(deck, "refresh", new_callable=AsyncMock):
-            await deck._dispatch(EncoderTurnEvent(encoder=0, direction=1))
-
-        change_handler.assert_not_awaited()
+        assert call_order == ["encoder", "card"]
 
     async def test_drain_card_callbacks_helper(self, deck):
         """_drain_card_callbacks awaits all pending callbacks in order."""
-        from deckboard.ui.cards.stack import StackCard
-
-        sw = StackCard(0)
+        card = _TestCard(0)
         results = []
 
         async def h1(v: float):
@@ -609,13 +527,28 @@ class TestDeckDispatchWidgetCallbacks:
         async def h2(v: float):
             results.append(("h2", v))
 
-        sw.queue_pending_callback(h1, (1.0,))
-        sw.queue_pending_callback(h2, (2.0,))
+        card.queue_pending_callback(h1, (1.0,))
+        card.queue_pending_callback(h2, (2.0,))
 
-        await deck._drain_card_callbacks(sw)
+        await deck._drain_card_callbacks(card)
         assert results == [("h1", 1.0), ("h2", 2.0)]
         # Queue should be empty after drain
-        assert sw.drain_pending_callbacks() == []
+        assert card.drain_pending_callbacks() == []
+
+    async def test_refresh_drains_pending_callbacks(self, deck):
+        """Programmatic queue_pending_callback + refresh drains callbacks."""
+        p = deck.screen("main")
+        card = _TestCard(0)
+        p.set_card(0, card)
+        deck._active_page = p
+        deck._render_key = AsyncMock()
+        deck._render_touchscreen = AsyncMock()
+
+        change_handler = AsyncMock()
+        card.queue_pending_callback(change_handler, (42.0,))
+
+        await deck.refresh()
+        change_handler.assert_awaited_once_with(42.0)
 
 
 # ── Deck._render_all_keys ──────────────────────────────────────────────
@@ -662,8 +595,6 @@ class TestDeckRenderKey:
         await deck._render_key(k)  # Should not raise
 
     async def test_renders_key_with_icon(self, deck, mock_streamdeck_device):
-        from PIL import Image
-
         deck._device = mock_streamdeck_device
         from deckboard.ui.controls.key_slot import KeySlot
 
@@ -707,16 +638,12 @@ class TestDeckRenderTouchscreen:
         await deck._render_touchscreen()
         mock_streamdeck_device.set_touchscreen_image.assert_called_once()
 
-    async def test_renders_cards_with_icons(self, deck, mock_streamdeck_device):
-        from PIL import Image
-
+    async def test_renders_custom_cards(self, deck, mock_streamdeck_device):
         deck._device = mock_streamdeck_device
         p = deck.screen("main")
-        p.card(0).set_icon("mdi:volume-high").set_label("Vol").set_value("75%")
+        card = _TestCard(0)
+        p.set_card(0, card)
         deck._active_page = p
-
-        fake_img = Image.new("RGBA", (80, 80))
-        deck.icons.get = AsyncMock(return_value=fake_img)
 
         await deck._render_touchscreen()
         mock_streamdeck_device.set_touchscreen_image.assert_called_once()
@@ -860,7 +787,7 @@ class TestDeckWaitClosed:
 
 
 class TestDeckCheckTimeouts:
-    """Tests for _check_timeouts — periodic slider selection timeout checks."""
+    """Tests for _check_timeouts — periodic card selection timeout checks."""
 
     async def test_no_active_page_is_noop(self, deck):
         """_check_timeouts does nothing when no page is active."""
@@ -868,17 +795,9 @@ class TestDeckCheckTimeouts:
         await deck._check_timeouts()  # Should not raise
 
     async def test_no_expired_timeouts_no_refresh(self, deck):
-        """No refresh when no widget has an expired timeout."""
-        from deckboard.ui.controls.volume import VolumeSlider
-        from deckboard.ui.controls.brightness import BrightnessSlider
-        from deckboard.ui.cards.stack import StackCard
-
+        """No refresh when no card has an expired timeout."""
         p = deck.screen("main")
-        sw = StackCard(0)
-        sw.add_control(VolumeSlider(), default=True)
-        sw.add_control(BrightnessSlider())
-        sw.set_selection_timeout(5)
-        p.set_card(0, sw)
+        # Default BlankCards always return False for check_selection_timeout
         deck._active_page = p
 
         with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
@@ -886,67 +805,17 @@ class TestDeckCheckTimeouts:
             mock_refresh.assert_not_awaited()
 
     async def test_expired_timeout_triggers_refresh(self, deck):
-        """Expired selection timeout reverts slider and triggers refresh."""
-        import time
-        from deckboard.ui.controls.volume import VolumeSlider
-        from deckboard.ui.controls.brightness import BrightnessSlider
-        from deckboard.ui.cards.stack import StackCard
-
+        """Card with expired timeout triggers a refresh."""
         p = deck.screen("main")
-        sw = StackCard(0)
-        sw.add_control(VolumeSlider(), default=True)
-        sw.add_control(BrightnessSlider())
-        sw.set_selection_timeout(1)
-        p.set_card(0, sw)
-        deck._active_page = p
-
-        # Select non-default slider, then simulate timeout expiry
-        sw.cycle_active_control()
-        assert sw.active_control_index == 1
-        sw._last_selection_time = time.monotonic() - 2.0
-
-        with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
-            await deck._check_timeouts()
-            mock_refresh.assert_awaited_once()
-
-        # Should have reverted to default
-        assert sw.active_control_index == 0
-
-    async def test_multiple_cards_only_expired_triggers(self, deck):
-        """Only widgets with expired timeouts cause a refresh."""
-        import time
-        from deckboard.ui.controls.volume import VolumeSlider
-        from deckboard.ui.controls.brightness import BrightnessSlider
-        from deckboard.ui.cards.stack import StackCard
-
-        p = deck.screen("main")
-
-        # Card 0: not expired
-        sw0 = StackCard(0)
-        sw0.add_control(VolumeSlider(), default=True)
-        sw0.add_control(BrightnessSlider())
-        sw0.set_selection_timeout(10)
-        sw0.cycle_active_control()
-        p.set_card(0, sw0)
-
-        # Card 1: expired
-        sw1 = StackCard(1)
-        sw1.add_control(VolumeSlider(), default=True)
-        sw1.add_control(BrightnessSlider())
-        sw1.set_selection_timeout(1)
-        sw1.cycle_active_control()
-        sw1._last_selection_time = time.monotonic() - 2.0
-        p.set_card(1, sw1)
-
+        card = _TestCard(0)
+        # Override check_selection_timeout to return True (simulating expiry)
+        card.check_selection_timeout = lambda: True  # type: ignore[assignment]
+        p.set_card(0, card)
         deck._active_page = p
 
         with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
             await deck._check_timeouts()
             mock_refresh.assert_awaited_once()
-
-        # sw0 unchanged, sw1 reverted
-        assert sw0.active_control_index == 1
-        assert sw1.active_control_index == 0
 
 
 class TestDeckEventLoop:

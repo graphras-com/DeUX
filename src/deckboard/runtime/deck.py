@@ -26,6 +26,7 @@ from .events import (
 from .transport import AsyncTransport
 
 if TYPE_CHECKING:
+    from ..dsui.key import DsuiKey
     from ..ui.cards.base import Card
     from ..ui.controls.key_slot import KeySlot
     from ..ui.screen import Screen
@@ -312,7 +313,9 @@ class Deck:
 
         for key_index in range(_KEY_COUNT):
             key_slot = screen.keys.get(key_index)
-            if key_slot and (key_slot.icon_name or key_slot.label):
+            if key_slot and self._is_dsui_key(key_slot):
+                await self._render_dsui_key(key_slot)
+            elif key_slot and (key_slot.icon_name or key_slot.label):
                 await self._render_key(key_slot)
             else:
                 # Blank key
@@ -347,6 +350,30 @@ class Deck:
             self._executor,
             self._device.set_key_image,
             key_slot.index,
+            image_bytes,
+        )
+
+    @staticmethod
+    def _is_dsui_key(key_slot: KeySlot) -> bool:
+        """Check whether a key slot is a DsuiKey."""
+        return getattr(key_slot, "has_dsui_content", False)
+
+    async def _render_dsui_key(self, key_slot: KeySlot) -> None:
+        """Render a DsuiKey and push to the device."""
+        if not self._device:
+            return
+
+        from ..dsui.key import DsuiKey
+
+        dsui_key: DsuiKey = key_slot  # type: ignore[assignment]
+        image_bytes = dsui_key.render_image()
+        dsui_key.set_rendered_image(image_bytes)
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            self._executor,
+            self._device.set_key_image,
+            dsui_key.index,
             image_bytes,
         )
 
@@ -395,7 +422,10 @@ class Deck:
         # Render dirty keys
         for key_slot in screen.keys.values():
             if key_slot.is_dirty:
-                await self._render_key(key_slot)
+                if self._is_dsui_key(key_slot):
+                    await self._render_dsui_key(key_slot)
+                else:
+                    await self._render_key(key_slot)
 
         # Render the touch strip if any card is dirty
         if screen.touch_strip.any_dirty:
@@ -454,10 +484,6 @@ class Deck:
         """
         for handler, args in card.drain_pending_callbacks():
             await handler(*args)
-
-    async def _drain_widget_callbacks(self, card: Card) -> None:
-        """Backward-compatible private helper used by existing tests."""
-        await self._drain_card_callbacks(card)
 
     async def _dispatch(self, event: DeckEvent) -> None:
         """Dispatch a single event to the appropriate handler on the active screen."""

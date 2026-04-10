@@ -9,8 +9,7 @@ from deckboard.ui.controls.encoder_slot import EncoderSlot
 from deckboard.ui.screen import Screen
 from deckboard.ui.touch_strip import TouchStrip
 from deckboard.ui.cards.base import Card
-from deckboard.ui.cards.status import StatusCard
-from deckboard.ui.cards.stack import StackCard
+from deckboard.ui.cards.blank import BlankCard
 
 
 class TestPageInit:
@@ -29,7 +28,7 @@ class TestPageInit:
     def test_has_touchscreen(self, page: Screen):
         assert isinstance(page.touch_strip, TouchStrip)
 
-    def test_widgets_list(self, page: Screen):
+    def test_cards_list(self, page: Screen):
         assert len(page.cards) == 4
 
 
@@ -102,7 +101,7 @@ class TestPageEncoder:
             page.encoder(4)
 
 
-class TestPageWidget:
+class TestPageCard:
     def test_card_alias(self, page: Screen):
         assert page.card(0) is page.card(0)
 
@@ -111,27 +110,24 @@ class TestPageWidget:
         assert isinstance(w, Card)
         assert w is page.touch_strip.card(0)
 
-    def test_default_is_icon_widget(self, page: Screen):
+    def test_default_is_blank(self, page: Screen):
         w = page.card(0)
-        assert isinstance(w, StatusCard)
+        assert isinstance(w, BlankCard)
 
     def test_index_error(self, page: Screen):
         with pytest.raises(IndexError):
             page.card(4)
 
 
-class TestPageSetWidget:
-    def test_set_card_alias(self, page: Screen):
-        sw = StackCard(0)
-        page.set_card(0, sw)
-        assert page.card(0) is sw
+class TestPageSetCard:
+    def test_set_card_replaces(self, page: Screen):
+        from tests.test_touch_strip import _ConcreteWidget
 
-    def test_replace_with_slider_widget(self, page: Screen):
-        sw = StackCard(0)
-        page.set_card(0, sw)
-        assert page.card(0) is sw
+        cw = _ConcreteWidget(0)
+        page.set_card(0, cw)
+        assert page.card(0) is cw
 
     def test_replace_preserves_others(self, page: Screen):
         original_1 = page.card(1)
-        page.set_card(0, StackCard(0))
+        page.set_card(0, BlankCard(0))
         assert page.card(1) is original_1

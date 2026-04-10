@@ -1,0 +1,11 @@
+<svg id="AudioCard" xmlns="http://www.w3.org/2000/svg" width="197" height="98" font-family="ArialMT,Arial,sans-serif">
+    <rect id="background" width="197" height="98" fill="#1c1c1c"/>
+    <rect id="cover_placeholder" x="102" y="2" width="93" height="93" rx="4" fill="#333333"/>
+    <image id="cover" x="102" y="2" width="93" height="93" href=""/>
+    <text id="artist" x="4" y="25" font-size="18" font-weight="bold" fill="#80bbff">Artist</text>
+    <text id="title" x="4" y="42" font-size="13" fill="#f2b23a">Title</text>
+    <text id="album" x="4" y="56" font-size="10" fill="#999999">Album</text>
+    <text id="state" x="4" y="78" font-size="10" fill="#dedede">Stopped</text>
+    <rect id="progress_bg" x="4" y="86" width="92" height="4" rx="2" fill="#333333"/>
+    <rect id="progress_bar" x="4" y="86" width="0" height="4" rx="2" fill="#f2b23a"/>
+</svg>

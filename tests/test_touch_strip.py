@@ -1,9 +1,6 @@
-"""Tests for deckboard.ui — Card (abstract), StatusCard, StackCard, and TouchStrip."""
+"""Tests for deckboard.ui — Card (abstract), BlankCard, and TouchStrip."""
 
 from __future__ import annotations
-
-import time
-from unittest.mock import patch
 
 import pytest
 from PIL import Image
@@ -11,13 +8,7 @@ from PIL import Image
 from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
 from deckboard.ui.touch_strip import TouchStrip
 from deckboard.ui.cards.base import Card
-from deckboard.ui.cards.status import StatusCard
-from deckboard.ui.cards.stack import StackCard
-from deckboard.ui.elements.text import LargeText, SmallText
-from deckboard.ui.controls.volume import VolumeSlider
-from deckboard.ui.controls.brightness import BrightnessSlider
-from deckboard.ui.controls.equalizer import EqualizerSlider
-from deckboard.ui.controls.balance import BalanceSlider
+from deckboard.ui.cards.blank import BlankCard
 
 
 # ── Card (abstract base) ──────────────────────────────────────────────
@@ -131,6 +122,10 @@ class TestWidgetAbstractBase:
         w = _ConcreteWidget(0)
         w.handle_encoder_press()  # should not raise
 
+    def test_handle_encoder_release_noop(self):
+        w = _ConcreteWidget(0)
+        w.handle_encoder_release()  # should not raise
+
     def test_check_selection_timeout_returns_false(self):
         w = _ConcreteWidget(0)
         assert w.check_selection_timeout() is False
@@ -178,10 +173,29 @@ class TestWidgetEncoderDecorators:
         result = w.on_encoder_press(handler)
         assert result is handler
 
+    def test_on_encoder_release(self):
+        w = _ConcreteWidget(0)
+
+        @w.on_encoder_release
+        async def handler():
+            pass
+
+        assert w._encoder_release_handler is handler
+
+    def test_on_encoder_release_returns_handler(self):
+        w = _ConcreteWidget(0)
+
+        async def handler():
+            pass
+
+        result = w.on_encoder_release(handler)
+        assert result is handler
+
     def test_encoder_handlers_initially_none(self):
         w = _ConcreteWidget(0)
         assert w._encoder_turn_handler is None
         assert w._encoder_press_handler is None
+        assert w._encoder_release_handler is None
 
 
 class TestWidgetPendingCallbacks:
@@ -227,506 +241,156 @@ class TestWidgetPendingCallbacks:
         assert callbacks[1] == (h2, (20.0,))
 
 
-# ── StatusCard ──────────────────────────────────────────────────────────
+class TestWidgetDispatch:
+    async def test_dispatch_encoder_turn_with_handler(self):
+        w = _ConcreteWidget(0)
+        called_with = []
 
+        @w.on_encoder_turn
+        async def handler(direction: int):
+            called_with.append(direction)
 
-class TestIconWidgetInit:
-    def test_index(self, widget: StatusCard):
-        assert widget.index == 0
+        await w.dispatch_encoder_turn(3)
+        assert called_with == [3]
 
-    def test_defaults(self, widget: StatusCard):
-        assert widget.icon_name is None
-        assert widget.icon_color == "white"
-        assert widget.label is None
-        assert widget.value is None
-        assert widget.rendered is None
-        assert widget.is_dirty is True
+    async def test_dispatch_encoder_turn_no_handler(self):
+        w = _ConcreteWidget(0)
+        await w.dispatch_encoder_turn(1)  # should not raise
 
-    def test_custom_index(self):
-        w = StatusCard(3)
-        assert w.index == 3
+    async def test_dispatch_encoder_press_with_handler(self):
+        w = _ConcreteWidget(0)
+        called = []
 
-    def test_is_widget(self, widget: StatusCard):
-        assert isinstance(widget, Card)
-
-
-class TestIconWidgetSetIcon:
-    def test_sets_icon_name(self, widget: StatusCard):
-        widget.set_icon("mdi:volume-high")
-        assert widget.icon_name == "mdi:volume-high"
-
-    def test_sets_color(self, widget: StatusCard):
-        widget.set_icon("mdi:x", color="#ff0000")
-        assert widget.icon_color == "#ff0000"
-
-    def test_default_color(self, widget: StatusCard):
-        widget.set_icon("mdi:x")
-        assert widget.icon_color == "white"
-
-    def test_marks_dirty(self, widget: StatusCard):
-        widget.mark_clean()
-        widget.set_icon("mdi:x")
-        assert widget.is_dirty is True
-
-    def test_returns_self(self, widget: StatusCard):
-        assert widget.set_icon("mdi:x") is widget
-
-
-class TestIconWidgetSetLabel:
-    def test_sets_label(self, widget: StatusCard):
-        widget.set_label("Volume")
-        assert widget.label == "Volume"
-
-    def test_none_removes(self, widget: StatusCard):
-        widget.set_label("x")
-        widget.set_label(None)
-        assert widget.label is None
-
-    def test_marks_dirty(self, widget: StatusCard):
-        widget.mark_clean()
-        widget.set_label("x")
-        assert widget.is_dirty is True
-
-    def test_returns_self(self, widget: StatusCard):
-        assert widget.set_label("x") is widget
-
-
-class TestIconWidgetSetValue:
-    def test_sets_value(self, widget: StatusCard):
-        widget.set_value("75%")
-        assert widget.value == "75%"
-
-    def test_none_removes(self, widget: StatusCard):
-        widget.set_value("x")
-        widget.set_value(None)
-        assert widget.value is None
-
-    def test_marks_dirty(self, widget: StatusCard):
-        widget.mark_clean()
-        widget.set_value("x")
-        assert widget.is_dirty is True
-
-    def test_returns_self(self, widget: StatusCard):
-        assert widget.set_value("x") is widget
-
-
-class TestIconWidgetClear:
-    def test_clears_all(self, widget: StatusCard):
-        widget.set_icon("mdi:x")
-        widget.set_label("L")
-        widget.set_value("V")
-        widget.set_rendered(Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT)))
-        widget.clear()
-        assert widget.icon_name is None
-        assert widget.label is None
-        assert widget.value is None
-        assert widget.rendered is None
-        assert widget.is_dirty is True
-
-    def test_returns_self(self, widget: StatusCard):
-        assert widget.clear() is widget
-
-
-class TestIconWidgetChaining:
-    def test_chained_calls(self):
-        w = StatusCard(0)
-        result = w.set_icon("mdi:x").set_label("L").set_value("V")
-        assert result is w
-        assert w.icon_name == "mdi:x"
-        assert w.label == "L"
-        assert w.value == "V"
-
-
-class TestIconWidgetEventHandlers:
-    def test_on_tap(self, widget: StatusCard):
-        @widget.on_tap
+        @w.on_encoder_press
         async def handler():
-            pass
+            called.append(True)
 
-        assert widget._tap_handler is handler
+        await w.dispatch_encoder_press()
+        assert called == [True]
 
-    def test_on_long_press(self, widget: StatusCard):
-        @widget.on_long_press
+    async def test_dispatch_encoder_release_with_handler(self):
+        w = _ConcreteWidget(0)
+        called = []
+
+        @w.on_encoder_release
         async def handler():
-            pass
+            called.append(True)
 
-        assert widget._long_press_handler is handler
+        await w.dispatch_encoder_release()
+        assert called == [True]
 
-    def test_on_drag(self, widget: StatusCard):
-        @widget.on_drag
+    async def test_dispatch_touch_tap(self):
+        from deckboard.runtime.events import EventType, TouchEvent
+
+        w = _ConcreteWidget(0)
+        called = []
+
+        @w.on_tap
+        async def handler():
+            called.append("tap")
+
+        await w.dispatch_touch(TouchEvent(event_type=EventType.TOUCH_SHORT, x=10, y=10))
+        assert called == ["tap"]
+
+    async def test_dispatch_touch_long_press(self):
+        from deckboard.runtime.events import EventType, TouchEvent
+
+        w = _ConcreteWidget(0)
+        called = []
+
+        @w.on_long_press
+        async def handler():
+            called.append("long")
+
+        await w.dispatch_touch(TouchEvent(event_type=EventType.TOUCH_LONG, x=10, y=10))
+        assert called == ["long"]
+
+    async def test_dispatch_touch_drag(self):
+        from deckboard.runtime.events import EventType, TouchEvent
+
+        w = _ConcreteWidget(0)
+        called = []
+
+        @w.on_drag
         async def handler(x, y, x_out, y_out):
-            pass
+            called.append((x, y, x_out, y_out))
 
-        assert widget._drag_handler is handler
-
-    def test_on_tap_returns_handler(self, widget: StatusCard):
-        async def handler():
-            pass
-
-        result = widget.on_tap(handler)
-        assert result is handler
-
-    def test_on_long_press_returns_handler(self, widget: StatusCard):
-        async def handler():
-            pass
-
-        result = widget.on_long_press(handler)
-        assert result is handler
-
-    def test_on_drag_returns_handler(self, widget: StatusCard):
-        async def handler(x, y, x_out, y_out):
-            pass
-
-        result = widget.on_drag(handler)
-        assert result is handler
-
-
-class TestIconWidgetRendering:
-    def test_set_rendered(self, widget: StatusCard):
-        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT))
-        widget.set_rendered(img)
-        assert widget.rendered is img
-        assert widget.is_dirty is False
-
-    def test_mark_clean(self, widget: StatusCard):
-        assert widget.is_dirty is True
-        widget.mark_clean()
-        assert widget.is_dirty is False
-
-    def test_mark_dirty(self, widget: StatusCard):
-        widget.mark_clean()
-        assert widget.is_dirty is False
-        widget.mark_dirty()
-        assert widget.is_dirty is True
-
-
-class TestIconWidgetRender:
-    def test_render_no_icon(self, widget: StatusCard):
-        widget.set_label("Test")
-        img = widget.render()
-        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
-        assert img.mode == "RGB"
-
-    def test_render_with_icon_image(self, widget: StatusCard, sample_icon):
-        widget.set_icon_image(sample_icon)
-        img = widget.render()
-        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
-
-    def test_render_blank(self, widget: StatusCard):
-        img = widget.render()
-        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
-
-    def test_set_icon_image(self, widget: StatusCard, sample_icon):
-        widget.set_icon_image(sample_icon)
-        # The icon image is used internally during render
-        img = widget.render()
-        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
-
-    def test_clear_clears_icon_image(self, widget: StatusCard, sample_icon):
-        widget.set_icon_image(sample_icon)
-        widget.clear()
-        # After clear, icon_image should be None (blank render)
-        img = widget.render()
-        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
-
-
-# ── StackCard ────────────────────────────────────────────────────────
-
-
-class TestStackCardInit:
-    def test_is_widget(self):
-        sw = StackCard(0)
-        assert isinstance(sw, Card)
-
-    def test_index(self, slider_widget: StackCard):
-        assert slider_widget.index == 0
-
-    def test_no_sliders(self, slider_widget: StackCard):
-        assert slider_widget.controls == []
-        assert slider_widget.active_control is None
-
-
-class TestStackCardAddSlider:
-    def test_add_single(self, slider_widget: StackCard):
-        vol = VolumeSlider("Volume")
-        result = slider_widget.add_control(vol)
-        assert result is slider_widget  # chaining
-        assert len(slider_widget.controls) == 1
-        assert slider_widget.controls[0] is vol
-
-    def test_first_is_default(self, slider_widget: StackCard):
-        vol = VolumeSlider("Volume")
-        slider_widget.add_control(vol)
-        assert slider_widget.active_control is vol
-        assert slider_widget.active_control_index == 0
-        assert slider_widget._default_control_index == 0
-
-    def test_add_multiple(self, slider_widget: StackCard):
-        s1 = VolumeSlider("Vol")
-        s2 = BrightnessSlider("Bri")
-        slider_widget.add_control(s1)
-        slider_widget.add_control(s2)
-        assert len(slider_widget.controls) == 2
-
-    def test_explicit_default(self, slider_widget: StackCard):
-        s1 = VolumeSlider("Vol")
-        s2 = BrightnessSlider("Bri")
-        slider_widget.add_control(s1)
-        slider_widget.add_control(s2, default=True)
-        assert slider_widget._default_control_index == 1
-        assert slider_widget.active_control_index == 1
-        assert slider_widget.active_control is s2
-
-    def test_marks_dirty(self, slider_widget: StackCard):
-        slider_widget.mark_clean()
-        slider_widget.add_control(VolumeSlider())
-        assert slider_widget.is_dirty is True
-
-    def test_rejects_non_slider(self, slider_widget: StackCard):
-        with pytest.raises(TypeError, match="Expected a Control instance"):
-            slider_widget.add_control("not a slider")  # type: ignore[arg-type]
-
-    def test_sliders_returns_copy(self, slider_widget: StackCard):
-        vol = VolumeSlider()
-        slider_widget.add_control(vol)
-        sliders = slider_widget.controls
-        sliders.clear()  # mutating the copy
-        assert len(slider_widget.controls) == 1  # original unchanged
-
-
-class TestStackCardActiveSlider:
-    def test_no_sliders(self, slider_widget: StackCard):
-        assert slider_widget.active_control is None
-
-    def test_default_active(self, slider_widget: StackCard):
-        vol = VolumeSlider()
-        slider_widget.add_control(vol)
-        assert slider_widget.active_control is vol
-
-
-class TestStackCardSelectionTimeout:
-    def test_default_timeout(self, slider_widget: StackCard):
-        assert slider_widget.selection_timeout == 5.0
-
-    def test_set_timeout(self, slider_widget: StackCard):
-        result = slider_widget.set_selection_timeout(10)
-        assert result is slider_widget
-        assert slider_widget.selection_timeout == 10.0
-
-    def test_negative_clamped_to_zero(self, slider_widget: StackCard):
-        slider_widget.set_selection_timeout(-3)
-        assert slider_widget.selection_timeout == 0.0
-
-
-class TestStackCardCycleSlider:
-    def test_single_slider_noop(self, slider_widget: StackCard):
-        slider_widget.add_control(VolumeSlider())
-        slider_widget.mark_clean()
-        slider_widget.cycle_active_control()
-        assert slider_widget.active_control_index == 0
-        assert slider_widget.is_dirty is False  # no change
-
-    def test_two_sliders_cycle(self, slider_widget: StackCard):
-        slider_widget.add_control(VolumeSlider())
-        slider_widget.add_control(BrightnessSlider())
-        assert slider_widget.active_control_index == 0
-        slider_widget.cycle_active_control()
-        assert slider_widget.active_control_index == 1
-        slider_widget.cycle_active_control()
-        assert slider_widget.active_control_index == 0  # wraps
-
-    def test_marks_dirty(self, slider_widget: StackCard):
-        slider_widget.add_control(VolumeSlider())
-        slider_widget.add_control(BrightnessSlider())
-        slider_widget.mark_clean()
-        slider_widget.cycle_active_control()
-        assert slider_widget.is_dirty is True
-
-
-class TestStackCardCheckSelectionTimeout:
-    def test_no_selection_no_change(self, slider_widget: StackCard):
-        slider_widget.add_control(VolumeSlider())
-        slider_widget.add_control(BrightnessSlider())
-        # No cycle happened → _last_selection_time is None
-        assert slider_widget.check_selection_timeout() is False
-
-    def test_already_at_default(self, slider_widget: StackCard):
-        slider_widget.add_control(VolumeSlider())
-        slider_widget.add_control(BrightnessSlider())
-        # Even if we set a time, active == default, so no change
-        slider_widget._last_selection_time = time.monotonic() - 100
-        assert slider_widget.check_selection_timeout() is False
-
-    def test_timeout_disabled(self, slider_widget: StackCard):
-        slider_widget.add_control(VolumeSlider())
-        slider_widget.add_control(BrightnessSlider())
-        slider_widget.set_selection_timeout(0)
-        slider_widget.cycle_active_control()
-        assert slider_widget.check_selection_timeout() is False
-
-    def test_timeout_not_elapsed(self, slider_widget: StackCard):
-        slider_widget.add_control(VolumeSlider())
-        slider_widget.add_control(BrightnessSlider())
-        slider_widget.set_selection_timeout(999)
-        slider_widget.cycle_active_control()
-        assert slider_widget.active_control_index == 1
-        assert slider_widget.check_selection_timeout() is False
-        assert slider_widget.active_control_index == 1  # not reset
-
-    def test_timeout_elapsed_resets(self, slider_widget: StackCard):
-        slider_widget.add_control(VolumeSlider())
-        slider_widget.add_control(BrightnessSlider())
-        slider_widget.set_selection_timeout(0.01)
-        slider_widget.cycle_active_control()
-        assert slider_widget.active_control_index == 1
-        # Fake time passing
-        slider_widget._last_selection_time = time.monotonic() - 1.0
-        slider_widget.mark_clean()
-        assert slider_widget.check_selection_timeout() is True
-        assert slider_widget.active_control_index == 0  # back to default
-        assert slider_widget._last_selection_time is None
-        assert slider_widget.is_dirty is True
-
-
-class TestStackCardHandleEncoderTurn:
-    def test_no_sliders_noop(self, slider_widget: StackCard):
-        slider_widget.handle_encoder_turn(1)  # should not raise
-
-    def test_adjusts_active_control(self, slider_widget: StackCard):
-        vol = VolumeSlider(value=50, step=5)
-        slider_widget.add_control(vol)
-        slider_widget.mark_clean()
-        slider_widget.handle_encoder_turn(1)
-        assert vol.value == 55
-        assert slider_widget.is_dirty is True
-
-    def test_adjusts_negative(self, slider_widget: StackCard):
-        vol = VolumeSlider(value=50, step=5)
-        slider_widget.add_control(vol)
-        slider_widget.handle_encoder_turn(-2)
-        assert vol.value == 40
-
-    def test_resets_selection_timeout_on_non_default(self, slider_widget: StackCard):
-        """Turning encoder while a non-default slider is active should
-        reset the selection timeout so it doesn't expire during use."""
-        vol = VolumeSlider(value=50, step=5)
-        bri = BrightnessSlider(value=50, step=5)
-        slider_widget.add_control(vol, default=True)
-        slider_widget.add_control(bri)
-
-        # Select the non-default slider
-        slider_widget.cycle_active_control()
-        assert slider_widget.active_control_index == 1
-        original_time = slider_widget._last_selection_time
-        assert original_time is not None
-
-        # Simulate a small delay, then turn the encoder
-        slider_widget._last_selection_time = time.monotonic() - 3.0
-        slider_widget.handle_encoder_turn(1)
-
-        # Timeout should have been refreshed to a recent timestamp
-        assert slider_widget._last_selection_time is not None
-        assert slider_widget._last_selection_time > original_time
-
-    def test_no_timeout_reset_on_default_slider(self, slider_widget: StackCard):
-        """Turning encoder while the default slider is active should NOT
-        set _last_selection_time (no timeout to manage)."""
-        vol = VolumeSlider(value=50, step=5)
-        bri = BrightnessSlider(value=50, step=5)
-        slider_widget.add_control(vol, default=True)
-        slider_widget.add_control(bri)
-
-        # Active slider is already the default (index 0)
-        assert (
-            slider_widget.active_control_index == slider_widget._default_control_index
+        await w.dispatch_touch(
+            TouchEvent(event_type=EventType.TOUCH_DRAG, x=10, y=20, x_out=30, y_out=40)
         )
-        assert slider_widget._last_selection_time is None
+        assert called == [(10, 20, 30, 40)]
 
-        slider_widget.handle_encoder_turn(1)
-        assert slider_widget._last_selection_time is None
+    async def test_dispatch_touch_no_handler(self):
+        from deckboard.runtime.events import EventType, TouchEvent
 
-    def test_encoder_turn_prevents_timeout_expiry(self, slider_widget: StackCard):
-        """Continuous encoder turns should keep the selection alive past
-        the configured timeout."""
-        vol = VolumeSlider(value=50, step=5)
-        bri = BrightnessSlider(value=50, step=5)
-        slider_widget.add_control(vol, default=True)
-        slider_widget.add_control(bri)
-        slider_widget.set_selection_timeout(2.0)
-
-        # Select non-default slider
-        slider_widget.cycle_active_control()
-        assert slider_widget.active_control_index == 1
-
-        # Simulate time passing almost to timeout, then turn
-        slider_widget._last_selection_time = time.monotonic() - 1.9
-        slider_widget.handle_encoder_turn(1)
-
-        # Should NOT have timed out
-        assert slider_widget.active_control_index == 1
-        assert slider_widget.check_selection_timeout() is False
+        w = _ConcreteWidget(0)
+        await w.dispatch_touch(TouchEvent(event_type=EventType.TOUCH_SHORT, x=10, y=10))
 
 
-class TestStackCardHandleEncoderPress:
-    def test_cycles_slider(self, slider_widget: StackCard):
-        slider_widget.add_control(VolumeSlider())
-        slider_widget.add_control(BrightnessSlider())
-        assert slider_widget.active_control_index == 0
-        slider_widget.handle_encoder_press()
-        assert slider_widget.active_control_index == 1
+class TestWidgetRefreshCallback:
+    async def test_set_and_request_refresh(self):
+        w = _ConcreteWidget(0)
+        called = []
+
+        async def refresh():
+            called.append(True)
+
+        w.set_refresh_callback(refresh)
+        await w.request_refresh()
+        assert called == [True]
+
+    async def test_request_refresh_no_callback(self):
+        w = _ConcreteWidget(0)
+        await w.request_refresh()  # no-op, should not raise
+
+    async def test_prepare_assets_noop(self):
+        from unittest.mock import MagicMock
+
+        w = _ConcreteWidget(0)
+        icons = MagicMock()
+        await w.prepare_assets(icons)  # should not raise
 
 
-class TestStackCardRender:
-    def test_render_empty(self, slider_widget: StackCard):
-        img = slider_widget.render()
+# ── BlankCard ──────────────────────────────────────────────────────────
+
+
+class TestBlankCard:
+    def test_is_card(self):
+        b = BlankCard(0)
+        assert isinstance(b, Card)
+
+    def test_index(self):
+        b = BlankCard(2)
+        assert b.index == 2
+
+    def test_render_size(self):
+        b = BlankCard(0)
+        img = b.render()
         assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
         assert img.mode == "RGB"
 
-    def test_render_single(self, slider_widget: StackCard):
-        vol = VolumeSlider("Volume", value=50)
-        slider_widget.add_control(vol)
-        img = slider_widget.render()
-        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
-        assert img.mode == "RGB"
-
-    def test_render_two_large(self, slider_widget: StackCard):
-        vol = VolumeSlider("Volume", value=50)
-        bri = BrightnessSlider("Bright", value=70)
-        slider_widget.add_control(vol)
-        slider_widget.add_control(bri)
-        img = slider_widget.render()
-        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
-
-    def test_render_four_small(self, slider_widget: StackCard):
-        s1 = EqualizerSlider("Sub", value=50)
-        s2 = EqualizerSlider("Bass", value=40)
-        s3 = EqualizerSlider("Treble", value=60)
-        s4 = BalanceSlider("Balance", value=50)
-        slider_widget.add_control(s1)
-        slider_widget.add_control(s2)
-        slider_widget.add_control(s3)
-        slider_widget.add_control(s4)
-        img = slider_widget.render()
-        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
+    def test_initially_dirty(self):
+        b = BlankCard(0)
+        assert b.is_dirty is True
 
 
 # ── TouchStrip ─────────────────────────────────────────────────────────
 
 
-class TestTouchScreenInit:
-    def test_creates_four_widgets(self, touchscreen: TouchStrip):
+class TestTouchStripInit:
+    def test_creates_four_cards(self, touchscreen: TouchStrip):
         assert len(touchscreen.cards) == 4
 
-    def test_widget_indices(self, touchscreen: TouchStrip):
+    def test_card_indices(self, touchscreen: TouchStrip):
         for i in range(4):
             assert touchscreen.cards[i].index == i
 
-    def test_default_widgets_are_icon_widgets(self, touchscreen: TouchStrip):
+    def test_default_cards_are_blank(self, touchscreen: TouchStrip):
         for w in touchscreen.cards:
-            assert isinstance(w, StatusCard)
+            assert isinstance(w, BlankCard)
 
 
-class TestTouchScreenWidget:
+class TestTouchStripCard:
     def test_get_by_index(self, touchscreen: TouchStrip):
         for i in range(4):
             w = touchscreen.card(i)
@@ -734,7 +398,7 @@ class TestTouchScreenWidget:
             assert w.index == i
 
     def test_same_instance(self, touchscreen: TouchStrip):
-        """widget(i) returns the same object each time."""
+        """card(i) returns the same object each time."""
         a = touchscreen.card(0)
         b = touchscreen.card(0)
         assert a is b
@@ -748,16 +412,18 @@ class TestTouchScreenWidget:
             touchscreen.card(4)
 
 
-class TestTouchScreenSetWidget:
-    def test_replace_with_slider_widget(self, touchscreen: TouchStrip):
-        sw = StackCard(0)
-        touchscreen.set_card(0, sw)
-        assert touchscreen.card(0) is sw
-
-    def test_replace_with_custom_widget(self, touchscreen: TouchStrip):
+class TestTouchStripSetCard:
+    def test_replace_with_custom_card(self, touchscreen: TouchStrip):
         cw = _ConcreteWidget(2)
         touchscreen.set_card(2, cw)
         assert touchscreen.card(2) is cw
+
+    def test_replace_with_blank(self, touchscreen: TouchStrip):
+        cw = _ConcreteWidget(0)
+        touchscreen.set_card(0, cw)
+        blank = BlankCard(0)
+        touchscreen.set_card(0, blank)
+        assert touchscreen.card(0) is blank
 
     def test_index_too_low(self, touchscreen: TouchStrip):
         with pytest.raises(IndexError, match="Card index must be 0-3"):
@@ -767,12 +433,12 @@ class TestTouchScreenSetWidget:
         with pytest.raises(IndexError, match="Card index must be 0-3"):
             touchscreen.set_card(4, _ConcreteWidget(0))
 
-    def test_rejects_non_widget(self, touchscreen: TouchStrip):
+    def test_rejects_non_card(self, touchscreen: TouchStrip):
         with pytest.raises(TypeError, match="Expected a Card instance"):
-            touchscreen.set_card(0, "not a widget")  # type: ignore[arg-type]
+            touchscreen.set_card(0, "not a card")  # type: ignore[arg-type]
 
 
-class TestTouchScreenAnyDirty:
+class TestTouchStripAnyDirty:
     def test_initially_dirty(self, touchscreen: TouchStrip):
         assert touchscreen.any_dirty is True
 
@@ -784,286 +450,5 @@ class TestTouchScreenAnyDirty:
     def test_one_dirty(self, touchscreen: TouchStrip):
         for w in touchscreen.cards:
             w.mark_clean()
-        w0 = touchscreen.card(2)
-        assert isinstance(w0, StatusCard)
-        w0.set_label("changed")
+        touchscreen.card(2).mark_dirty()
         assert touchscreen.any_dirty is True
-
-
-# ── StackCard ──────────────────────────────────────────────────────────
-
-
-class TestTouchPanelInit:
-    def test_is_widget(self):
-        panel = StackCard(0)
-        assert isinstance(panel, Card)
-
-    def test_index(self):
-        panel = StackCard(2)
-        assert panel.index == 2
-
-    def test_no_elements(self):
-        panel = StackCard(0)
-        assert panel.elements == []
-        assert panel.controls == []
-        assert panel.active_control is None
-
-
-class TestStackCardIsTouchPanel:
-    """StackCard is now a backward-compatible alias for StackCard."""
-
-    def test_alias(self):
-        assert StackCard is StackCard
-
-    def test_instance(self):
-        sw = StackCard(0)
-        assert isinstance(sw, StackCard)
-
-
-class TestTouchPanelAddElement:
-    def test_add_control(self):
-        panel = StackCard(0)
-        vol = VolumeSlider("Volume")
-        result = panel.add_element(vol)
-        assert result is panel
-        assert len(panel.elements) == 1
-        assert panel.elements[0] is vol
-
-    def test_add_large_text(self):
-        panel = StackCard(0)
-        t = LargeText("Hello")
-        result = panel.add_element(t)
-        assert result is panel
-        assert len(panel.elements) == 1
-        assert panel.elements[0] is t
-
-    def test_add_small_text(self):
-        panel = StackCard(0)
-        t = SmallText("Value")
-        result = panel.add_element(t)
-        assert result is panel
-        assert len(panel.elements) == 1
-        assert panel.elements[0] is t
-
-    def test_rejects_invalid_type(self):
-        panel = StackCard(0)
-        with pytest.raises(
-            TypeError,
-            match="Expected a Control or Element instance",
-        ):
-            panel.add_element("not an element")  # type: ignore[arg-type]
-
-    def test_marks_dirty(self):
-        panel = StackCard(0)
-        panel.mark_clean()
-        panel.add_element(LargeText("Hi"))
-        assert panel.is_dirty is True
-
-    def test_elements_returns_copy(self):
-        panel = StackCard(0)
-        panel.add_element(LargeText("Hi"))
-        elements = panel.elements
-        elements.clear()
-        assert len(panel.elements) == 1
-
-    def test_text_default_flag_ignored(self):
-        """Passing default=True for a non-selectable element should not crash."""
-        panel = StackCard(0)
-        t = LargeText("Title")
-        panel.add_element(t, default=True)
-        # No selectable elements, so active slider is None
-        assert panel.active_control is None
-
-
-class TestTouchPanelMixedElements:
-    def test_sliders_filters_text(self):
-        panel = StackCard(0)
-        panel.add_element(LargeText("Title"))
-        vol = VolumeSlider("Volume")
-        panel.add_element(vol)
-        assert panel.controls == [vol]
-        assert len(panel.elements) == 2
-
-    def test_active_control_with_text_and_sliders(self):
-        panel = StackCard(0)
-        panel.add_element(LargeText("Title"))
-        vol = VolumeSlider("Volume")
-        panel.add_element(vol)
-        assert panel.active_control is vol
-
-    def test_cycling_skips_text(self):
-        """Encoder press should only cycle among selectable (slider) elements."""
-        panel = StackCard(0)
-        t = LargeText("Title")
-        s1 = VolumeSlider("Volume", value=50)
-        s2 = BrightnessSlider("Bright", value=50)
-        panel.add_element(t)  # index 0 — not selectable
-        panel.add_element(s1)  # index 1 — selectable
-        panel.add_element(s2)  # index 2 — selectable
-
-        assert panel.active_control is s1
-        assert panel.active_control_index == 1
-
-        panel.cycle_active_control()
-        assert panel.active_control is s2
-        assert panel.active_control_index == 2
-
-        panel.cycle_active_control()
-        assert panel.active_control is s1
-        assert panel.active_control_index == 1  # wraps, skipping text
-
-    def test_single_slider_with_text_noop_cycle(self):
-        """With only one selectable element, cycling should be a no-op."""
-        panel = StackCard(0)
-        panel.add_element(LargeText("Title"))
-        vol = VolumeSlider("Volume")
-        panel.add_element(vol)
-        panel.mark_clean()
-        panel.cycle_active_control()
-        assert panel.active_control_index == 1  # unchanged
-        assert panel.is_dirty is False
-
-    def test_text_between_sliders(self):
-        """Text element between sliders should be skipped during cycling."""
-        panel = StackCard(0)
-        s1 = EqualizerSlider("Bass", value=50)
-        t = SmallText("Value")
-        s2 = EqualizerSlider("Treble", value=50)
-        panel.add_element(s1)  # index 0
-        panel.add_element(t)  # index 1 — not selectable
-        panel.add_element(s2)  # index 2
-
-        assert panel.active_control is s1
-        panel.cycle_active_control()
-        assert panel.active_control is s2
-        assert panel.active_control_index == 2
-        panel.cycle_active_control()
-        assert panel.active_control is s1
-        assert panel.active_control_index == 0
-
-    def test_only_text_elements(self):
-        """Panel with only text elements should have no active slider."""
-        panel = StackCard(0)
-        panel.add_element(LargeText("Title"))
-        panel.add_element(SmallText("Value"))
-        assert panel.active_control is None
-        # Cycling and encoder turn should be no-ops
-        panel.cycle_active_control()
-        panel.handle_encoder_turn(1)
-        panel.handle_encoder_press()
-
-    def test_default_on_second_slider_with_text(self):
-        """Setting default on the second slider should track correctly."""
-        panel = StackCard(0)
-        panel.add_element(LargeText("Title"))
-        s1 = VolumeSlider("Volume")
-        s2 = BrightnessSlider("Bright")
-        panel.add_element(s1)
-        panel.add_element(s2, default=True)
-        assert panel.active_control is s2
-        assert panel._default_control_index == 2
-
-
-class TestTouchPanelEncoderWithMixedElements:
-    def test_encoder_turn_adjusts_slider_not_text(self):
-        panel = StackCard(0)
-        panel.add_element(LargeText("Title"))
-        vol = VolumeSlider("Volume", value=50, step=5)
-        panel.add_element(vol)
-        panel.mark_clean()
-        panel.handle_encoder_turn(1)
-        assert vol.value == 55
-        assert panel.is_dirty is True
-
-    def test_encoder_press_cycles_sliders(self):
-        panel = StackCard(0)
-        panel.add_element(LargeText("Title"))
-        s1 = VolumeSlider("Volume")
-        s2 = BrightnessSlider("Bright")
-        panel.add_element(s1)
-        panel.add_element(s2)
-        assert panel.active_control_index == 1
-        panel.handle_encoder_press()
-        assert panel.active_control_index == 2
-
-    def test_timeout_resets_to_default_with_text(self):
-        panel = StackCard(0)
-        panel.add_element(LargeText("Title"))
-        s1 = VolumeSlider("Volume")
-        s2 = BrightnessSlider("Bright")
-        panel.add_element(s1, default=True)
-        panel.add_element(s2)
-        panel.set_selection_timeout(0.01)
-        panel.cycle_active_control()
-        assert panel.active_control_index == 2  # s2
-        panel._last_selection_time = time.monotonic() - 1.0
-        panel.mark_clean()
-        assert panel.check_selection_timeout() is True
-        assert panel.active_control_index == 1  # back to s1 (default)
-
-
-class TestTouchPanelRenderMixed:
-    def test_render_text_and_sliders(self):
-        panel = StackCard(0)
-        panel.add_element(LargeText("Now Playing"))
-        panel.add_element(VolumeSlider("Volume", value=50))
-        img = panel.render()
-        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
-        assert img.mode == "RGB"
-
-    def test_render_small_texts_and_sliders(self):
-        panel = StackCard(0)
-        panel.add_element(SmallText("Online"))
-        panel.add_element(EqualizerSlider("Bass", value=50))
-        panel.add_element(EqualizerSlider("Treble", value=60))
-        panel.add_element(SmallText("OK"))
-        img = panel.render()
-        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
-
-    def test_render_only_text(self):
-        panel = StackCard(0)
-        panel.add_element(LargeText("Title"))
-        panel.add_element(SmallText("Value"))
-        img = panel.render()
-        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
-
-    def test_render_empty(self):
-        panel = StackCard(0)
-        img = panel.render()
-        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
-        assert img.mode == "RGB"
-
-    def test_render_active_highlight_only_on_selectable(self):
-        """With 2 sliders and 1 text, active highlight should only show on sliders."""
-        panel = StackCard(0)
-        panel.add_element(LargeText("Title"))
-        panel.add_element(VolumeSlider("Volume", value=50))
-        panel.add_element(BrightnessSlider("Bright", value=70))
-        # Should render without error
-        img = panel.render()
-        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
-
-
-class TestTouchPanelEdgeCases:
-    def test_active_control_returns_none_when_index_points_to_text(self):
-        """If _active_control_index points to a non-selectable element, return None."""
-        panel = StackCard(0)
-        panel.add_element(LargeText("Title"))
-        vol = VolumeSlider("Volume")
-        panel.add_element(vol)
-        # Manually force index to point at the text element
-        panel._active_control_index = 0
-        assert panel.active_control is None
-
-    def test_cycle_recovers_when_active_index_not_in_selectable(self):
-        """If _active_control_index is somehow invalid, cycling should recover."""
-        panel = StackCard(0)
-        s1 = VolumeSlider("Volume")
-        s2 = BrightnessSlider("Bright")
-        panel.add_element(s1)
-        panel.add_element(s2)
-        # Manually break the index
-        panel._active_control_index = 999
-        panel.cycle_active_control()
-        # Should recover: pos defaults to 0, next is 1
-        assert panel.active_control_index == 1
