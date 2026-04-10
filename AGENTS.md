@@ -27,71 +27,61 @@ You MUST follow this sequence for every task. Do not write any code before step 
 
 ## Project overview
 
-Deckboard is an asyncio-native Python 3.11+ library for Elgato Stream Deck+ devices. It wraps the low-level `python-elgato-streamdeck` HID library and provides a high-level API for key slots, encoder slots, touchscreen cards, icons, and screen management.
+Deckboard is an asyncio-native Python 3.11+ library for Elgato Stream Deck+ devices. It wraps the low-level `python-elgato-streamdeck` HID library and provides a high-level API for key slots, encoder slots, touchscreen cards, icons, screen management, and declarative `.dsui` UI packages.
 
 ### Repository structure
 
-The codebase is organized into four top-level packages plus an integrations package:
+The codebase is organized into five top-level packages:
 
 ```
 src/deckboard/              # Library source
-  __init__.py               # Public API surface — re-exports from runtime, render, ui, presets
+  __init__.py               # Public API surface — re-exports from runtime, render, ui, dsui
+  py.typed                  # PEP 561 marker for typed package
 
   runtime/                  # Device lifecycle, events, transport
-    __init__.py             # Re-exports: Deck, DeckError, DeviceInfo, event types, Transport
+    __init__.py             # Re-exports: Deck, DeckError, DeviceInfo, event types, AsyncTransport
     deck.py                 # Main Deck class — entry point, event loop, rendering
     device_info.py          # DeviceInfo dataclass
     events.py               # Event dataclasses (KeyEvent, EncoderTurnEvent, etc.), EventType enum, type aliases
     transport.py            # Async bridge for HID callbacks (sync thread → asyncio queue)
 
   render/                   # Image rendering, fonts, icons
-    __init__.py             # Re-exports: IconManager, IconError, render helpers
+    __init__.py             # Re-exports: IconManager, IconError, render helpers, metrics constants
     debug_grid.py           # Debug grid overlay for development
     fonts.py                # Font loading and management
     icons.py                # IconManager — Iconify API fetching, SVG→PNG, disk/memory cache
-    key_renderer.py         # Key image rendering helpers, layout constants, JPEG encoding
-    metrics.py              # Render metrics and constants
+    key_renderer.py         # Key image rendering helpers, JPEG encoding
+    metrics.py              # Render metrics and constants (KEY_SIZE, PANEL_WIDTH, etc.)
     touch_renderer.py       # Touchscreen rendering helpers
 
   ui/                       # UI primitives and concrete components
-    __init__.py             # Re-exports all UI types from subpackages
+    __init__.py             # Re-exports: BlankCard, Card, EncoderSlot, KeySlot, Screen, TouchStrip
     screen.py               # Screen class — named layout of key slots, encoder slots, cards
     touch_strip.py          # TouchStrip — container for cards on the touchscreen
 
     cards/                  # Card types (touchscreen panels)
-      __init__.py           # Re-exports: Card, StackCard, StatusCard
+      __init__.py           # Re-exports: BlankCard, Card
       base.py               # Card ABC — abstract base for touchscreen cards
-      stack.py              # StackCard — generic container for mixed elements
-      status.py             # StatusCard — icon + label + value display
+      blank.py              # BlankCard — minimal card rendering an empty black panel
 
     controls/               # Interactive controls bound to physical inputs
-      __init__.py           # Re-exports all control types
-      base.py               # Control ABC — abstract base for controls
+      __init__.py           # Re-exports: EncoderSlot, KeySlot
       key_slot.py           # KeySlot class — wraps a physical key (0-7)
       encoder_slot.py       # EncoderSlot class — wraps a rotary encoder (0-3)
-      range_control.py      # RangeControl/Slider/LargeSlider/SmallSlider hierarchy
-      volume.py             # VolumeSlider
-      brightness.py         # BrightnessSlider
-      temperature.py        # TemperatureSlider
-      kelvin.py             # KelvinSlider
-      balance.py            # BalanceSlider
-      equalizer.py          # EqualizerSlider
 
-    elements/               # Passive display elements within cards
-      __init__.py           # Lazy re-exports: LargeText, SmallText, LargeDualValue, SmallDualValue
-      base.py               # Element ABC — abstract base for display elements
-      text.py               # LargeText, SmallText
-      metrics.py            # LargeDualValue, SmallDualValue
+  dsui/                     # Declarative UI packages (.dsui format)
+    __init__.py             # Re-exports: DsuiCard, DsuiKey, PackageSpec, loader, schema types
+    schema.py               # Data model for .dsui package manifests (PackageSpec, bindings, events, regions)
+    loader.py               # Load and validate .dsui packages from disk (YAML + SVG)
+    card.py                 # DsuiCard — touchscreen card backed by a .dsui package
+    key.py                  # DsuiKey — physical key backed by a .dsui package
+    event_map.py            # Physical-to-semantic event routing for .dsui packages
+    svg_renderer.py         # SVG-to-PIL rendering engine with live data bindings
 
-  presets/                  # Domain-grouped composite cards
-    __init__.py             # Re-exports: EqualizerCard, LightCard, MediaCard
-    audio.py                # EqualizerCard — multi-band equalizer card
-    lighting.py             # LightCard — light control card
-    media.py                # MediaCard — media playback card
-    climate.py              # Climate-related presets (future)
-    sensors.py              # Sensor-related presets (future)
-
-  integrations/             # External service bindings (not part of core refactor)
+  tools/                    # CLI utilities
+    __init__.py             # Package marker
+    __main__.py             # Entry point for `python -m deckboard.tools`
+    preview.py              # Preview SVG designs on a physical Stream Deck+ device
 
 tests/                      # One test file per source module
   conftest.py               # Shared fixtures (mock device, sample images, etc.)
@@ -105,12 +95,17 @@ The canonical class names reflect their hardware role:
 |------------------|---------------------------------|
 | `KeySlot`        | `ui.controls.key_slot`          |
 | `EncoderSlot`    | `ui.controls.encoder_slot`      |
-| `RangeControl`   | `ui.controls.range_control`     |
-| `Screen`         | `ui.screen` (was `Page`)        |
-| `Card`           | `ui.cards.base` (was `Widget`)  |
-| `TouchStrip`     | `ui.touch_strip` (was `TouchScreen`) |
+| `Screen`         | `ui.screen`                     |
+| `Card`           | `ui.cards.base`                 |
+| `BlankCard`      | `ui.cards.blank`                |
+| `TouchStrip`     | `ui.touch_strip`                |
+| `DsuiCard`       | `dsui.card`                     |
+| `DsuiKey`        | `dsui.key`                      |
+| `PackageSpec`    | `dsui.schema`                   |
+| `EventMap`       | `dsui.event_map`                |
+| `SvgRenderer`    | `dsui.svg_renderer`             |
 
-All classes are exported from `deckboard.__init__`. There are no backward-compatible aliases.
+All public classes are exported from `deckboard.__init__`. There are no backward-compatible aliases.
 
 ## Build / lint / test commands
 
