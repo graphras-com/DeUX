@@ -438,6 +438,34 @@ class TestTouchStripSetCard:
             touchscreen.set_card(0, "not a card")  # type: ignore[arg-type]
 
 
+class TestTouchStripBackgroundColor:
+    def test_default_is_black(self, touchscreen: TouchStrip):
+        assert touchscreen.background_color == "black"
+
+    def test_constructor_accepts_background_color(self):
+        ts = TouchStrip(background_color="#1a1a2e")
+        assert ts.background_color == "#1a1a2e"
+
+    def test_setter_updates_value(self, touchscreen: TouchStrip):
+        touchscreen.background_color = "#ff0000"
+        assert touchscreen.background_color == "#ff0000"
+
+    def test_setter_marks_all_cards_dirty(self, touchscreen: TouchStrip):
+        for card in touchscreen.cards:
+            card.mark_clean()
+        assert touchscreen.any_dirty is False
+        touchscreen.background_color = "#00ff00"
+        assert touchscreen.any_dirty is True
+        for card in touchscreen.cards:
+            assert card.is_dirty is True
+
+    def test_setter_same_value_does_not_mark_dirty(self, touchscreen: TouchStrip):
+        for card in touchscreen.cards:
+            card.mark_clean()
+        touchscreen.background_color = "black"  # same as default
+        assert touchscreen.any_dirty is False
+
+
 class TestTouchStripAnyDirty:
     def test_initially_dirty(self, touchscreen: TouchStrip):
         assert touchscreen.any_dirty is True

@@ -114,5 +114,14 @@ class Screen:
         return self._touch_strip
 
     @property
+    def touchstrip_background(self) -> str:
+        """The fill colour for the touchscreen canvas (margins and gaps)."""
+        return self._touch_strip.background_color
+
+    @touchstrip_background.setter
+    def touchstrip_background(self, value: str) -> None:
+        self._touch_strip.background_color = value
+
+    @property
     def cards(self) -> list[Card]:
         return self._touch_strip.cards

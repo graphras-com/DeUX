@@ -119,6 +119,25 @@ class TestPageCard:
             page.card(4)
 
 
+class TestPageTouchstripBackground:
+    def test_default_is_black(self, page: Screen):
+        assert page.touchstrip_background == "black"
+
+    def test_getter_delegates_to_touch_strip(self, page: Screen):
+        page.touch_strip.background_color = "#abcdef"
+        assert page.touchstrip_background == "#abcdef"
+
+    def test_setter_delegates_to_touch_strip(self, page: Screen):
+        page.touchstrip_background = "#123456"
+        assert page.touch_strip.background_color == "#123456"
+
+    def test_setter_marks_cards_dirty(self, page: Screen):
+        for card in page.cards:
+            card.mark_clean()
+        page.touchstrip_background = "#ff0000"
+        assert page.touch_strip.any_dirty is True
+
+
 class TestPageSetCard:
     def test_set_card_replaces(self, page: Screen):
         from tests.test_touch_strip import _ConcreteWidget

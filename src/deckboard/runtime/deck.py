@@ -390,7 +390,11 @@ class Deck:
             card.set_rendered(img)
             card_images.append(img)
 
-        touchstrip_bytes = compose_touchstrip(card_images, debug_grid=self._debug_grid)
+        touchstrip_bytes = compose_touchstrip(
+            card_images,
+            debug_grid=self._debug_grid,
+            background=screen.touch_strip.background_color,
+        )
 
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(

@@ -21,14 +21,16 @@ from .metrics import (
 def compose_touchstrip(
     cards: list[Image.Image | None],
     debug_grid: bool = False,
+    background: str = "black",
 ) -> bytes:
     """Compose 4 card images into a single touchscreen JPEG.
 
     Args:
         cards: Up to 4 card images (or ``None`` for blank slots).
         debug_grid: When ``True``, overlay a 32x4 alignment grid.
+        background: Fill colour for the 800x100 canvas (margins and gaps).
     """
-    img = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), "black")
+    img = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), background)
 
     for index, card_image in enumerate(cards):
         if index >= PANEL_COUNT:
@@ -43,6 +45,11 @@ def compose_touchstrip(
     return _encode_jpeg(img)
 
 
-def render_blank_touchscreen(debug_grid: bool = False) -> bytes:
+def render_blank_touchscreen(
+    debug_grid: bool = False,
+    background: str = "black",
+) -> bytes:
     """Render a blank touch-strip image."""
-    return compose_touchstrip([None] * PANEL_COUNT, debug_grid=debug_grid)
+    return compose_touchstrip(
+        [None] * PANEL_COUNT, debug_grid=debug_grid, background=background
+    )
