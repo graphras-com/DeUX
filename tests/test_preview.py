@@ -13,8 +13,6 @@ import pytest
 from PIL import Image
 
 from deckboard.render.metrics import (
-    ICON_PADDING,
-    ICON_SIZE,
     KEY_SIZE,
     MARGIN_LEFT,
     MARGIN_TOP,
@@ -184,9 +182,9 @@ class TestComposeKeyImage:
         decoded = Image.open(io.BytesIO(result))
         assert decoded.size == KEY_SIZE
 
-    def test_full_size_icon(self):
-        """An 80x80 icon should be placed at (ICON_PADDING, ICON_PADDING)."""
-        svg_img = Image.new("RGBA", (ICON_SIZE, ICON_SIZE), (255, 0, 0, 255))
+    def test_full_size_image(self):
+        """A 120x120 image should fill the entire key canvas."""
+        svg_img = Image.new("RGBA", KEY_SIZE, (255, 0, 0, 255))
         result = compose_key_image(svg_img)
         decoded = Image.open(io.BytesIO(result))
         assert decoded.size == KEY_SIZE
