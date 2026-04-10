@@ -220,6 +220,26 @@ class TestComposeTouchscreen:
         img = _decode_jpeg(result)
         assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
 
+    def test_custom_background_color(self):
+        """Background colour fills the canvas margins and gaps."""
+        result = compose_touchstrip([None] * 4, background="#ff0000")
+        img = _decode_jpeg(result)
+        assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
+        # Top-left corner (0,0) is in the margin area — should be red-ish
+        r, g, b = img.getpixel((0, 0))
+        assert r > 200  # JPEG compression may shift values slightly
+        assert g < 50
+        assert b < 50
+
+    def test_default_background_is_black(self):
+        """Without a background argument the canvas is black."""
+        result = compose_touchstrip([None] * 4)
+        img = _decode_jpeg(result)
+        r, g, b = img.getpixel((0, 0))
+        assert r < 10
+        assert g < 10
+        assert b < 10
+
 
 # ── render_blank_key ────────────────────────────────────────────────────
 
@@ -258,6 +278,14 @@ class TestRenderBlankTouchscreen:
         result = render_blank_touchscreen(debug_grid=True)
         img = _decode_jpeg(result)
         assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
+
+    def test_custom_background(self):
+        result = render_blank_touchscreen(background="#00ff00")
+        img = _decode_jpeg(result)
+        r, g, b = img.getpixel((0, 0))
+        assert g > 200
+        assert r < 50
+        assert b < 50
 
 
 # ── _encode_jpeg ────────────────────────────────────────────────────────

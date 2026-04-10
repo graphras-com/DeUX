@@ -8,10 +8,29 @@ from .cards.blank import BlankCard
 
 
 class TouchStrip:
-    """Manage the 4 card zones on the Stream Deck+ touch strip."""
+    """Manage the 4 card zones on the Stream Deck+ touch strip.
 
-    def __init__(self) -> None:
+    The *background_color* fills the entire 800x100 canvas — including
+    the margin and gap areas outside card panels.  Each :class:`Screen`
+    owns its own ``TouchStrip``, so different screens can use different
+    background colours.
+    """
+
+    def __init__(self, background_color: str = "black") -> None:
         self._cards: list[Card] = [BlankCard(i) for i in range(PANEL_COUNT)]
+        self._background_color = background_color
+
+    @property
+    def background_color(self) -> str:
+        """The fill colour for the touchscreen canvas (margins and gaps)."""
+        return self._background_color
+
+    @background_color.setter
+    def background_color(self, value: str) -> None:
+        if self._background_color != value:
+            self._background_color = value
+            for card in self._cards:
+                card.mark_dirty()
 
     def card(self, index: int) -> Card:
         """Get a card zone by index (0-3)."""
