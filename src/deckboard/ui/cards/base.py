@@ -206,7 +206,7 @@ class Card(ABC):
     def rendered(self) -> Image.Image | None:
         return self._rendered
 
-    def set_rendered(self, img: Image.Image) -> None:
+    def set_rendered(self, img: Image.Image | None) -> None:
         self._rendered = img
         self._dirty = False
 
@@ -247,11 +247,15 @@ class Card(ABC):
     # -- Rendering (abstract) ----------------------------------------------
 
     @abstractmethod
-    def render(self) -> Image.Image:
+    def render(self) -> Image.Image | None:
         """Render this card as a PANEL_WIDTH x PANEL_HEIGHT PIL Image.
 
+        Return ``None`` to let the touchstrip background colour show
+        through (used by :class:`~deckboard.ui.cards.blank.BlankCard`).
+
         Returns:
-            A PANEL_WIDTH x PANEL_HEIGHT RGB :class:`~PIL.Image.Image`.
+            A PANEL_WIDTH x PANEL_HEIGHT RGB :class:`~PIL.Image.Image`,
+            or ``None`` for a transparent/empty slot.
         """
 
     # -- Encoder interaction hooks (default no-ops) ------------------------

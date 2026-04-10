@@ -1,19 +1,18 @@
-"""BlankCard: a minimal card that renders an empty black panel."""
+"""BlankCard: a transparent placeholder card for empty touch-strip slots."""
 
 from __future__ import annotations
 
-from PIL import Image
-
-from ...render.metrics import PANEL_HEIGHT, PANEL_WIDTH
 from .base import Card
 
 
 class BlankCard(Card):
-    """A card that renders a plain black rectangle.
+    """A card that renders nothing, letting the touchstrip background show through.
 
     Used as the default placeholder in :class:`~deckboard.ui.touch_strip.TouchStrip`
-    before the user assigns real cards.
+    before the user assigns real cards.  Returns ``None`` from :meth:`render`
+    so the compositor skips the slot and the
+    :attr:`~deckboard.ui.touch_strip.TouchStrip.background_color` is visible.
     """
 
-    def render(self) -> Image.Image:
-        return Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+    def render(self) -> None:
+        return None
