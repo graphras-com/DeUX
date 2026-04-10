@@ -13,6 +13,11 @@ from deckboard.render.debug_grid import (
     draw_touchscreen_grid,
 )
 from deckboard.render.metrics import (
+    KEY_MARGIN_BOTTOM,
+    KEY_MARGIN_LEFT,
+    KEY_MARGIN_RIGHT,
+    KEY_MARGIN_TOP,
+    KEY_SIZE,
     MARGIN_BOTTOM,
     MARGIN_LEFT,
     MARGIN_RIGHT,
@@ -206,3 +211,39 @@ class TestDrawKeyGrid:
         img = Image.new("RGB", (200, 100), "black")
         result = draw_key_grid(img, divisions=5)
         assert result.size == (200, 100)
+
+    def test_margin_pixels_present(self):
+        """Margin boundary pixels should be drawn at key margin positions."""
+        img = Image.new("RGB", KEY_SIZE, "black")
+        result = draw_key_grid(img)
+
+        left = KEY_MARGIN_LEFT
+        right = KEY_SIZE[0] - KEY_MARGIN_RIGHT - 1
+        top = KEY_MARGIN_TOP
+        bottom = KEY_SIZE[1] - KEY_MARGIN_BOTTOM - 1
+        mid_x = (left + right) // 2
+        mid_y = (top + bottom) // 2
+
+        # Left margin line
+        assert result.getpixel((left, mid_y)) == _MARGIN_COLOR
+        # Right margin line
+        assert result.getpixel((right, mid_y)) == _MARGIN_COLOR
+        # Top margin line
+        assert result.getpixel((mid_x, top)) == _MARGIN_COLOR
+        # Bottom margin line
+        assert result.getpixel((mid_x, bottom)) == _MARGIN_COLOR
+
+    def test_margin_lines_stay_within_bounds(self):
+        """Margin lines should not extend beyond the margin rectangle."""
+        img = Image.new("RGB", KEY_SIZE, "black")
+        result = draw_key_grid(img)
+
+        # Pixels outside the margin rectangle should remain black
+        if KEY_MARGIN_TOP > 0:
+            assert result.getpixel((KEY_MARGIN_LEFT, 0)) == (0, 0, 0)
+        if KEY_MARGIN_BOTTOM > 0:
+            assert result.getpixel((KEY_MARGIN_LEFT, KEY_SIZE[1] - 1)) == (0, 0, 0)
+        if KEY_MARGIN_LEFT > 1:
+            assert result.getpixel((0, KEY_MARGIN_TOP)) == (0, 0, 0)
+        if KEY_MARGIN_RIGHT > 1:
+            assert result.getpixel((KEY_SIZE[0] - 1, KEY_MARGIN_TOP)) == (0, 0, 0)

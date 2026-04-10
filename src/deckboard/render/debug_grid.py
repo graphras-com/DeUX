@@ -5,6 +5,10 @@ from __future__ import annotations
 from PIL import Image, ImageDraw
 
 from .metrics import (
+    KEY_MARGIN_BOTTOM,
+    KEY_MARGIN_LEFT,
+    KEY_MARGIN_RIGHT,
+    KEY_MARGIN_TOP,
     MARGIN_BOTTOM,
     MARGIN_LEFT,
     MARGIN_RIGHT,
@@ -75,6 +79,11 @@ def draw_touchscreen_grid(img: Image.Image) -> Image.Image:
 def draw_key_grid(img: Image.Image, divisions: int = 4) -> Image.Image:
     """Draw a debug grid on a key-sized image.
 
+    Margin boundaries (top/bottom/left/right) are drawn with a
+    brighter line so they are easy to distinguish from the evenly
+    spaced inner grid lines.  Grid lines run only within the
+    margin-bounded usable area.
+
     Args:
         img: A 120x120 RGB :class:`~PIL.Image.Image`.
              A copy is made — the original is not modified.
@@ -87,15 +96,30 @@ def draw_key_grid(img: Image.Image, divisions: int = 4) -> Image.Image:
     draw = ImageDraw.Draw(overlay)
     w, h = overlay.size
 
-    col_step = w / divisions
-    row_step = h / divisions
+    left = KEY_MARGIN_LEFT
+    right = w - KEY_MARGIN_RIGHT - 1
+    top = KEY_MARGIN_TOP
+    bottom = h - KEY_MARGIN_BOTTOM - 1
+
+    usable_w = right - left
+    usable_h = bottom - top
+
+    col_step = usable_w / divisions
+    row_step = usable_h / divisions
+
+    # Inner grid lines (within the usable area)
+    for i in range(1, divisions):
+        x = round(left + i * col_step)
+        draw.line([(x, top), (x, bottom)], fill=_GRID_COLOR)
 
     for i in range(1, divisions):
-        x = round(i * col_step)
-        draw.line([(x, 0), (x, h - 1)], fill=_GRID_COLOR)
+        y = round(top + i * row_step)
+        draw.line([(left, y), (right, y)], fill=_GRID_COLOR)
 
-    for i in range(1, divisions):
-        y = round(i * row_step)
-        draw.line([(0, y), (w - 1, y)], fill=_GRID_COLOR)
+    # Margin boundary lines (brighter)
+    draw.line([(left, top), (left, bottom)], fill=_MARGIN_COLOR)
+    draw.line([(right, top), (right, bottom)], fill=_MARGIN_COLOR)
+    draw.line([(left, top), (right, top)], fill=_MARGIN_COLOR)
+    draw.line([(left, bottom), (right, bottom)], fill=_MARGIN_COLOR)
 
     return overlay

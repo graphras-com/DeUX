@@ -8,8 +8,15 @@ from unittest.mock import patch
 from PIL import Image, ImageFont
 
 from deckboard.render.metrics import (
+    ICON_PADDING,
     ICON_SIZE,
+    KEY_MARGIN_BOTTOM,
+    KEY_MARGIN_LEFT,
+    KEY_MARGIN_RIGHT,
+    KEY_MARGIN_TOP,
     KEY_SIZE,
+    KEY_USABLE_HEIGHT,
+    KEY_USABLE_WIDTH,
     TOUCHSCREEN_HEIGHT,
     TOUCHSCREEN_WIDTH,
     PANEL_COUNT,
@@ -170,6 +177,93 @@ class TestRenderKeyImage:
         result = render_key_image(icon=sample_icon, label="Test", debug_grid=True)
         img = _decode_jpeg(result)
         assert img.size == KEY_SIZE
+
+
+# ── Key margin constants ────────────────────────────────────────────────
+
+
+class TestKeyMarginConstants:
+    def test_usable_width(self):
+        assert KEY_USABLE_WIDTH == KEY_SIZE[0] - KEY_MARGIN_LEFT - KEY_MARGIN_RIGHT
+
+    def test_usable_height(self):
+        assert KEY_USABLE_HEIGHT == KEY_SIZE[1] - KEY_MARGIN_TOP - KEY_MARGIN_BOTTOM
+
+    def test_usable_area_is_106x106(self):
+        assert KEY_USABLE_WIDTH == 106
+        assert KEY_USABLE_HEIGHT == 106
+
+    def test_icon_padding_fits_within_usable_area(self):
+        assert ICON_PADDING == (KEY_USABLE_WIDTH - ICON_SIZE) // 2
+
+    def test_icon_plus_padding_fits(self):
+        assert ICON_SIZE + 2 * ICON_PADDING <= KEY_USABLE_WIDTH
+        assert ICON_SIZE + 2 * ICON_PADDING <= KEY_USABLE_HEIGHT
+
+    def test_margins_are_positive(self):
+        assert KEY_MARGIN_TOP > 0
+        assert KEY_MARGIN_RIGHT > 0
+        assert KEY_MARGIN_BOTTOM > 0
+        assert KEY_MARGIN_LEFT > 0
+
+
+# ── Key margin rendering behaviour ─────────────────────────────────────
+
+
+class TestKeyMarginRendering:
+    def test_icon_within_margins(self, sample_icon):
+        """An icon-only key should have content only inside the margin area."""
+        result = render_key_image(icon=sample_icon)
+        img = _decode_jpeg(result)
+
+        # The icon is red (255, 0, 0) on a black background.
+        # Check that the top-left corner (inside the margin area) is black.
+        for x in range(KEY_MARGIN_LEFT):
+            for y in range(KEY_SIZE[1]):
+                r, g, b = img.getpixel((x, y))
+                # JPEG compression means values won't be exactly 0,
+                # but they should be very dark in the margin area.
+                assert r < 20 and g < 20 and b < 20, (
+                    f"Non-black pixel at ({x}, {y}) in left margin: ({r}, {g}, {b})"
+                )
+
+    def test_icon_positioned_at_margin_offset(self, sample_icon):
+        """Icon x_offset should include the left margin."""
+        result = render_key_image(icon=sample_icon)
+        img = _decode_jpeg(result)
+
+        # The icon is placed at (KEY_MARGIN_LEFT + ICON_PADDING, ...)
+        # which is (7 + 13, ...) = (20, ...).  The pixel just inside
+        # should be red-ish (the icon colour).
+        expected_x = KEY_MARGIN_LEFT + ICON_PADDING
+        expected_y = KEY_MARGIN_TOP + ICON_PADDING
+        r, g, b = img.getpixel((expected_x + 2, expected_y + 2))
+        assert r > 200, f"Expected red-ish pixel at icon start, got ({r}, {g}, {b})"
+
+    def test_right_margin_is_clear(self, sample_icon):
+        """Right margin area should remain background-coloured."""
+        result = render_key_image(icon=sample_icon)
+        img = _decode_jpeg(result)
+
+        for x in range(KEY_SIZE[0] - KEY_MARGIN_RIGHT, KEY_SIZE[0]):
+            for y in range(KEY_SIZE[1]):
+                r, g, b = img.getpixel((x, y))
+                assert r < 20 and g < 20 and b < 20, (
+                    f"Non-black pixel at ({x}, {y}) in right margin: ({r}, {g}, {b})"
+                )
+
+    def test_label_within_bottom_margin(self):
+        """Label text should not extend into the bottom margin."""
+        result = render_key_image(label="Test")
+        img = _decode_jpeg(result)
+
+        # The bottom margin rows should be essentially black
+        for x in range(KEY_SIZE[0]):
+            for y in range(KEY_SIZE[1] - KEY_MARGIN_BOTTOM + 1, KEY_SIZE[1]):
+                r, g, b = img.getpixel((x, y))
+                assert r < 30 and g < 30 and b < 30, (
+                    f"Non-black pixel at ({x}, {y}) in bottom margin: ({r}, {g}, {b})"
+                )
 
 
 # ── compose_touchstrip ─────────────────────────────────────────────────
