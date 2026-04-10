@@ -60,6 +60,12 @@ class TestWidgetAbstractBase:
         assert w.rendered is img
         assert w.is_dirty is False
 
+    def test_set_rendered_none(self):
+        w = _ConcreteWidget(0)
+        w.set_rendered(None)
+        assert w.rendered is None
+        assert w.is_dirty is False
+
     def test_on_tap(self):
         w = _ConcreteWidget(0)
 
@@ -363,11 +369,9 @@ class TestBlankCard:
         b = BlankCard(2)
         assert b.index == 2
 
-    def test_render_size(self):
+    def test_render_returns_none(self):
         b = BlankCard(0)
-        img = b.render()
-        assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
-        assert img.mode == "RGB"
+        assert b.render() is None
 
     def test_initially_dirty(self):
         b = BlankCard(0)
