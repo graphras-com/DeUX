@@ -99,8 +99,12 @@ events:
   - name: previous
     source: encoder_turn
     direction: left
-  - name: seek
+  - name: seek_forward
     source: encoder_press_turn
+    direction: right
+  - name: seek_backward
+    source: encoder_press_turn
+    direction: left
 
 regions:
   card:

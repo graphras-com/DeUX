@@ -104,12 +104,22 @@ class TestLoadPackageValid:
         assert "toggle_play" in names
         assert "next" in names
         assert "previous" in names
-        assert "seek" in names
+        assert "seek_forward" in names
+        assert "seek_backward" in names
 
     def test_event_direction(self, card_dsui_path):
         spec = load_package(card_dsui_path)
         next_evt = next(e for e in spec.events if e.name == "next")
         assert next_evt.direction == "right"
+
+    def test_event_press_turn_direction(self, card_dsui_path):
+        spec = load_package(card_dsui_path)
+        seek_fwd = next(e for e in spec.events if e.name == "seek_forward")
+        seek_bwd = next(e for e in spec.events if e.name == "seek_backward")
+        assert seek_fwd.source == "encoder_press_turn"
+        assert seek_fwd.direction == "right"
+        assert seek_bwd.source == "encoder_press_turn"
+        assert seek_bwd.direction == "left"
 
     def test_event_duration(self, card_dsui_path):
         spec = load_package(card_dsui_path)
