@@ -190,6 +190,8 @@ class TestDsuiInitExports:
             "ImageBinding",
             "VisibilityBinding",
             "ColorBinding",
+            "RangeBinding",
+            "RangeDirection",
             "EventMapping",
             "Region",
             "ImageFit",

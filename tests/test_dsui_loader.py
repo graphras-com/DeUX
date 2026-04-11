@@ -13,6 +13,8 @@ from deckboard.dsui.schema import (
     ImageFit,
     OverflowMode,
     PackageType,
+    RangeBinding,
+    RangeDirection,
     TextBinding,
     VisibilityBinding,
 )
@@ -69,6 +71,32 @@ class TestLoadPackageValid:
         assert isinstance(b, ColorBinding)
         assert b.attribute == "fill"
         assert b.default == "#ff0000"
+
+    def test_range_binding_parsed(self, card_dsui_path):
+        spec = load_package(card_dsui_path)
+        b = spec.bindings["progress"]
+        assert isinstance(b, RangeBinding)
+        assert b.node == "accent"
+        assert b.default == 0.5
+        assert b.direction == RangeDirection.HORIZONTAL
+
+    def test_range_binding_vertical(self, tmp_path):
+        pkg = tmp_path / "R.dsui"
+        pkg.mkdir()
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar" height="80"/></svg>'
+        )
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: R\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  level:\n    type: range\n    node: bar\n    direction: vertical\n    default: 1.0",
+            encoding="utf-8",
+        )
+        spec = load_package(pkg)
+        b = spec.bindings["level"]
+        assert isinstance(b, RangeBinding)
+        assert b.direction == RangeDirection.VERTICAL
+        assert b.default == 1.0
 
     def test_events_parsed(self, card_dsui_path):
         spec = load_package(card_dsui_path)
@@ -576,6 +604,58 @@ class TestLoadPackageInvalid:
             encoding="utf-8",
         )
         with pytest.raises(PackageError, match="must be a mapping"):
+            load_package(pkg)
+
+    def test_range_binding_invalid_direction(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  bar:\n    type: range\n    node: bar\n    direction: diagonal",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="invalid direction"):
+            load_package(pkg)
+
+    def test_range_binding_default_out_of_range(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  bar:\n    type: range\n    node: bar\n    default: 1.5",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="between 0.0 and 1.0"):
+            load_package(pkg)
+
+    def test_range_binding_default_negative(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  bar:\n    type: range\n    node: bar\n    default: -0.1",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="between 0.0 and 1.0"):
+            load_package(pkg)
+
+    def test_range_binding_default_not_number(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  bar:\n    type: range\n    node: bar\n    default: high",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="must be a number"):
             load_package(pkg)
 
     def test_version_string_invalid(self, tmp_path):

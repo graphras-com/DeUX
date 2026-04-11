@@ -12,6 +12,7 @@ from deckboard.dsui.schema import (
     EventMapping,
     PackageSpec,
     PackageType,
+    RangeBinding,
     Region,
     TextBinding,
 )
@@ -25,6 +26,7 @@ _CARD_SVG = (
     '<svg id="TestCard" xmlns="http://www.w3.org/2000/svg" width="197" height="98">'
     '<rect id="bg" width="197" height="98" fill="#1c1c1c"/>'
     '<text id="title" x="4" y="40" font-size="14" fill="#ffffff">Default</text>'
+    '<rect id="bar" x="4" y="86" width="189" height="4" fill="#00ff00"/>'
     "</svg>"
 )
 
@@ -127,6 +129,33 @@ class TestDsuiCardDataBinding:
         card = DsuiCard(0, spec)
         with pytest.raises(KeyError):
             card.get("nonexistent")
+
+    def test_set_range_marks_dirty(self):
+        spec = _make_card_spec(
+            bindings={"level": RangeBinding(node="bar", default=0.0)}
+        )
+        card = DsuiCard(0, spec)
+        card.mark_clean()
+        card.set("level", 0.5)
+        assert card.is_dirty is True
+
+    def test_set_range_same_value_not_dirty(self):
+        spec = _make_card_spec(
+            bindings={"level": RangeBinding(node="bar", default=0.5)}
+        )
+        card = DsuiCard(0, spec)
+        card.mark_clean()
+        card.set("level", 0.5)
+        assert card.is_dirty is False
+
+    def test_get_range_value(self):
+        spec = _make_card_spec(
+            bindings={"level": RangeBinding(node="bar", default=0.3)}
+        )
+        card = DsuiCard(0, spec)
+        assert card.get("level") == 0.3
+        card.set("level", 0.8)
+        assert card.get("level") == 0.8
 
 
 class TestDsuiCardRender:

@@ -14,6 +14,8 @@ from deckboard.dsui.schema import (
     OverflowMode,
     PackageSpec,
     PackageType,
+    RangeBinding,
+    RangeDirection,
     TextBinding,
     VisibilityBinding,
 )
@@ -52,6 +54,20 @@ _VISIBILITY_SVG = (
 _COLOR_SVG = (
     '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="100" height="50">'
     '<rect id="accent" width="100" height="50" fill="#ff0000"/>'
+    "</svg>"
+)
+
+_RANGE_SVG = (
+    '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="100" height="50">'
+    '<rect id="bg" width="100" height="50" fill="#000000"/>'
+    '<rect id="bar" x="5" y="20" width="80" height="10" fill="#00ff00"/>'
+    "</svg>"
+)
+
+_RANGE_VERTICAL_SVG = (
+    '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="50" height="100">'
+    '<rect id="bg" width="50" height="100" fill="#000000"/>'
+    '<rect id="vbar" x="20" y="5" width="10" height="80" fill="#00ff00"/>'
     "</svg>"
 )
 
@@ -432,3 +448,137 @@ class TestSvgRendererInlineAssets:
         renderer = SvgRenderer(spec)
         result = renderer.render()
         assert result.size == (50, 50)
+
+
+class TestSvgRendererRange:
+    def test_set_range_returns_true_on_change(self):
+        spec = _make_spec(
+            _RANGE_SVG,
+            bindings={"bar": RangeBinding(node="bar", default=0.0)},
+        )
+        renderer = SvgRenderer(spec)
+        assert renderer.set("bar", 0.5) is True
+
+    def test_set_range_same_value_returns_false(self):
+        spec = _make_spec(
+            _RANGE_SVG,
+            bindings={"bar": RangeBinding(node="bar", default=0.5)},
+        )
+        renderer = SvgRenderer(spec)
+        assert renderer.set("bar", 0.5) is False
+
+    def test_range_default(self):
+        spec = _make_spec(
+            _RANGE_SVG,
+            bindings={"bar": RangeBinding(node="bar", default=0.75)},
+        )
+        renderer = SvgRenderer(spec)
+        assert renderer.get("bar") == 0.75
+
+    def test_range_extent_cached_horizontal(self):
+        spec = _make_spec(
+            _RANGE_SVG,
+            bindings={"bar": RangeBinding(node="bar", default=0.0)},
+        )
+        renderer = SvgRenderer(spec)
+        assert renderer._range_extents["bar"] == 80.0
+
+    def test_range_extent_cached_vertical(self):
+        spec = _make_spec(
+            _RANGE_VERTICAL_SVG,
+            bindings={
+                "vbar": RangeBinding(
+                    node="vbar", default=0.0, direction=RangeDirection.VERTICAL
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        assert renderer._range_extents["vbar"] == 80.0
+
+    def test_range_renders_differently(self):
+        spec = _make_spec(
+            _RANGE_SVG,
+            bindings={"bar": RangeBinding(node="bar", default=0.0)},
+        )
+        renderer = SvgRenderer(spec)
+        img_empty = renderer.render()
+
+        renderer.set("bar", 1.0)
+        img_full = renderer.render()
+
+        assert img_empty.tobytes() != img_full.tobytes()
+
+    def test_range_half_differs_from_full(self):
+        spec = _make_spec(
+            _RANGE_SVG,
+            bindings={"bar": RangeBinding(node="bar", default=1.0)},
+        )
+        renderer = SvgRenderer(spec)
+        img_full = renderer.render()
+
+        renderer.set("bar", 0.5)
+        img_half = renderer.render()
+
+        assert img_full.tobytes() != img_half.tobytes()
+
+    def test_range_vertical_renders(self):
+        spec = _make_spec(
+            _RANGE_VERTICAL_SVG,
+            bindings={
+                "vbar": RangeBinding(
+                    node="vbar", default=1.0, direction=RangeDirection.VERTICAL
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        img_full = renderer.render()
+
+        renderer.set("vbar", 0.0)
+        img_empty = renderer.render()
+
+        assert img_full.tobytes() != img_empty.tobytes()
+
+    def test_range_clamped_above_one(self):
+        spec = _make_spec(
+            _RANGE_SVG,
+            bindings={"bar": RangeBinding(node="bar", default=0.0)},
+        )
+        renderer = SvgRenderer(spec)
+        renderer.set("bar", 1.0)
+        img_one = renderer.render()
+
+        renderer.set("bar", 5.0)
+        img_over = renderer.render()
+
+        # Both should produce the same output (clamped to 1.0)
+        assert img_one.tobytes() == img_over.tobytes()
+
+    def test_range_clamped_below_zero(self):
+        spec = _make_spec(
+            _RANGE_SVG,
+            bindings={"bar": RangeBinding(node="bar", default=0.0)},
+        )
+        renderer = SvgRenderer(spec)
+        img_zero = renderer.render()
+
+        renderer.set("bar", -0.5)
+        img_neg = renderer.render()
+
+        # Both should produce the same output (clamped to 0.0)
+        assert img_zero.tobytes() == img_neg.tobytes()
+
+    def test_range_missing_node_logs_warning(self, caplog):
+        svg = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"/>'
+        spec = PackageSpec(
+            name="Test",
+            type=PackageType.KEY,
+            version=1,
+            svg_source=svg,
+            bindings={"ghost": RangeBinding(node="ghost_node", default=0.5)},
+        )
+        renderer = SvgRenderer(spec)
+        import logging
+
+        with caplog.at_level(logging.WARNING):
+            renderer.render()
+        assert "not found in SVG" in caplog.text

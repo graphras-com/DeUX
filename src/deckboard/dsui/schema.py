@@ -20,6 +20,7 @@ class BindingType(Enum):
     IMAGE = "image"
     VISIBILITY = "visibility"
     COLOR = "color"
+    RANGE = "range"
 
 
 class OverflowMode(Enum):
@@ -35,6 +36,13 @@ class ImageFit(Enum):
     COVER = "cover"
     CONTAIN = "contain"
     FILL = "fill"
+
+
+class RangeDirection(Enum):
+    """Axis along which a range binding scales an SVG element."""
+
+    HORIZONTAL = "horizontal"
+    VERTICAL = "vertical"
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,7 +81,16 @@ class ColorBinding:
     default: str = "#ffffff"
 
 
-Binding = TextBinding | ImageBinding | VisibilityBinding | ColorBinding
+@dataclass(frozen=True, slots=True)
+class RangeBinding:
+    """Scale an SVG element's width or height proportional to a 0–1 value."""
+
+    node: str
+    default: float = 0.0
+    direction: RangeDirection = RangeDirection.HORIZONTAL
+
+
+Binding = TextBinding | ImageBinding | VisibilityBinding | ColorBinding | RangeBinding
 
 # Valid event source names and their physical origins
 VALID_SOURCES = frozenset(

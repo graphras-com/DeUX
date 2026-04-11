@@ -42,6 +42,12 @@ bindings:
     attribute: fill
     default: "#f2b23a"
 
+  progress:
+    type: range
+    node: progress_bar
+    default: 0.0
+    direction: horizontal
+
 events:
   - name: toggle_play_pause
     source: encoder_press_release

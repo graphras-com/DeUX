@@ -83,8 +83,9 @@ target SVG element).  The `node` must exist in the SVG layout.
 | `image`        | Yes              | Yes   |
 | `visibility`   | Yes              | Yes   |
 | `color`        | Yes              | Yes   |
+| `range`        | Yes              | Yes   |
 
-All four binding types are available in both package types.
+All five binding types are available in both package types.
 
 ---
 
@@ -183,6 +184,62 @@ bindings:
 
 **Runtime value type:** `str` — any valid CSS colour (`"#ff0000"`,
 `"rgb(255,0,0)"`, `"red"`, etc.).
+
+---
+
+### `range` — scale an element's width or height proportionally
+
+Scales an SVG element's `width` (horizontal) or `height` (vertical)
+attribute proportionally to a normalised 0.0–1.0 value.  Ideal for
+progress bars, volume sliders, level meters, and similar visual
+indicators.
+
+The maximum extent is read from the SVG template at load time.  For
+example, if the SVG element has `width="185"`, then setting the value to
+`0.5` renders `width="92.5"`.
+
+```yaml
+bindings:
+  volume:
+    type: range
+    node: volume_bar       # SVG element id
+    default: 0.5           # Default proportion (optional)
+    direction: horizontal  # Axis to scale (optional)
+```
+
+| Parameter   | Type   | Required | Default        | Description                                                  |
+|-------------|--------|----------|----------------|--------------------------------------------------------------|
+| `node`      | string | Yes      | —              | `id` of the target SVG element (typically a `<rect>`).       |
+| `default`   | float  | No       | `0.0`          | Initial value, must be between 0.0 and 1.0 inclusive.        |
+| `direction` | string | No       | `horizontal`   | `horizontal` — scales the `width` attribute. `vertical` — scales the `height` attribute. |
+
+**Runtime value type:** `float` — a value between `0.0` (empty) and
+`1.0` (full extent).  Values outside this range are clamped.
+
+**SVG design tips:**
+
+- Use a **frame** rect (stroke only, no fill) at the full size, and a
+  **fill** rect (the bound element) inside it.  The frame stays fixed
+  while the fill rect scales.
+- The element's original `width` (or `height`) in the SVG template is
+  the 100% reference.  Design your SVG with the bar at full size.
+- Combine with a `color` binding on the same node to change the bar
+  colour dynamically (e.g., red when muted).
+
+**Example SVG layout:**
+
+```xml
+<rect id="volume_frame" x="4" y="72" width="189" height="15"
+      stroke="#dedede" fill="none" stroke-width="2" rx="2" ry="2"/>
+<rect id="volume_bar" x="6" y="74" width="185" height="11"
+      stroke="none" fill="#dedede" rx="1" ry="1"/>
+```
+
+```python
+card.set("volume", 0.65)   # 65% filled → width becomes 120.25
+card.set("volume", 0.0)    # empty bar → width = 0
+card.set("volume", 1.0)    # full bar → width = 185
+```
 
 ---
 
@@ -403,6 +460,12 @@ bindings:
     attribute: fill
     default: "#f2b23a"
 
+  progress:
+    type: range
+    node: progress_bar
+    default: 0.0
+    direction: horizontal
+
 events:
   - name: toggle_play_pause
     source: encoder_press_release
@@ -432,6 +495,7 @@ spec = load_package("./AudioCard.dsui")
 card = DsuiCard(0, spec)
 
 card.set("artist", "Ash Walker").set("title", "Aquamarine")
+card.set("progress", 0.35)  # 35% through the track
 
 @card.on("toggle_play_pause")
 async def toggle():
@@ -497,6 +561,69 @@ async def activate():
 @key.on_event("long_hold")
 async def force_shutdown():
     ...
+```
+
+### `TouchStripCard` — volume slider (range binding)
+
+```yaml
+name: VolumeSlider
+type: TouchStripCard
+version: 1
+layout: layout.svg
+
+bindings:
+  volume:
+    type: range
+    node: volume_bar
+    default: 0.5
+    direction: horizontal
+
+  bar_color:
+    type: color
+    node: volume_bar
+    attribute: fill
+    default: "#dedede"
+
+  value_text:
+    type: text
+    node: value_text
+    default: "50%"
+
+events:
+  - name: volume_up
+    source: encoder_turn
+    direction: right
+
+  - name: volume_down
+    source: encoder_turn
+    direction: left
+
+  - name: mute_toggle
+    source: encoder_press_release
+    max_duration_ms: 300
+```
+
+```python
+from deckboard.dsui import load_package, DsuiCard
+
+spec = load_package("./VolumeSlider.dsui")
+card = DsuiCard(0, spec)
+
+volume = 0.5
+card.set("volume", volume)
+card.set("value_text", f"{int(volume * 100)}%")
+
+@card.on("volume_up")
+async def up():
+    nonlocal volume
+    volume = min(1.0, volume + 0.05)
+    card.set("volume", volume)
+    card.set("value_text", f"{int(volume * 100)}%")
+
+@card.on("mute_toggle")
+async def mute():
+    card.set("bar_color", "#ff4444")
+    card.set("value_text", "MUTED")
 ```
 
 ---

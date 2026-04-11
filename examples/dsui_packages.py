@@ -51,6 +51,7 @@ async def main():
         audio.set("title", "Afghanistan")
         audio.set("album", "Echo Chamber (Deluxe)")
         audio.set("state", "Playing")
+        audio.set("progress", 0.35)  # 35% through the track
         screen.set_card(0, audio)
 
         # Install the power key on key slot 7
