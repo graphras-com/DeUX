@@ -103,19 +103,28 @@ async def main():
 
         @power.on_event("activate")
         async def on_power():
-            print("Power activated — stopping deck")
+            print("Power SHORT press — shutting down")
+            power.set("indicator_color", "#44ff44")  # flash green
+            await deck.refresh()
+            await asyncio.sleep(0.5)
             await deck.stop()
 
         @power.on_event("long_hold")
         async def on_power_hold():
-            print("Power long-hold detected")
+            print("Power LONG HOLD — force restart")
+            power.set("ring_color", "#ff8800")
+            power.set("line_color", "#ff8800")
+            power.set("indicator_color", "#ff8800")  # orange = held
+            await deck.refresh()
 
         # -- Activate and run ----------------------------------------------
 
         await deck.set_screen("main")
         print("\nDeck ready!")
         print("  Encoder 0: turn for next/prev track, press for play/pause")
-        print("  Key 7 (Shutdown): press to exit")
+        print("  Key 7 (Shutdown):")
+        print("    Short press (<300ms): clean shutdown (green flash)")
+        print("    Long hold  (>500ms):  force restart  (turns orange)")
         await deck.wait_closed()
 
 

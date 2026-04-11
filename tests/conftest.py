@@ -145,7 +145,8 @@ events:
     source: key_press_release
     max_duration_ms: 300
   - name: hold
-    source: key_press
+    source: key_hold
+    hold_ms: 500
 """
     (pkg_dir / "manifest.yaml").write_text(manifest, encoding="utf-8")
     return pkg_dir

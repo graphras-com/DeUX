@@ -33,4 +33,5 @@ events:
     max_duration_ms: 300
 
   - name: long_hold
-    source: key_press
+    source: key_hold
+    hold_ms: 500
