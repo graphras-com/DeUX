@@ -343,11 +343,11 @@ class TestKeyHold:
         hold_handler.assert_awaited_once()
 
         result = em.handle_key_release()
-        assert result == []  # all release-phase events suppressed
+        assert tap_handler not in result  # press_release suppressed
         tap_handler.assert_not_awaited()
 
-    async def test_hold_suppresses_key_release(self):
-        """After key_hold fires, key_release is also suppressed."""
+    async def test_hold_does_not_suppress_key_release(self):
+        """After key_hold fires, key_release still fires."""
         events = _make_events(
             ("up", "key_release"),
             ("long_hold", "key_hold", {"hold_ms": 10}),
@@ -363,8 +363,7 @@ class TestKeyHold:
         hold_handler.assert_awaited_once()
 
         result = em.handle_key_release()
-        assert result == []
-        release_handler.assert_not_awaited()
+        assert release_handler in result
 
     async def test_short_tap_still_works_with_hold(self):
         """Quick release fires press_release, not the hold."""
@@ -420,8 +419,8 @@ class TestKeyHold:
         result = em.handle_key_release()
         assert tap_handler in result
 
-    async def test_hold_suppresses_all_release_events(self):
-        """After key_hold fires, both key_press_release and key_release are suppressed."""
+    async def test_hold_suppresses_press_release_but_not_release(self):
+        """After key_hold fires, key_press_release is suppressed but key_release still fires."""
         events = _make_events(
             ("activate", "key_press_release", {"max_duration_ms": 5000}),
             ("up", "key_release"),
@@ -440,9 +439,8 @@ class TestKeyHold:
         hold_handler.assert_awaited_once()
 
         result = em.handle_key_release()
-        assert result == []
-        tap_handler.assert_not_awaited()
-        release_handler.assert_not_awaited()
+        assert tap_handler not in result  # compound gesture suppressed
+        assert release_handler in result  # simple release still fires
 
 
 class TestEncoderHold:
@@ -487,7 +485,7 @@ class TestEncoderHold:
         hold_handler.assert_awaited_once()
 
         result = em.handle_encoder_release()
-        assert result == []
+        assert toggle_handler not in result  # compound gesture suppressed
         toggle_handler.assert_not_awaited()
 
     async def test_encoder_short_tap_still_works_with_hold(self):
@@ -524,6 +522,25 @@ class TestEncoderHold:
         em.handle_encoder_press()
         result = em.handle_encoder_release()
         assert toggle_handler in result
+        assert release_handler in result
+
+    async def test_encoder_hold_does_not_suppress_release(self):
+        """After encoder_hold fires, encoder_release still fires."""
+        events = _make_events(
+            ("up", "encoder_release"),
+            ("enc_hold", "encoder_hold", {"hold_ms": 10}),
+        )
+        em = EventMap(events)
+        release_handler = AsyncMock()
+        hold_handler = AsyncMock()
+        em.on("up", release_handler)
+        em.on("enc_hold", hold_handler)
+
+        em.handle_encoder_press()
+        await asyncio.sleep(0.05)
+        hold_handler.assert_awaited_once()
+
+        result = em.handle_encoder_release()
         assert release_handler in result
 
 

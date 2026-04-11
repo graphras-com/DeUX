@@ -164,12 +164,10 @@ class EventMap:
         """Match an encoder release to semantic events.
 
         Cancels any running hold timer.  The simple ``encoder_release``
-        event always fires (unless suppressed by a hold).
-        ``encoder_press_release`` fires as an additional compound gesture
-        when the duration constraint is met.
-
-        If the hold already fired, all release-phase events are
-        suppressed for this press–release cycle.
+        event always fires regardless of whether a hold fired.
+        ``encoder_press_release`` is suppressed when a hold already
+        fired for this press–release cycle (since the interaction was
+        a hold, not a press-release gesture).
 
         Returns:
             A list of handlers to call (may be empty).
@@ -177,17 +175,14 @@ class EventMap:
         self._pressed = False
         self._cancel_hold_timer()
 
-        if self._hold_fired:
-            self._hold_fired = False
-            self._press_time = None
-            return []
+        hold_fired = self._hold_fired
+        self._hold_fired = False
 
         handlers: list[AsyncHandler] = []
 
-        # Check press_release compound gesture
-        if self._press_time is not None:
+        # Compound press_release gesture — suppressed after a hold
+        if not hold_fired and self._press_time is not None:
             elapsed_ms = (time.monotonic() - self._press_time) * 1000
-            self._press_time = None
 
             for mapping in self._by_source.get("encoder_press_release", []):
                 max_ms = mapping.max_duration_ms
@@ -196,7 +191,9 @@ class EventMap:
                     if handler is not None:
                         handlers.append(handler)
 
-        # Always include simple encoder_release
+        self._press_time = None
+
+        # Simple encoder_release always fires
         for mapping in self._by_source.get("encoder_release", []):
             handler = self._handlers.get(mapping.name)
             if handler is not None:
@@ -232,12 +229,10 @@ class EventMap:
         """Match a key release to semantic events.
 
         Cancels any running hold timer.  The simple ``key_release``
-        event always fires (unless suppressed by a hold).
-        ``key_press_release`` fires as an additional compound gesture
-        when the duration constraint is met.
-
-        If the hold already fired, all release-phase events are
-        suppressed for this press–release cycle.
+        event always fires regardless of whether a hold fired.
+        ``key_press_release`` is suppressed when a hold already
+        fired for this press–release cycle (since the interaction was
+        a hold, not a press-release gesture).
 
         Returns:
             A list of handlers to call (may be empty).
@@ -245,17 +240,14 @@ class EventMap:
         self._pressed = False
         self._cancel_hold_timer()
 
-        if self._hold_fired:
-            self._hold_fired = False
-            self._press_time = None
-            return []
+        hold_fired = self._hold_fired
+        self._hold_fired = False
 
         handlers: list[AsyncHandler] = []
 
-        # Check press_release compound gesture
-        if self._press_time is not None:
+        # Compound press_release gesture — suppressed after a hold
+        if not hold_fired and self._press_time is not None:
             elapsed_ms = (time.monotonic() - self._press_time) * 1000
-            self._press_time = None
 
             for mapping in self._by_source.get("key_press_release", []):
                 max_ms = mapping.max_duration_ms
@@ -264,7 +256,9 @@ class EventMap:
                     if handler is not None:
                         handlers.append(handler)
 
-        # Always include simple key_release
+        self._press_time = None
+
+        # Simple key_release always fires
         for mapping in self._by_source.get("key_release", []):
             handler = self._handlers.get(mapping.name)
             if handler is not None:
