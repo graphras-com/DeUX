@@ -189,6 +189,80 @@ class TestEncoderPressTurn:
         result = em.handle_encoder_turn(1)
         assert result is None
 
+    def test_press_turn_direction_right(self):
+        events = _make_events(
+            ("seek_fwd", "encoder_press_turn", {"direction": "right"}),
+            ("seek_bwd", "encoder_press_turn", {"direction": "left"}),
+        )
+        em = EventMap(events)
+        fwd_handler = AsyncMock()
+        bwd_handler = AsyncMock()
+        em.on("seek_fwd", fwd_handler)
+        em.on("seek_bwd", bwd_handler)
+
+        em.handle_encoder_press()
+        result = em.handle_encoder_turn(1)
+        assert result is fwd_handler
+
+    def test_press_turn_direction_left(self):
+        events = _make_events(
+            ("seek_fwd", "encoder_press_turn", {"direction": "right"}),
+            ("seek_bwd", "encoder_press_turn", {"direction": "left"}),
+        )
+        em = EventMap(events)
+        fwd_handler = AsyncMock()
+        bwd_handler = AsyncMock()
+        em.on("seek_fwd", fwd_handler)
+        em.on("seek_bwd", bwd_handler)
+
+        em.handle_encoder_press()
+        result = em.handle_encoder_turn(-1)
+        assert result is bwd_handler
+
+    def test_press_turn_direction_no_match(self):
+        events = _make_events(
+            ("seek_fwd", "encoder_press_turn", {"direction": "right"}),
+        )
+        em = EventMap(events)
+        handler = AsyncMock()
+        em.on("seek_fwd", handler)
+
+        em.handle_encoder_press()
+        result = em.handle_encoder_turn(-1)  # left turn, only right registered
+        assert result is None
+
+    def test_press_turn_takes_priority_over_regular_turn(self):
+        """encoder_press_turn is checked before encoder_turn when pressed."""
+        events = _make_events(
+            ("scroll", "encoder_turn"),
+            ("seek", "encoder_press_turn"),
+        )
+        em = EventMap(events)
+        scroll_handler = AsyncMock()
+        seek_handler = AsyncMock()
+        em.on("scroll", scroll_handler)
+        em.on("seek", seek_handler)
+
+        em.handle_encoder_press()
+        result = em.handle_encoder_turn(1)
+        assert result is seek_handler  # press_turn wins
+
+    def test_regular_turn_fires_when_press_turn_direction_mismatches(self):
+        """Falls back to encoder_turn when press_turn direction doesn't match."""
+        events = _make_events(
+            ("scroll", "encoder_turn"),
+            ("seek_fwd", "encoder_press_turn", {"direction": "right"}),
+        )
+        em = EventMap(events)
+        scroll_handler = AsyncMock()
+        seek_handler = AsyncMock()
+        em.on("scroll", scroll_handler)
+        em.on("seek_fwd", seek_handler)
+
+        em.handle_encoder_press()
+        result = em.handle_encoder_turn(-1)  # left turn, press_turn only has right
+        assert result is scroll_handler  # falls back to regular turn
+
 
 class TestKeyEvents:
     def test_key_press(self):
