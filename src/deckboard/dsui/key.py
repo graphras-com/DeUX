@@ -154,16 +154,18 @@ class DsuiKey(KeySlot):
     async def dispatch(self, pressed: bool) -> None:
         """Dispatch a key press/release through the event map.
 
+        All matching handlers (simple and compound) are called.
         Falls back to the base KeySlot handlers if the event map
-        doesn't match.
+        returns no matches.
         """
         if pressed:
-            handler = self._events.handle_key_press()
+            handlers = self._events.handle_key_press()
         else:
-            handler = self._events.handle_key_release()
+            handlers = self._events.handle_key_release()
 
-        if handler is not None:
-            await handler()
+        if handlers:
+            for handler in handlers:
+                await handler()
         else:
             # Fall back to base KeySlot on_press/on_release decorators
             await super().dispatch(pressed)

@@ -148,14 +148,12 @@ class DsuiCard(Card):
 
     def handle_encoder_press(self) -> None:
         """Route encoder press through the event map."""
-        handler = self._events.handle_encoder_press()
-        if handler is not None:
+        for handler in self._events.handle_encoder_press():
             self.queue_pending_callback(handler, ())
 
     def handle_encoder_release(self) -> None:
         """Route encoder release through the event map."""
-        handler = self._events.handle_encoder_release()
-        if handler is not None:
+        for handler in self._events.handle_encoder_release():
             self.queue_pending_callback(handler, ())
 
     # -- Card protocol: touch event dispatch override ----------------------

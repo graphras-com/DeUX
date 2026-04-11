@@ -138,14 +138,14 @@ class EventMap:
 
         return None
 
-    def handle_encoder_press(self) -> AsyncHandler | None:
-        """Match an encoder press to a semantic event.
+    def handle_encoder_press(self) -> list[AsyncHandler]:
+        """Match an encoder press to semantic events.
 
         Records the press timestamp for gesture detection and starts
         a hold timer if an ``encoder_hold`` mapping exists.
 
         Returns:
-            The handler to call, or ``None`` if no mapping matched.
+            A list of handlers to call (may be empty).
         """
         self._press_time = time.monotonic()
         self._pressed = True
@@ -153,20 +153,26 @@ class EventMap:
 
         self._start_hold_timer("encoder_hold")
 
+        handlers: list[AsyncHandler] = []
         for mapping in self._by_source.get("encoder_press", []):
-            return self._handlers.get(mapping.name)
+            handler = self._handlers.get(mapping.name)
+            if handler is not None:
+                handlers.append(handler)
+        return handlers
 
-        return None
+    def handle_encoder_release(self) -> list[AsyncHandler]:
+        """Match an encoder release to semantic events.
 
-    def handle_encoder_release(self) -> AsyncHandler | None:
-        """Match an encoder release to a semantic event.
+        Cancels any running hold timer.  The simple ``encoder_release``
+        event always fires (unless suppressed by a hold).
+        ``encoder_press_release`` fires as an additional compound gesture
+        when the duration constraint is met.
 
-        Cancels any running hold timer.  If the hold already fired,
-        suppresses ``encoder_press_release`` and ``encoder_release``
-        events for this press–release cycle.
+        If the hold already fired, all release-phase events are
+        suppressed for this press–release cycle.
 
         Returns:
-            The handler to call, or ``None`` if no mapping matched.
+            A list of handlers to call (may be empty).
         """
         self._pressed = False
         self._cancel_hold_timer()
@@ -174,9 +180,11 @@ class EventMap:
         if self._hold_fired:
             self._hold_fired = False
             self._press_time = None
-            return None
+            return []
 
-        # Check press_release gesture first
+        handlers: list[AsyncHandler] = []
+
+        # Check press_release compound gesture
         if self._press_time is not None:
             elapsed_ms = (time.monotonic() - self._press_time) * 1000
             self._press_time = None
@@ -184,21 +192,28 @@ class EventMap:
             for mapping in self._by_source.get("encoder_press_release", []):
                 max_ms = mapping.max_duration_ms
                 if max_ms is None or elapsed_ms <= max_ms:
-                    return self._handlers.get(mapping.name)
+                    handler = self._handlers.get(mapping.name)
+                    if handler is not None:
+                        handlers.append(handler)
 
-        # Then simple encoder_release
+        # Always include simple encoder_release
         for mapping in self._by_source.get("encoder_release", []):
-            return self._handlers.get(mapping.name)
+            handler = self._handlers.get(mapping.name)
+            if handler is not None:
+                handlers.append(handler)
 
-        return None
+        return handlers
 
     # -- Key events --------------------------------------------------------
 
-    def handle_key_press(self) -> AsyncHandler | None:
-        """Match a key press to a semantic event.
+    def handle_key_press(self) -> list[AsyncHandler]:
+        """Match a key press to semantic events.
 
         Records the press timestamp and starts a hold timer if a
         ``key_hold`` mapping exists.
+
+        Returns:
+            A list of handlers to call (may be empty).
         """
         self._press_time = time.monotonic()
         self._pressed = True
@@ -206,17 +221,26 @@ class EventMap:
 
         self._start_hold_timer("key_hold")
 
+        handlers: list[AsyncHandler] = []
         for mapping in self._by_source.get("key_press", []):
-            return self._handlers.get(mapping.name)
+            handler = self._handlers.get(mapping.name)
+            if handler is not None:
+                handlers.append(handler)
+        return handlers
 
-        return None
+    def handle_key_release(self) -> list[AsyncHandler]:
+        """Match a key release to semantic events.
 
-    def handle_key_release(self) -> AsyncHandler | None:
-        """Match a key release to a semantic event.
+        Cancels any running hold timer.  The simple ``key_release``
+        event always fires (unless suppressed by a hold).
+        ``key_press_release`` fires as an additional compound gesture
+        when the duration constraint is met.
 
-        Cancels any running hold timer.  If the hold already fired,
-        suppresses ``key_press_release`` and ``key_release`` events
-        for this press–release cycle.
+        If the hold already fired, all release-phase events are
+        suppressed for this press–release cycle.
+
+        Returns:
+            A list of handlers to call (may be empty).
         """
         self._pressed = False
         self._cancel_hold_timer()
@@ -224,9 +248,11 @@ class EventMap:
         if self._hold_fired:
             self._hold_fired = False
             self._press_time = None
-            return None
+            return []
 
-        # Check press_release gesture first
+        handlers: list[AsyncHandler] = []
+
+        # Check press_release compound gesture
         if self._press_time is not None:
             elapsed_ms = (time.monotonic() - self._press_time) * 1000
             self._press_time = None
@@ -234,13 +260,17 @@ class EventMap:
             for mapping in self._by_source.get("key_press_release", []):
                 max_ms = mapping.max_duration_ms
                 if max_ms is None or elapsed_ms <= max_ms:
-                    return self._handlers.get(mapping.name)
+                    handler = self._handlers.get(mapping.name)
+                    if handler is not None:
+                        handlers.append(handler)
 
-        # Then simple key_release
+        # Always include simple key_release
         for mapping in self._by_source.get("key_release", []):
-            return self._handlers.get(mapping.name)
+            handler = self._handlers.get(mapping.name)
+            if handler is not None:
+                handlers.append(handler)
 
-        return None
+        return handlers
 
     # -- Touch events ------------------------------------------------------
 

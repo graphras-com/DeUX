@@ -82,7 +82,7 @@ class TestEncoderPressRelease:
         em = EventMap(events)
         handler = AsyncMock()
         em.on("press", handler)
-        assert em.handle_encoder_press() is handler
+        assert em.handle_encoder_press() == [handler]
 
     def test_simple_release(self):
         events = _make_events(("release", "encoder_release"))
@@ -90,7 +90,7 @@ class TestEncoderPressRelease:
         handler = AsyncMock()
         em.on("release", handler)
         em.handle_encoder_press()  # establish pressed state
-        assert em.handle_encoder_release() is handler
+        assert em.handle_encoder_release() == [handler]
 
     def test_press_release_gesture_within_duration(self):
         events = _make_events(
@@ -103,7 +103,7 @@ class TestEncoderPressRelease:
         em.handle_encoder_press()
         # Simulate fast release
         result = em.handle_encoder_release()
-        assert result is handler
+        assert handler in result
 
     def test_press_release_gesture_exceeded_duration(self):
         events = _make_events(
@@ -117,7 +117,7 @@ class TestEncoderPressRelease:
         # Simulate slow release (wait a bit)
         time.sleep(0.01)  # 10ms > 1ms max
         result = em.handle_encoder_release()
-        assert result is None
+        assert handler not in result
 
     def test_press_release_no_max_duration(self):
         events = _make_events(("toggle", "encoder_press_release"))
@@ -128,7 +128,7 @@ class TestEncoderPressRelease:
         em.handle_encoder_press()
         time.sleep(0.01)
         result = em.handle_encoder_release()
-        assert result is handler  # No max_duration → always fires
+        assert handler in result  # No max_duration -> always fires
 
     def test_release_without_press(self):
         events = _make_events(("release", "encoder_release"))
@@ -137,7 +137,24 @@ class TestEncoderPressRelease:
         em.on("release", handler)
         # No press recorded
         result = em.handle_encoder_release()
-        assert result is handler
+        assert result == [handler]
+
+    def test_release_always_fires_alongside_press_release(self):
+        """encoder_release fires even when encoder_press_release also fires."""
+        events = _make_events(
+            ("toggle", "encoder_press_release", {"max_duration_ms": 500}),
+            ("up", "encoder_release"),
+        )
+        em = EventMap(events)
+        toggle_handler = AsyncMock()
+        release_handler = AsyncMock()
+        em.on("toggle", toggle_handler)
+        em.on("up", release_handler)
+
+        em.handle_encoder_press()
+        result = em.handle_encoder_release()
+        assert toggle_handler in result
+        assert release_handler in result
 
 
 class TestEncoderPressTurn:
@@ -179,7 +196,7 @@ class TestKeyEvents:
         em = EventMap(events)
         handler = AsyncMock()
         em.on("hold", handler)
-        assert em.handle_key_press() is handler
+        assert em.handle_key_press() == [handler]
 
     def test_key_release(self):
         events = _make_events(("up", "key_release"))
@@ -187,7 +204,7 @@ class TestKeyEvents:
         handler = AsyncMock()
         em.on("up", handler)
         em.handle_key_press()  # set state
-        assert em.handle_key_release() is handler
+        assert em.handle_key_release() == [handler]
 
     def test_key_press_release_within_duration(self):
         events = _make_events(
@@ -199,7 +216,7 @@ class TestKeyEvents:
 
         em.handle_key_press()
         result = em.handle_key_release()
-        assert result is handler
+        assert handler in result
 
     def test_key_press_release_exceeded(self):
         events = _make_events(
@@ -212,7 +229,7 @@ class TestKeyEvents:
         em.handle_key_press()
         time.sleep(0.01)
         result = em.handle_key_release()
-        assert result is None
+        assert handler not in result
 
     def test_key_release_without_press(self):
         events = _make_events(("up", "key_release"))
@@ -220,7 +237,7 @@ class TestKeyEvents:
         handler = AsyncMock()
         em.on("up", handler)
         result = em.handle_key_release()
-        assert result is handler
+        assert result == [handler]
 
     def test_key_press_release_no_max(self):
         events = _make_events(("tap", "key_press_release"))
@@ -229,7 +246,56 @@ class TestKeyEvents:
         em.on("tap", handler)
         em.handle_key_press()
         time.sleep(0.01)
-        assert em.handle_key_release() is handler
+        assert handler in em.handle_key_release()
+
+    def test_release_always_fires_alongside_press_release(self):
+        """key_release fires even when key_press_release also fires."""
+        events = _make_events(
+            ("activate", "key_press_release", {"max_duration_ms": 500}),
+            ("up", "key_release"),
+        )
+        em = EventMap(events)
+        tap_handler = AsyncMock()
+        release_handler = AsyncMock()
+        em.on("activate", tap_handler)
+        em.on("up", release_handler)
+
+        em.handle_key_press()
+        result = em.handle_key_release()
+        assert tap_handler in result
+        assert release_handler in result
+
+    def test_press_always_fires_with_hold_configured(self):
+        """key_press fires even when key_hold is also configured."""
+        events = _make_events(
+            ("down", "key_press"),
+            ("long_hold", "key_hold", {"hold_ms": 500}),
+        )
+        em = EventMap(events)
+        press_handler = AsyncMock()
+        hold_handler = AsyncMock()
+        em.on("down", press_handler)
+        em.on("long_hold", hold_handler)
+
+        result = em.handle_key_press()
+        assert press_handler in result
+
+    def test_no_key_press_mapping_returns_empty(self):
+        """handle_key_press returns empty list when no key_press mapping."""
+        events = _make_events(("up", "key_release"))
+        em = EventMap(events)
+        result = em.handle_key_press()
+        assert result == []
+
+    def test_no_key_release_mapping_returns_empty(self):
+        """handle_key_release returns empty list when no key_release mapping."""
+        events = _make_events(("down", "key_press"))
+        em = EventMap(events)
+        handler = AsyncMock()
+        em.on("down", handler)
+        em.handle_key_press()
+        result = em.handle_key_release()
+        assert result == []
 
 
 class TestKeyHold:
@@ -277,7 +343,7 @@ class TestKeyHold:
         hold_handler.assert_awaited_once()
 
         result = em.handle_key_release()
-        assert result is None  # press_release suppressed
+        assert result == []  # all release-phase events suppressed
         tap_handler.assert_not_awaited()
 
     async def test_hold_suppresses_key_release(self):
@@ -297,7 +363,7 @@ class TestKeyHold:
         hold_handler.assert_awaited_once()
 
         result = em.handle_key_release()
-        assert result is None
+        assert result == []
         release_handler.assert_not_awaited()
 
     async def test_short_tap_still_works_with_hold(self):
@@ -315,7 +381,7 @@ class TestKeyHold:
         em.handle_key_press()
         # Release immediately — well before 500ms hold
         result = em.handle_key_release()
-        assert result is tap_handler
+        assert tap_handler in result
         hold_handler.assert_not_awaited()
 
     async def test_hold_no_handler_registered(self):
@@ -352,7 +418,31 @@ class TestKeyHold:
         # Second: quick tap
         em.handle_key_press()
         result = em.handle_key_release()
-        assert result is tap_handler
+        assert tap_handler in result
+
+    async def test_hold_suppresses_all_release_events(self):
+        """After key_hold fires, both key_press_release and key_release are suppressed."""
+        events = _make_events(
+            ("activate", "key_press_release", {"max_duration_ms": 5000}),
+            ("up", "key_release"),
+            ("long_hold", "key_hold", {"hold_ms": 10}),
+        )
+        em = EventMap(events)
+        tap_handler = AsyncMock()
+        release_handler = AsyncMock()
+        hold_handler = AsyncMock()
+        em.on("activate", tap_handler)
+        em.on("up", release_handler)
+        em.on("long_hold", hold_handler)
+
+        em.handle_key_press()
+        await asyncio.sleep(0.05)
+        hold_handler.assert_awaited_once()
+
+        result = em.handle_key_release()
+        assert result == []
+        tap_handler.assert_not_awaited()
+        release_handler.assert_not_awaited()
 
 
 class TestEncoderHold:
@@ -397,7 +487,7 @@ class TestEncoderHold:
         hold_handler.assert_awaited_once()
 
         result = em.handle_encoder_release()
-        assert result is None
+        assert result == []
         toggle_handler.assert_not_awaited()
 
     async def test_encoder_short_tap_still_works_with_hold(self):
@@ -413,8 +503,28 @@ class TestEncoderHold:
 
         em.handle_encoder_press()
         result = em.handle_encoder_release()
-        assert result is toggle_handler
+        assert toggle_handler in result
         hold_handler.assert_not_awaited()
+
+    async def test_encoder_release_fires_alongside_press_release(self):
+        """encoder_release fires even when encoder_press_release also fires."""
+        events = _make_events(
+            ("toggle", "encoder_press_release", {"max_duration_ms": 500}),
+            ("up", "encoder_release"),
+            ("enc_hold", "encoder_hold", {"hold_ms": 500}),
+        )
+        em = EventMap(events)
+        toggle_handler = AsyncMock()
+        release_handler = AsyncMock()
+        hold_handler = AsyncMock()
+        em.on("toggle", toggle_handler)
+        em.on("up", release_handler)
+        em.on("enc_hold", hold_handler)
+
+        em.handle_encoder_press()
+        result = em.handle_encoder_release()
+        assert toggle_handler in result
+        assert release_handler in result
 
 
 class TestTouchEvents:
@@ -495,8 +605,8 @@ class TestEventMapRegistration:
         em = EventMap(events)
         assert em.event_names == ["play", "stop"]
 
-    def test_unregistered_handler_returns_none(self):
+    def test_unregistered_handler_returns_empty(self):
         events = _make_events(("play", "encoder_press"))
         em = EventMap(events)
         # Don't register any handler
-        assert em.handle_encoder_press() is None
+        assert em.handle_encoder_press() == []
