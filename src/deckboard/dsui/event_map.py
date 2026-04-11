@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import TYPE_CHECKING
@@ -22,6 +23,10 @@ class EventMap:
 
     - ``encoder_press_release``: fires only if the press duration is
       within ``max_duration_ms``.
+    - ``encoder_hold`` / ``key_hold``: starts a timer on press and fires
+      the handler after ``hold_ms`` while the key/encoder is still held.
+      Suppresses any ``press_release`` or ``release`` event for that
+      press–release cycle.
     - ``encoder_press_turn``: fires turn events only while the encoder
       is held down.
     - Direction filtering: ``encoder_turn`` with ``direction: left``
@@ -44,6 +49,10 @@ class EventMap:
         # Gesture state
         self._press_time: float | None = None
         self._pressed = False
+
+        # Hold timer state
+        self._hold_task: asyncio.Task[None] | None = None
+        self._hold_fired = False
 
         # Pre-index mappings by source for fast lookup
         self._by_source: dict[str, list[EventMapping]] = {}
@@ -72,6 +81,39 @@ class EventMap:
         """All semantic event names defined in this map."""
         return [m.name for m in self._mappings]
 
+    # -- Hold timer --------------------------------------------------------
+
+    def _start_hold_timer(self, source: str) -> None:
+        """Start a hold timer for the first matching hold mapping.
+
+        Args:
+            source: ``"key_hold"`` or ``"encoder_hold"``.
+        """
+        for mapping in self._by_source.get(source, []):
+            handler = self._handlers.get(mapping.name)
+            if handler is None:
+                continue
+            hold_ms = mapping.hold_ms
+            if hold_ms is None:
+                continue  # pragma: no cover — validated by loader
+            self._hold_task = asyncio.ensure_future(
+                self._hold_delay(hold_ms / 1000.0, handler)
+            )
+            return
+
+    async def _hold_delay(self, seconds: float, handler: AsyncHandler) -> None:
+        """Sleep then fire the hold handler if still pressed."""
+        await asyncio.sleep(seconds)
+        if self._pressed:
+            self._hold_fired = True
+            await handler()
+
+    def _cancel_hold_timer(self) -> None:
+        """Cancel an in-progress hold timer if one is running."""
+        if self._hold_task is not None:
+            self._hold_task.cancel()
+            self._hold_task = None
+
     # -- Encoder events ----------------------------------------------------
 
     def handle_encoder_turn(self, direction: int) -> AsyncHandler | None:
@@ -99,13 +141,17 @@ class EventMap:
     def handle_encoder_press(self) -> AsyncHandler | None:
         """Match an encoder press to a semantic event.
 
-        Records the press timestamp for gesture detection.
+        Records the press timestamp for gesture detection and starts
+        a hold timer if an ``encoder_hold`` mapping exists.
 
         Returns:
             The handler to call, or ``None`` if no mapping matched.
         """
         self._press_time = time.monotonic()
         self._pressed = True
+        self._hold_fired = False
+
+        self._start_hold_timer("encoder_hold")
 
         for mapping in self._by_source.get("encoder_press", []):
             return self._handlers.get(mapping.name)
@@ -115,12 +161,20 @@ class EventMap:
     def handle_encoder_release(self) -> AsyncHandler | None:
         """Match an encoder release to a semantic event.
 
-        Checks ``encoder_press_release`` gesture timing.
+        Cancels any running hold timer.  If the hold already fired,
+        suppresses ``encoder_press_release`` and ``encoder_release``
+        events for this press–release cycle.
 
         Returns:
             The handler to call, or ``None`` if no mapping matched.
         """
         self._pressed = False
+        self._cancel_hold_timer()
+
+        if self._hold_fired:
+            self._hold_fired = False
+            self._press_time = None
+            return None
 
         # Check press_release gesture first
         if self._press_time is not None:
@@ -141,9 +195,16 @@ class EventMap:
     # -- Key events --------------------------------------------------------
 
     def handle_key_press(self) -> AsyncHandler | None:
-        """Match a key press to a semantic event."""
+        """Match a key press to a semantic event.
+
+        Records the press timestamp and starts a hold timer if a
+        ``key_hold`` mapping exists.
+        """
         self._press_time = time.monotonic()
         self._pressed = True
+        self._hold_fired = False
+
+        self._start_hold_timer("key_hold")
 
         for mapping in self._by_source.get("key_press", []):
             return self._handlers.get(mapping.name)
@@ -151,8 +212,19 @@ class EventMap:
         return None
 
     def handle_key_release(self) -> AsyncHandler | None:
-        """Match a key release to a semantic event."""
+        """Match a key release to a semantic event.
+
+        Cancels any running hold timer.  If the hold already fired,
+        suppresses ``key_press_release`` and ``key_release`` events
+        for this press–release cycle.
+        """
         self._pressed = False
+        self._cancel_hold_timer()
+
+        if self._hold_fired:
+            self._hold_fired = False
+            self._press_time = None
+            return None
 
         # Check press_release gesture first
         if self._press_time is not None:

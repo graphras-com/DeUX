@@ -373,6 +373,71 @@ class TestLoadPackageInvalid:
         with pytest.raises(PackageError, match="positive integer"):
             load_package(pkg)
 
+    def test_event_hold_ms_required_for_key_hold(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "events:\n  - name: x\n    source: key_hold",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="hold_ms is required"):
+            load_package(pkg)
+
+    def test_event_hold_ms_required_for_encoder_hold(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "events:\n  - name: x\n    source: encoder_hold",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="hold_ms is required"):
+            load_package(pkg)
+
+    def test_event_hold_ms_invalid(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "events:\n  - name: x\n    source: key_hold\n    hold_ms: -1",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="hold_ms must be a positive integer"):
+            load_package(pkg)
+
+    def test_event_hold_ms_zero(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "events:\n  - name: x\n    source: key_hold\n    hold_ms: 0",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="hold_ms must be a positive integer"):
+            load_package(pkg)
+
+    def test_event_hold_ms_not_allowed_on_other_sources(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "events:\n  - name: x\n    source: key_press\n    hold_ms: 500",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="hold_ms is only valid for"):
+            load_package(pkg)
+
     def test_duplicate_event_name(self, tmp_path):
         pkg = tmp_path / "Bad.dsui"
         pkg.mkdir()

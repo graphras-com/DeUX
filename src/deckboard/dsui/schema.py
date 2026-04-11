@@ -83,9 +83,11 @@ VALID_SOURCES = frozenset(
         "encoder_press_release",
         "encoder_turn",
         "encoder_press_turn",
+        "encoder_hold",
         "key_press",
         "key_release",
         "key_press_release",
+        "key_hold",
         "tap",
         "long_press",
     }
@@ -104,6 +106,11 @@ class EventMapping:
     source: str
     direction: str | None = None
     max_duration_ms: int | None = None
+    hold_ms: int | None = None
+
+
+# Sources that require the hold_ms field.
+HOLD_SOURCES = frozenset({"key_hold", "encoder_hold"})
 
 
 @dataclass(frozen=True, slots=True)

@@ -8,6 +8,7 @@ from deckboard.dsui.schema import (
     BindingType,
     ColorBinding,
     EventMapping,
+    HOLD_SOURCES,
     ImageBinding,
     ImageFit,
     OverflowMode,
@@ -125,6 +126,14 @@ class TestEventMapping:
         )
         assert e.max_duration_ms == 250
 
+    def test_with_hold_ms(self):
+        e = EventMapping(name="hold", source="key_hold", hold_ms=500)
+        assert e.hold_ms == 500
+
+    def test_hold_ms_default_none(self):
+        e = EventMapping(name="play", source="encoder_press")
+        assert e.hold_ms is None
+
     def test_frozen(self):
         e = EventMapping(name="play", source="encoder_press")
         with pytest.raises(AttributeError):
@@ -176,11 +185,16 @@ class TestValidSets:
         assert "encoder_press_release" in VALID_SOURCES
         assert "encoder_turn" in VALID_SOURCES
         assert "encoder_press_turn" in VALID_SOURCES
+        assert "encoder_hold" in VALID_SOURCES
         assert "key_press" in VALID_SOURCES
         assert "key_release" in VALID_SOURCES
         assert "key_press_release" in VALID_SOURCES
+        assert "key_hold" in VALID_SOURCES
         assert "tap" in VALID_SOURCES
         assert "long_press" in VALID_SOURCES
+
+    def test_hold_sources(self):
+        assert HOLD_SOURCES == frozenset({"key_hold", "encoder_hold"})
 
     def test_valid_directions(self):
         assert VALID_DIRECTIONS == frozenset({"left", "right"})

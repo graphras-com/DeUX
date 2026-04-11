@@ -14,6 +14,7 @@ from .schema import (
     BindingType,
     ColorBinding,
     EventMapping,
+    HOLD_SOURCES,
     ImageBinding,
     ImageFit,
     OverflowMode,
@@ -146,11 +147,25 @@ def _parse_event(raw: dict[str, Any], index: int) -> EventMapping:
                 f"Event '{name}': max_duration_ms must be a positive integer"
             )
 
+    hold_ms = raw.get("hold_ms")
+    if source in HOLD_SOURCES:
+        if hold_ms is None:
+            raise PackageError(
+                f"Event '{name}': hold_ms is required for source '{source}'"
+            )
+        if not isinstance(hold_ms, int) or hold_ms <= 0:
+            raise PackageError(f"Event '{name}': hold_ms must be a positive integer")
+    elif hold_ms is not None:
+        raise PackageError(
+            f"Event '{name}': hold_ms is only valid for key_hold/encoder_hold sources"
+        )
+
     return EventMapping(
         name=name,
         source=source,
         direction=direction,
         max_duration_ms=max_duration_ms,
+        hold_ms=hold_ms,
     )
 
 

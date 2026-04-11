@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from unittest.mock import AsyncMock
 
@@ -229,6 +230,191 @@ class TestKeyEvents:
         em.handle_key_press()
         time.sleep(0.01)
         assert em.handle_key_release() is handler
+
+
+class TestKeyHold:
+    async def test_hold_fires_after_delay(self):
+        """key_hold handler fires after hold_ms while key is still held."""
+        events = _make_events(
+            ("long_hold", "key_hold", {"hold_ms": 10}),
+        )
+        em = EventMap(events)
+        handler = AsyncMock()
+        em.on("long_hold", handler)
+
+        em.handle_key_press()
+        await asyncio.sleep(0.05)  # wait well past 10ms
+        handler.assert_awaited_once()
+
+    async def test_hold_cancelled_on_early_release(self):
+        """key_hold does NOT fire if released before hold_ms."""
+        events = _make_events(
+            ("long_hold", "key_hold", {"hold_ms": 5000}),
+        )
+        em = EventMap(events)
+        handler = AsyncMock()
+        em.on("long_hold", handler)
+
+        em.handle_key_press()
+        em.handle_key_release()  # immediate release
+        await asyncio.sleep(0.01)
+        handler.assert_not_awaited()
+
+    async def test_hold_suppresses_press_release(self):
+        """After key_hold fires, key_press_release is suppressed on release."""
+        events = _make_events(
+            ("activate", "key_press_release", {"max_duration_ms": 5000}),
+            ("long_hold", "key_hold", {"hold_ms": 10}),
+        )
+        em = EventMap(events)
+        tap_handler = AsyncMock()
+        hold_handler = AsyncMock()
+        em.on("activate", tap_handler)
+        em.on("long_hold", hold_handler)
+
+        em.handle_key_press()
+        await asyncio.sleep(0.05)  # hold fires
+        hold_handler.assert_awaited_once()
+
+        result = em.handle_key_release()
+        assert result is None  # press_release suppressed
+        tap_handler.assert_not_awaited()
+
+    async def test_hold_suppresses_key_release(self):
+        """After key_hold fires, key_release is also suppressed."""
+        events = _make_events(
+            ("up", "key_release"),
+            ("long_hold", "key_hold", {"hold_ms": 10}),
+        )
+        em = EventMap(events)
+        release_handler = AsyncMock()
+        hold_handler = AsyncMock()
+        em.on("up", release_handler)
+        em.on("long_hold", hold_handler)
+
+        em.handle_key_press()
+        await asyncio.sleep(0.05)
+        hold_handler.assert_awaited_once()
+
+        result = em.handle_key_release()
+        assert result is None
+        release_handler.assert_not_awaited()
+
+    async def test_short_tap_still_works_with_hold(self):
+        """Quick release fires press_release, not the hold."""
+        events = _make_events(
+            ("activate", "key_press_release", {"max_duration_ms": 300}),
+            ("long_hold", "key_hold", {"hold_ms": 500}),
+        )
+        em = EventMap(events)
+        tap_handler = AsyncMock()
+        hold_handler = AsyncMock()
+        em.on("activate", tap_handler)
+        em.on("long_hold", hold_handler)
+
+        em.handle_key_press()
+        # Release immediately — well before 500ms hold
+        result = em.handle_key_release()
+        assert result is tap_handler
+        hold_handler.assert_not_awaited()
+
+    async def test_hold_no_handler_registered(self):
+        """If no handler is registered, no timer starts."""
+        events = _make_events(
+            ("long_hold", "key_hold", {"hold_ms": 10}),
+        )
+        em = EventMap(events)
+        # Don't register any handler
+
+        em.handle_key_press()
+        await asyncio.sleep(0.05)
+        # Should not crash — task was never created
+        assert em._hold_task is None
+
+    async def test_hold_reset_between_presses(self):
+        """hold_fired is reset on each new press."""
+        events = _make_events(
+            ("activate", "key_press_release"),
+            ("long_hold", "key_hold", {"hold_ms": 10}),
+        )
+        em = EventMap(events)
+        tap_handler = AsyncMock()
+        hold_handler = AsyncMock()
+        em.on("activate", tap_handler)
+        em.on("long_hold", hold_handler)
+
+        # First: long hold
+        em.handle_key_press()
+        await asyncio.sleep(0.05)
+        hold_handler.assert_awaited_once()
+        em.handle_key_release()  # suppressed
+
+        # Second: quick tap
+        em.handle_key_press()
+        result = em.handle_key_release()
+        assert result is tap_handler
+
+
+class TestEncoderHold:
+    async def test_encoder_hold_fires_after_delay(self):
+        events = _make_events(
+            ("enc_hold", "encoder_hold", {"hold_ms": 10}),
+        )
+        em = EventMap(events)
+        handler = AsyncMock()
+        em.on("enc_hold", handler)
+
+        em.handle_encoder_press()
+        await asyncio.sleep(0.05)
+        handler.assert_awaited_once()
+
+    async def test_encoder_hold_cancelled_on_early_release(self):
+        events = _make_events(
+            ("enc_hold", "encoder_hold", {"hold_ms": 5000}),
+        )
+        em = EventMap(events)
+        handler = AsyncMock()
+        em.on("enc_hold", handler)
+
+        em.handle_encoder_press()
+        em.handle_encoder_release()
+        await asyncio.sleep(0.01)
+        handler.assert_not_awaited()
+
+    async def test_encoder_hold_suppresses_press_release(self):
+        events = _make_events(
+            ("toggle", "encoder_press_release", {"max_duration_ms": 5000}),
+            ("enc_hold", "encoder_hold", {"hold_ms": 10}),
+        )
+        em = EventMap(events)
+        toggle_handler = AsyncMock()
+        hold_handler = AsyncMock()
+        em.on("toggle", toggle_handler)
+        em.on("enc_hold", hold_handler)
+
+        em.handle_encoder_press()
+        await asyncio.sleep(0.05)
+        hold_handler.assert_awaited_once()
+
+        result = em.handle_encoder_release()
+        assert result is None
+        toggle_handler.assert_not_awaited()
+
+    async def test_encoder_short_tap_still_works_with_hold(self):
+        events = _make_events(
+            ("toggle", "encoder_press_release", {"max_duration_ms": 300}),
+            ("enc_hold", "encoder_hold", {"hold_ms": 500}),
+        )
+        em = EventMap(events)
+        toggle_handler = AsyncMock()
+        hold_handler = AsyncMock()
+        em.on("toggle", toggle_handler)
+        em.on("enc_hold", hold_handler)
+
+        em.handle_encoder_press()
+        result = em.handle_encoder_release()
+        assert result is toggle_handler
+        hold_handler.assert_not_awaited()
 
 
 class TestTouchEvents:
