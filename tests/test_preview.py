@@ -13,7 +13,13 @@ import pytest
 from PIL import Image
 
 from deckboard.render.metrics import (
+    KEY_MARGIN_BOTTOM,
+    KEY_MARGIN_LEFT,
+    KEY_MARGIN_RIGHT,
+    KEY_MARGIN_TOP,
     KEY_SIZE,
+    KEY_USABLE_HEIGHT,
+    KEY_USABLE_WIDTH,
     MARGIN_LEFT,
     MARGIN_TOP,
     PANEL_COUNT,
@@ -168,12 +174,49 @@ class TestComposeKeyImage:
         assert decoded.format == "JPEG"
         assert decoded.size == KEY_SIZE
 
-    def test_centres_icon_in_key(self):
-        """A small image should be centred in the icon area."""
+    def test_centres_within_usable_area(self):
+        """A small image should be centred within the margin-bounded usable area."""
         svg_img = Image.new("RGBA", (40, 40), (255, 0, 0, 255))
         result = compose_key_image(svg_img)
-        decoded = Image.open(io.BytesIO(result))
+        decoded = Image.open(io.BytesIO(result)).convert("RGB")
         assert decoded.size == KEY_SIZE
+
+        # Expected centre of the usable area
+        cx = KEY_MARGIN_LEFT + KEY_USABLE_WIDTH // 2
+        cy = KEY_MARGIN_TOP + KEY_USABLE_HEIGHT // 2
+        r, g, b = decoded.getpixel((cx, cy))
+        assert r > 200, f"Centre of usable area should be red, got ({r}, {g}, {b})"
+
+    def test_left_margin_is_clear(self):
+        """Outer edge of left margin should remain black (no content)."""
+        svg_img = Image.new(
+            "RGBA",
+            (KEY_USABLE_WIDTH, KEY_USABLE_HEIGHT),
+            (255, 0, 0, 255),
+        )
+        result = compose_key_image(svg_img)
+        decoded = Image.open(io.BytesIO(result)).convert("RGB")
+        mid_y = KEY_SIZE[1] // 2
+        # Check the outermost column — JPEG bleed doesn't reach x=0.
+        r, g, b = decoded.getpixel((0, mid_y))
+        assert r < 20, f"Left margin edge pixel (0, {mid_y}) not black: ({r},{g},{b})"
+
+    def test_right_margin_is_clear(self):
+        """Outer edge of right margin should remain black (no content)."""
+        svg_img = Image.new(
+            "RGBA",
+            (KEY_USABLE_WIDTH, KEY_USABLE_HEIGHT),
+            (255, 0, 0, 255),
+        )
+        result = compose_key_image(svg_img)
+        decoded = Image.open(io.BytesIO(result)).convert("RGB")
+        mid_y = KEY_SIZE[1] // 2
+        # Check the outermost column — JPEG bleed doesn't reach the far edge.
+        last_x = KEY_SIZE[0] - 1
+        r, g, b = decoded.getpixel((last_x, mid_y))
+        assert r < 20, (
+            f"Right margin edge pixel ({last_x}, {mid_y}) not black: ({r},{g},{b})"
+        )
 
     def test_rgb_image_no_alpha(self):
         """An RGB image (no alpha) should compose without error."""
@@ -182,12 +225,21 @@ class TestComposeKeyImage:
         decoded = Image.open(io.BytesIO(result))
         assert decoded.size == KEY_SIZE
 
-    def test_full_size_image(self):
-        """A 120x120 image should fill the entire key canvas."""
-        svg_img = Image.new("RGBA", KEY_SIZE, (255, 0, 0, 255))
+    def test_usable_size_image_fills_usable_area(self):
+        """A 106x106 image should fill exactly the usable area."""
+        svg_img = Image.new(
+            "RGBA",
+            (KEY_USABLE_WIDTH, KEY_USABLE_HEIGHT),
+            (255, 0, 0, 255),
+        )
         result = compose_key_image(svg_img)
-        decoded = Image.open(io.BytesIO(result))
+        decoded = Image.open(io.BytesIO(result)).convert("RGB")
         assert decoded.size == KEY_SIZE
+        # Centre of usable area should be red
+        cx = KEY_MARGIN_LEFT + KEY_USABLE_WIDTH // 2
+        cy = KEY_MARGIN_TOP + KEY_USABLE_HEIGHT // 2
+        r, _, _ = decoded.getpixel((cx, cy))
+        assert r > 200
 
 
 # -- compose_card_image ------------------------------------------------------

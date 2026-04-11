@@ -31,7 +31,11 @@ from PIL import Image
 from deckboard.render.icons import IconError
 from deckboard.render.key_renderer import _encode_jpeg
 from deckboard.render.metrics import (
+    KEY_MARGIN_LEFT,
+    KEY_MARGIN_TOP,
     KEY_SIZE,
+    KEY_USABLE_HEIGHT,
+    KEY_USABLE_WIDTH,
     MARGIN_LEFT,
     MARGIN_TOP,
     PANEL_COUNT,
@@ -147,14 +151,15 @@ def load_svg(path: Path, max_width: int, max_height: int) -> Image.Image:
 
 
 def compose_key_image(svg_img: Image.Image) -> bytes:
-    """Place *svg_img* centred on a 120x120 black key canvas.
+    """Place *svg_img* centred within the usable area of a key canvas.
 
-    The SVG is rendered at the full key size and centred on the canvas
-    so the design fills the entire physical key area.
+    The SVG is centred within the margin-bounded usable area
+    (``KEY_USABLE_WIDTH`` x ``KEY_USABLE_HEIGHT``) so the design
+    respects the key margins defined in ``render.metrics``.
     """
     canvas = Image.new("RGB", KEY_SIZE, "black")
-    x = (KEY_SIZE[0] - svg_img.width) // 2
-    y = (KEY_SIZE[1] - svg_img.height) // 2
+    x = KEY_MARGIN_LEFT + (KEY_USABLE_WIDTH - svg_img.width) // 2
+    y = KEY_MARGIN_TOP + (KEY_USABLE_HEIGHT - svg_img.height) // 2
     if svg_img.mode == "RGBA":
         canvas.paste(svg_img, (x, y), svg_img)
     else:
@@ -359,7 +364,7 @@ def render_preview(
             if not svg_path.exists():
                 print(f"ERROR: Key SVG not found: {svg_path}", file=sys.stderr)  # noqa: T201
                 sys.exit(1)
-            img = load_svg(svg_path, KEY_SIZE[0], KEY_SIZE[1])
+            img = load_svg(svg_path, KEY_USABLE_WIDTH, KEY_USABLE_HEIGHT)
             key_images[i] = compose_key_image(img)
             logger.info(
                 "Rendered key %d from %s (%dx%d)", i, svg_path, img.width, img.height
