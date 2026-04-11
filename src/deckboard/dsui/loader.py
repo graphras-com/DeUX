@@ -20,6 +20,8 @@ from .schema import (
     OverflowMode,
     PackageSpec,
     PackageType,
+    RangeBinding,
+    RangeDirection,
     Region,
     TextBinding,
     VALID_DIRECTIONS,
@@ -108,6 +110,28 @@ def _parse_binding(name: str, raw: dict[str, Any]) -> Binding:
         return VisibilityBinding(
             node=node,
             default=bool(raw.get("default", True)),
+        )
+
+    if binding_type == BindingType.RANGE:
+        direction_raw = raw.get("direction", "horizontal")
+        try:
+            direction = RangeDirection(direction_raw)
+        except ValueError:
+            valid_dirs = [d.value for d in RangeDirection]
+            raise PackageError(
+                f"Binding '{name}' has invalid direction '{direction_raw}'. "
+                f"Valid directions: {valid_dirs}"
+            ) from None
+        default_val = raw.get("default", 0.0)
+        if not isinstance(default_val, (int, float)):
+            raise PackageError(f"Binding '{name}': default must be a number")
+        default_float = float(default_val)
+        if not 0.0 <= default_float <= 1.0:
+            raise PackageError(f"Binding '{name}': default must be between 0.0 and 1.0")
+        return RangeBinding(
+            node=node,
+            default=default_float,
+            direction=direction,
         )
 
     # BindingType.COLOR

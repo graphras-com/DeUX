@@ -14,6 +14,8 @@ from deckboard.dsui.schema import (
     OverflowMode,
     PackageSpec,
     PackageType,
+    RangeBinding,
+    RangeDirection,
     Region,
     TextBinding,
     VALID_DIRECTIONS,
@@ -41,6 +43,7 @@ class TestBindingType:
         assert BindingType("image") == BindingType.IMAGE
         assert BindingType("visibility") == BindingType.VISIBILITY
         assert BindingType("color") == BindingType.COLOR
+        assert BindingType("range") == BindingType.RANGE
 
 
 class TestOverflowMode:
@@ -108,6 +111,34 @@ class TestColorBinding:
     def test_stroke(self):
         b = ColorBinding(node="border", attribute="stroke", default="#000000")
         assert b.attribute == "stroke"
+
+
+class TestRangeDirection:
+    def test_modes(self):
+        assert RangeDirection("horizontal") == RangeDirection.HORIZONTAL
+        assert RangeDirection("vertical") == RangeDirection.VERTICAL
+
+    def test_invalid_raises(self):
+        with pytest.raises(ValueError):
+            RangeDirection("diagonal")
+
+
+class TestRangeBinding:
+    def test_defaults(self):
+        b = RangeBinding(node="bar")
+        assert b.node == "bar"
+        assert b.default == 0.0
+        assert b.direction == RangeDirection.HORIZONTAL
+
+    def test_custom(self):
+        b = RangeBinding(node="meter", default=0.5, direction=RangeDirection.VERTICAL)
+        assert b.default == 0.5
+        assert b.direction == RangeDirection.VERTICAL
+
+    def test_frozen(self):
+        b = RangeBinding(node="bar")
+        with pytest.raises(AttributeError):
+            b.node = "other"  # type: ignore[misc]
 
 
 class TestEventMapping:

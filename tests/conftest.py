@@ -83,6 +83,11 @@ bindings:
     node: accent
     attribute: fill
     default: "#ff0000"
+  progress:
+    type: range
+    node: accent
+    default: 0.5
+    direction: horizontal
 
 events:
   - name: toggle_play

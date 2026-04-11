@@ -18,6 +18,8 @@ from .schema import (
     ImageFit,
     OverflowMode,
     PackageSpec,
+    RangeBinding,
+    RangeDirection,
     TextBinding,
     VisibilityBinding,
 )
@@ -124,6 +126,7 @@ class SvgRenderer:
         self._spec = spec
         self._values: dict[str, Any] = {}
         self._base_root: ET.Element = ET.fromstring(spec.svg_source)  # noqa: S314
+        self._range_extents: dict[str, float] = {}
 
         # Initialise defaults from bindings
         for name, binding in spec.bindings.items():
@@ -133,6 +136,17 @@ class SvgRenderer:
                 self._values[name] = binding.default
             elif isinstance(binding, ColorBinding):
                 self._values[name] = binding.default
+            elif isinstance(binding, RangeBinding):
+                self._values[name] = binding.default
+                # Cache the original extent from the SVG template
+                elem = _find_element_by_id(self._base_root, binding.node)
+                if elem is not None:
+                    attr = (
+                        "width"
+                        if binding.direction == RangeDirection.HORIZONTAL
+                        else "height"
+                    )
+                    self._range_extents[name] = float(elem.get(attr, "0"))
             # ImageBinding defaults to None (no image)
 
     def set(self, name: str, value: Any) -> bool:
@@ -234,6 +248,8 @@ class SvgRenderer:
             self._apply_visibility(elem, value)
         elif isinstance(binding, ColorBinding):
             self._apply_color(elem, binding, value)
+        elif isinstance(binding, RangeBinding):
+            self._apply_range(elem, name, binding, value)
 
     def _apply_text(self, elem: ET.Element, binding: TextBinding, value: Any) -> None:
         """Set text content, applying truncation if configured."""
@@ -301,6 +317,21 @@ class SvgRenderer:
         """Set an element's fill or stroke colour."""
         color_val = str(value) if value is not None else binding.default
         elem.set(binding.attribute, color_val)
+
+    def _apply_range(
+        self,
+        elem: ET.Element,
+        name: str,
+        binding: RangeBinding,
+        value: Any,
+    ) -> None:
+        """Scale an element's width or height proportional to a 0–1 value."""
+        ratio = max(
+            0.0, min(1.0, float(value if value is not None else binding.default))
+        )
+        extent = self._range_extents.get(name, 0.0)
+        attr = "width" if binding.direction == RangeDirection.HORIZONTAL else "height"
+        elem.set(attr, str(ratio * extent))
 
     def _inline_assets(self, root: ET.Element) -> None:
         """Replace relative asset href references with data URIs."""
