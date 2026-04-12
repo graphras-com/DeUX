@@ -19,6 +19,7 @@ from deckboard.dsui.schema import (
     Region,
     SliderBinding,
     TextBinding,
+    ToggleBinding,
     VALID_DIRECTIONS,
     VALID_REGION_EVENTS,
     VALID_SOURCES,
@@ -46,6 +47,7 @@ class TestBindingType:
         assert BindingType("color") == BindingType.COLOR
         assert BindingType("range") == BindingType.RANGE
         assert BindingType("slider") == BindingType.SLIDER
+        assert BindingType("toggle") == BindingType.TOGGLE
 
 
 class TestOverflowMode:
@@ -102,6 +104,23 @@ class TestVisibilityBinding:
     def test_default_hidden(self):
         b = VisibilityBinding(node="overlay", default=False)
         assert b.default is False
+
+
+class TestToggleBinding:
+    def test_defaults(self):
+        b = ToggleBinding(node_on="icon_on", node_off="icon_off")
+        assert b.node_on == "icon_on"
+        assert b.node_off == "icon_off"
+        assert b.default is False
+
+    def test_default_true(self):
+        b = ToggleBinding(node_on="icon_on", node_off="icon_off", default=True)
+        assert b.default is True
+
+    def test_frozen(self):
+        b = ToggleBinding(node_on="icon_on", node_off="icon_off")
+        with pytest.raises(AttributeError):
+            b.node_on = "other"  # type: ignore[misc]
 
 
 class TestColorBinding:

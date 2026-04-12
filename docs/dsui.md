@@ -82,10 +82,12 @@ target SVG element).  The `node` must exist in the SVG layout.
 | `text`         | Yes              | Yes   |
 | `image`        | Yes              | Yes   |
 | `visibility`   | Yes              | Yes   |
+| `toggle`       | Yes              | Yes   |
 | `color`        | Yes              | Yes   |
 | `range`        | Yes              | Yes   |
+| `slider`       | Yes              | Yes   |
 
-All five binding types are available in both package types.
+All binding types are available in both package types.
 
 ---
 
@@ -160,6 +162,54 @@ bindings:
 
 **Runtime value type:** `bool` — `True` shows the element (removes
 `display` attribute), `False` hides it (`display="none"`).
+
+---
+
+### `toggle` — switch between two elements based on on/off state
+
+Switches visibility between two SVG elements based on a boolean value.
+When the value is truthy, `node_on` is shown and `node_off` is hidden.
+When falsy, `node_off` is shown and `node_on` is hidden.
+
+This is a convenience binding for the very common on/off pattern.  It
+replaces what would otherwise require two separate `visibility` bindings
+that must be kept in sync.
+
+```yaml
+bindings:
+  lights:
+    type: toggle
+    node_on: lights_on     # SVG element id shown when value is true
+    node_off: lights_off   # SVG element id shown when value is false
+    default: false         # Start in "off" state (optional)
+```
+
+| Parameter  | Type   | Required | Default | Description                                       |
+|------------|--------|----------|---------|---------------------------------------------------|
+| `node_on`  | string | Yes      | —       | `id` of the SVG element shown when value is truthy.|
+| `node_off` | string | Yes      | —       | `id` of the SVG element shown when value is falsy. |
+| `default`  | bool   | No       | `false` | Initial toggle state.                              |
+
+**Runtime value type:** `bool` — `True` shows `node_on` and hides
+`node_off`; `False` shows `node_off` and hides `node_on`.
+
+Both nodes must exist in the SVG.  Unlike `visibility`, both `node_on`
+and `node_off` are required — if you only need to show/hide a single
+element, use `visibility` instead.
+
+**Example SVG layout:**
+
+```xml
+<g transform="translate(30 10)">
+    <path id="lights_off" fill="#888888" d="..."/>
+    <path id="lights_on"  fill="#FFD700" d="..."/>
+</g>
+```
+
+```python
+key.set("lights", True)    # shows lights_on, hides lights_off
+key.set("lights", False)   # shows lights_off, hides lights_on
+```
 
 ---
 
@@ -687,6 +737,56 @@ async def up():
 async def mute():
     card.set("bar_color", "#ff4444")
     card.set("value_text", "MUTED")
+```
+
+### `Key` — lights toggle (toggle binding)
+
+```yaml
+name: LightsKey
+type: Key
+version: 1
+layout: layout.svg
+
+bindings:
+  lights:
+    type: toggle
+    node_on: lights_on
+    node_off: lights_off
+    default: false
+
+  label:
+    type: text
+    node: label
+    default: "Lights"
+
+  indicator_color:
+    type: color
+    node: indicator
+    attribute: fill
+    default: "#333333"
+
+events:
+  - name: toggle
+    source: key_press_release
+    max_duration_ms: 300
+```
+
+```python
+from deckboard.dsui import load_package, DsuiKey
+
+spec = load_package("./LightsKey.dsui")
+key = DsuiKey(0, spec)
+
+lights_on = False
+
+@key.on_event("toggle")
+async def on_toggle():
+    global lights_on
+    lights_on = not lights_on
+
+    # Single set() call flips both icons at once
+    key.set("lights", lights_on)
+    key.set("indicator_color", "#FFD700" if lights_on else "#333333")
 ```
 
 ---

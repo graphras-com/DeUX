@@ -22,6 +22,7 @@ from .schema import (
     RangeDirection,
     SliderBinding,
     TextBinding,
+    ToggleBinding,
     VisibilityBinding,
 )
 
@@ -150,6 +151,8 @@ class SvgRenderer:
                     self._range_extents[name] = float(elem.get(attr, "0"))
             elif isinstance(binding, SliderBinding):
                 self._values[name] = binding.default
+            elif isinstance(binding, ToggleBinding):
+                self._values[name] = binding.default
             # ImageBinding defaults to None (no image)
 
     def set(self, name: str, value: Any) -> bool:
@@ -236,6 +239,25 @@ class SvgRenderer:
         value: Any,
     ) -> None:
         """Apply a single binding to the SVG tree."""
+        # Toggle bindings address two nodes instead of one.
+        if isinstance(binding, ToggleBinding):
+            elem_on = _find_element_by_id(root, binding.node_on)
+            elem_off = _find_element_by_id(root, binding.node_off)
+            if elem_on is None:
+                logger.warning(
+                    "Binding '%s': node_on '%s' not found in SVG",
+                    name,
+                    binding.node_on,
+                )
+            if elem_off is None:
+                logger.warning(
+                    "Binding '%s': node_off '%s' not found in SVG",
+                    name,
+                    binding.node_off,
+                )
+            self._apply_toggle(elem_on, elem_off, value)
+            return
+
         elem = _find_element_by_id(root, binding.node)
         if elem is None:
             logger.warning(
@@ -317,6 +339,24 @@ class SvgRenderer:
             elem.attrib.pop("display", None)
         else:
             elem.set("display", "none")
+
+    def _apply_toggle(
+        self,
+        elem_on: ET.Element | None,
+        elem_off: ET.Element | None,
+        value: Any,
+    ) -> None:
+        """Toggle visibility between two elements based on a boolean value."""
+        if value:
+            if elem_on is not None:
+                elem_on.attrib.pop("display", None)
+            if elem_off is not None:
+                elem_off.set("display", "none")
+        else:
+            if elem_off is not None:
+                elem_off.attrib.pop("display", None)
+            if elem_on is not None:
+                elem_on.set("display", "none")
 
     def _apply_color(self, elem: ET.Element, binding: ColorBinding, value: Any) -> None:
         """Set an element's fill or stroke colour."""

@@ -18,6 +18,7 @@ from deckboard.dsui.schema import (
     RangeDirection,
     SliderBinding,
     TextBinding,
+    ToggleBinding,
     VisibilityBinding,
 )
 from deckboard.dsui.svg_renderer import (
@@ -49,6 +50,14 @@ _VISIBILITY_SVG = (
     '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="100" height="50">'
     '<rect id="bg" width="100" height="50" fill="#000000"/>'
     '<rect id="panel" x="10" y="10" width="80" height="30" fill="#ff0000"/>'
+    "</svg>"
+)
+
+_TOGGLE_SVG = (
+    '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="100" height="50">'
+    '<rect id="bg" width="100" height="50" fill="#000000"/>'
+    '<path id="icon_on" d="M10 10 L50 10 L50 40 L10 40 Z" fill="#00ff00"/>'
+    '<path id="icon_off" d="M60 10 L90 10 L90 40 L60 40 Z" fill="#ff0000"/>'
     "</svg>"
 )
 
@@ -843,3 +852,222 @@ class TestSvgRendererSlider:
         with caplog.at_level(logging.WARNING):
             renderer.render()
         assert "not found in SVG" in caplog.text
+
+
+# -- Toggle tests -------------------------------------------------------------
+
+
+class TestSvgRendererToggleSet:
+    def test_set_toggle_returns_true_on_change(self):
+        spec = _make_spec(
+            _TOGGLE_SVG,
+            bindings={
+                "lights": ToggleBinding(
+                    node_on="icon_on", node_off="icon_off", default=False
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        assert renderer.set("lights", True) is True
+
+    def test_set_toggle_same_value_returns_false(self):
+        spec = _make_spec(
+            _TOGGLE_SVG,
+            bindings={
+                "lights": ToggleBinding(
+                    node_on="icon_on", node_off="icon_off", default=False
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        assert renderer.set("lights", False) is False
+
+    def test_toggle_default_false(self):
+        spec = _make_spec(
+            _TOGGLE_SVG,
+            bindings={
+                "lights": ToggleBinding(
+                    node_on="icon_on", node_off="icon_off", default=False
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        assert renderer.get("lights") is False
+
+    def test_toggle_default_true(self):
+        spec = _make_spec(
+            _TOGGLE_SVG,
+            bindings={
+                "lights": ToggleBinding(
+                    node_on="icon_on", node_off="icon_off", default=True
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        assert renderer.get("lights") is True
+
+
+class TestSvgRendererToggleRender:
+    def test_toggle_true_differs_from_false(self):
+        spec = _make_spec(
+            _TOGGLE_SVG,
+            bindings={
+                "lights": ToggleBinding(
+                    node_on="icon_on", node_off="icon_off", default=False
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        img_off = renderer.render()
+
+        renderer.set("lights", True)
+        img_on = renderer.render()
+
+        assert img_off.tobytes() != img_on.tobytes()
+
+    def test_toggle_true_shows_on_hides_off(self):
+        """Verify SVG DOM manipulation: True → node_on visible, node_off hidden."""
+        import copy
+        import xml.etree.ElementTree as ET
+
+        spec = _make_spec(
+            _TOGGLE_SVG,
+            bindings={
+                "lights": ToggleBinding(
+                    node_on="icon_on", node_off="icon_off", default=True
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        root = copy.deepcopy(renderer._base_root)
+        binding = spec.bindings["lights"]
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        elem_on = _find_element_by_id(root, "icon_on")
+        elem_off = _find_element_by_id(root, "icon_off")
+        renderer._apply_toggle(elem_on, elem_off, True)
+
+        assert elem_on.get("display") is None  # visible
+        assert elem_off.get("display") == "none"  # hidden
+
+    def test_toggle_false_shows_off_hides_on(self):
+        """Verify SVG DOM manipulation: False → node_off visible, node_on hidden."""
+        import copy
+
+        spec = _make_spec(
+            _TOGGLE_SVG,
+            bindings={
+                "lights": ToggleBinding(
+                    node_on="icon_on", node_off="icon_off", default=False
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        root = copy.deepcopy(renderer._base_root)
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        elem_on = _find_element_by_id(root, "icon_on")
+        elem_off = _find_element_by_id(root, "icon_off")
+        renderer._apply_toggle(elem_on, elem_off, False)
+
+        assert elem_on.get("display") == "none"  # hidden
+        assert elem_off.get("display") is None  # visible
+
+    def test_toggle_switch_from_true_to_false(self):
+        spec = _make_spec(
+            _TOGGLE_SVG,
+            bindings={
+                "lights": ToggleBinding(
+                    node_on="icon_on", node_off="icon_off", default=True
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        img_on = renderer.render()
+
+        renderer.set("lights", False)
+        img_off = renderer.render()
+
+        assert img_on.tobytes() != img_off.tobytes()
+
+    def test_toggle_renders_rgb_image(self):
+        spec = _make_spec(
+            _TOGGLE_SVG,
+            bindings={
+                "lights": ToggleBinding(
+                    node_on="icon_on", node_off="icon_off", default=False
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        img = renderer.render()
+        assert isinstance(img, Image.Image)
+        assert img.mode == "RGB"
+        assert img.size == (100, 50)
+
+    def test_toggle_missing_node_on_logs_warning(self, caplog):
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50">'
+            '<path id="icon_off" d="M0 0"/></svg>'
+        )
+        spec = PackageSpec(
+            name="Test",
+            type=PackageType.KEY,
+            version=1,
+            svg_source=svg,
+            bindings={
+                "lights": ToggleBinding(
+                    node_on="ghost_on", node_off="icon_off", default=False
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        import logging
+
+        with caplog.at_level(logging.WARNING):
+            renderer.render()
+        assert "node_on 'ghost_on' not found" in caplog.text
+
+    def test_toggle_missing_node_off_logs_warning(self, caplog):
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50">'
+            '<path id="icon_on" d="M0 0"/></svg>'
+        )
+        spec = PackageSpec(
+            name="Test",
+            type=PackageType.KEY,
+            version=1,
+            svg_source=svg,
+            bindings={
+                "lights": ToggleBinding(
+                    node_on="icon_on", node_off="ghost_off", default=False
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        import logging
+
+        with caplog.at_level(logging.WARNING):
+            renderer.render()
+        assert "node_off 'ghost_off' not found" in caplog.text
+
+    def test_toggle_missing_both_nodes_logs_warnings(self, caplog):
+        svg = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"/>'
+        spec = PackageSpec(
+            name="Test",
+            type=PackageType.KEY,
+            version=1,
+            svg_source=svg,
+            bindings={
+                "lights": ToggleBinding(
+                    node_on="ghost_on", node_off="ghost_off", default=True
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        import logging
+
+        with caplog.at_level(logging.WARNING):
+            renderer.render()
+        assert "node_on 'ghost_on' not found" in caplog.text
+        assert "node_off 'ghost_off' not found" in caplog.text
