@@ -16,6 +16,7 @@ from deckboard.dsui.schema import (
     PackageType,
     RangeBinding,
     RangeDirection,
+    SliderBinding,
     TextBinding,
     VisibilityBinding,
 )
@@ -575,6 +576,266 @@ class TestSvgRendererRange:
             version=1,
             svg_source=svg,
             bindings={"ghost": RangeBinding(node="ghost_node", default=0.5)},
+        )
+        renderer = SvgRenderer(spec)
+        import logging
+
+        with caplog.at_level(logging.WARNING):
+            renderer.render()
+        assert "not found in SVG" in caplog.text
+
+
+# -- Slider SVGs ---------------------------------------------------------------
+
+_SLIDER_SVG = (
+    '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="200" height="50">'
+    '<rect id="bg" width="200" height="50" fill="#000000"/>'
+    '<rect id="track" x="5" y="20" width="190" height="10" fill="#333333"/>'
+    '<rect id="knob" x="5" y="18" width="4" height="14" fill="#ffffff"/>'
+    "</svg>"
+)
+
+_SLIDER_VERTICAL_SVG = (
+    '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="50" height="200">'
+    '<rect id="bg" width="50" height="200" fill="#000000"/>'
+    '<rect id="track" x="20" y="5" width="10" height="190" fill="#333333"/>'
+    '<rect id="vknob" x="18" y="5" width="14" height="4" fill="#ffffff"/>'
+    "</svg>"
+)
+
+
+class TestSvgRendererSlider:
+    def test_set_slider_returns_true_on_change(self):
+        spec = _make_spec(
+            _SLIDER_SVG,
+            bindings={
+                "pos": SliderBinding(
+                    node="knob", default=0.0, min_pos=5.0, max_pos=191.0
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        assert renderer.set("pos", 0.5) is True
+
+    def test_set_slider_same_value_returns_false(self):
+        spec = _make_spec(
+            _SLIDER_SVG,
+            bindings={
+                "pos": SliderBinding(
+                    node="knob", default=0.5, min_pos=5.0, max_pos=191.0
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        assert renderer.set("pos", 0.5) is False
+
+    def test_slider_default(self):
+        spec = _make_spec(
+            _SLIDER_SVG,
+            bindings={
+                "pos": SliderBinding(
+                    node="knob", default=0.75, min_pos=5.0, max_pos=191.0
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        assert renderer.get("pos") == 0.75
+
+    def test_slider_horizontal_renders_differently(self):
+        spec = _make_spec(
+            _SLIDER_SVG,
+            bindings={
+                "pos": SliderBinding(
+                    node="knob", default=0.0, min_pos=5.0, max_pos=191.0
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        img_min = renderer.render()
+
+        renderer.set("pos", 1.0)
+        img_max = renderer.render()
+
+        assert img_min.tobytes() != img_max.tobytes()
+
+    def test_slider_half_differs_from_full(self):
+        spec = _make_spec(
+            _SLIDER_SVG,
+            bindings={
+                "pos": SliderBinding(
+                    node="knob", default=1.0, min_pos=5.0, max_pos=191.0
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        img_full = renderer.render()
+
+        renderer.set("pos", 0.5)
+        img_half = renderer.render()
+
+        assert img_full.tobytes() != img_half.tobytes()
+
+    def test_slider_vertical_renders(self):
+        spec = _make_spec(
+            _SLIDER_VERTICAL_SVG,
+            bindings={
+                "vpos": SliderBinding(
+                    node="vknob",
+                    default=1.0,
+                    direction=RangeDirection.VERTICAL,
+                    min_pos=5.0,
+                    max_pos=191.0,
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        img_full = renderer.render()
+
+        renderer.set("vpos", 0.0)
+        img_empty = renderer.render()
+
+        assert img_full.tobytes() != img_empty.tobytes()
+
+    def test_slider_clamped_above_one(self):
+        spec = _make_spec(
+            _SLIDER_SVG,
+            bindings={
+                "pos": SliderBinding(
+                    node="knob", default=0.0, min_pos=5.0, max_pos=191.0
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        renderer.set("pos", 1.0)
+        img_one = renderer.render()
+
+        renderer.set("pos", 5.0)
+        img_over = renderer.render()
+
+        # Both should produce the same output (clamped to 1.0)
+        assert img_one.tobytes() == img_over.tobytes()
+
+    def test_slider_clamped_below_zero(self):
+        spec = _make_spec(
+            _SLIDER_SVG,
+            bindings={
+                "pos": SliderBinding(
+                    node="knob", default=0.0, min_pos=5.0, max_pos=191.0
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        img_zero = renderer.render()
+
+        renderer.set("pos", -0.5)
+        img_neg = renderer.render()
+
+        # Both should produce the same output (clamped to 0.0)
+        assert img_zero.tobytes() == img_neg.tobytes()
+
+    def test_slider_midpoint_position(self):
+        """Value 0.5 should place the element at the midpoint between min and max."""
+        spec = _make_spec(
+            _SLIDER_SVG,
+            bindings={
+                "pos": SliderBinding(
+                    node="knob", default=0.0, min_pos=10.0, max_pos=190.0
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        renderer.set("pos", 0.5)
+        # Check the calculated position via internal rendering
+        # midpoint = 10.0 + 0.5 * (190.0 - 10.0) = 100.0
+        import copy
+        import xml.etree.ElementTree as ET
+
+        root = copy.deepcopy(renderer._base_root)
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        binding = spec.bindings["pos"]
+        renderer._apply_slider(_find_element_by_id(root, "knob"), binding, 0.5)
+        elem = _find_element_by_id(root, "knob")
+        assert elem.get("x") == "100.0"
+
+    def test_slider_at_zero_uses_min_pos(self):
+        spec = _make_spec(
+            _SLIDER_SVG,
+            bindings={
+                "pos": SliderBinding(
+                    node="knob", default=0.0, min_pos=10.0, max_pos=190.0
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        import copy
+        import xml.etree.ElementTree as ET
+
+        root = copy.deepcopy(renderer._base_root)
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        binding = spec.bindings["pos"]
+        renderer._apply_slider(_find_element_by_id(root, "knob"), binding, 0.0)
+        elem = _find_element_by_id(root, "knob")
+        assert elem.get("x") == "10.0"
+
+    def test_slider_at_one_uses_max_pos(self):
+        spec = _make_spec(
+            _SLIDER_SVG,
+            bindings={
+                "pos": SliderBinding(
+                    node="knob", default=0.0, min_pos=10.0, max_pos=190.0
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        import copy
+        import xml.etree.ElementTree as ET
+
+        root = copy.deepcopy(renderer._base_root)
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        binding = spec.bindings["pos"]
+        renderer._apply_slider(_find_element_by_id(root, "knob"), binding, 1.0)
+        elem = _find_element_by_id(root, "knob")
+        assert elem.get("x") == "190.0"
+
+    def test_slider_vertical_sets_y(self):
+        spec = _make_spec(
+            _SLIDER_VERTICAL_SVG,
+            bindings={
+                "vpos": SliderBinding(
+                    node="vknob",
+                    default=0.0,
+                    direction=RangeDirection.VERTICAL,
+                    min_pos=5.0,
+                    max_pos=191.0,
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        import copy
+
+        root = copy.deepcopy(renderer._base_root)
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        binding = spec.bindings["vpos"]
+        renderer._apply_slider(_find_element_by_id(root, "vknob"), binding, 0.5)
+        elem = _find_element_by_id(root, "vknob")
+        assert elem.get("y") == "98.0"
+
+    def test_slider_missing_node_logs_warning(self, caplog):
+        svg = '<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"/>'
+        spec = PackageSpec(
+            name="Test",
+            type=PackageType.KEY,
+            version=1,
+            svg_source=svg,
+            bindings={
+                "ghost": SliderBinding(
+                    node="ghost_node", default=0.5, min_pos=0.0, max_pos=100.0
+                ),
+            },
         )
         renderer = SvgRenderer(spec)
         import logging

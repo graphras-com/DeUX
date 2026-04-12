@@ -15,6 +15,7 @@ from deckboard.dsui.schema import (
     PackageType,
     RangeBinding,
     RangeDirection,
+    SliderBinding,
     TextBinding,
     VisibilityBinding,
 )
@@ -97,6 +98,70 @@ class TestLoadPackageValid:
         assert isinstance(b, RangeBinding)
         assert b.direction == RangeDirection.VERTICAL
         assert b.default == 1.0
+
+    def test_slider_binding_parsed(self, tmp_path):
+        pkg = tmp_path / "S.dsui"
+        pkg.mkdir()
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg">'
+            '<rect id="knob" x="5" y="10" width="4" height="11"/></svg>'
+        )
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: S\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  brightness:\n    type: slider\n    node: knob\n"
+            "    default: 0.5\n    direction: horizontal\n    min_pos: 1.5\n    max_pos: 183.5",
+            encoding="utf-8",
+        )
+        spec = load_package(pkg)
+        b = spec.bindings["brightness"]
+        assert isinstance(b, SliderBinding)
+        assert b.node == "knob"
+        assert b.default == 0.5
+        assert b.direction == RangeDirection.HORIZONTAL
+        assert b.min_pos == 1.5
+        assert b.max_pos == 183.5
+
+    def test_slider_binding_vertical(self, tmp_path):
+        pkg = tmp_path / "SV.dsui"
+        pkg.mkdir()
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg">'
+            '<rect id="knob" x="5" y="10" width="4" height="11"/></svg>'
+        )
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: SV\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  level:\n    type: slider\n    node: knob\n"
+            "    direction: vertical\n    min_pos: 5.0\n    max_pos: 80.0",
+            encoding="utf-8",
+        )
+        spec = load_package(pkg)
+        b = spec.bindings["level"]
+        assert isinstance(b, SliderBinding)
+        assert b.direction == RangeDirection.VERTICAL
+        assert b.min_pos == 5.0
+        assert b.max_pos == 80.0
+
+    def test_slider_binding_equal_min_max(self, tmp_path):
+        """min_pos == max_pos is valid (indicator is pinned to one position)."""
+        pkg = tmp_path / "SP.dsui"
+        pkg.mkdir()
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg">'
+            '<rect id="dot" x="50" y="10" width="4" height="4"/></svg>'
+        )
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: SP\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  pin:\n    type: slider\n    node: dot\n"
+            "    min_pos: 50.0\n    max_pos: 50.0",
+            encoding="utf-8",
+        )
+        spec = load_package(pkg)
+        b = spec.bindings["pin"]
+        assert isinstance(b, SliderBinding)
+        assert b.min_pos == b.max_pos == 50.0
 
     def test_events_parsed(self, card_dsui_path):
         spec = load_package(card_dsui_path)
@@ -663,6 +728,113 @@ class TestLoadPackageInvalid:
         (pkg / "manifest.yaml").write_text(
             "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
             "bindings:\n  bar:\n    type: range\n    node: bar\n    default: high",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="must be a number"):
+            load_package(pkg)
+
+    def test_slider_binding_missing_min_pos(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  bar:\n    type: slider\n    node: bar\n    max_pos: 100",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="missing 'min_pos'"):
+            load_package(pkg)
+
+    def test_slider_binding_missing_max_pos(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  bar:\n    type: slider\n    node: bar\n    min_pos: 0",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="missing 'max_pos'"):
+            load_package(pkg)
+
+    def test_slider_binding_min_pos_not_number(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  bar:\n    type: slider\n    node: bar\n    min_pos: left\n    max_pos: 100",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="min_pos must be a number"):
+            load_package(pkg)
+
+    def test_slider_binding_max_pos_not_number(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  bar:\n    type: slider\n    node: bar\n    min_pos: 0\n    max_pos: right",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="max_pos must be a number"):
+            load_package(pkg)
+
+    def test_slider_binding_min_greater_than_max(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  bar:\n    type: slider\n    node: bar\n    min_pos: 100\n    max_pos: 10",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="min_pos.*must be <= max_pos"):
+            load_package(pkg)
+
+    def test_slider_binding_invalid_direction(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  bar:\n    type: slider\n    node: bar\n"
+            "    direction: diagonal\n    min_pos: 0\n    max_pos: 100",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="invalid direction"):
+            load_package(pkg)
+
+    def test_slider_binding_default_out_of_range(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  bar:\n    type: slider\n    node: bar\n"
+            "    default: 1.5\n    min_pos: 0\n    max_pos: 100",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="between 0.0 and 1.0"):
+            load_package(pkg)
+
+    def test_slider_binding_default_not_number(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  bar:\n    type: slider\n    node: bar\n"
+            "    default: high\n    min_pos: 0\n    max_pos: 100",
             encoding="utf-8",
         )
         with pytest.raises(PackageError, match="must be a number"):

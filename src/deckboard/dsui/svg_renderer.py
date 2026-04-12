@@ -20,6 +20,7 @@ from .schema import (
     PackageSpec,
     RangeBinding,
     RangeDirection,
+    SliderBinding,
     TextBinding,
     VisibilityBinding,
 )
@@ -147,6 +148,8 @@ class SvgRenderer:
                         else "height"
                     )
                     self._range_extents[name] = float(elem.get(attr, "0"))
+            elif isinstance(binding, SliderBinding):
+                self._values[name] = binding.default
             # ImageBinding defaults to None (no image)
 
     def set(self, name: str, value: Any) -> bool:
@@ -250,6 +253,8 @@ class SvgRenderer:
             self._apply_color(elem, binding, value)
         elif isinstance(binding, RangeBinding):
             self._apply_range(elem, name, binding, value)
+        elif isinstance(binding, SliderBinding):
+            self._apply_slider(elem, binding, value)
 
     def _apply_text(self, elem: ET.Element, binding: TextBinding, value: Any) -> None:
         """Set text content, applying truncation if configured."""
@@ -332,6 +337,20 @@ class SvgRenderer:
         extent = self._range_extents.get(name, 0.0)
         attr = "width" if binding.direction == RangeDirection.HORIZONTAL else "height"
         elem.set(attr, str(ratio * extent))
+
+    def _apply_slider(
+        self,
+        elem: ET.Element,
+        binding: SliderBinding,
+        value: Any,
+    ) -> None:
+        """Translate an element's x or y between min_pos and max_pos."""
+        ratio = max(
+            0.0, min(1.0, float(value if value is not None else binding.default))
+        )
+        pos = binding.min_pos + ratio * (binding.max_pos - binding.min_pos)
+        attr = "x" if binding.direction == RangeDirection.HORIZONTAL else "y"
+        elem.set(attr, str(pos))
 
     def _inline_assets(self, root: ET.Element) -> None:
         """Replace relative asset href references with data URIs."""

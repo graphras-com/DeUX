@@ -21,6 +21,7 @@ class BindingType(Enum):
     VISIBILITY = "visibility"
     COLOR = "color"
     RANGE = "range"
+    SLIDER = "slider"
 
 
 class OverflowMode(Enum):
@@ -90,7 +91,25 @@ class RangeBinding:
     direction: RangeDirection = RangeDirection.HORIZONTAL
 
 
-Binding = TextBinding | ImageBinding | VisibilityBinding | ColorBinding | RangeBinding
+@dataclass(frozen=True, slots=True)
+class SliderBinding:
+    """Translate an SVG element between two positions proportional to a 0–1 value."""
+
+    node: str
+    default: float = 0.0
+    direction: RangeDirection = RangeDirection.HORIZONTAL
+    min_pos: float = 0.0
+    max_pos: float = 0.0
+
+
+Binding = (
+    TextBinding
+    | ImageBinding
+    | VisibilityBinding
+    | ColorBinding
+    | RangeBinding
+    | SliderBinding
+)
 
 # Valid event source names and their physical origins
 VALID_SOURCES = frozenset(

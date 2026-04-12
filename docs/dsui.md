@@ -243,6 +243,69 @@ card.set("volume", 1.0)    # full bar → width = 185
 
 ---
 
+### `slider` — translate an element between two positions
+
+Translates (moves) a fixed-size SVG element along an axis between two
+explicit positions, proportional to a normalised 0.0–1.0 value.  At
+value `0.0` the element sits at `min_pos`; at `1.0` it sits at
+`max_pos`.
+
+Unlike `range` (which scales `width`/`height`), `slider` moves an
+element by setting its `x` or `y` attribute.  Ideal for brightness
+indicators, position markers, and any control where a fixed-size knob
+slides along a track.
+
+```yaml
+bindings:
+  brightness:
+    type: slider
+    node: brightness_indicator   # SVG element id
+    default: 0.5                 # Default position (optional)
+    direction: horizontal        # Axis to translate (optional)
+    min_pos: 1.5                 # SVG coordinate at value 0.0
+    max_pos: 183.5               # SVG coordinate at value 1.0
+```
+
+| Parameter   | Type   | Required | Default        | Description                                                  |
+|-------------|--------|----------|----------------|--------------------------------------------------------------|
+| `node`      | string | Yes      | —              | `id` of the target SVG element (typically a `<rect>`).       |
+| `default`   | float  | No       | `0.0`          | Initial value, must be between 0.0 and 1.0 inclusive.        |
+| `direction` | string | No       | `horizontal`   | `horizontal` — translates the `x` attribute. `vertical` — translates the `y` attribute. |
+| `min_pos`   | float  | Yes      | —              | SVG coordinate when the value is `0.0`.                      |
+| `max_pos`   | float  | Yes      | —              | SVG coordinate when the value is `1.0`. Must be >= `min_pos`.|
+
+**Runtime value type:** `float` — a value between `0.0` (min position)
+and `1.0` (max position).  Values outside this range are clamped.
+
+**SVG design tips:**
+
+- Design the indicator element at its default position in the SVG.
+- Use a background track rect with a gradient or solid colour to give
+  context for what the slider range represents.
+- The indicator element keeps its original size — only its position
+  changes.
+- Combine with a `color` binding on the same node to change the
+  indicator colour dynamically.
+
+**Example SVG layout:**
+
+```xml
+<rect id="brightness_frame" x="0" y="4" width="189" height="14"
+      stroke="#dedede" fill="none" stroke-width="1" rx="3" ry="3"/>
+<rect id="brightness_background" x="1" y="5" width="187" height="12"
+      fill="url(#brightness_gradient)" rx="2" ry="2"/>
+<rect id="brightness_indicator" x="92.25" y="5.5" width="4" height="11"
+      stroke="black" stroke-width="0.5" fill="#dedede" rx="1.5" ry="1.5"/>
+```
+
+```python
+card.set("brightness", 0.5)   # midpoint → x = 92.5
+card.set("brightness", 0.0)   # left edge → x = 1.5
+card.set("brightness", 1.0)   # right edge → x = 183.5
+```
+
+---
+
 ## Events
 
 Events map physical hardware inputs to named semantic events.  You

@@ -35,6 +35,7 @@ from .schema import (
     RangeBinding,
     RangeDirection,
     Region,
+    SliderBinding,
     TextBinding,
     VisibilityBinding,
 )
@@ -57,6 +58,7 @@ __all__ = [
     "RangeBinding",
     "RangeDirection",
     "Region",
+    "SliderBinding",
     "SvgRenderer",
     "TextBinding",
     "VisibilityBinding",
