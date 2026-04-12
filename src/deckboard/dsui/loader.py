@@ -23,6 +23,7 @@ from .schema import (
     RangeBinding,
     RangeDirection,
     Region,
+    SliderBinding,
     TextBinding,
     VALID_DIRECTIONS,
     VALID_REGION_EVENTS,
@@ -132,6 +133,44 @@ def _parse_binding(name: str, raw: dict[str, Any]) -> Binding:
             node=node,
             default=default_float,
             direction=direction,
+        )
+
+    if binding_type == BindingType.SLIDER:
+        direction_raw = raw.get("direction", "horizontal")
+        try:
+            direction = RangeDirection(direction_raw)
+        except ValueError:
+            valid_dirs = [d.value for d in RangeDirection]
+            raise PackageError(
+                f"Binding '{name}' has invalid direction '{direction_raw}'. "
+                f"Valid directions: {valid_dirs}"
+            ) from None
+        default_val = raw.get("default", 0.0)
+        if not isinstance(default_val, (int, float)):
+            raise PackageError(f"Binding '{name}': default must be a number")
+        default_float = float(default_val)
+        if not 0.0 <= default_float <= 1.0:
+            raise PackageError(f"Binding '{name}': default must be between 0.0 and 1.0")
+        min_pos_raw = raw.get("min_pos")
+        if min_pos_raw is None:
+            raise PackageError(f"Binding '{name}' missing 'min_pos'")
+        if not isinstance(min_pos_raw, (int, float)):
+            raise PackageError(f"Binding '{name}': min_pos must be a number")
+        max_pos_raw = raw.get("max_pos")
+        if max_pos_raw is None:
+            raise PackageError(f"Binding '{name}' missing 'max_pos'")
+        if not isinstance(max_pos_raw, (int, float)):
+            raise PackageError(f"Binding '{name}': max_pos must be a number")
+        if float(min_pos_raw) > float(max_pos_raw):
+            raise PackageError(
+                f"Binding '{name}': min_pos ({min_pos_raw}) must be <= max_pos ({max_pos_raw})"
+            )
+        return SliderBinding(
+            node=node,
+            default=default_float,
+            direction=direction,
+            min_pos=float(min_pos_raw),
+            max_pos=float(max_pos_raw),
         )
 
     # BindingType.COLOR

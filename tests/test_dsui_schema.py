@@ -17,6 +17,7 @@ from deckboard.dsui.schema import (
     RangeBinding,
     RangeDirection,
     Region,
+    SliderBinding,
     TextBinding,
     VALID_DIRECTIONS,
     VALID_REGION_EVENTS,
@@ -44,6 +45,7 @@ class TestBindingType:
         assert BindingType("visibility") == BindingType.VISIBILITY
         assert BindingType("color") == BindingType.COLOR
         assert BindingType("range") == BindingType.RANGE
+        assert BindingType("slider") == BindingType.SLIDER
 
 
 class TestOverflowMode:
@@ -137,6 +139,34 @@ class TestRangeBinding:
 
     def test_frozen(self):
         b = RangeBinding(node="bar")
+        with pytest.raises(AttributeError):
+            b.node = "other"  # type: ignore[misc]
+
+
+class TestSliderBinding:
+    def test_defaults(self):
+        b = SliderBinding(node="indicator")
+        assert b.node == "indicator"
+        assert b.default == 0.0
+        assert b.direction == RangeDirection.HORIZONTAL
+        assert b.min_pos == 0.0
+        assert b.max_pos == 0.0
+
+    def test_custom(self):
+        b = SliderBinding(
+            node="knob",
+            default=0.5,
+            direction=RangeDirection.VERTICAL,
+            min_pos=1.5,
+            max_pos=183.5,
+        )
+        assert b.default == 0.5
+        assert b.direction == RangeDirection.VERTICAL
+        assert b.min_pos == 1.5
+        assert b.max_pos == 183.5
+
+    def test_frozen(self):
+        b = SliderBinding(node="indicator")
         with pytest.raises(AttributeError):
             b.node = "other"  # type: ignore[misc]
 

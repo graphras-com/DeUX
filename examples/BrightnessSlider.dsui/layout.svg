@@ -1,0 +1,16 @@
+<svg id="BrightnessCard" xmlns="http://www.w3.org/2000/svg" width="197" height="98" font-family="ArialMT,Arial,sans-serif">
+    <rect id="background" width="197" height="98" fill="#1c1c1c"/>
+    <g transform="translate(4 28)">
+        <defs>
+            <linearGradient id="brightness_gradient" x1="0" x2="100%" y1="0" y2="0">
+                <stop offset="0%" stop-color="#000000"/>
+                <stop offset="100%" stop-color="#FFFFFF"/>
+            </linearGradient>
+        </defs>
+        <text id="brightness_label" x="0" y="0" font-size="14" fill="#dedede" text-anchor="start">Brightness</text>
+        <text id="brightness_value_text" x="189" y="0" font-size="14" fill="#dedede" text-anchor="end">50%</text>
+        <rect id="brightness_frame" x="0" y="4" width="189" height="14" stroke="#dedede" fill="none" stroke-width="1" rx="3" ry="3"/>
+        <rect id="brightness_background" x="1" y="5" width="187" height="12" stroke="none" fill="url(#brightness_gradient)" rx="2" ry="2"/>
+        <rect id="brightness_indicator" x="92.25" y="5.5" width="4" height="11" stroke="black" stroke-width="0.5" fill="#dedede" rx="1.5" ry="1.5"/>
+    </g>
+</svg>
