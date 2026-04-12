@@ -15,6 +15,7 @@ from deckboard.dsui.schema import (
     RangeBinding,
     Region,
     TextBinding,
+    ToggleBinding,
 )
 from deckboard.runtime.events import EventType, TouchEvent
 from deckboard.ui.cards.base import Card
@@ -156,6 +157,60 @@ class TestDsuiCardDataBinding:
         assert card.get("level") == 0.3
         card.set("level", 0.8)
         assert card.get("level") == 0.8
+
+
+class TestDsuiCardToggleBinding:
+    _TOGGLE_CARD_SVG = (
+        '<svg id="TC" xmlns="http://www.w3.org/2000/svg" width="197" height="98">'
+        '<rect id="bg" width="197" height="98" fill="#1c1c1c"/>'
+        '<path id="icon_on" d="M10 10 L50 10 L50 40 L10 40 Z" fill="#00ff00"/>'
+        '<path id="icon_off" d="M60 10 L90 10 L90 40 L60 40 Z" fill="#ff0000"/>'
+        "</svg>"
+    )
+
+    def _make_toggle_spec(self):
+        return PackageSpec(
+            name="ToggleCard",
+            type=PackageType.TOUCH_STRIP_CARD,
+            version=1,
+            svg_source=self._TOGGLE_CARD_SVG,
+            bindings={
+                "lights": ToggleBinding(
+                    node_on="icon_on", node_off="icon_off", default=False
+                ),
+            },
+        )
+
+    def test_set_toggle_marks_dirty(self):
+        spec = self._make_toggle_spec()
+        card = DsuiCard(0, spec)
+        card.mark_clean()
+        card.set("lights", True)
+        assert card.is_dirty is True
+
+    def test_set_toggle_same_value_not_dirty(self):
+        spec = self._make_toggle_spec()
+        card = DsuiCard(0, spec)
+        card.mark_clean()
+        card.set("lights", False)  # same as default
+        assert card.is_dirty is False
+
+    def test_get_toggle_value(self):
+        spec = self._make_toggle_spec()
+        card = DsuiCard(0, spec)
+        assert card.get("lights") is False
+        card.set("lights", True)
+        assert card.get("lights") is True
+
+    def test_toggle_renders_differently(self):
+        spec = self._make_toggle_spec()
+        card = DsuiCard(0, spec)
+        img_off = card.render()
+
+        card.set("lights", True)
+        img_on = card.render()
+
+        assert img_off.tobytes() != img_on.tobytes()
 
 
 class TestDsuiCardRender:

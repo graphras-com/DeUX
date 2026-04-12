@@ -17,6 +17,7 @@ from deckboard.dsui.schema import (
     RangeDirection,
     SliderBinding,
     TextBinding,
+    ToggleBinding,
     VisibilityBinding,
 )
 
@@ -98,6 +99,45 @@ class TestLoadPackageValid:
         assert isinstance(b, RangeBinding)
         assert b.direction == RangeDirection.VERTICAL
         assert b.default == 1.0
+
+    def test_toggle_binding_parsed(self, tmp_path):
+        pkg = tmp_path / "T.dsui"
+        pkg.mkdir()
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg">'
+            '<path id="icon_on" d="M0 0"/><path id="icon_off" d="M0 0"/></svg>'
+        )
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: T\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  lights:\n    type: toggle\n    node_on: icon_on\n"
+            "    node_off: icon_off\n    default: true",
+            encoding="utf-8",
+        )
+        spec = load_package(pkg)
+        b = spec.bindings["lights"]
+        assert isinstance(b, ToggleBinding)
+        assert b.node_on == "icon_on"
+        assert b.node_off == "icon_off"
+        assert b.default is True
+
+    def test_toggle_binding_default_false(self, tmp_path):
+        pkg = tmp_path / "TF.dsui"
+        pkg.mkdir()
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg">'
+            '<path id="icon_on" d="M0 0"/><path id="icon_off" d="M0 0"/></svg>'
+        )
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: TF\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  state:\n    type: toggle\n    node_on: icon_on\n    node_off: icon_off",
+            encoding="utf-8",
+        )
+        spec = load_package(pkg)
+        b = spec.bindings["state"]
+        assert isinstance(b, ToggleBinding)
+        assert b.default is False
 
     def test_slider_binding_parsed(self, tmp_path):
         pkg = tmp_path / "S.dsui"
@@ -838,6 +878,67 @@ class TestLoadPackageInvalid:
             encoding="utf-8",
         )
         with pytest.raises(PackageError, match="must be a number"):
+            load_package(pkg)
+
+    def test_toggle_binding_missing_node_on(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><path id="off" d="M0 0"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  t:\n    type: toggle\n    node_off: off",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="missing 'node_on'"):
+            load_package(pkg)
+
+    def test_toggle_binding_missing_node_off(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg">'
+            '<path id="icon_on" d="M0 0"/></svg>'
+        )
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  t:\n    type: toggle\n    node_on: icon_on",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="missing 'node_off'"):
+            load_package(pkg)
+
+    def test_toggle_binding_node_on_not_in_svg(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg">'
+            '<path id="icon_off" d="M0 0"/></svg>'
+        )
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  t:\n    type: toggle\n    node_on: missing\n    node_off: icon_off",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="node_on 'missing'.*does not exist"):
+            load_package(pkg)
+
+    def test_toggle_binding_node_off_not_in_svg(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg">'
+            '<path id="icon_on" d="M0 0"/></svg>'
+        )
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  t:\n    type: toggle\n    node_on: icon_on\n    node_off: missing",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="node_off 'missing'.*does not exist"):
             load_package(pkg)
 
     def test_version_string_invalid(self, tmp_path):

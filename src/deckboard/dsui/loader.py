@@ -25,6 +25,7 @@ from .schema import (
     Region,
     SliderBinding,
     TextBinding,
+    ToggleBinding,
     VALID_DIRECTIONS,
     VALID_REGION_EVENTS,
     VALID_SOURCES,
@@ -69,6 +70,20 @@ def _parse_binding(name: str, raw: dict[str, Any]) -> Binding:
         raise PackageError(
             f"Binding '{name}' has invalid type '{raw_type}'. Valid types: {valid}"
         ) from None
+
+    # Toggle bindings use node_on/node_off instead of a single node.
+    if binding_type == BindingType.TOGGLE:
+        node_on = raw.get("node_on")
+        if not node_on or not isinstance(node_on, str):
+            raise PackageError(f"Binding '{name}' missing 'node_on'")
+        node_off = raw.get("node_off")
+        if not node_off or not isinstance(node_off, str):
+            raise PackageError(f"Binding '{name}' missing 'node_off'")
+        return ToggleBinding(
+            node_on=node_on,
+            node_off=node_off,
+            default=bool(raw.get("default", False)),
+        )
 
     node = raw.get("node")
     if node is None:
@@ -338,20 +353,34 @@ def load_package(path: str | Path) -> PackageSpec:
         if not isinstance(binding_raw, dict):
             raise PackageError(f"Binding '{binding_name}' must be a mapping")
         binding = _parse_binding(binding_name, binding_raw)
-        # Validate node exists in SVG
-        if binding.node not in svg_ids:
-            raise PackageError(
-                f"Binding '{binding_name}' references node '{binding.node}' "
-                f"which does not exist in the SVG. "
-                f"Available ids: {sorted(svg_ids)}"
-            )
-        # Validate placeholder_node for image bindings
-        if isinstance(binding, ImageBinding) and binding.placeholder_node:
-            if binding.placeholder_node not in svg_ids:
+        # Validate node(s) exist in SVG
+        if isinstance(binding, ToggleBinding):
+            if binding.node_on not in svg_ids:
                 raise PackageError(
-                    f"Binding '{binding_name}' references placeholder_node "
-                    f"'{binding.placeholder_node}' which does not exist in the SVG"
+                    f"Binding '{binding_name}' references node_on '{binding.node_on}' "
+                    f"which does not exist in the SVG. "
+                    f"Available ids: {sorted(svg_ids)}"
                 )
+            if binding.node_off not in svg_ids:
+                raise PackageError(
+                    f"Binding '{binding_name}' references node_off '{binding.node_off}' "
+                    f"which does not exist in the SVG. "
+                    f"Available ids: {sorted(svg_ids)}"
+                )
+        else:
+            if binding.node not in svg_ids:
+                raise PackageError(
+                    f"Binding '{binding_name}' references node '{binding.node}' "
+                    f"which does not exist in the SVG. "
+                    f"Available ids: {sorted(svg_ids)}"
+                )
+            # Validate placeholder_node for image bindings
+            if isinstance(binding, ImageBinding) and binding.placeholder_node:
+                if binding.placeholder_node not in svg_ids:
+                    raise PackageError(
+                        f"Binding '{binding_name}' references placeholder_node "
+                        f"'{binding.placeholder_node}' which does not exist in the SVG"
+                    )
         bindings[binding_name] = binding
 
     # --- Events ---

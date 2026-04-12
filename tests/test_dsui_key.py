@@ -13,6 +13,7 @@ from deckboard.dsui.schema import (
     PackageSpec,
     PackageType,
     TextBinding,
+    ToggleBinding,
 )
 from deckboard.ui.controls.key_slot import KeySlot
 
@@ -164,6 +165,60 @@ class TestDsuiKeyRender:
 
         img = Image.open(io.BytesIO(data))
         assert img.size == (120, 120)
+
+
+class TestDsuiKeyToggleBinding:
+    _TOGGLE_KEY_SVG = (
+        '<svg id="TK" xmlns="http://www.w3.org/2000/svg" width="120" height="120">'
+        '<rect id="bg" width="120" height="120" fill="#1c1c1c"/>'
+        '<path id="on_icon" d="M20 20 L60 20 L60 60 L20 60 Z" fill="#00ff00"/>'
+        '<path id="off_icon" d="M20 20 L60 20 L60 60 L20 60 Z" fill="#ff0000"/>'
+        "</svg>"
+    )
+
+    def _make_toggle_spec(self):
+        return PackageSpec(
+            name="ToggleKey",
+            type=PackageType.KEY,
+            version=1,
+            svg_source=self._TOGGLE_KEY_SVG,
+            bindings={
+                "state": ToggleBinding(
+                    node_on="on_icon", node_off="off_icon", default=False
+                ),
+            },
+        )
+
+    def test_set_toggle_marks_dirty(self):
+        spec = self._make_toggle_spec()
+        key = DsuiKey(0, spec)
+        key.mark_clean()
+        key.set("state", True)
+        assert key.is_dirty is True
+
+    def test_set_toggle_same_value_not_dirty(self):
+        spec = self._make_toggle_spec()
+        key = DsuiKey(0, spec)
+        key.mark_clean()
+        key.set("state", False)  # same as default
+        assert key.is_dirty is False
+
+    def test_get_toggle_value(self):
+        spec = self._make_toggle_spec()
+        key = DsuiKey(0, spec)
+        assert key.get("state") is False
+        key.set("state", True)
+        assert key.get("state") is True
+
+    def test_toggle_renders_different_images(self):
+        spec = self._make_toggle_spec()
+        key = DsuiKey(0, spec)
+        data_off = key.render_image()
+
+        key.set("state", True)
+        data_on = key.render_image()
+
+        assert data_off != data_on
 
 
 class TestDsuiKeyEvents:

@@ -37,6 +37,7 @@ from .schema import (
     Region,
     SliderBinding,
     TextBinding,
+    ToggleBinding,
     VisibilityBinding,
 )
 from .svg_renderer import SvgRenderer
@@ -61,6 +62,7 @@ __all__ = [
     "SliderBinding",
     "SvgRenderer",
     "TextBinding",
+    "ToggleBinding",
     "VisibilityBinding",
     "load_all_packages",
     "load_package",

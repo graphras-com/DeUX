@@ -22,6 +22,7 @@ class BindingType(Enum):
     COLOR = "color"
     RANGE = "range"
     SLIDER = "slider"
+    TOGGLE = "toggle"
 
 
 class OverflowMode(Enum):
@@ -102,6 +103,19 @@ class SliderBinding:
     max_pos: float = 0.0
 
 
+@dataclass(frozen=True, slots=True)
+class ToggleBinding:
+    """Switch between two SVG elements based on a boolean value.
+
+    When the value is truthy, ``node_on`` is visible and ``node_off``
+    is hidden.  When falsy, the opposite applies.
+    """
+
+    node_on: str
+    node_off: str
+    default: bool = False
+
+
 Binding = (
     TextBinding
     | ImageBinding
@@ -109,6 +123,7 @@ Binding = (
     | ColorBinding
     | RangeBinding
     | SliderBinding
+    | ToggleBinding
 )
 
 # Valid event source names and their physical origins
