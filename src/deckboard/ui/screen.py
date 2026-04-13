@@ -26,7 +26,6 @@ class Screen:
     Usage::
 
         main = deck.screen("main")
-        main.key(0).set_icon("mdi:home")
 
         @main.key(0).on_press
         async def handle():

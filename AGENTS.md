@@ -189,7 +189,7 @@ if TYPE_CHECKING:
 
 - **Async context manager** for resource lifecycle (`Deck.__aenter__`/`__aexit__`).
 - **Decorator-based event registration** — `@key.on_press`, `@encoder.on_turn`.
-- **Method chaining** — mutators return `self` (e.g., `key.set_icon(...).set_label(...)`).
+- **Method chaining** — mutators return `self` (e.g., `card.set("title", "...").set("artist", "...")`).
 - **Dirty tracking** — `is_dirty` / `mark_clean()` / `mark_dirty()` on cards and key slots.
 - **Abstract base classes** — `Card(ABC)` with `@abstractmethod render()`.
 - **Thread-safe bridge** — `runtime/transport.py` uses `loop.call_soon_threadsafe()` to enqueue events from the HID reader thread.
@@ -209,12 +209,12 @@ target-version = "py311"
 - **All hardware is mocked** — tests run without a physical Stream Deck.
 - `asyncio_mode = "auto"` — no `@pytest.mark.asyncio` decorator needed.
 - Use `unittest.mock.MagicMock` / `AsyncMock` for device mocking.
-- Use `respx` for mocking HTTP requests (icon fetching).
+
 
 ### Test file conventions
 
 - One file per source module: `test_key_slot.py`, `test_deck.py`, `test_widgets_volume.py`.
-- Group related tests in classes: `class TestKeySlotSetIcon:`, `class TestDeckDispatch:`.
+- Group related tests in classes: `class TestKeySlotRendering:`, `class TestDeckDispatch:`.
 - Shared fixtures in `conftest.py` (key slots, encoder slots, cards, mock device, sample images).
 - Test edge cases and error paths, not just the happy path.
 
@@ -227,15 +227,16 @@ from __future__ import annotations
 import pytest
 from deckboard.ui.controls.key_slot import KeySlot
 
-class TestKeySlotSetIcon:
-    def test_sets_icon_name(self, key_slot: KeySlot):
-        key_slot.set_icon("mdi:home")
-        assert key_slot.icon_name == "mdi:home"
+class TestKeySlotRendering:
+    def test_set_rendered_image(self, key_slot: KeySlot):
+        key_slot.set_rendered_image(b"jpeg-data")
+        assert key_slot.image_bytes == b"jpeg-data"
+        assert key_slot.is_dirty is False
 
-    def test_marks_dirty(self, key_slot: KeySlot):
-        key_slot.mark_clean()
-        key_slot.set_icon("mdi:home")
+    def test_mark_clean(self, key_slot: KeySlot):
         assert key_slot.is_dirty is True
+        key_slot.mark_clean()
+        assert key_slot.is_dirty is False
 ```
 
 ## Branch naming
