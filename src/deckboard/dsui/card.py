@@ -13,7 +13,6 @@ from .event_map import EventMap
 from .svg_renderer import SvgRenderer
 
 if TYPE_CHECKING:
-    from ..render.icons import IconManager
     from .schema import PackageSpec
 
 logger = logging.getLogger(__name__)
@@ -135,7 +134,7 @@ class DsuiCard(Card):
         """
         return self._renderer.render()
 
-    async def prepare_assets(self, icons: IconManager) -> None:
+    async def prepare_assets(self) -> None:
         """No-op — .dsui cards manage their own assets via the SVG."""
 
     # -- Card protocol: encoder event hooks --------------------------------

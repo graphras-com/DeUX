@@ -9,7 +9,6 @@ import pytest
 from PIL import Image
 
 from deckboard.runtime.deck import Deck, DeckError, _KEY_COUNT
-from deckboard.render.icons import IconManager
 from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
 from deckboard.ui.screen import Screen
 from deckboard.ui.cards.base import Card
@@ -32,8 +31,8 @@ class _TestCard(Card):
 
 @pytest.fixture
 def deck(tmp_path):
-    """A Deck instance with a temporary icon cache."""
-    return Deck(icon_cache_dir=tmp_path / "icons")
+    """A Deck instance."""
+    return Deck()
 
 
 # ── Deck.__init__ ───────────────────────────────────────────────────────
@@ -50,19 +49,15 @@ class TestDeckInit:
         assert deck._active_page is None
         assert deck._pages == {}
 
-    def test_custom_params(self, tmp_path):
+    def test_custom_params(self):
         d = Deck(
             device_type="Stream Deck Mini",
             device_index=1,
             brightness=50,
-            icon_cache_dir=tmp_path / "custom",
         )
         assert d._device_type == "Stream Deck Mini"
         assert d._device_index == 1
         assert d._brightness == 50
-
-    def test_has_icon_manager(self, deck):
-        assert isinstance(deck.icons, IconManager)
 
 
 # ── Deck.page ───────────────────────────────────────────────────────────
@@ -115,58 +110,6 @@ class TestDeckBrightness:
         deck._device = mock_streamdeck_device
         await deck.set_brightness(60)
         assert deck.brightness == 60
-
-
-# ── Deck.debug_grid ─────────────────────────────────────────────────────
-
-
-class TestDeckDebugGrid:
-    def test_initially_false(self, deck):
-        assert deck.debug_grid is False
-
-    def test_set_true(self, deck):
-        deck.debug_grid = True
-        assert deck.debug_grid is True
-
-    def test_set_false(self, deck):
-        deck.debug_grid = True
-        deck.debug_grid = False
-        assert deck.debug_grid is False
-
-    async def test_render_all_keys_uses_debug_grid(self, deck, mock_streamdeck_device):
-        """Blank keys are rendered with debug_grid when enabled."""
-        deck._device = mock_streamdeck_device
-        p = deck.screen("main")
-        deck._active_page = p
-        deck.debug_grid = True
-
-        await deck._render_all_keys()
-        assert mock_streamdeck_device.set_key_image.call_count == _KEY_COUNT
-
-    async def test_render_key_uses_debug_grid(self, deck, mock_streamdeck_device):
-        """Configured key renders with debug_grid overlay."""
-        deck._device = mock_streamdeck_device
-        from deckboard.ui.controls.key_slot import KeySlot
-
-        k = KeySlot(0)
-        k.set_label("Test")
-        deck.debug_grid = True
-
-        await deck._render_key(k)
-        mock_streamdeck_device.set_key_image.assert_called_once()
-        assert k.image_bytes is not None
-
-    async def test_render_touchscreen_uses_debug_grid(
-        self, deck, mock_streamdeck_device
-    ):
-        """Touchscreen renders with debug_grid overlay."""
-        deck._device = mock_streamdeck_device
-        p = deck.screen("main")
-        deck._active_page = p
-        deck.debug_grid = True
-
-        await deck._render_touchscreen()
-        mock_streamdeck_device.set_touchscreen_image.assert_called_once()
 
 
 # ── Deck.set_page ───────────────────────────────────────────────────────
@@ -222,42 +165,14 @@ class TestDeckRefresh:
         """refresh() is a no-op when no active page."""
         await deck.refresh()  # Should not raise
 
-    async def test_renders_dirty_keys(self, deck):
-        p = deck.screen("main")
-        p.key(0).set_icon("mdi:home")
-
-        deck._active_page = p
-        deck._render_key = AsyncMock()
-        deck._render_touchscreen = AsyncMock()
-
-        await deck.refresh()
-        deck._render_key.assert_awaited_once()
-
     async def test_renders_dirty_touchscreen(self, deck):
         p = deck.screen("main")
         # BlankCards start dirty, so touch strip is dirty by default
         deck._active_page = p
-        deck._render_key = AsyncMock()
         deck._render_touchscreen = AsyncMock()
 
         await deck.refresh()
         deck._render_touchscreen.assert_awaited_once()
-
-    async def test_skips_clean_keys(self, deck):
-        p = deck.screen("main")
-        k = p.key(0)
-        k.set_icon("mdi:home")
-        k.mark_clean()  # Make it clean
-
-        deck._active_page = p
-        deck._render_key = AsyncMock()
-        deck._render_touchscreen = AsyncMock()
-        # Mark all cards clean
-        for w in p.cards:
-            w.mark_clean()
-
-        await deck.refresh()
-        deck._render_key.assert_not_awaited()
 
     async def test_skips_clean_touchscreen(self, deck):
         p = deck.screen("main")
@@ -265,7 +180,6 @@ class TestDeckRefresh:
             w.mark_clean()
 
         deck._active_page = p
-        deck._render_key = AsyncMock()
         deck._render_touchscreen = AsyncMock()
 
         await deck.refresh()
@@ -541,7 +455,6 @@ class TestDeckDispatchCardCallbacks:
         card = _TestCard(0)
         p.set_card(0, card)
         deck._active_page = p
-        deck._render_key = AsyncMock()
         deck._render_touchscreen = AsyncMock()
 
         change_handler = AsyncMock()
@@ -568,57 +481,6 @@ class TestDeckRenderAllKeys:
         await deck._render_all_keys()
         # Should have called set_key_image for all 8 keys (all blank)
         assert mock_streamdeck_device.set_key_image.call_count == _KEY_COUNT
-
-    async def test_renders_configured_key(self, deck, mock_streamdeck_device):
-        deck._device = mock_streamdeck_device
-        p = deck.screen("main")
-        p.key(0).set_icon("mdi:home")
-        deck._active_page = p
-
-        # Mock icon fetch
-        deck._render_key = AsyncMock()
-
-        await deck._render_all_keys()
-        deck._render_key.assert_awaited_once()
-
-
-# ── Deck._render_key ───────────────────────────────────────────────────
-
-
-class TestDeckRenderKey:
-    async def test_no_device(self, deck):
-        """No-op when device is None."""
-        from deckboard.ui.controls.key_slot import KeySlot
-
-        k = KeySlot(0)
-        k.set_icon("mdi:home")
-        await deck._render_key(k)  # Should not raise
-
-    async def test_renders_key_with_icon(self, deck, mock_streamdeck_device):
-        deck._device = mock_streamdeck_device
-        from deckboard.ui.controls.key_slot import KeySlot
-
-        k = KeySlot(0)
-        k.set_icon("mdi:home")
-
-        # Mock icon manager
-        fake_img = Image.new("RGBA", (80, 80))
-        deck.icons.get = AsyncMock(return_value=fake_img)
-
-        await deck._render_key(k)
-        mock_streamdeck_device.set_key_image.assert_called_once()
-        assert k.image_bytes is not None
-        assert k.is_dirty is False
-
-    async def test_renders_key_without_icon(self, deck, mock_streamdeck_device):
-        deck._device = mock_streamdeck_device
-        from deckboard.ui.controls.key_slot import KeySlot
-
-        k = KeySlot(0)
-        k.set_label("Test")
-
-        await deck._render_key(k)
-        mock_streamdeck_device.set_key_image.assert_called_once()
 
 
 # ── Deck._render_touchscreen ───────────────────────────────────────────

@@ -5,12 +5,10 @@ from __future__ import annotations
 import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from StreamDeck.DeviceManager import DeviceManager
 
-from ..render.icons import IconManager
 from ..render.key_renderer import render_blank_key, render_key_image
 from ..render.metrics import TOUCHSCREEN_HEIGHT, TOUCHSCREEN_WIDTH
 from ..render.touch_renderer import compose_touchstrip
@@ -49,7 +47,6 @@ class Deck:
 
         async with Deck() as deck:
             main = deck.screen("main")
-            main.key(0).set_icon("mdi:home")
 
             @main.key(0).on_press
             async def on_home():
@@ -71,14 +68,12 @@ class Deck:
         device_type: str = "Stream Deck +",
         device_index: int = 0,
         brightness: int = 80,
-        icon_cache_dir: str | Path | None = None,
     ) -> None:
         """
         Args:
             device_type: Stream Deck model to search for.
             device_index: If multiple decks match, which one to use.
             brightness: Initial brightness (0-100).
-            icon_cache_dir: Override the default icon cache directory.
         """
         # Lazy import to avoid circular dependency at module level
         from ..ui.screen import Screen
@@ -92,12 +87,6 @@ class Deck:
         self._closed_event = asyncio.Event()
         self._running = False
         self._executor = ThreadPoolExecutor(max_workers=2)
-
-        # Icon manager
-        self.icons = IconManager(cache_dir=icon_cache_dir)
-
-        # Debug grid overlay
-        self._debug_grid = False
 
         # Screens
         self._screens: dict[str, Screen] = {}
@@ -197,9 +186,6 @@ class Deck:
             except Exception as e:
                 logger.warning("Error closing device: %s", e)
 
-        # Close icon HTTP client
-        await self.icons.close()
-
         self._closed_event.set()
         self._executor.shutdown(wait=False)
         logger.info("Deck stopped")
@@ -248,17 +234,6 @@ class Deck:
             await loop.run_in_executor(
                 self._executor, self._device.set_brightness, self._brightness
             )
-
-    # -- Debug grid --------------------------------------------------------
-
-    @property
-    def debug_grid(self) -> bool:
-        """Whether a debug alignment grid is drawn over rendered images."""
-        return self._debug_grid
-
-    @debug_grid.setter
-    def debug_grid(self, value: bool) -> None:
-        self._debug_grid = value
 
     # -- Screen management -------------------------------------------------
 
@@ -315,43 +290,15 @@ class Deck:
             key_slot = screen.keys.get(key_index)
             if key_slot and self._is_dsui_key(key_slot):
                 await self._render_dsui_key(key_slot)
-            elif key_slot and (key_slot.icon_name or key_slot.label):
-                await self._render_key(key_slot)
             else:
                 # Blank key
-                image_bytes = render_blank_key(debug_grid=self._debug_grid)
+                image_bytes = render_blank_key()
                 await loop.run_in_executor(
                     self._executor,
                     self._device.set_key_image,
                     key_index,
                     image_bytes,
                 )
-
-    async def _render_key(self, key_slot: KeySlot) -> None:
-        """Render a single key and push to the device."""
-        if not self._device:
-            return
-
-        icon_img = None
-        if key_slot.icon_name:
-            icon_img = await self.icons.get(
-                key_slot.icon_name, color=key_slot.icon_color
-            )
-
-        image_bytes = render_key_image(
-            icon=icon_img,
-            label=key_slot.label,
-            debug_grid=self._debug_grid,
-        )
-        key_slot.set_rendered_image(image_bytes)
-
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            self._executor,
-            self._device.set_key_image,
-            key_slot.index,
-            image_bytes,
-        )
 
     @staticmethod
     def _is_dsui_key(key_slot: KeySlot) -> bool:
@@ -385,14 +332,13 @@ class Deck:
 
         card_images = []
         for card in screen.cards:
-            await card.prepare_assets(self.icons)
+            await card.prepare_assets()
             img = card.render()
             card.set_rendered(img)
             card_images.append(img)
 
         touchstrip_bytes = compose_touchstrip(
             card_images,
-            debug_grid=self._debug_grid,
             background=screen.touch_strip.background_color,
         )
 
@@ -410,10 +356,10 @@ class Deck:
     async def refresh(self) -> None:
         """Re-render and push all dirty controls on the active screen.
 
-        Call this after changing key icons/labels or card values
-        if you need immediate updates outside of ``set_screen()``.
-        Also drains any pending callbacks queued by programmatic
-        ``set_value()`` calls on range controls.
+        Call this after changing card values if you need immediate
+        updates outside of ``set_screen()``.  Also drains any pending
+        callbacks queued by programmatic ``set_value()`` calls on
+        range controls.
         """
         screen = self._current_screen()
         if not screen:
@@ -428,8 +374,6 @@ class Deck:
             if key_slot.is_dirty:
                 if self._is_dsui_key(key_slot):
                     await self._render_dsui_key(key_slot)
-                else:
-                    await self._render_key(key_slot)
 
         # Render the touch strip if any card is dirty
         if screen.touch_strip.any_dirty:

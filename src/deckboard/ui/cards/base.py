@@ -4,15 +4,11 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
 
 from PIL import Image
 
 from ...render.metrics import PANEL_HEIGHT, PANEL_WIDTH
 from ...runtime.events import AsyncHandler, EventType, TouchEvent
-
-if TYPE_CHECKING:
-    from ...render.icons import IconManager
 
 logger = logging.getLogger(__name__)
 
@@ -210,7 +206,7 @@ class Card(ABC):
         self._rendered = img
         self._dirty = False
 
-    async def prepare_assets(self, icons: IconManager) -> None:
+    async def prepare_assets(self) -> None:
         """Prepare external assets needed for rendering this card."""
 
     async def dispatch_encoder_turn(self, direction: int) -> None:

@@ -8,7 +8,6 @@ Example::
     async def main():
         async with Deck() as deck:
             main = deck.screen("main")
-            main.key(0).set_icon("mdi:home")
 
             @main.key(0).on_press
             async def on_home():
@@ -30,7 +29,6 @@ from .dsui import (
     load_all_packages,
     load_package,
 )
-from .render import IconError, IconManager
 from .runtime import (
     Deck,
     DeckError,
@@ -64,8 +62,6 @@ __all__ = [
     "EncoderSlot",
     "EncoderTurnEvent",
     "EventType",
-    "IconError",
-    "IconManager",
     "KeyEvent",
     "KeySlot",
     "PackageError",

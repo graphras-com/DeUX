@@ -23,8 +23,6 @@ class TestPublicAPI:
             "EncoderSlot",
             "EncoderTurnEvent",
             "EventType",
-            "IconError",
-            "IconManager",
             "KeyEvent",
             "KeySlot",
             "PackageError",
@@ -72,12 +70,6 @@ class TestPublicAPI:
         assert EncoderPressEvent is not None
         assert TouchEvent is not None
         assert EventType is not None
-
-    def test_icon_importable(self):
-        from deckboard import IconError, IconManager
-
-        assert IconManager is not None
-        assert IconError is not None
 
     def test_screen_importable(self):
         from deckboard import Screen
