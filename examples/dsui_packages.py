@@ -62,10 +62,6 @@ async def main():
         power.set("indicator_color", "#ff4444")
         screen.set_key(7, power)
 
-        # Regular keys alongside .dsui keys
-        screen.key(0).set_icon("mdi:home").set_label("Home")
-        screen.key(1).set_icon("mdi:music").set_label("Music")
-
         # -- Register event handlers ---------------------------------------
 
         playing = True

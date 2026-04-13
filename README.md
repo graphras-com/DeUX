@@ -4,21 +4,19 @@ An asyncio-native Python 3.11+ library for building rich interfaces on the
 Elgato Stream Deck+.
 
 Deckboard wraps the low-level HID layer and gives you a high-level API for
-keys, rotary encoders, and the touchscreen strip. Define multi-page layouts,
-bind Iconify icons by name, register event handlers with decorators, and let
-the library handle rendering and device I/O.
+keys, rotary encoders, and the touchscreen strip. Define multi-screen layouts,
+register event handlers with decorators, and use declarative `.dsui` packages
+for SVG-based UI — the library handles rendering and device I/O.
 
 ## Quick start
 
 ```python
 import asyncio
-from deckboard import Deck
+from deckboard import Deck, DsuiKey, load_package
 
 async def main():
     async with Deck() as deck:
         screen = deck.screen("main")
-        screen.key(0).set_icon("mdi:home").set_label("Home")
-        screen.key(1).set_icon("mdi:cog").set_label("Settings")
 
         @screen.key(0).on_press
         async def on_home():
@@ -76,7 +74,6 @@ The constructor accepts optional parameters:
 | `device_type`    | `"Stream Deck +"`  | Stream Deck model to search for    |
 | `device_index`   | `0`                | Which device if multiple are found |
 | `brightness`     | `80`               | Initial brightness (0-100)         |
-| `icon_cache_dir` | `None`             | Override default icon cache path   |
 
 ### Screens
 
@@ -87,25 +84,14 @@ slots, and 4 touchscreen card zones. Switch between screens atomically:
 main = deck.screen("main")
 settings = deck.screen("settings")
 
-# configure each screen independently
-main.key(0).set_icon("mdi:home").set_label("Home")
-settings.key(0).set_icon("mdi:arrow-left").set_label("Back")
-
 await deck.set_screen("main")       # render and activate
 await deck.set_screen("settings")   # swap instantly
 ```
 
 ### Keys
 
-`KeySlot` wraps a single physical key (indices 0-7). Configuration methods
-return `self` for chaining:
-
-```python
-key = screen.key(0)
-key.set_icon("mdi:play", color="#00ff00").set_label("Play")
-```
-
-Register press and release handlers with decorators:
+`KeySlot` wraps a single physical key (indices 0-7). Register press and
+release handlers with decorators:
 
 ```python
 @screen.key(0).on_press
@@ -116,6 +102,8 @@ async def handle_press():
 async def handle_release():
     print("released")
 ```
+
+For keys with custom visual content, use `.dsui` key packages (see below).
 
 ### Encoders
 
@@ -183,11 +171,11 @@ async def on_enc_turn(direction: int):
 
 ### Dirty tracking and rendering
 
-Key slots and cards track whether they need re-rendering. After updating
-values programmatically, call `refresh()` to push changes to the device:
+Cards track whether they need re-rendering. After updating values
+programmatically, call `refresh()` to push changes to the device:
 
 ```python
-screen.key(0).set_label("Updated")
+card.set("title", "Updated")
 await deck.refresh()
 ```
 
@@ -318,7 +306,7 @@ Arguments: `--key0` through `--key7`, `--card0` through `--card3`,
 ```
 src/deckboard/
   runtime/          # Device lifecycle, events, async transport
-  render/           # Image rendering, fonts, icon fetching
+  render/           # Image rendering, SVG rasterisation
   ui/               # Screens, key slots, encoder slots, cards
   dsui/             # Declarative .dsui package system
   tools/            # CLI utilities (preview)

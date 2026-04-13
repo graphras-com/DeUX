@@ -21,9 +21,6 @@ class KeySlot:
 
     def __init__(self, index: int) -> None:
         self._index = index
-        self._icon_name: str | None = None
-        self._icon_color: str = "white"
-        self._label: str | None = None
         self._press_handler: AsyncHandler | None = None
         self._release_handler: AsyncHandler | None = None
         self._image_bytes: bytes | None = None
@@ -32,56 +29,6 @@ class KeySlot:
     @property
     def index(self) -> int:
         return self._index
-
-    @property
-    def icon_name(self) -> str | None:
-        return self._icon_name
-
-    @property
-    def label(self) -> str | None:
-        return self._label
-
-    @property
-    def icon_color(self) -> str:
-        return self._icon_color
-
-    # -- Configuration methods (return self for chaining) ------------------
-
-    def set_icon(self, name: str, color: str = "white") -> KeySlot:
-        """Set the icon by Iconify name (e.g. ``mdi:home``).
-
-        Args:
-            name: Icon name in ``prefix:name`` format.
-            color: Icon color (CSS color string). Defaults to white.
-
-        Returns:
-            self, for method chaining.
-        """
-        self._icon_name = name
-        self._icon_color = color
-        self._dirty = True
-        return self
-
-    def set_label(self, label: str | None) -> KeySlot:
-        """Set a text label displayed below the icon.
-
-        Args:
-            label: Text label, or None to remove.
-
-        Returns:
-            self, for method chaining.
-        """
-        self._label = label
-        self._dirty = True
-        return self
-
-    def clear(self) -> KeySlot:
-        """Clear the icon and label, resetting to a blank key."""
-        self._icon_name = None
-        self._label = None
-        self._image_bytes = None
-        self._dirty = True
-        return self
 
     # -- Decorator-based event registration --------------------------------
 
