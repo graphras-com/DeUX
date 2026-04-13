@@ -239,8 +239,7 @@ class TestDsuiCardPrepareAssets:
     async def test_prepare_assets_is_noop(self):
         spec = _make_card_spec()
         card = DsuiCard(0, spec)
-        mock_icons = MagicMock()
-        await card.prepare_assets(mock_icons)
+        await card.prepare_assets()
         # Should not raise or call anything
 
 

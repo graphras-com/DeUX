@@ -28,7 +28,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from deckboard.render.icons import IconError
+from deckboard.render.svg_rasterize import RasterizeError
 from deckboard.render.key_renderer import _encode_jpeg
 from deckboard.render.metrics import (
     KEY_MARGIN_LEFT,
@@ -124,7 +124,7 @@ def _svg_to_png_fit(svg_data: bytes, max_width: int, max_height: int) -> bytes:
     except (FileNotFoundError, subprocess.SubprocessError) as exc:
         logger.debug("rsvg-convert unavailable (%s)", exc)
 
-    raise IconError(
+    raise RasterizeError(
         "No SVG renderer available. Install one of:\n"
         "  - System library: brew install cairo  (macOS) or apt install libcairo2 (Linux)\n"
         "  - CLI tool: apt install librsvg2-bin\n"

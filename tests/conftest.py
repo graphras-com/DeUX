@@ -11,7 +11,6 @@ from PIL import Image
 
 from deckboard.ui.controls.key_slot import KeySlot
 from deckboard.ui.controls.encoder_slot import EncoderSlot
-from deckboard.render.icons import IconManager
 from deckboard.ui.screen import Screen
 from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
 from deckboard.ui.touch_strip import TouchStrip
@@ -219,12 +218,6 @@ def touchscreen():
 def page():
     """A fresh Screen named 'test'."""
     return Screen("test")
-
-
-@pytest.fixture
-def icon_manager(tmp_path):
-    """An IconManager with a temporary cache directory."""
-    return IconManager(cache_dir=tmp_path / "icons")
 
 
 @pytest.fixture

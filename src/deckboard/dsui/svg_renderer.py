@@ -417,7 +417,7 @@ class SvgRenderer:
 
     def _rasterise(self, svg_data: bytes) -> Image.Image:
         """Rasterise SVG bytes to a PIL Image via CairoSVG."""
-        from ..render.icons import _svg_to_png
+        from ..render.svg_rasterize import _svg_to_png
 
         # Read target dimensions from the SVG root
         width = int(float(self._base_root.get("width", "197")))

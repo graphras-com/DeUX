@@ -350,11 +350,8 @@ class TestWidgetRefreshCallback:
         await w.request_refresh()  # no-op, should not raise
 
     async def test_prepare_assets_noop(self):
-        from unittest.mock import MagicMock
-
         w = _ConcreteWidget(0)
-        icons = MagicMock()
-        await w.prepare_assets(icons)  # should not raise
+        await w.prepare_assets()  # should not raise
 
 
 # ── BlankCard ──────────────────────────────────────────────────────────

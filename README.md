@@ -181,18 +181,6 @@ async def on_enc_turn(direction: int):
     print(f"encoder above card turned {direction}")
 ```
 
-### Icons
-
-Deckboard fetches icons from the [Iconify](https://iconify.design/) API by
-name (e.g. `mdi:home`, `mdi:music`, `lucide:settings`). Icons are converted
-from SVG to PNG and cached on disk at `~/.cache/deckboard/icons/`.
-
-Use `IconManager` directly when you need icons outside of key slots:
-
-```python
-icon = await deck.icons.get("mdi:volume-high", size=80, color="white")
-```
-
 ### Dirty tracking and rendering
 
 Key slots and cards track whether they need re-rendering. After updating
@@ -367,7 +355,7 @@ mypy src/deckboard/
 | `Card`         | `deckboard.ui.cards`        | Abstract base for touchscreen cards        |
 | `BlankCard`    | `deckboard.ui.cards`        | Default empty card                         |
 | `TouchStrip`   | `deckboard.ui.touch_strip`  | Container for 4 card zones                 |
-| `IconManager`  | `deckboard.render.icons`    | Icon fetching and caching                  |
+
 
 ### DSUI classes
 
@@ -392,9 +380,9 @@ mypy src/deckboard/
 
 | Exception      | Raised when                                |
 |----------------|--------------------------------------------|
-| `DeckError`    | Device not found, not opened, or HID error |
-| `IconError`    | Icon fetch or SVG conversion failure       |
-| `PackageError` | Invalid .dsui manifest or layout           |
+| `DeckError`       | Device not found, not opened, or HID error |
+| `RasterizeError`  | SVG rasterisation failure                  |
+| `PackageError`    | Invalid .dsui manifest or layout           |
 
 ## License
 

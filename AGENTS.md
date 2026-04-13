@@ -45,13 +45,11 @@ src/deckboard/              # Library source
     events.py               # Event dataclasses (KeyEvent, EncoderTurnEvent, etc.), EventType enum, type aliases
     transport.py            # Async bridge for HID callbacks (sync thread → asyncio queue)
 
-  render/                   # Image rendering, fonts, icons
-    __init__.py             # Re-exports: IconManager, IconError, render helpers, metrics constants
-    debug_grid.py           # Debug grid overlay for development
-    fonts.py                # Font loading and management
-    icons.py                # IconManager — Iconify API fetching, SVG→PNG, disk/memory cache
+  render/                   # Image rendering and rasterisation
+    __init__.py             # Re-exports: render helpers, metrics constants, RasterizeError
     key_renderer.py         # Key image rendering helpers, JPEG encoding
     metrics.py              # Render metrics and constants (KEY_SIZE, PANEL_WIDTH, etc.)
+    svg_rasterize.py        # SVG-to-PNG rasterisation (CairoSVG / rsvg-convert)
     touch_renderer.py       # Touchscreen rendering helpers
 
   ui/                       # UI primitives and concrete components
@@ -179,7 +177,7 @@ if TYPE_CHECKING:
 ### Error handling
 
 - Define module-specific exception classes inheriting from `Exception`:
-  `DeckError`, `IconError`.
+  `DeckError`, `RasterizeError`.
 - Use `raise ... from e` to chain exceptions.
 - Guard state access: raise early with descriptive messages
   (e.g., `raise DeckError("Device not opened")`).

@@ -1,10 +1,7 @@
-"""Rendering helpers for deckboard keys, cards, and icons."""
+"""Rendering helpers for deckboard keys, cards, and touchscreen."""
 
 from __future__ import annotations
 
-from .debug_grid import draw_key_grid, draw_touchscreen_grid
-from .fonts import get_font, get_large_font, get_small_font
-from .icons import IconError, IconManager
 from .key_renderer import render_blank_key, render_key_image
 from .metrics import (
     ICON_PADDING,
@@ -29,6 +26,7 @@ from .metrics import (
     USABLE_HEIGHT,
     USABLE_WIDTH,
 )
+from .svg_rasterize import RasterizeError
 from .touch_renderer import (
     compose_touchstrip,
     render_blank_touchscreen,
@@ -37,8 +35,6 @@ from .touch_renderer import (
 __all__ = [
     "ICON_PADDING",
     "ICON_SIZE",
-    "IconError",
-    "IconManager",
     "KEY_MARGIN_BOTTOM",
     "KEY_MARGIN_LEFT",
     "KEY_MARGIN_RIGHT",
@@ -54,16 +50,12 @@ __all__ = [
     "PANEL_GAP",
     "PANEL_HEIGHT",
     "PANEL_WIDTH",
+    "RasterizeError",
     "TOUCHSCREEN_HEIGHT",
     "TOUCHSCREEN_WIDTH",
     "USABLE_HEIGHT",
     "USABLE_WIDTH",
     "compose_touchstrip",
-    "draw_key_grid",
-    "draw_touchscreen_grid",
-    "get_font",
-    "get_large_font",
-    "get_small_font",
     "render_blank_key",
     "render_blank_touchscreen",
     "render_key_image",

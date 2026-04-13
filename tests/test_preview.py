@@ -29,7 +29,7 @@ from deckboard.render.metrics import (
     TOUCHSCREEN_HEIGHT,
     TOUCHSCREEN_WIDTH,
 )
-from deckboard.render.icons import IconError
+from deckboard.render.svg_rasterize import RasterizeError
 from deckboard.tools.preview import (
     _KEY_COUNT,
     _svg_to_png_fit,
@@ -664,7 +664,7 @@ class TestSvgToPngFit:
                 mock_run.assert_called_once()
 
     def test_no_renderer_raises(self):
-        """When both cairosvg and rsvg-convert fail, raise IconError."""
+        """When both cairosvg and rsvg-convert fail, raise RasterizeError."""
         svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>'
 
         with patch.dict("sys.modules", {"cairosvg": None}):
@@ -672,7 +672,7 @@ class TestSvgToPngFit:
                 "subprocess.run",
                 side_effect=FileNotFoundError("no rsvg"),
             ):
-                with pytest.raises(IconError, match="No SVG renderer"):
+                with pytest.raises(RasterizeError, match="No SVG renderer"):
                     _svg_to_png_fit(svg, 80, 80)
 
 
