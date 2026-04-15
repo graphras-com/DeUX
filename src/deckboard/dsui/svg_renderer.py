@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import base64
 import copy
+import functools
 import io
 import logging
+import math
 import xml.etree.ElementTree as ET
 from typing import Any
 
-from PIL import Image
+from PIL import Image, ImageFont
 
 from .schema import (
     Binding,
@@ -110,6 +112,169 @@ def _truncate_text(text: str, max_width: int, overflow: OverflowMode) -> str:
         return text
 
     return text[: max(1, max_chars - 1)] + "\u2026"  # ellipsis character
+
+
+# ---------------------------------------------------------------------------
+# Font resolution and text wrapping
+# ---------------------------------------------------------------------------
+
+_DEFAULT_FONT_FAMILY = "sans-serif"
+_DEFAULT_FONT_SIZE = 16.0
+_DEFAULT_LINE_HEIGHT_RATIO = 1.2
+
+
+def _resolve_font_attrs(root: ET.Element, elem: ET.Element) -> tuple[str, float]:
+    """Resolve font-family and font-size from an SVG element and its ancestors.
+
+    Walks from *elem* up through the SVG tree to find ``font-family``
+    and ``font-size`` attributes.  Falls back to sensible defaults if
+    neither the element nor any ancestor declares them.
+
+    Returns:
+        A ``(font_family, font_size)`` tuple.
+    """
+    family: str | None = None
+    size: float | None = None
+
+    # Build a parent map so we can walk upward
+    parent_map: dict[ET.Element, ET.Element] = {}
+    for parent in root.iter():
+        for child in parent:
+            parent_map[child] = parent
+
+    # Walk from elem upward
+    current: ET.Element | None = elem
+    while current is not None:
+        if family is None:
+            raw_family = current.get("font-family")
+            if raw_family:
+                family = raw_family.split(",")[0].strip().strip("'\"")
+        if size is None:
+            raw_size = current.get("font-size")
+            if raw_size:
+                try:
+                    size = float(raw_size.rstrip("px"))
+                except ValueError:
+                    pass
+        if family is not None and size is not None:
+            break
+        current = parent_map.get(current)
+
+    return (
+        family or _DEFAULT_FONT_FAMILY,
+        size or _DEFAULT_FONT_SIZE,
+    )
+
+
+@functools.lru_cache(maxsize=32)
+def _load_font(family: str, size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    """Load a TrueType font by family name and size, with fallbacks.
+
+    Tries several name variations.  If all fail, logs a warning and
+    returns Pillow's built-in default font.  Results are cached.
+
+    Args:
+        family: Font family name (e.g. ``"ArialMT"``).
+        size: Font size in pixels (integer for cache-key hashability).
+    """
+    # Build candidate names: original, stripped suffixes, lowercase
+    candidates: list[str] = [family]
+    for suffix in ("MT", "Bold", "Italic", "-Regular", "-Bold"):
+        if family.endswith(suffix):
+            candidates.append(family[: -len(suffix)])
+    candidates.append(family.lower())
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    unique: list[str] = []
+    for c in candidates:
+        if c not in seen:
+            seen.add(c)
+            unique.append(c)
+
+    for name in unique:
+        try:
+            return ImageFont.truetype(name, size)
+        except (OSError, IOError):
+            continue
+
+    logger.warning(
+        "Could not load font '%s' at size %d; using Pillow default font. "
+        "Text wrapping measurements may be inaccurate.",
+        family,
+        size,
+    )
+    return ImageFont.load_default()
+
+
+def _wrap_text(
+    text: str,
+    max_width: int,
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    overflow: OverflowMode,
+    max_height: int | None = None,
+    line_height: float = 18.0,
+) -> list[str]:
+    """Word-wrap *text* into lines that fit within *max_width* pixels.
+
+    Uses *font* for pixel-accurate text measurement via
+    :meth:`~PIL.ImageFont.ImageFont.getlength`.
+
+    If *max_height* is set, the number of visible lines is capped at
+    ``floor(max_height / line_height)``.  When there are more lines
+    than fit, the last visible line is truncated with an ellipsis
+    character (if *overflow* is :attr:`~OverflowMode.ELLIPSIS`).
+
+    Args:
+        text: The text string to wrap.
+        max_width: Maximum line width in pixels.
+        font: A Pillow font object for measurement.
+        overflow: How to handle text that doesn't fit.
+        max_height: Optional vertical pixel budget.
+        line_height: Vertical spacing between lines in pixels.
+
+    Returns:
+        A list of line strings, one per wrapped line.
+    """
+    if not text or not text.strip():
+        return []
+
+    words = text.split()
+    if not words:
+        return []
+
+    lines: list[str] = []
+    current_line = words[0]
+
+    for word in words[1:]:
+        test_line = current_line + " " + word
+        if font.getlength(test_line) <= max_width:
+            current_line = test_line
+        else:
+            lines.append(current_line)
+            current_line = word
+
+    lines.append(current_line)
+
+    # Apply max_height constraint
+    if max_height is not None and line_height > 0:
+        max_lines = max(1, math.floor(max_height / line_height))
+        if len(lines) > max_lines:
+            # Truncate to max_lines; handle last-line overflow
+            lines = lines[:max_lines]
+            if overflow == OverflowMode.ELLIPSIS:
+                last = lines[-1]
+                # Re-join remaining text that was cut off is implicit
+                # — we just need to mark the last line with ellipsis
+                ellipsis = "\u2026"
+                if font.getlength(last + ellipsis) > max_width:
+                    # Trim characters until it fits
+                    while len(last) > 1 and font.getlength(last + ellipsis) > max_width:
+                        last = last[:-1]
+                    lines[-1] = last.rstrip() + ellipsis
+                else:
+                    lines[-1] = last + ellipsis
+
+    return lines
 
 
 class SvgRenderer:
@@ -266,7 +431,7 @@ class SvgRenderer:
             return
 
         if isinstance(binding, TextBinding):
-            self._apply_text(elem, binding, value)
+            self._apply_text(root, elem, binding, value)
         elif isinstance(binding, ImageBinding):
             self._apply_image(root, elem, binding, value)
         elif isinstance(binding, VisibilityBinding):
@@ -278,12 +443,65 @@ class SvgRenderer:
         elif isinstance(binding, SliderBinding):
             self._apply_slider(elem, binding, value)
 
-    def _apply_text(self, elem: ET.Element, binding: TextBinding, value: Any) -> None:
-        """Set text content, applying truncation if configured."""
+    def _apply_text(
+        self,
+        root: ET.Element,
+        elem: ET.Element,
+        binding: TextBinding,
+        value: Any,
+    ) -> None:
+        """Set text content, applying wrapping or truncation if configured."""
         text = str(value) if value is not None else binding.default
+
+        if binding.wrap and binding.max_width is not None:
+            self._apply_wrapped_text(root, elem, binding, text)
+            return
+
         if binding.max_width is not None:
             text = _truncate_text(text, binding.max_width, binding.overflow)
         elem.text = text
+
+    def _apply_wrapped_text(
+        self,
+        root: ET.Element,
+        elem: ET.Element,
+        binding: TextBinding,
+        text: str,
+    ) -> None:
+        """Word-wrap text into ``<tspan>`` children of *elem*.
+
+        Each ``<tspan>`` carries the parent ``<text>`` element's ``x``
+        attribute so that ``text-anchor`` alignment is respected on
+        every line.
+        """
+        # Resolve font from the SVG tree
+        family, size_f = _resolve_font_attrs(root, elem)
+        font = _load_font(family, int(size_f))
+
+        line_height = binding.line_height or (size_f * _DEFAULT_LINE_HEIGHT_RATIO)
+
+        lines = _wrap_text(
+            text,
+            binding.max_width,  # type: ignore[arg-type]  # validated non-None
+            font,
+            binding.overflow,
+            max_height=binding.max_height,
+            line_height=line_height,
+        )
+
+        # Clear existing content and children
+        elem.text = None
+        for child in list(elem):
+            elem.remove(child)
+
+        # Inherit x from the parent <text> so text-anchor is respected
+        x_attr = elem.get("x", "0")
+
+        for i, line in enumerate(lines):
+            tspan = ET.SubElement(elem, f"{{{_SVG_NS}}}tspan")
+            tspan.set("x", x_attr)
+            tspan.set("dy", "0" if i == 0 else str(line_height))
+            tspan.text = line
 
     def _apply_image(
         self,

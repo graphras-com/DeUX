@@ -53,6 +53,53 @@ class TestLoadPackageValid:
         assert isinstance(b, TextBinding)
         assert b.max_width is None
 
+    def test_text_binding_wrap_default_false(self, card_dsui_path):
+        spec = load_package(card_dsui_path)
+        b = spec.bindings["title"]
+        assert isinstance(b, TextBinding)
+        assert b.wrap is False
+        assert b.max_height is None
+        assert b.line_height is None
+
+    def test_text_binding_wrap_true(self, tmp_path):
+        pkg = tmp_path / "Wrap.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Wrap\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  label:\n    type: text\n    node: t\n"
+            "    max_width: 90\n    wrap: true\n    max_height: 60\n"
+            "    line_height: 18.0",
+            encoding="utf-8",
+        )
+        spec = load_package(pkg)
+        b = spec.bindings["label"]
+        assert isinstance(b, TextBinding)
+        assert b.wrap is True
+        assert b.max_width == 90
+        assert b.max_height == 60
+        assert b.line_height == 18.0
+
+    def test_text_binding_wrap_without_max_height(self, tmp_path):
+        """wrap=true without max_height is valid (unlimited vertical space)."""
+        pkg = tmp_path / "WrapNoH.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: WrapNoH\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  label:\n    type: text\n    node: t\n"
+            "    max_width: 90\n    wrap: true",
+            encoding="utf-8",
+        )
+        spec = load_package(pkg)
+        b = spec.bindings["label"]
+        assert isinstance(b, TextBinding)
+        assert b.wrap is True
+        assert b.max_height is None
+        assert b.line_height is None
+
     def test_image_binding_parsed(self, card_dsui_path):
         spec = load_package(card_dsui_path)
         b = spec.bindings["cover"]
@@ -939,6 +986,103 @@ class TestLoadPackageInvalid:
             encoding="utf-8",
         )
         with pytest.raises(PackageError, match="node_off 'missing'.*does not exist"):
+            load_package(pkg)
+
+    def test_text_binding_wrap_without_max_width(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  t:\n    type: text\n    node: t\n    wrap: true",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="max_width is required"):
+            load_package(pkg)
+
+    def test_text_binding_max_height_invalid(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  t:\n    type: text\n    node: t\n"
+            "    max_width: 90\n    wrap: true\n    max_height: -5",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="max_height must be a positive integer"):
+            load_package(pkg)
+
+    def test_text_binding_max_height_zero(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  t:\n    type: text\n    node: t\n"
+            "    max_width: 90\n    wrap: true\n    max_height: 0",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="max_height must be a positive integer"):
+            load_package(pkg)
+
+    def test_text_binding_max_height_not_int(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  t:\n    type: text\n    node: t\n"
+            "    max_width: 90\n    wrap: true\n    max_height: big",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="max_height must be a positive integer"):
+            load_package(pkg)
+
+    def test_text_binding_line_height_invalid(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  t:\n    type: text\n    node: t\n"
+            "    max_width: 90\n    wrap: true\n    line_height: -1.0",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="line_height must be a positive number"):
+            load_package(pkg)
+
+    def test_text_binding_line_height_zero(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  t:\n    type: text\n    node: t\n"
+            "    max_width: 90\n    wrap: true\n    line_height: 0",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="line_height must be a positive number"):
+            load_package(pkg)
+
+    def test_text_binding_line_height_not_number(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  t:\n    type: text\n    node: t\n"
+            "    max_width: 90\n    wrap: true\n    line_height: wide",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="line_height must be a positive number"):
             load_package(pkg)
 
     def test_version_string_invalid(self, tmp_path):
