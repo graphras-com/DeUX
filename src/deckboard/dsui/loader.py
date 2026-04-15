@@ -99,11 +99,43 @@ def _parse_binding(name: str, raw: dict[str, Any]) -> Binding:
                 f"Binding '{name}' has invalid overflow '{overflow_raw}'. "
                 f"Valid modes: {valid_modes}"
             ) from None
+
+        wrap = bool(raw.get("wrap", False))
+        max_width = raw.get("max_width")
+        if wrap and max_width is None:
+            raise PackageError(
+                f"Binding '{name}' has wrap=true but no max_width. "
+                "max_width is required when wrapping is enabled."
+            )
+
+        max_height_raw = raw.get("max_height")
+        max_height: int | None = None
+        if max_height_raw is not None:
+            if not isinstance(max_height_raw, int) or max_height_raw <= 0:
+                raise PackageError(
+                    f"Binding '{name}' max_height must be a positive integer, "
+                    f"got {max_height_raw!r}"
+                )
+            max_height = max_height_raw
+
+        line_height_raw = raw.get("line_height")
+        line_height: float | None = None
+        if line_height_raw is not None:
+            if not isinstance(line_height_raw, (int, float)) or line_height_raw <= 0:
+                raise PackageError(
+                    f"Binding '{name}' line_height must be a positive number, "
+                    f"got {line_height_raw!r}"
+                )
+            line_height = float(line_height_raw)
+
         return TextBinding(
             node=node,
             default=str(raw.get("default", "")),
-            max_width=raw.get("max_width"),
+            max_width=max_width,
             overflow=overflow,
+            wrap=wrap,
+            max_height=max_height,
+            line_height=line_height,
         )
 
     if binding_type == BindingType.IMAGE:

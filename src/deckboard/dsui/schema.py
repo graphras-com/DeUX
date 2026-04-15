@@ -49,12 +49,22 @@ class RangeDirection(Enum):
 
 @dataclass(frozen=True, slots=True)
 class TextBinding:
-    """Bind a value to a <text> SVG element's content."""
+    """Bind a value to a ``<text>`` SVG element's content.
+
+    When *wrap* is ``True`` the renderer word-wraps the text into
+    multiple ``<tspan>`` lines that each fit within *max_width* pixels.
+    Font metrics are auto-detected from the SVG ``<text>`` element.
+    If the wrapped text exceeds *max_height*, the last visible line is
+    truncated according to *overflow*.
+    """
 
     node: str
     default: str = ""
     max_width: int | None = None
     overflow: OverflowMode = OverflowMode.ELLIPSIS
+    wrap: bool = False
+    max_height: int | None = None
+    line_height: float | None = None
 
 
 @dataclass(frozen=True, slots=True)

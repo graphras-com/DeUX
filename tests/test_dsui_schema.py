@@ -70,6 +70,9 @@ class TestTextBinding:
         assert b.default == ""
         assert b.max_width is None
         assert b.overflow == OverflowMode.ELLIPSIS
+        assert b.wrap is False
+        assert b.max_height is None
+        assert b.line_height is None
 
     def test_custom(self):
         b = TextBinding(
@@ -83,6 +86,24 @@ class TestTextBinding:
         b = TextBinding(node="title")
         with pytest.raises(AttributeError):
             b.node = "other"  # type: ignore[misc]
+
+    def test_wrap_fields(self):
+        b = TextBinding(
+            node="label",
+            max_width=90,
+            wrap=True,
+            max_height=60,
+            line_height=18.0,
+        )
+        assert b.wrap is True
+        assert b.max_height == 60
+        assert b.line_height == 18.0
+
+    def test_wrap_defaults_false(self):
+        b = TextBinding(node="label", max_width=90)
+        assert b.wrap is False
+        assert b.max_height is None
+        assert b.line_height is None
 
 
 class TestImageBinding:

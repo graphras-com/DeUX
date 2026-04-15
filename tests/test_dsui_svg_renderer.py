@@ -25,7 +25,10 @@ from deckboard.dsui.svg_renderer import (
     SvgRenderer,
     _fit_image,
     _image_to_data_uri,
+    _load_font,
+    _resolve_font_attrs,
     _truncate_text,
+    _wrap_text,
 )
 
 
@@ -1071,3 +1074,477 @@ class TestSvgRendererToggleRender:
             renderer.render()
         assert "node_on 'ghost_on' not found" in caplog.text
         assert "node_off 'ghost_off' not found" in caplog.text
+
+
+# -- Text wrapping tests -------------------------------------------------------
+
+_WRAP_SVG = (
+    '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="106" height="106"'
+    ' font-family="Arial,sans-serif">'
+    '<rect id="bg" width="106" height="106" fill="#000000"/>'
+    '<text id="label" x="53" y="30" font-size="15" text-anchor="middle"'
+    ' fill="#ffffff">Placeholder</text>'
+    "</svg>"
+)
+
+_WRAP_SVG_FONT_ON_TEXT = (
+    '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="100" height="100">'
+    '<rect id="bg" width="100" height="100" fill="#000000"/>'
+    '<text id="label" x="50" y="20" font-size="12" font-family="Helvetica,sans-serif"'
+    ' fill="#ffffff">Text</text>'
+    "</svg>"
+)
+
+_WRAP_SVG_NO_FONT = (
+    '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="100" height="100">'
+    '<rect id="bg" width="100" height="100" fill="#000000"/>'
+    '<text id="label" x="50" y="20" fill="#ffffff">Text</text>'
+    "</svg>"
+)
+
+
+class TestResolveFontAttrs:
+    """Test _resolve_font_attrs — font detection from SVG elements."""
+
+    def test_font_from_text_element(self):
+        import xml.etree.ElementTree as ET
+
+        root = ET.fromstring(_WRAP_SVG_FONT_ON_TEXT)
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        elem = _find_element_by_id(root, "label")
+        family, size = _resolve_font_attrs(root, elem)
+        assert family == "Helvetica"
+        assert size == 12.0
+
+    def test_font_inherited_from_svg_root(self):
+        import xml.etree.ElementTree as ET
+
+        root = ET.fromstring(_WRAP_SVG)
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        elem = _find_element_by_id(root, "label")
+        family, size = _resolve_font_attrs(root, elem)
+        assert family == "Arial"
+        assert size == 15.0
+
+    def test_font_defaults_when_missing(self):
+        import xml.etree.ElementTree as ET
+
+        root = ET.fromstring(_WRAP_SVG_NO_FONT)
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        elem = _find_element_by_id(root, "label")
+        family, size = _resolve_font_attrs(root, elem)
+        # Should fall back to defaults
+        assert family == "sans-serif"
+        assert size == 16.0
+
+    def test_font_size_with_px_suffix(self):
+        import xml.etree.ElementTree as ET
+
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">'
+            '<text id="t" font-size="20px" font-family="Courier">hi</text>'
+            "</svg>"
+        )
+        root = ET.fromstring(svg)
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        elem = _find_element_by_id(root, "t")
+        family, size = _resolve_font_attrs(root, elem)
+        assert family == "Courier"
+        assert size == 20.0
+
+
+class TestLoadFont:
+    """Test _load_font — font loading with fallbacks."""
+
+    def test_loads_known_font(self):
+        from PIL import ImageFont
+
+        font = _load_font("Arial", 15)
+        assert isinstance(font, (ImageFont.FreeTypeFont, ImageFont.ImageFont))
+
+    def test_strips_mt_suffix(self):
+        from PIL import ImageFont
+
+        font = _load_font("ArialMT", 15)
+        # Should succeed either via ArialMT or by stripping to Arial
+        assert isinstance(font, (ImageFont.FreeTypeFont, ImageFont.ImageFont))
+
+    def test_unknown_font_returns_default_and_warns(self, caplog):
+        import logging
+
+        _load_font.cache_clear()
+        with caplog.at_level(logging.WARNING):
+            font = _load_font("TotallyFakeFont12345", 15)
+        assert "Could not load font" in caplog.text
+        # Should still return a usable font
+        assert hasattr(font, "getlength")
+        _load_font.cache_clear()
+
+    def test_cached_result(self):
+        _load_font.cache_clear()
+        font1 = _load_font("Arial", 12)
+        font2 = _load_font("Arial", 12)
+        assert font1 is font2
+        _load_font.cache_clear()
+
+
+class TestWrapText:
+    """Test _wrap_text — word-wrapping algorithm."""
+
+    def test_single_line_fits(self):
+        font = _load_font("Arial", 15)
+        lines = _wrap_text("Hello", 200, font, OverflowMode.ELLIPSIS)
+        assert lines == ["Hello"]
+
+    def test_multi_line_wrap(self):
+        font = _load_font("Arial", 15)
+        lines = _wrap_text("Arthur Olsen's Favorites", 80, font, OverflowMode.ELLIPSIS)
+        assert len(lines) >= 2
+        # All words should be present across lines
+        joined = " ".join(lines)
+        assert "Arthur" in joined
+        assert "Favorites" in joined
+
+    def test_empty_string(self):
+        font = _load_font("Arial", 15)
+        lines = _wrap_text("", 100, font, OverflowMode.ELLIPSIS)
+        assert lines == []
+
+    def test_whitespace_only(self):
+        font = _load_font("Arial", 15)
+        lines = _wrap_text("   ", 100, font, OverflowMode.ELLIPSIS)
+        assert lines == []
+
+    def test_single_word_per_line(self):
+        font = _load_font("Arial", 15)
+        # Very narrow width — each word gets its own line
+        lines = _wrap_text("One Two Three", 30, font, OverflowMode.ELLIPSIS)
+        assert len(lines) >= 3
+
+    def test_max_height_truncates(self):
+        font = _load_font("Arial", 15)
+        lines = _wrap_text(
+            "One Two Three Four Five Six Seven",
+            60,
+            font,
+            OverflowMode.ELLIPSIS,
+            max_height=36,
+            line_height=18.0,
+        )
+        # max_height=36, line_height=18 → max 2 lines
+        assert len(lines) <= 2
+        # Last line should end with ellipsis
+        assert lines[-1].endswith("\u2026")
+
+    def test_max_height_no_truncation_needed(self):
+        font = _load_font("Arial", 15)
+        lines = _wrap_text(
+            "Short",
+            200,
+            font,
+            OverflowMode.ELLIPSIS,
+            max_height=100,
+            line_height=18.0,
+        )
+        assert lines == ["Short"]
+        assert not lines[0].endswith("\u2026")
+
+    def test_max_height_clip_mode(self):
+        font = _load_font("Arial", 15)
+        lines = _wrap_text(
+            "One Two Three Four Five Six Seven",
+            60,
+            font,
+            OverflowMode.CLIP,
+            max_height=36,
+            line_height=18.0,
+        )
+        # CLIP mode should still truncate lines but NOT add ellipsis
+        assert len(lines) <= 2
+        assert not lines[-1].endswith("\u2026")
+
+    def test_long_single_word(self):
+        font = _load_font("Arial", 15)
+        lines = _wrap_text("Supercalifragilistic", 50, font, OverflowMode.ELLIPSIS)
+        # Single word that doesn't fit — goes on one line
+        assert len(lines) == 1
+        assert lines[0] == "Supercalifragilistic"
+
+    def test_custom_line_height(self):
+        font = _load_font("Arial", 15)
+        # line_height=10 with max_height=25 → 2 lines
+        lines = _wrap_text(
+            "A B C D E F G H",
+            40,
+            font,
+            OverflowMode.ELLIPSIS,
+            max_height=25,
+            line_height=10.0,
+        )
+        assert len(lines) <= 2
+
+
+class TestSvgRendererWrappedText:
+    """Test SvgRenderer with wrap=True text bindings."""
+
+    def test_wrap_produces_tspan_elements(self):
+        """Wrapped text creates <tspan> children in the <text> element."""
+        import copy
+        import xml.etree.ElementTree as ET
+
+        spec = _make_spec(
+            _WRAP_SVG,
+            bindings={
+                "label": TextBinding(node="label", default="", max_width=80, wrap=True),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        renderer.set("label", "Arthur Olsen's Favorites")
+
+        root = copy.deepcopy(renderer._base_root)
+        binding = spec.bindings["label"]
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        elem = _find_element_by_id(root, "label")
+        renderer._apply_text(root, elem, binding, "Arthur Olsen's Favorites")
+
+        tspans = list(elem)
+        assert len(tspans) >= 2
+        # Each tspan should inherit the x attribute from the parent
+        for tspan in tspans:
+            assert tspan.get("x") == "53"
+        # First tspan has dy="0", subsequent have the line height
+        assert tspans[0].get("dy") == "0"
+        for tspan in tspans[1:]:
+            assert float(tspan.get("dy")) > 0
+
+    def test_wrap_respects_text_anchor(self):
+        """All tspans get the parent's x attribute for text-anchor centering."""
+        import copy
+
+        spec = _make_spec(
+            _WRAP_SVG,
+            bindings={
+                "label": TextBinding(node="label", default="", max_width=60, wrap=True),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        root = copy.deepcopy(renderer._base_root)
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        elem = _find_element_by_id(root, "label")
+        binding = spec.bindings["label"]
+        renderer._apply_text(root, elem, binding, "Hello World Foo Bar")
+
+        for tspan in elem:
+            assert tspan.get("x") == "53"
+
+    def test_wrap_single_line_short_text(self):
+        """Short text that fits in one line produces one tspan."""
+        import copy
+
+        spec = _make_spec(
+            _WRAP_SVG,
+            bindings={
+                "label": TextBinding(
+                    node="label", default="", max_width=200, wrap=True
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        root = copy.deepcopy(renderer._base_root)
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        elem = _find_element_by_id(root, "label")
+        binding = spec.bindings["label"]
+        renderer._apply_text(root, elem, binding, "Hi")
+
+        tspans = list(elem)
+        assert len(tspans) == 1
+        assert tspans[0].text == "Hi"
+
+    def test_wrap_empty_string(self):
+        """Empty text produces no tspan elements."""
+        import copy
+
+        spec = _make_spec(
+            _WRAP_SVG,
+            bindings={
+                "label": TextBinding(node="label", default="", max_width=80, wrap=True),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        root = copy.deepcopy(renderer._base_root)
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        elem = _find_element_by_id(root, "label")
+        binding = spec.bindings["label"]
+        renderer._apply_text(root, elem, binding, "")
+
+        tspans = list(elem)
+        assert len(tspans) == 0
+        assert elem.text is None
+
+    def test_wrap_max_height_truncates_with_ellipsis(self):
+        """Excess lines are dropped and the last visible line gets an ellipsis."""
+        import copy
+
+        spec = _make_spec(
+            _WRAP_SVG,
+            bindings={
+                "label": TextBinding(
+                    node="label",
+                    default="",
+                    max_width=60,
+                    wrap=True,
+                    max_height=36,
+                    overflow=OverflowMode.ELLIPSIS,
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        root = copy.deepcopy(renderer._base_root)
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        elem = _find_element_by_id(root, "label")
+        binding = spec.bindings["label"]
+        renderer._apply_text(
+            root, elem, binding, "One Two Three Four Five Six Seven Eight"
+        )
+
+        tspans = list(elem)
+        # font-size=15, line_height=15*1.2=18, max_height=36 → max 2 lines
+        assert len(tspans) <= 2
+        # Last line should contain ellipsis
+        assert tspans[-1].text.endswith("\u2026")
+
+    def test_wrap_custom_line_height(self):
+        """Custom line_height is used for dy spacing."""
+        import copy
+
+        spec = _make_spec(
+            _WRAP_SVG,
+            bindings={
+                "label": TextBinding(
+                    node="label",
+                    default="",
+                    max_width=60,
+                    wrap=True,
+                    line_height=20.0,
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        root = copy.deepcopy(renderer._base_root)
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        elem = _find_element_by_id(root, "label")
+        binding = spec.bindings["label"]
+        renderer._apply_text(root, elem, binding, "Hello World Foo Bar")
+
+        tspans = list(elem)
+        assert len(tspans) >= 2
+        # Second tspan should have dy=20.0
+        assert tspans[1].get("dy") == "20.0"
+
+    def test_wrap_clears_previous_tspans(self):
+        """Re-applying wrapped text clears previously generated tspans."""
+        import copy
+
+        spec = _make_spec(
+            _WRAP_SVG,
+            bindings={
+                "label": TextBinding(node="label", default="", max_width=60, wrap=True),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        root = copy.deepcopy(renderer._base_root)
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        elem = _find_element_by_id(root, "label")
+        binding = spec.bindings["label"]
+
+        renderer._apply_text(root, elem, binding, "One Two Three Four Five")
+        first_count = len(list(elem))
+
+        renderer._apply_text(root, elem, binding, "Short")
+        second_count = len(list(elem))
+
+        assert second_count == 1  # "Short" fits one line
+        assert first_count > second_count
+
+    def test_wrap_disabled_uses_truncation(self):
+        """wrap=False still uses the old truncation behavior."""
+        import copy
+
+        spec = _make_spec(
+            _WRAP_SVG,
+            bindings={
+                "label": TextBinding(
+                    node="label",
+                    default="",
+                    max_width=35,
+                    wrap=False,
+                    overflow=OverflowMode.ELLIPSIS,
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        root = copy.deepcopy(renderer._base_root)
+        from deckboard.dsui.svg_renderer import _find_element_by_id
+
+        elem = _find_element_by_id(root, "label")
+        binding = spec.bindings["label"]
+        renderer._apply_text(
+            root, elem, binding, "A very long piece of text that should be truncated"
+        )
+
+        # No tspan children — text is set directly
+        assert len(list(elem)) == 0
+        assert elem.text is not None
+        assert elem.text.endswith("\u2026")
+
+    def test_wrap_renders_to_image(self):
+        """Full render with wrapping produces a valid PIL Image."""
+        spec = _make_spec(
+            _WRAP_SVG,
+            bindings={
+                "label": TextBinding(
+                    node="label",
+                    default="",
+                    max_width=80,
+                    wrap=True,
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        renderer.set("label", "Arthur Olsen's Favorites")
+        img = renderer.render()
+        assert isinstance(img, Image.Image)
+        assert img.mode == "RGB"
+        assert img.size == (106, 106)
+
+    def test_wrap_different_text_different_pixels(self):
+        """Different wrapped text produces different rendered images."""
+        spec = _make_spec(
+            _WRAP_SVG,
+            bindings={
+                "label": TextBinding(
+                    node="label",
+                    default="Hello",
+                    max_width=80,
+                    wrap=True,
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        img_before = renderer.render()
+
+        renderer.set("label", "Arthur Olsen's Favorites")
+        img_after = renderer.render()
+
+        assert img_before.tobytes() != img_after.tobytes()
