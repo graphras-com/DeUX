@@ -583,7 +583,7 @@ class SvgRenderer:
                 elem_on.set("display", "none")
 
     def _apply_color(self, elem: ET.Element, binding: ColorBinding, value: Any) -> None:
-        """Set an element's fill or stroke colour."""
+        """Set an element's fill, stroke, or color attribute."""
         color_val = str(value) if value is not None else binding.default
         elem.set(binding.attribute, color_val)
 

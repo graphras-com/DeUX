@@ -174,6 +174,14 @@ class TestColorBinding:
         b = ColorBinding(node="border", attribute="stroke", default="#000000")
         assert b.attribute == "stroke"
 
+    def test_color(self):
+        b = ColorBinding(node="group", attribute="color", default="#00ff00")
+        assert b.attribute == "color"
+
+    def test_invalid_attribute_raises(self):
+        with pytest.raises(ValueError, match="Invalid color attribute"):
+            ColorBinding(node="bg", attribute="opacity")
+
 
 class TestRangeDirection:
     def test_modes(self):

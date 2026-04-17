@@ -85,13 +85,24 @@ class VisibilityBinding:
     default: bool = True
 
 
+_COLOR_ATTRIBUTES: frozenset[str] = frozenset({"fill", "stroke", "color"})
+
+
 @dataclass(frozen=True, slots=True)
 class ColorBinding:
-    """Bind a colour value to an SVG element's fill or stroke."""
+    """Bind a colour value to an SVG element's fill, stroke, or color."""
 
     node: str
     attribute: str = "fill"
     default: str = "#ffffff"
+
+    def __post_init__(self) -> None:
+        if self.attribute not in _COLOR_ATTRIBUTES:
+            msg = (
+                f"Invalid color attribute {self.attribute!r}; "
+                f"must be one of {sorted(_COLOR_ATTRIBUTES)}"
+            )
+            raise ValueError(msg)
 
 
 @dataclass(frozen=True, slots=True)
