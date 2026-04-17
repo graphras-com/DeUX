@@ -22,6 +22,12 @@ ICONIFY_API_URL = "https://api.iconify.design"
 # Timeout for HTTP requests, in seconds.
 _REQUEST_TIMEOUT = 10.0
 
+# User-Agent sent with icon requests.  The Iconify CDN returns 403 to
+# the default ``Python-urllib/x.y`` UA, so we identify ourselves with
+# the library name.  Exposed as a module attribute so tests and users
+# can override it if needed.
+USER_AGENT = "deckboard/0.1.0 (+https://github.com/graphras-com/deckboard)"
+
 # In-process cache: maps "prefix:name" -> SVG source bytes.  ``None``
 # marks a name that has been looked up and failed to load, so we do not
 # spam the Iconify API for a broken icon reference.
@@ -54,8 +60,14 @@ def _parse_name(name: str) -> tuple[str, str]:
 
 
 def _http_get(url: str) -> str:
-    """Fetch *url* and return its body decoded as UTF-8 text."""
-    with urllib.request.urlopen(url, timeout=_REQUEST_TIMEOUT) as resp:
+    """Fetch *url* and return its body decoded as UTF-8 text.
+
+    Sends :data:`USER_AGENT` as the ``User-Agent`` header because the
+    Iconify CDN rejects requests using the default ``Python-urllib``
+    identifier with HTTP 403.
+    """
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(request, timeout=_REQUEST_TIMEOUT) as resp:
         charset = resp.headers.get_content_charset() or "utf-8"
         return resp.read().decode(charset)
 

@@ -9,6 +9,7 @@ import pytest
 
 from deckboard.dsui import iconify as iconify_mod
 from deckboard.dsui.iconify import (
+    USER_AGENT,
     IconifyError,
     _parse_name,
     clear_cache,
@@ -156,3 +157,42 @@ class TestFetchIcon:
                 fetch_icon("line-md:home")
             url_arg = mock.call_args.args[0]
             assert url_arg == "https://example.test/line-md/home.svg"
+
+
+class TestHttpGet:
+    """Verify transport-level behaviour of :func:`_http_get`."""
+
+    def test_sends_user_agent_header(self):
+        """The Iconify CDN 403s the default Python-urllib UA."""
+        captured: dict[str, object] = {}
+
+        class _FakeHeaders:
+            def get_content_charset(self) -> str | None:
+                return None
+
+        class _FakeResp:
+            headers = _FakeHeaders()
+
+            def read(self) -> bytes:
+                return _SAMPLE_SVG.encode("utf-8")
+
+            def __enter__(self) -> "_FakeResp":
+                return self
+
+            def __exit__(self, *exc: object) -> None:
+                return None
+
+        def fake_urlopen(req, timeout):  # noqa: ARG001
+            captured["request"] = req
+            return _FakeResp()
+
+        # urlopen normally gets a Request with a ``.headers`` mapping.
+        # Capture it and verify the UA was attached.
+        with patch.object(iconify_mod.urllib.request, "urlopen", fake_urlopen):
+            result = iconify_mod._http_get("https://example.test/x.svg")
+
+        assert result == _SAMPLE_SVG
+        req = captured["request"]
+        # urllib normalises header names to Capitalized form via
+        # ``Request.add_header``; ``get_header`` does a case-insensitive lookup.
+        assert req.get_header("User-agent") == USER_AGENT
