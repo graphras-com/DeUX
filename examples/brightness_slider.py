@@ -32,7 +32,7 @@ async def main():
     async with Deck(brightness=80) as deck:
         screen = deck.screen("main")
 
-        card = DsuiCard(0, spec)
+        card = DsuiCard(spec)
         brightness = 0.5
 
         card.set("brightness", brightness)

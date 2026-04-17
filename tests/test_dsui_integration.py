@@ -65,13 +65,13 @@ def _card_spec() -> PackageSpec:
 class TestScreenSetKey:
     def test_set_key_installs_dsui_key(self):
         screen = Screen("test")
-        key = DsuiKey(0, _key_spec())
+        key = DsuiKey(_key_spec())
         screen.set_key(0, key)
         assert screen.keys[0] is key
 
     def test_set_key_validates_index(self):
         screen = Screen("test")
-        key = DsuiKey(0, _key_spec())
+        key = DsuiKey(_key_spec())
         with pytest.raises(IndexError):
             screen.set_key(8, key)
         with pytest.raises(IndexError):
@@ -85,7 +85,7 @@ class TestScreenSetKey:
     def test_set_key_replaces_existing(self):
         screen = Screen("test")
         old = screen.key(0)
-        new = DsuiKey(0, _key_spec())
+        new = DsuiKey(_key_spec())
         screen.set_key(0, new)
         assert screen.keys[0] is new
         assert screen.keys[0] is not old
@@ -100,7 +100,7 @@ class TestScreenSetKey:
 class TestScreenSetCard:
     def test_set_card_with_dsui_card(self):
         screen = Screen("test")
-        card = DsuiCard(0, _card_spec())
+        card = DsuiCard(_card_spec())
         screen.set_card(0, card)
         assert screen.card(0) is card
 
@@ -111,7 +111,7 @@ class TestDeckDsuiKeyRendering:
     def test_is_dsui_key_true(self):
         from deckboard.runtime.deck import Deck
 
-        key = DsuiKey(0, _key_spec())
+        key = DsuiKey(_key_spec())
         assert Deck._is_dsui_key(key) is True
 
     def test_is_dsui_key_false_for_regular(self):
@@ -207,7 +207,7 @@ class TestEndToEnd:
 
     def test_load_and_render_card(self, card_dsui_path):
         spec = load_package(card_dsui_path)
-        card = DsuiCard(0, spec)
+        card = DsuiCard(spec)
         card.set("title", "Integration Test")
         img = card.render()
         assert isinstance(img, Image.Image)
@@ -215,7 +215,7 @@ class TestEndToEnd:
 
     def test_load_and_render_key(self, key_dsui_path):
         spec = load_package(key_dsui_path)
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         key.set("label", "Power")
         data = key.render_image()
         assert isinstance(data, bytes)
@@ -223,7 +223,7 @@ class TestEndToEnd:
 
     async def test_card_event_roundtrip(self, card_dsui_path):
         spec = load_package(card_dsui_path)
-        card = DsuiCard(0, spec)
+        card = DsuiCard(spec)
         handler = AsyncMock()
         card.bind_event("toggle_play", handler)
 
@@ -240,7 +240,7 @@ class TestEndToEnd:
 
     async def test_key_event_roundtrip(self, key_dsui_path):
         spec = load_package(key_dsui_path)
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         handler = AsyncMock()
         key.bind_event("activate", handler)
 
@@ -253,10 +253,10 @@ class TestEndToEnd:
         assert len(packages) == 2
 
         screen = Screen("test")
-        card = DsuiCard(0, packages["TestCard"])
+        card = DsuiCard(packages["TestCard"])
         screen.set_card(0, card)
 
-        key = DsuiKey(0, packages["TestKey"])
+        key = DsuiKey(packages["TestKey"])
         screen.set_key(0, key)
 
         assert screen.card(0) is card

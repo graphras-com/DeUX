@@ -16,6 +16,7 @@ from deckboard.dsui.schema import (
     ToggleBinding,
 )
 from deckboard.ui.controls.key_slot import KeySlot
+from deckboard.ui.screen import Screen
 
 
 # -- Helpers ---------------------------------------------------------------
@@ -45,29 +46,31 @@ def _make_key_spec(
 class TestDsuiKeyIsKeySlot:
     def test_is_key_slot_subclass(self):
         spec = _make_key_spec()
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         assert isinstance(key, KeySlot)
 
-    def test_has_index(self):
+    def test_has_index_after_set_key(self):
         spec = _make_key_spec()
-        key = DsuiKey(3, spec)
+        key = DsuiKey(spec)
+        screen = Screen("test")
+        screen.set_key(3, key)
         assert key.index == 3
 
     def test_has_spec(self):
         spec = _make_key_spec()
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         assert key.spec is spec
 
     def test_has_dsui_content(self):
         spec = _make_key_spec()
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         assert key.has_dsui_content is True
 
 
 class TestDsuiKeyDataBinding:
     def test_set_marks_dirty(self):
         spec = _make_key_spec(bindings={"label": TextBinding(node="label", default="")})
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         key.mark_clean()
         key.set("label", "Hello")
         assert key.is_dirty is True
@@ -76,19 +79,19 @@ class TestDsuiKeyDataBinding:
         spec = _make_key_spec(
             bindings={"label": TextBinding(node="label", default="Same")}
         )
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         key.mark_clean()
         key.set("label", "Same")
         assert key.is_dirty is False
 
     def test_set_returns_self(self):
         spec = _make_key_spec(bindings={"label": TextBinding(node="label", default="")})
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         assert key.set("label", "Test") is key
 
     def test_set_many(self):
         spec = _make_key_spec(bindings={"label": TextBinding(node="label", default="")})
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         key.mark_clean()
         result = key.set_many(label="New")
         assert result is key
@@ -98,7 +101,7 @@ class TestDsuiKeyDataBinding:
         spec = _make_key_spec(
             bindings={"label": TextBinding(node="label", default="Same")}
         )
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         key.mark_clean()
         key.set_many(label="Same")
         assert key.is_dirty is False
@@ -107,18 +110,18 @@ class TestDsuiKeyDataBinding:
         spec = _make_key_spec(
             bindings={"label": TextBinding(node="label", default="Init")}
         )
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         assert key.get("label") == "Init"
 
     def test_set_unknown_raises(self):
         spec = _make_key_spec()
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         with pytest.raises(KeyError):
             key.set("nope", "val")
 
     def test_get_unknown_raises(self):
         spec = _make_key_spec()
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         with pytest.raises(KeyError):
             key.get("nope")
 
@@ -128,7 +131,7 @@ class TestDsuiKeyRender:
         spec = _make_key_spec(
             bindings={"label": TextBinding(node="label", default="Test")}
         )
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         data = key.render_image()
         assert isinstance(data, bytes)
         assert len(data) > 0
@@ -137,7 +140,7 @@ class TestDsuiKeyRender:
 
     def test_render_image_is_120x120(self):
         spec = _make_key_spec()
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         data = key.render_image()
         import io
 
@@ -159,7 +162,7 @@ class TestDsuiKeyRender:
             svg_source=svg,
             bindings={"label": TextBinding(node="label", default="Hi")},
         )
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         data = key.render_image()
         import io
 
@@ -191,28 +194,28 @@ class TestDsuiKeyToggleBinding:
 
     def test_set_toggle_marks_dirty(self):
         spec = self._make_toggle_spec()
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         key.mark_clean()
         key.set("state", True)
         assert key.is_dirty is True
 
     def test_set_toggle_same_value_not_dirty(self):
         spec = self._make_toggle_spec()
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         key.mark_clean()
         key.set("state", False)  # same as default
         assert key.is_dirty is False
 
     def test_get_toggle_value(self):
         spec = self._make_toggle_spec()
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         assert key.get("state") is False
         key.set("state", True)
         assert key.get("state") is True
 
     def test_toggle_renders_different_images(self):
         spec = self._make_toggle_spec()
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         data_off = key.render_image()
 
         key.set("state", True)
@@ -226,7 +229,7 @@ class TestDsuiKeyEvents:
         spec = _make_key_spec(
             events=(EventMapping(name="activate", source="key_press"),),
         )
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
 
         @key.on_event("activate")
         async def handler():
@@ -238,7 +241,7 @@ class TestDsuiKeyEvents:
         spec = _make_key_spec(
             events=(EventMapping(name="activate", source="key_press"),),
         )
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         handler = AsyncMock()
         key.bind_event("activate", handler)
 
@@ -246,7 +249,7 @@ class TestDsuiKeyEvents:
         spec = _make_key_spec(
             events=(EventMapping(name="activate", source="key_press"),),
         )
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         handler = AsyncMock()
         key.bind_event("activate", handler)
 
@@ -257,7 +260,7 @@ class TestDsuiKeyEvents:
         spec = _make_key_spec(
             events=(EventMapping(name="up", source="key_release"),),
         )
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         handler = AsyncMock()
         key.bind_event("up", handler)
 
@@ -267,7 +270,7 @@ class TestDsuiKeyEvents:
 
     async def test_dispatch_falls_back_to_base(self):
         spec = _make_key_spec()  # no events
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         base_handler = AsyncMock()
         key.on_press(base_handler)
 
@@ -276,7 +279,7 @@ class TestDsuiKeyEvents:
 
     async def test_dispatch_release_falls_back(self):
         spec = _make_key_spec()
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         base_handler = AsyncMock()
         key.on_release(base_handler)
 
@@ -291,7 +294,7 @@ class TestDsuiKeyEvents:
                 ),
             ),
         )
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         handler = AsyncMock()
         key.bind_event("tap", handler)
 
@@ -303,17 +306,17 @@ class TestDsuiKeyEvents:
 class TestDsuiKeyDirtyTracking:
     def test_starts_dirty(self):
         spec = _make_key_spec()
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         assert key.is_dirty is True
 
     def test_set_rendered_image_clears_dirty(self):
         spec = _make_key_spec()
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         key.set_rendered_image(b"\xff\xd8fake_jpeg")
         assert key.is_dirty is False
 
     def test_mark_clean(self):
         spec = _make_key_spec()
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         key.mark_clean()
         assert key.is_dirty is False

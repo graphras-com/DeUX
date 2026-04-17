@@ -72,6 +72,7 @@ class Screen:
             raise IndexError(f"Key index must be 0-{_KEY_COUNT - 1}, got {index}")
         if not isinstance(key, KeySlot):
             raise TypeError(f"Expected KeySlot, got {type(key).__name__}")
+        key._index = index
         self._keys[index] = key
 
     def encoder(self, index: int) -> EncoderSlot:

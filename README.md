@@ -261,7 +261,7 @@ async def main():
         screen = deck.screen("main")
 
         # touchscreen card from .dsui
-        card = DsuiCard(0, audio_spec)
+        card = DsuiCard(audio_spec)
         card.set("title", "Bohemian Rhapsody")
         card.set("artist", "Queen")
         screen.set_card(0, card)
@@ -272,7 +272,7 @@ async def main():
             await deck.refresh()
 
         # key from .dsui
-        power = DsuiKey(0, power_spec)
+        power = DsuiKey(power_spec)
         power.set("ring_color", "#00ff00")
         screen.set_key(0, power)
 
