@@ -246,7 +246,7 @@ key.set("lights", False)   # shows lights_off, hides lights_on
 
 ### `color` — bind a colour to fill or stroke
 
-Sets a colour attribute (`fill` or `stroke`) on an SVG element.
+Sets a colour attribute (`fill`, `stroke`, or `color`) on an SVG element.
 
 ```yaml
 bindings:
@@ -260,7 +260,7 @@ bindings:
 | Parameter   | Type   | Required | Default      | Description                              |
 |-------------|--------|----------|--------------|------------------------------------------|
 | `node`      | string | Yes      | —            | `id` of the target SVG element.          |
-| `attribute` | string | No       | `fill`       | SVG attribute to set: `fill` or `stroke`.|
+| `attribute` | string | No       | `fill`       | SVG attribute to set: `fill`, `stroke`, or `color`.|
 | `default`   | string | No       | `"#ffffff"`  | Default CSS colour value.                |
 
 **Runtime value type:** `str` — any valid CSS colour (`"#ff0000"`,
@@ -473,7 +473,7 @@ These sources fire from physical key presses on the Stream Deck+.
 | `key_press`          | Fires immediately when the key is pressed down.        | —                   |
 | `key_release`        | Fires when the key is released.                        | —                   |
 | `key_press_release`  | Fires on release if the press duration is within the limit. A quick-tap gesture. | `max_duration_ms`   |
-| `key_hold`           | Fires after the key has been held for a duration.  Suppresses `key_press_release` and `key_release` for that cycle. | `hold_ms` (required)|
+| `key_hold`           | Fires after the key has been held for a duration.  Suppresses `key_press_release` for that cycle. | `hold_ms` (required)|
 
 #### Encoder sources (`TouchStripCard` packages only)
 
@@ -486,7 +486,7 @@ These sources fire from the rotary encoders beneath the touchscreen.
 | `encoder_press_release` | Fires on release if the press duration is within the limit. A quick-tap gesture. | `max_duration_ms`      |
 | `encoder_turn`          | Fires when the encoder is rotated.                      | `direction` (optional) |
 | `encoder_press_turn`    | Fires when the encoder is rotated while held down.      | `direction` (optional) |
-| `encoder_hold`          | Fires after the encoder has been held for a duration.  Suppresses `encoder_press_release` and `encoder_release` for that cycle. | `hold_ms` (required)   |
+| `encoder_hold`          | Fires after the encoder has been held for a duration.  Suppresses `encoder_press_release` for that cycle. | `hold_ms` (required)   |
 
 #### Touch sources (`TouchStripCard` packages only)
 
@@ -524,16 +524,17 @@ handler fires.  If not (or if a hold fired first), it falls through to
 **Hold gesture** (`key_hold`, `encoder_hold`): On press, an async timer
 starts.  If the key/encoder is still held when the timer expires, the
 hold handler fires.  On release, the timer is cancelled.  If the hold
-already fired, `*_press_release` and `*_release` events are
-**suppressed** for that press-release cycle — this prevents a hold from
-also triggering a tap.
+already fired, `*_press_release` events are **suppressed** for that
+press-release cycle — this prevents a hold from also triggering a tap.
+The simple `*_release` event still fires, allowing you to detect when
+the key/encoder is physically released after a hold.
 
 **Press-turn** (`encoder_press_turn`): Turn events while the encoder is
 held down are matched against `encoder_press_turn` mappings first, then
 fall through to regular `encoder_turn` mappings.
 
 **Priority order on release:**
-1. If a hold already fired → suppress all release events.
+1. If a hold already fired → suppress `*_press_release`, but still fire `*_release`.
 2. Check `*_press_release` with duration filter.
 3. Fall back to `*_release`.
 
