@@ -13,9 +13,11 @@ from typing import Any
 
 from PIL import Image, ImageFont
 
+from .iconify import IconifyError, fetch_icon
 from .schema import (
     Binding,
     ColorBinding,
+    IconifyBinding,
     ImageBinding,
     ImageFit,
     OverflowMode,
@@ -318,6 +320,8 @@ class SvgRenderer:
                 self._values[name] = binding.default
             elif isinstance(binding, ToggleBinding):
                 self._values[name] = binding.default
+            elif isinstance(binding, IconifyBinding):
+                self._values[name] = binding.default
             # ImageBinding defaults to None (no image)
 
     def set(self, name: str, value: Any) -> bool:
@@ -442,6 +446,8 @@ class SvgRenderer:
             self._apply_range(elem, name, binding, value)
         elif isinstance(binding, SliderBinding):
             self._apply_slider(elem, binding, value)
+        elif isinstance(binding, IconifyBinding):
+            self._apply_iconify(elem, binding, value)
 
     def _apply_text(
         self,
@@ -609,6 +615,55 @@ class SvgRenderer:
         pos = binding.min_pos + ratio * (binding.max_pos - binding.min_pos)
         attr = "x" if binding.direction == RangeDirection.HORIZONTAL else "y"
         elem.set(attr, str(pos))
+
+    def _apply_iconify(
+        self,
+        elem: ET.Element,
+        binding: IconifyBinding,
+        value: Any,
+    ) -> None:
+        """Load an Iconify icon by name and embed it into a ``<g>`` node.
+
+        The existing children of *elem* are replaced by a single
+        ``<svg>`` child that contains the icon.  Passing ``None`` or an
+        empty string clears the group.
+        """
+        # Always clear existing content — either we replace it with the
+        # new icon, or we leave the group empty.
+        elem.text = None
+        for child in list(elem):
+            elem.remove(child)
+
+        # ``None`` and empty string both clear the group.  The binding's
+        # default is applied at construction time via ``_values`` and is
+        # not re-used here so users can explicitly unset the icon.
+        if value is None or value == "":
+            return
+        name = str(value)
+
+        try:
+            svg_source = fetch_icon(str(name))
+        except IconifyError as exc:
+            logger.warning("Iconify binding '%s': %s", binding.node, exc)
+            return
+
+        try:
+            icon_root = ET.fromstring(svg_source)  # noqa: S314 — trusted API
+        except ET.ParseError as exc:
+            logger.warning(
+                "Iconify binding '%s': failed to parse icon SVG: %s",
+                binding.node,
+                exc,
+            )
+            return
+
+        # Force the embedded icon to our requested pixel size.  The
+        # original viewBox is preserved, so the icon scales uniformly.
+        size = str(binding.size)
+        icon_root.set("width", size)
+        icon_root.set("height", size)
+
+        elem.append(icon_root)
 
     def _inline_assets(self, root: ET.Element) -> None:
         """Replace relative asset href references with data URIs."""

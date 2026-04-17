@@ -23,6 +23,7 @@ class BindingType(Enum):
     RANGE = "range"
     SLIDER = "slider"
     TOGGLE = "toggle"
+    ICONIFY = "iconify"
 
 
 class OverflowMode(Enum):
@@ -126,6 +127,25 @@ class ToggleBinding:
     default: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class IconifyBinding:
+    """Load an Iconify icon by name and embed it into an SVG ``<g>`` element.
+
+    The icon name follows the Iconify convention ``<prefix>:<name>`` (for
+    example ``line-md:home``).  Icons are fetched from
+    ``https://api.iconify.design`` on first use and cached in-process.
+
+    The resolved icon SVG is inserted as children of the target ``<g>``
+    node, scaled to a ``size`` × ``size`` square.  Setting the binding
+    value to ``None`` or an empty string removes any previously embedded
+    icon from the node.
+    """
+
+    node: str
+    size: int
+    default: str = ""
+
+
 Binding = (
     TextBinding
     | ImageBinding
@@ -134,6 +154,7 @@ Binding = (
     | RangeBinding
     | SliderBinding
     | ToggleBinding
+    | IconifyBinding
 )
 
 # Valid event source names and their physical origins
