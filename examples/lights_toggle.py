@@ -37,7 +37,7 @@ async def main():
     async with Deck(brightness=80) as deck:
         screen = deck.screen("main")
 
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         screen.set_key(0, key)
 
         lights_on = False

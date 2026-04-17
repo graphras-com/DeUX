@@ -8,7 +8,7 @@ Example::
     from deckboard.dsui import DsuiCard, load_package
 
     spec = load_package("./AudioCard.dsui")
-    card = DsuiCard(0, spec)
+    card = DsuiCard(spec)
     card.set("artist", "Ash Walker")
 
     @card.on("toggle_play_pause")

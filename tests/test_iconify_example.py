@@ -61,14 +61,14 @@ class TestIconKeyExamplePackage:
 
     def test_dsui_key_renders_with_icon(self, patch_fetch):
         spec = load_package(_EXAMPLE_DIR)
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         jpeg_bytes = key.render_image()
         assert isinstance(jpeg_bytes, (bytes, bytearray))
         assert len(jpeg_bytes) > 0
 
     def test_dsui_key_updates_label_and_icon(self, patch_fetch):
         spec = load_package(_EXAMPLE_DIR)
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         # set() returns self for chaining.
         assert key.set("label", "Home") is key
         assert key.set("icon", "line-md:settings") is key

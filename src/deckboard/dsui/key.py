@@ -33,20 +33,22 @@ class DsuiKey(KeySlot):
         from deckboard.dsui import load_package, DsuiKey
 
         spec = load_package("./PowerKey.dsui")
-        key = DsuiKey(0, spec)
+        key = DsuiKey(spec)
         key.set("label", "Shutdown")
 
         @key.on_event("activate")
         async def handle():
             ...
 
+    The key index is assigned automatically when you install the key
+    on a screen with :meth:`~deckboard.ui.screen.Screen.set_key`.
+
     Args:
-        index: Key index (0-7 for Stream Deck+).
         spec: A validated :class:`~deckboard.dsui.schema.PackageSpec`.
     """
 
-    def __init__(self, index: int, spec: PackageSpec) -> None:
-        super().__init__(index)
+    def __init__(self, spec: PackageSpec) -> None:
+        super().__init__(-1)
         self._spec = spec
         self._renderer = SvgRenderer(spec)
         self._events = EventMap(spec.events)

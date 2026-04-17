@@ -31,20 +31,22 @@ class DsuiCard(Card):
         from deckboard.dsui import load_package, DsuiCard
 
         spec = load_package("./AudioCard.dsui")
-        card = DsuiCard(0, spec)
+        card = DsuiCard(spec)
         card.set("artist", "Ash Walker")
 
         @card.on("toggle_play_pause")
         async def handle():
             ...
 
+    The card index is assigned automatically when you install the card
+    on a screen with :meth:`~deckboard.ui.screen.Screen.set_card`.
+
     Args:
-        index: Touch-strip zone index (0-3).
         spec: A validated :class:`~deckboard.dsui.schema.PackageSpec`.
     """
 
-    def __init__(self, index: int, spec: PackageSpec) -> None:
-        super().__init__(index)
+    def __init__(self, spec: PackageSpec) -> None:
+        super().__init__(-1)
         self._spec = spec
         self._renderer = SvgRenderer(spec)
         self._events = EventMap(spec.events, spec.regions)

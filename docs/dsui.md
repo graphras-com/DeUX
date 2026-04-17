@@ -19,7 +19,7 @@ Load a package and use it as a card or key:
 from deckboard.dsui import load_package, DsuiCard, DsuiKey
 
 spec = load_package("./AudioCard.dsui")
-card = DsuiCard(0, spec)
+card = DsuiCard(spec)
 card.set("artist", "Ash Walker")
 
 @card.on("toggle_play_pause")
@@ -605,7 +605,7 @@ regions:
 from deckboard.dsui import load_package, DsuiCard
 
 spec = load_package("./AudioCard.dsui")
-card = DsuiCard(0, spec)
+card = DsuiCard(spec)
 
 card.set("artist", "Ash Walker").set("title", "Aquamarine")
 card.set("progress", 0.35)  # 35% through the track
@@ -663,7 +663,7 @@ events:
 from deckboard.dsui import load_package, DsuiKey
 
 spec = load_package("./PowerKey.dsui")
-key = DsuiKey(0, spec)
+key = DsuiKey(spec)
 
 key.set("label", "Shutdown")
 
@@ -720,7 +720,7 @@ events:
 from deckboard.dsui import load_package, DsuiCard
 
 spec = load_package("./VolumeSlider.dsui")
-card = DsuiCard(0, spec)
+card = DsuiCard(spec)
 
 volume = 0.5
 card.set("volume", volume)
@@ -775,7 +775,7 @@ events:
 from deckboard.dsui import load_package, DsuiKey
 
 spec = load_package("./LightsKey.dsui")
-key = DsuiKey(0, spec)
+key = DsuiKey(spec)
 
 lights_on = False
 
@@ -819,7 +819,7 @@ suffix and loads each one.  Non-`.dsui` directories are ignored.
 
 | Method / Property       | Description                                          |
 |-------------------------|------------------------------------------------------|
-| `DsuiCard(index, spec)` | Create a card for touch-strip zone `index` (0-3).    |
+| `DsuiCard(spec)`        | Create a card from a `.dsui` package.            |
 | `.set(name, value)`     | Set a binding value. Returns `self`.                 |
 | `.set_many(**kwargs)`   | Set multiple bindings at once. Returns `self`.       |
 | `.get(name)`            | Get the current value of a binding.                  |
@@ -832,7 +832,7 @@ suffix and loads each one.  Non-`.dsui` directories are ignored.
 
 | Method / Property          | Description                                       |
 |----------------------------|---------------------------------------------------|
-| `DsuiKey(index, spec)`     | Create a key for key index `index` (0-7).         |
+| `DsuiKey(spec)`            | Create a key from a `.dsui` package.              |
 | `.set(name, value)`        | Set a binding value. Returns `self`.              |
 | `.set_many(**kwargs)`      | Set multiple bindings at once. Returns `self`.    |
 | `.get(name)`               | Get the current value of a binding.               |

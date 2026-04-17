@@ -54,6 +54,7 @@ class TouchStrip:
         if not isinstance(card, Card):
             msg = f"Expected a Card instance, got {type(card).__name__}"
             raise TypeError(msg)
+        card._index = index
         self._cards[index] = card
 
     @property

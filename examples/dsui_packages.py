@@ -46,7 +46,7 @@ async def main():
         screen = deck.screen("main")
 
         # Install the audio card on touch-strip zone 0
-        audio = DsuiCard(0, audio_spec)
+        audio = DsuiCard(audio_spec)
         audio.set("artist", "Ash Walker")
         audio.set("title", "Afghanistan")
         audio.set("album", "Echo Chamber (Deluxe)")
@@ -55,7 +55,7 @@ async def main():
         screen.set_card(0, audio)
 
         # Install the power key on key slot 7
-        power = DsuiKey(7, power_spec)
+        power = DsuiKey(power_spec)
         power.set("label", "Shutdown")
         power.set("ring_color", "#ff4444")
         power.set("line_color", "#ff4444")
