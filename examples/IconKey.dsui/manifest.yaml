@@ -1,0 +1,24 @@
+name: IconKey
+type: Key
+version: 1
+layout: layout.svg
+
+bindings:
+  icon:
+    type: iconify
+    node: icon
+    size: 55
+    default: "line-md:home"
+
+  label:
+    type: text
+    node: label
+    default: "Label"
+
+events:
+  - name: activate
+    source: key_press_release
+    max_duration_ms: 300
+  - name: long_hold
+    source: key_hold
+    hold_ms: 800

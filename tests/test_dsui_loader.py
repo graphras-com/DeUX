@@ -9,6 +9,7 @@ import pytest
 from deckboard.dsui.loader import PackageError, load_all_packages, load_package
 from deckboard.dsui.schema import (
     ColorBinding,
+    IconifyBinding,
     ImageBinding,
     ImageFit,
     OverflowMode,
@@ -185,6 +186,40 @@ class TestLoadPackageValid:
         b = spec.bindings["state"]
         assert isinstance(b, ToggleBinding)
         assert b.default is False
+
+    def test_iconify_binding_parsed(self, tmp_path):
+        pkg = tmp_path / "I.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: I\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  icon:\n    type: iconify\n    node: icon\n"
+            '    size: 55\n    default: "line-md:home"',
+            encoding="utf-8",
+        )
+        spec = load_package(pkg)
+        b = spec.bindings["icon"]
+        assert isinstance(b, IconifyBinding)
+        assert b.node == "icon"
+        assert b.size == 55
+        assert b.default == "line-md:home"
+
+    def test_iconify_binding_default_empty(self, tmp_path):
+        pkg = tmp_path / "IE.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: IE\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  icon:\n    type: iconify\n    node: icon\n    size: 24",
+            encoding="utf-8",
+        )
+        spec = load_package(pkg)
+        b = spec.bindings["icon"]
+        assert isinstance(b, IconifyBinding)
+        assert b.size == 24
+        assert b.default == ""
 
     def test_slider_binding_parsed(self, tmp_path):
         pkg = tmp_path / "S.dsui"
@@ -1095,6 +1130,98 @@ class TestLoadPackageInvalid:
             encoding="utf-8",
         )
         with pytest.raises(PackageError, match="positive integer"):
+            load_package(pkg)
+
+    def test_iconify_binding_missing_size(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  icon:\n    type: iconify\n    node: icon",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="missing 'size'"):
+            load_package(pkg)
+
+    def test_iconify_binding_size_not_int(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  icon:\n    type: iconify\n    node: icon\n    size: big",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="size must be a positive integer"):
+            load_package(pkg)
+
+    def test_iconify_binding_size_zero(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  icon:\n    type: iconify\n    node: icon\n    size: 0",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="size must be a positive integer"):
+            load_package(pkg)
+
+    def test_iconify_binding_size_negative(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  icon:\n    type: iconify\n    node: icon\n    size: -10",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="size must be a positive integer"):
+            load_package(pkg)
+
+    def test_iconify_binding_size_bool_rejected(self, tmp_path):
+        """YAML's ``true`` coerces to int(1) in Python; reject explicitly."""
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  icon:\n    type: iconify\n    node: icon\n    size: true",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="size must be a positive integer"):
+            load_package(pkg)
+
+    def test_iconify_binding_missing_node(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  icon:\n    type: iconify\n    size: 55",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="missing 'node'"):
+            load_package(pkg)
+
+    def test_iconify_binding_node_not_in_svg(self, tmp_path):
+        pkg = tmp_path / "Bad.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  icon:\n    type: iconify\n    node: missing\n    size: 55",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="does not exist in the SVG"):
             load_package(pkg)
 
 

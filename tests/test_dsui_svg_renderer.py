@@ -9,6 +9,7 @@ from PIL import Image
 
 from deckboard.dsui.schema import (
     ColorBinding,
+    IconifyBinding,
     ImageBinding,
     ImageFit,
     OverflowMode,
@@ -1548,3 +1549,227 @@ class TestSvgRendererWrappedText:
         img_after = renderer.render()
 
         assert img_before.tobytes() != img_after.tobytes()
+
+
+# -- Iconify binding -------------------------------------------------------
+
+_ICONIFY_SVG = (
+    '<svg id="IconKey" xmlns="http://www.w3.org/2000/svg" '
+    'width="106" height="106">'
+    '<rect id="bg" width="106" height="106" fill="#1c1c1c"/>'
+    '<g id="icon" transform="translate(25 10)" color="#dedede"/>'
+    "</svg>"
+)
+
+_ICONIFY_SAMPLE = (
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" '
+    'viewBox="0 0 24 24"><path fill="currentColor" d="M0 0"/></svg>'
+)
+
+_SVG_NS = "http://www.w3.org/2000/svg"
+
+
+def _find_by_id(root, target_id: str):
+    """Search an ElementTree for the first element with id == target_id."""
+    for elem in root.iter():
+        if elem.get("id") == target_id:
+            return elem
+    return None
+
+
+class TestIconifyBindingRendering:
+    def _patch_fetch(self, monkeypatch, svg: str = _ICONIFY_SAMPLE):
+        import deckboard.dsui.svg_renderer as svg_renderer_mod
+
+        monkeypatch.setattr(
+            svg_renderer_mod, "fetch_icon", lambda name: svg, raising=True
+        )
+
+    def _serialise_with_bindings(self, renderer: SvgRenderer):
+        """Build a pre-rasterised ElementTree root for inspection."""
+        import copy
+        import xml.etree.ElementTree as ET
+
+        root = copy.deepcopy(renderer._base_root)
+        for name, binding in renderer._spec.bindings.items():
+            renderer._apply_binding(root, name, binding, renderer._values.get(name))
+        # Round-trip through a string to normalise namespaces
+        xml = ET.tostring(root, encoding="unicode")
+        return ET.fromstring(xml)
+
+    def test_default_icon_embedded(self, monkeypatch):
+        self._patch_fetch(monkeypatch)
+        spec = _make_spec(
+            _ICONIFY_SVG,
+            bindings={
+                "icon": IconifyBinding(node="icon", size=55, default="line-md:home"),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        root = self._serialise_with_bindings(renderer)
+        g = _find_by_id(root, "icon")
+        assert g is not None
+        children = list(g)
+        assert len(children) == 1
+        inner = children[0]
+        assert inner.tag == f"{{{_SVG_NS}}}svg"
+        assert inner.get("width") == "55"
+        assert inner.get("height") == "55"
+        # The embedded <path> from the sample icon must be preserved.
+        assert any(c.tag == f"{{{_SVG_NS}}}path" for c in inner.iter())
+
+    def test_set_changes_icon(self, monkeypatch):
+        calls: list[str] = []
+
+        def fake_fetch(name: str) -> str:
+            calls.append(name)
+            return _ICONIFY_SAMPLE
+
+        import deckboard.dsui.svg_renderer as svg_renderer_mod
+
+        monkeypatch.setattr(svg_renderer_mod, "fetch_icon", fake_fetch, raising=True)
+
+        spec = _make_spec(
+            _ICONIFY_SVG,
+            bindings={
+                "icon": IconifyBinding(node="icon", size=40, default="line-md:home"),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        changed = renderer.set("icon", "line-md:settings")
+        assert changed is True
+        root = self._serialise_with_bindings(renderer)
+        g = _find_by_id(root, "icon")
+        assert g is not None
+        inner = list(g)[0]
+        assert inner.get("width") == "40"
+        assert "line-md:settings" in calls
+
+    def test_empty_value_clears_group(self, monkeypatch):
+        """Setting the binding to an empty string removes the embedded icon."""
+        self._patch_fetch(monkeypatch)
+        spec = _make_spec(
+            _ICONIFY_SVG,
+            bindings={
+                "icon": IconifyBinding(node="icon", size=55),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        root = self._serialise_with_bindings(renderer)
+        g = _find_by_id(root, "icon")
+        assert list(g) == []
+
+    def test_none_value_clears_group(self, monkeypatch):
+        self._patch_fetch(monkeypatch)
+        spec = _make_spec(
+            _ICONIFY_SVG,
+            bindings={
+                "icon": IconifyBinding(node="icon", size=55, default="line-md:home"),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        renderer.set("icon", None)
+        root = self._serialise_with_bindings(renderer)
+        g = _find_by_id(root, "icon")
+        assert list(g) == []
+
+    def test_existing_children_replaced(self, monkeypatch):
+        """Any pre-existing children of the target <g> are dropped."""
+        self._patch_fetch(monkeypatch)
+        svg_with_child = (
+            '<svg id="IconKey" xmlns="http://www.w3.org/2000/svg" '
+            'width="106" height="106">'
+            '<g id="icon"><rect id="stale" width="5" height="5"/></g>'
+            "</svg>"
+        )
+        spec = _make_spec(
+            svg_with_child,
+            bindings={
+                "icon": IconifyBinding(node="icon", size=32, default="line-md:home"),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        root = self._serialise_with_bindings(renderer)
+        g = _find_by_id(root, "icon")
+        # Only the new <svg> child should remain.
+        children = list(g)
+        assert len(children) == 1
+        assert children[0].tag == f"{{{_SVG_NS}}}svg"
+        # "stale" must be gone.
+        assert _find_by_id(root, "stale") is None
+
+    def test_iconify_error_leaves_group_empty(self, monkeypatch, caplog):
+        """A failed icon fetch is logged and renders an empty <g>."""
+        import logging
+
+        from deckboard.dsui.iconify import IconifyError
+        import deckboard.dsui.svg_renderer as svg_renderer_mod
+
+        def boom(name: str) -> str:
+            raise IconifyError("no network")
+
+        monkeypatch.setattr(svg_renderer_mod, "fetch_icon", boom, raising=True)
+
+        spec = _make_spec(
+            _ICONIFY_SVG,
+            bindings={
+                "icon": IconifyBinding(node="icon", size=55, default="line-md:home"),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        with caplog.at_level(logging.WARNING, logger="deckboard.dsui.svg_renderer"):
+            root = self._serialise_with_bindings(renderer)
+        g = _find_by_id(root, "icon")
+        assert list(g) == []
+        assert any("Iconify binding" in rec.message for rec in caplog.records)
+
+    def test_invalid_icon_svg_logs_and_empties(self, monkeypatch, caplog):
+        """A fetched payload that is not parseable XML is skipped gracefully."""
+        import logging
+
+        import deckboard.dsui.svg_renderer as svg_renderer_mod
+
+        monkeypatch.setattr(
+            svg_renderer_mod, "fetch_icon", lambda name: "<svg><broken", raising=True
+        )
+
+        spec = _make_spec(
+            _ICONIFY_SVG,
+            bindings={
+                "icon": IconifyBinding(node="icon", size=55, default="line-md:home"),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        with caplog.at_level(logging.WARNING, logger="deckboard.dsui.svg_renderer"):
+            root = self._serialise_with_bindings(renderer)
+        g = _find_by_id(root, "icon")
+        assert list(g) == []
+        assert any("failed to parse" in rec.message for rec in caplog.records)
+
+    def test_full_render_produces_image(self, monkeypatch):
+        """End-to-end render goes through CairoSVG without exceptions."""
+        self._patch_fetch(monkeypatch)
+        spec = _make_spec(
+            _ICONIFY_SVG,
+            bindings={
+                "icon": IconifyBinding(node="icon", size=55, default="line-md:home"),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        img = renderer.render()
+        assert isinstance(img, Image.Image)
+        assert img.mode == "RGB"
+        assert img.size == (106, 106)
+
+    def test_set_same_value_no_change(self, monkeypatch):
+        """SvgRenderer.set reports no change when the value is identical."""
+        self._patch_fetch(monkeypatch)
+        spec = _make_spec(
+            _ICONIFY_SVG,
+            bindings={
+                "icon": IconifyBinding(node="icon", size=55, default="line-md:home"),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        assert renderer.set("icon", "line-md:home") is False
+        assert renderer.set("icon", "line-md:settings") is True

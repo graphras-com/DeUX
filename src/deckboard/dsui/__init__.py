@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from .card import DsuiCard
 from .event_map import EventMap
+from .iconify import IconifyError, clear_cache as clear_iconify_cache, fetch_icon
 from .key import DsuiKey
 from .loader import PackageError, load_all_packages, load_package
 from .schema import (
@@ -27,6 +28,7 @@ from .schema import (
     BindingType,
     ColorBinding,
     EventMapping,
+    IconifyBinding,
     ImageBinding,
     ImageFit,
     OverflowMode,
@@ -50,6 +52,8 @@ __all__ = [
     "DsuiKey",
     "EventMap",
     "EventMapping",
+    "IconifyBinding",
+    "IconifyError",
     "ImageBinding",
     "ImageFit",
     "OverflowMode",
@@ -64,6 +68,8 @@ __all__ = [
     "TextBinding",
     "ToggleBinding",
     "VisibilityBinding",
+    "clear_iconify_cache",
+    "fetch_icon",
     "load_all_packages",
     "load_package",
 ]

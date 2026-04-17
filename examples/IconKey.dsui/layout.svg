@@ -1,0 +1,11 @@
+<svg id="IconKey" width="106" height="106" version="1.1" xmlns="http://www.w3.org/2000/svg" font-family="ArialMT,Arial,sans-serif">
+    <style>
+        .background_color {color: #1c1c1c;}
+        .foreground_color {color: #dedede;}
+    </style>
+    <rect class="background_color" x="0" y="0" width="106" height="106" rx="5" ry="5" fill="#1c1c1c"/>
+    <g id="icon" class="foreground_color" transform="translate(25.5 10)" color="#dedede"/>
+    <text id="label" class="foreground_color" x="53" y="90" font-size="18" text-anchor="middle" fill="#dedede">
+        Label
+    </text>
+</svg>

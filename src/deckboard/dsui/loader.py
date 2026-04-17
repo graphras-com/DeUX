@@ -15,6 +15,7 @@ from .schema import (
     ColorBinding,
     EventMapping,
     HOLD_SOURCES,
+    IconifyBinding,
     ImageBinding,
     ImageFit,
     OverflowMode,
@@ -218,6 +219,23 @@ def _parse_binding(name: str, raw: dict[str, Any]) -> Binding:
             direction=direction,
             min_pos=float(min_pos_raw),
             max_pos=float(max_pos_raw),
+        )
+
+    if binding_type == BindingType.ICONIFY:
+        size_raw = raw.get("size")
+        if size_raw is None:
+            raise PackageError(f"Binding '{name}' missing 'size'")
+        if not isinstance(size_raw, int) or isinstance(size_raw, bool) or size_raw <= 0:
+            raise PackageError(
+                f"Binding '{name}': size must be a positive integer, got {size_raw!r}"
+            )
+        default_raw = raw.get("default", "")
+        if default_raw is not None and not isinstance(default_raw, str):
+            raise PackageError(f"Binding '{name}': default must be a string")
+        return IconifyBinding(
+            node=node,
+            size=size_raw,
+            default=str(default_raw) if default_raw is not None else "",
         )
 
     # BindingType.COLOR

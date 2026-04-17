@@ -9,6 +9,7 @@ from deckboard.dsui.schema import (
     ColorBinding,
     EventMapping,
     HOLD_SOURCES,
+    IconifyBinding,
     ImageBinding,
     ImageFit,
     OverflowMode,
@@ -48,6 +49,7 @@ class TestBindingType:
         assert BindingType("range") == BindingType.RANGE
         assert BindingType("slider") == BindingType.SLIDER
         assert BindingType("toggle") == BindingType.TOGGLE
+        assert BindingType("iconify") == BindingType.ICONIFY
 
 
 class TestOverflowMode:
@@ -142,6 +144,24 @@ class TestToggleBinding:
         b = ToggleBinding(node_on="icon_on", node_off="icon_off")
         with pytest.raises(AttributeError):
             b.node_on = "other"  # type: ignore[misc]
+
+
+class TestIconifyBinding:
+    def test_defaults(self):
+        b = IconifyBinding(node="icon", size=55)
+        assert b.node == "icon"
+        assert b.size == 55
+        assert b.default == ""
+
+    def test_custom(self):
+        b = IconifyBinding(node="icon", size=32, default="line-md:home")
+        assert b.size == 32
+        assert b.default == "line-md:home"
+
+    def test_frozen(self):
+        b = IconifyBinding(node="icon", size=55)
+        with pytest.raises(AttributeError):
+            b.size = 32  # type: ignore[misc]
 
 
 class TestColorBinding:
