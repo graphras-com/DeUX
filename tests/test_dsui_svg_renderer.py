@@ -317,6 +317,30 @@ class TestSvgRendererRender:
 
         assert img_red.tobytes() != img_blue.tobytes()
 
+    def test_color_binding_color_attribute(self):
+        """The 'color' attribute is set on <g> elements for currentColor use."""
+        svg = (
+            '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="100" height="50">'
+            '<g id="group" color="#ff0000">'
+            '<rect width="100" height="50" fill="currentColor"/>'
+            "</g></svg>"
+        )
+        spec = _make_spec(
+            svg,
+            bindings={
+                "group_color": ColorBinding(
+                    node="group", attribute="color", default="#ff0000"
+                ),
+            },
+        )
+        renderer = SvgRenderer(spec)
+        img_default = renderer.render()
+
+        renderer.set("group_color", "#00ff00")
+        img_changed = renderer.render()
+
+        assert img_default.tobytes() != img_changed.tobytes()
+
     def test_image_binding_with_pil(self):
         spec = _make_spec(
             _IMAGE_SVG,
