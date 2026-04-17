@@ -1,5 +1,29 @@
 # DSUI — Declarative Stream Deck UI Packages
 
+## Table of contents
+
+- [Package types](#package-types)
+- [Manifest reference](#manifest-reference)
+- [Bindings](#bindings)
+  - [Binding types by package type](#binding-types-by-package-type)
+  - [`text`](#text--bind-text-content-to-a-text-element)
+  - [`image`](#image--bind-a-pil-image-to-an-image-element)
+  - [`visibility`](#visibility--toggle-element-visibility)
+  - [`toggle`](#toggle--switch-between-two-elements-based-on-onoff-state)
+  - [`color`](#color--bind-a-colour-to-fill-or-stroke)
+  - [`range`](#range--scale-an-elements-width-or-height-proportionally)
+  - [`slider`](#slider--translate-an-element-between-two-positions)
+  - [`iconify`](#iconify--embed-an-iconify-icon-into-a-group-element)
+- [Events](#events)
+  - [Event sources by package type](#event-sources-by-package-type)
+  - [Event parameters reference](#event-parameters-reference)
+  - [Gesture detection](#gesture-detection)
+- [Regions](#regions-touchstripcard-only)
+- [Assets](#assets)
+- [Complete examples](#complete-examples)
+- [Loading packages](#loading-packages)
+- [API summary](#api-summary)
+
 DSUI (`.dsui`) packages let you describe Stream Deck+ UIs declaratively
 using an SVG layout and a YAML manifest instead of writing imperative
 Python rendering code.  A package is a directory with a `.dsui` suffix
@@ -86,6 +110,7 @@ target SVG element).  The `node` must exist in the SVG layout.
 | `color`        | Yes              | Yes   |
 | `range`        | Yes              | Yes   |
 | `slider`       | Yes              | Yes   |
+| `iconify`      | Yes              | Yes   |
 
 All binding types are available in both package types.
 
@@ -103,14 +128,20 @@ bindings:
     default: ""           # Default text (optional, defaults to "")
     max_width: 90         # Pixel budget for truncation (optional)
     overflow: ellipsis    # How to handle overflow (optional)
+    wrap: false           # Word-wrap into multiple lines (optional)
+    max_height: null      # Max height in pixels for wrapped text (optional)
+    line_height: null     # Line height multiplier for wrapped text (optional)
 ```
 
-| Parameter    | Type   | Required | Default    | Description                                              |
-|--------------|--------|----------|------------|----------------------------------------------------------|
-| `node`       | string | Yes      | —          | `id` of the target `<text>` SVG element.                 |
-| `default`    | string | No       | `""`       | Initial text value.                                      |
-| `max_width`  | int    | No       | `null`     | Maximum width in pixels. Text exceeding this is handled by `overflow`. |
-| `overflow`   | string | No       | `ellipsis` | `ellipsis` — truncate and append `…`. `clip` — leave text unchanged (the SVG viewBox clips it). |
+| Parameter      | Type   | Required | Default    | Description                                              |
+|----------------|--------|----------|------------|----------------------------------------------------------|
+| `node`         | string | Yes      | —          | `id` of the target `<text>` SVG element.                 |
+| `default`      | string | No       | `""`       | Initial text value.                                      |
+| `max_width`    | int    | No       | `null`     | Maximum width in pixels. Text exceeding this is handled by `overflow`. |
+| `overflow`     | string | No       | `ellipsis` | `ellipsis` — truncate and append `…`. `clip` — leave text unchanged (the SVG viewBox clips it). |
+| `wrap`         | bool   | No       | `false`    | When `true`, the renderer word-wraps text into multiple `<tspan>` lines that each fit within `max_width`. Font metrics are auto-detected from the SVG `<text>` element. |
+| `max_height`   | int    | No       | `null`     | Maximum height in pixels for wrapped text.  If the wrapped text exceeds this, the last visible line is truncated according to `overflow`.  Only meaningful when `wrap` is `true`. |
+| `line_height`  | float  | No       | `null`     | Line height multiplier for wrapped text.  Controls the vertical spacing between `<tspan>` lines.  Only meaningful when `wrap` is `true`. |
 
 **Runtime value type:** `str`
 
@@ -352,6 +383,44 @@ and `1.0` (max position).  Values outside this range are clamped.
 card.set("brightness", 0.5)   # midpoint → x = 92.5
 card.set("brightness", 0.0)   # left edge → x = 1.5
 card.set("brightness", 1.0)   # right edge → x = 183.5
+```
+
+---
+
+### `iconify` — embed an Iconify icon into a group element
+
+Loads an icon from the [Iconify](https://iconify.design) API by name and
+embeds it as SVG content inside a `<g>` element.  Icons are fetched from
+`https://api.iconify.design` on first use and cached in-process.
+
+The icon name follows the Iconify convention `<prefix>:<name>` (for
+example `line-md:home`).  The resolved icon SVG is inserted as children
+of the target `<g>` node, scaled to a `size` × `size` square.  Setting
+the value to `None` or an empty string removes any previously embedded
+icon from the node.
+
+```yaml
+bindings:
+  status_icon:
+    type: iconify
+    node: icon_group       # SVG <g> element id
+    size: 24               # Icon size in pixels (required)
+    default: ""            # Default icon name (optional)
+```
+
+| Parameter | Type   | Required | Default | Description                                                  |
+|-----------|--------|----------|---------|--------------------------------------------------------------|
+| `node`    | string | Yes      | —       | `id` of the target `<g>` SVG element.                        |
+| `size`    | int    | Yes      | —       | Icon size in pixels (width and height of the square).        |
+| `default` | string | No       | `""`    | Initial icon name (e.g. `"line-md:home"`). Empty means no icon. |
+
+**Runtime value type:** `str` — an Iconify icon name like
+`"mdi:volume-high"`, `"line-md:play"`, etc.  Set to `""` or `None` to
+clear the icon.
+
+```python
+card.set("status_icon", "mdi:check-circle")   # show a check icon
+card.set("status_icon", "")                    # remove the icon
 ```
 
 ---
