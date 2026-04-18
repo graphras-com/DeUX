@@ -598,6 +598,44 @@ class TestEncoderHold:
         assert toggle_handler in result
         assert release_handler in result
 
+    async def test_encoder_hold_cancelled_by_turn_before_hold_ms(self):
+        """encoder_hold does NOT fire if a turn occurs before hold_ms expires."""
+        events = _make_events(
+            ("seek", "encoder_press_turn"),
+            ("enc_hold", "encoder_hold", {"hold_ms": 50}),
+        )
+        em = EventMap(events)
+        seek_handler = AsyncMock()
+        hold_handler = AsyncMock()
+        em.on("seek", seek_handler)
+        em.on("enc_hold", hold_handler)
+
+        em.handle_encoder_press()
+        # Turn before hold_ms — should cancel hold timer
+        result = em.handle_encoder_turn(1)
+        assert result is seek_handler
+
+        await asyncio.sleep(0.1)  # wait past hold_ms
+        hold_handler.assert_not_awaited()
+
+    async def test_encoder_hold_cancelled_by_turn_without_press_turn_mapping(self):
+        """encoder_hold is cancelled by turn even without encoder_press_turn mapping."""
+        events = _make_events(
+            ("scroll", "encoder_turn"),
+            ("enc_hold", "encoder_hold", {"hold_ms": 50}),
+        )
+        em = EventMap(events)
+        scroll_handler = AsyncMock()
+        hold_handler = AsyncMock()
+        em.on("scroll", scroll_handler)
+        em.on("enc_hold", hold_handler)
+
+        em.handle_encoder_press()
+        em.handle_encoder_turn(1)  # turn cancels hold
+
+        await asyncio.sleep(0.1)
+        hold_handler.assert_not_awaited()
+
     async def test_encoder_hold_does_not_suppress_release(self):
         """After encoder_hold fires, encoder_release still fires."""
         events = _make_events(
