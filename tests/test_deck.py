@@ -228,6 +228,34 @@ class TestDeckDispatch:
 
         await deck._dispatch(KeyEvent(key=7, pressed=True))  # No key 7
 
+    async def test_key_press_refreshes_when_dirty(self, deck):
+        """refresh() is called after key dispatch if the key is dirty."""
+        p = deck.screen("main")
+        key_slot = p.key(0)
+
+        async def mark_dirty():
+            key_slot._dirty = True
+
+        key_slot.on_press(mark_dirty)
+        deck._active_page = p
+        key_slot._dirty = False
+
+        with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
+            await deck._dispatch(KeyEvent(key=0, pressed=True))
+            mock_refresh.assert_awaited_once()
+
+    async def test_key_press_no_refresh_when_clean(self, deck):
+        """refresh() is NOT called after key dispatch if key stays clean."""
+        p = deck.screen("main")
+        key_slot = p.key(0)
+        key_slot.on_press(AsyncMock())
+        deck._active_page = p
+        key_slot._dirty = False
+
+        with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
+            await deck._dispatch(KeyEvent(key=0, pressed=True))
+            mock_refresh.assert_not_awaited()
+
     async def test_encoder_turn_dispatches(self, deck):
         p = deck.screen("main")
         handler = AsyncMock()

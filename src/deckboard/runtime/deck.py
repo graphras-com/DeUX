@@ -443,6 +443,8 @@ class Deck:
             key_slot = screen.keys.get(event.key)
             if key_slot:
                 await key_slot.dispatch(event.pressed)
+                if key_slot.is_dirty:
+                    await self.refresh()
 
         elif isinstance(event, EncoderTurnEvent):
             encoder = screen.encoders.get(event.encoder)
