@@ -127,6 +127,10 @@ class EventMap:
         """
         # Check encoder_press_turn first (turn while pressed)
         if self._pressed:
+            # A turn during a press cancels the hold timer — the user is
+            # performing a press-turn gesture, not a hold gesture.
+            self._cancel_hold_timer()
+
             for mapping in self._by_source.get("encoder_press_turn", []):
                 if self._direction_matches(mapping, direction):
                     return self._handlers.get(mapping.name)
