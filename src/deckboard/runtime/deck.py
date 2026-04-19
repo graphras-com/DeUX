@@ -87,6 +87,7 @@ class Deck:
         self._closed_event = asyncio.Event()
         self._running = False
         self._executor = ThreadPoolExecutor(max_workers=2)
+        self._device_lock = asyncio.Lock()
 
         # Screens
         self._screens: dict[str, Screen] = {}
@@ -231,9 +232,10 @@ class Deck:
         self._brightness = max(0, min(100, percent))
         if self._device:
             loop = asyncio.get_running_loop()
-            await loop.run_in_executor(
-                self._executor, self._device.set_brightness, self._brightness
-            )
+            async with self._device_lock:
+                await loop.run_in_executor(
+                    self._executor, self._device.set_brightness, self._brightness
+                )
 
     # -- Screen management -------------------------------------------------
 
@@ -293,12 +295,13 @@ class Deck:
             else:
                 # Blank key
                 image_bytes = render_blank_key()
-                await loop.run_in_executor(
-                    self._executor,
-                    self._device.set_key_image,
-                    key_index,
-                    image_bytes,
-                )
+                async with self._device_lock:
+                    await loop.run_in_executor(
+                        self._executor,
+                        self._device.set_key_image,
+                        key_index,
+                        image_bytes,
+                    )
 
     @staticmethod
     def _is_dsui_key(key_slot: KeySlot) -> bool:
@@ -317,12 +320,13 @@ class Deck:
         dsui_key.set_rendered_image(image_bytes)
 
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            self._executor,
-            self._device.set_key_image,
-            dsui_key.index,
-            image_bytes,
-        )
+        async with self._device_lock:
+            await loop.run_in_executor(
+                self._executor,
+                self._device.set_key_image,
+                dsui_key.index,
+                image_bytes,
+            )
 
     async def _render_touchscreen(self) -> None:
         """Render and push the full touch-strip image for the active screen."""
@@ -343,15 +347,16 @@ class Deck:
         )
 
         loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            self._executor,
-            self._device.set_touchscreen_image,
-            touchstrip_bytes,
-            0,
-            0,
-            TOUCHSCREEN_WIDTH,
-            TOUCHSCREEN_HEIGHT,
-        )
+        async with self._device_lock:
+            await loop.run_in_executor(
+                self._executor,
+                self._device.set_touchscreen_image,
+                touchstrip_bytes,
+                0,
+                0,
+                TOUCHSCREEN_WIDTH,
+                TOUCHSCREEN_HEIGHT,
+            )
 
     async def refresh(self) -> None:
         """Re-render and push all dirty controls on the active screen.
