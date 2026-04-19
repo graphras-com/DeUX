@@ -37,7 +37,7 @@ async def main():
             print("Home pressed!")
 
         # encoders are only available on devices that have them (e.g. Plus)
-        if deck.caps.has_encoders:
+        if deck.capabilities.has_encoders:
             @screen.encoder(0).on_turn
             async def on_turn(direction: int):
                 print(f"Encoder turned: {direction}")
@@ -79,11 +79,11 @@ based on a `DeviceCapabilities` snapshot queried from the hardware.
 
 ```python
 async with Deck() as deck:
-    print(deck.caps.deck_type)      # e.g. "Stream Deck XL"
-    print(deck.caps.key_count)      # e.g. 32
-    print(deck.caps.key_size)       # e.g. (96, 96)
-    print(deck.caps.has_encoders)   # e.g. False
-    print(deck.caps.has_touchscreen)  # e.g. False
+    print(deck.capabilities.deck_type)      # e.g. "Stream Deck XL"
+    print(deck.capabilities.key_count)      # e.g. 32
+    print(deck.capabilities.key_size)       # e.g. (96, 96)
+    print(deck.capabilities.has_encoders)   # e.g. False
+    print(deck.capabilities.has_touchscreen)  # e.g. False
 ```
 
 Constructor parameters:
@@ -189,7 +189,7 @@ The Neo has a 248×58 non-touch info display. Deckboard exposes it via the
 from PIL import Image
 
 async with Deck() as deck:
-    if deck.caps.has_info_screen:
+    if deck.capabilities.has_info_screen:
         screen = deck.screen("main")
         info = screen.info_screen
 
