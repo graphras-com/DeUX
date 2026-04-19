@@ -215,19 +215,29 @@ class DsuiKey(KeySlot):
 
     # -- Rendering ---------------------------------------------------------
 
-    def render_image(self) -> bytes:
-        """Render the SVG layout to JPEG bytes for the key.
+    def render_image(
+        self,
+        key_size: tuple[int, int] | None = None,
+        image_format: str = "JPEG",
+    ) -> bytes:
+        """Render the SVG layout to image bytes for the key.
 
-        The SVG is rasterised and scaled to KEY_SIZE (120x120),
-        then encoded as JPEG.
+        The SVG is rasterised and scaled to the device's key size,
+        then encoded in the device's image format.
+
+        Args:
+            key_size: Target key dimensions ``(width, height)``.
+                Defaults to ``KEY_SIZE`` (120x120 for Stream Deck+).
+            image_format: Image encoding format (``"JPEG"`` or ``"BMP"``).
 
         Returns:
-            JPEG-encoded image bytes.
+            Encoded image bytes.
         """
+        size = key_size or KEY_SIZE
         img = self._renderer.render()
-        if img.size != KEY_SIZE:
-            img = img.resize(KEY_SIZE, Image.LANCZOS)
-        return self._encode_jpeg(img)
+        if img.size != size:
+            img = img.resize(size, Image.LANCZOS)
+        return self._encode_image(img, image_format)
 
     @property
     def has_dsui_content(self) -> bool:
@@ -258,10 +268,16 @@ class DsuiKey(KeySlot):
     # -- Private helpers ---------------------------------------------------
 
     @staticmethod
-    def _encode_jpeg(img: Image.Image, quality: int = 90) -> bytes:
-        """Encode a PIL image as JPEG bytes."""
+    def _encode_image(
+        img: Image.Image, image_format: str = "JPEG", quality: int = 90
+    ) -> bytes:
+        """Encode a PIL image in the specified format."""
         buf = io.BytesIO()
         if img.mode != "RGB":
             img = img.convert("RGB")
-        img.save(buf, format="JPEG", quality=quality)
+        fmt = image_format.upper()
+        if fmt == "BMP":
+            img.save(buf, format="BMP")
+        else:
+            img.save(buf, format="JPEG", quality=quality)
         return buf.getvalue()

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from .deck import Deck, DeckError, _KEY_COUNT
+from .capabilities import DeviceCapabilities
+from .deck import Deck, DeckError
 from .device_info import DeviceInfo
 from .events import (
     AsyncHandler,
@@ -21,11 +22,11 @@ __all__ = [
     "Deck",
     "DeckError",
     "DeckEvent",
+    "DeviceCapabilities",
     "DeviceInfo",
     "EncoderPressEvent",
     "EncoderTurnEvent",
     "EventType",
     "KeyEvent",
     "TouchEvent",
-    "_KEY_COUNT",
 ]

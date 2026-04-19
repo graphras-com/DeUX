@@ -21,11 +21,13 @@ from .metrics import (
     PANEL_GAP,
     PANEL_HEIGHT,
     PANEL_WIDTH,
+    RenderMetrics,
     TOUCHSCREEN_HEIGHT,
     TOUCHSCREEN_WIDTH,
     USABLE_HEIGHT,
     USABLE_WIDTH,
 )
+from .screen_renderer import render_info_screen
 from .svg_rasterize import RasterizeError
 from .touch_renderer import (
     compose_touchstrip,
@@ -51,6 +53,7 @@ __all__ = [
     "PANEL_HEIGHT",
     "PANEL_WIDTH",
     "RasterizeError",
+    "RenderMetrics",
     "TOUCHSCREEN_HEIGHT",
     "TOUCHSCREEN_WIDTH",
     "USABLE_HEIGHT",
@@ -58,5 +61,6 @@ __all__ = [
     "compose_touchstrip",
     "render_blank_key",
     "render_blank_touchscreen",
+    "render_info_screen",
     "render_key_image",
 ]

@@ -1,4 +1,4 @@
-"""Preview SVG designs on a physical Stream Deck+ device.
+"""Preview SVG designs on a physical Stream Deck device.
 
 Run with::
 
@@ -10,6 +10,9 @@ Only the specified slots are updated; unspecified keys and cards are
 left blank (black unless ``--background`` is given).  SVGs are scaled to
 fit the target area while preserving aspect ratio and centred on the
 background colour.
+
+The tool auto-detects the first connected visual Stream Deck device
+and adapts key/card counts and dimensions to the hardware.
 """
 
 from __future__ import annotations
@@ -29,7 +32,7 @@ from pathlib import Path
 from PIL import Image
 
 from deckboard.render.svg_rasterize import RasterizeError
-from deckboard.render.key_renderer import _encode_jpeg
+from deckboard.render.key_renderer import _encode_image
 from deckboard.render.metrics import (
     KEY_MARGIN_LEFT,
     KEY_MARGIN_TOP,
@@ -42,13 +45,15 @@ from deckboard.render.metrics import (
     PANEL_GAP,
     PANEL_HEIGHT,
     PANEL_WIDTH,
+    RenderMetrics,
     TOUCHSCREEN_HEIGHT,
     TOUCHSCREEN_WIDTH,
 )
+from deckboard.runtime.capabilities import DeviceCapabilities, STREAM_DECK_PLUS
 
 logger = logging.getLogger(__name__)
 
-_KEY_COUNT = 8
+_KEY_COUNT = STREAM_DECK_PLUS.key_count
 
 _HEX_RE = re.compile(r"^#?([0-9a-fA-F]{6})$")
 
@@ -164,7 +169,7 @@ def compose_key_image(svg_img: Image.Image) -> bytes:
         canvas.paste(svg_img, (x, y), svg_img)
     else:
         canvas.paste(svg_img, (x, y))
-    return _encode_jpeg(canvas)
+    return _encode_image(canvas)
 
 
 def compose_card_image(
@@ -202,7 +207,7 @@ def compose_touchstrip(
         if card_image is not None:
             x = MARGIN_LEFT + index * (PANEL_WIDTH + PANEL_GAP)
             img.paste(card_image, (x, MARGIN_TOP))
-    return _encode_jpeg(img)
+    return _encode_image(img)
 
 
 # -- CLI argument parsing -----------------------------------------------------
@@ -263,7 +268,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def _find_and_open_device() -> object:
-    """Discover, open, and return the first Stream Deck+ device.
+    """Discover, open, and return the first visual Stream Deck device.
 
     Prints an error and exits if no device is found.
     """
@@ -274,7 +279,12 @@ def _find_and_open_device() -> object:
         print("ERROR: No Stream Deck devices found", file=sys.stderr)  # noqa: T201
         sys.exit(1)
 
-    deck = devices[0]
+    visual = [d for d in devices if d.DECK_VISUAL]
+    if not visual:
+        print("ERROR: No visual Stream Deck devices found", file=sys.stderr)  # noqa: T201
+        sys.exit(1)
+
+    deck = visual[0]
     deck.open()
     logger.debug("Opened device: %s", deck.deck_type())
     return deck

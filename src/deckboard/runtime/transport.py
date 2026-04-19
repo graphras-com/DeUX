@@ -20,15 +20,32 @@ from .events import (
 if TYPE_CHECKING:
     from StreamDeck.Devices.StreamDeck import StreamDeck
 
+    from .capabilities import DeviceCapabilities
+
 logger = logging.getLogger(__name__)
 
 
 class AsyncTransport:
-    """Bridge sync streamdeck callbacks into an asyncio event queue."""
+    """Bridge sync streamdeck callbacks into an asyncio event queue.
 
-    def __init__(self, device: StreamDeck, loop: asyncio.AbstractEventLoop) -> None:
+    Conditionally registers dial and touchscreen callbacks only when
+    the device supports those features.
+
+    Args:
+        device: An open Stream Deck device.
+        loop: The running asyncio event loop.
+        caps: Device capabilities (used to determine which callbacks to register).
+    """
+
+    def __init__(
+        self,
+        device: StreamDeck,
+        loop: asyncio.AbstractEventLoop,
+        caps: DeviceCapabilities | None = None,
+    ) -> None:
         self._device = device
         self._loop = loop
+        self._caps = caps
         self._queue: asyncio.Queue[DeckEvent] = asyncio.Queue()
         self._running = False
 
@@ -40,15 +57,22 @@ class AsyncTransport:
         """Register callbacks on the low-level device."""
         self._running = True
         self._device.set_key_callback(self._on_key)
-        self._device.set_dial_callback(self._on_encoder)
-        self._device.set_touchscreen_callback(self._on_touch)
+
+        # Only register dial/touch callbacks if the device has those features
+        if self._caps is None or self._caps.has_encoders:
+            self._device.set_dial_callback(self._on_encoder)
+        if self._caps is None or self._caps.has_touchscreen:
+            self._device.set_touchscreen_callback(self._on_touch)
 
     def stop(self) -> None:
         """Unregister callbacks."""
         self._running = False
         self._device.set_key_callback(None)
-        self._device.set_dial_callback(None)
-        self._device.set_touchscreen_callback(None)
+
+        if self._caps is None or self._caps.has_encoders:
+            self._device.set_dial_callback(None)
+        if self._caps is None or self._caps.has_touchscreen:
+            self._device.set_touchscreen_callback(None)
 
     def _enqueue(self, event: DeckEvent) -> None:
         """Thread-safe: put an event onto the asyncio queue."""

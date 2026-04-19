@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, call
 
 import pytest
 
+from deckboard.runtime.capabilities import STREAM_DECK_PLUS
 from deckboard.runtime.transport import AsyncTransport
 from deckboard.runtime.events import (
     EncoderPressEvent,
@@ -15,6 +16,7 @@ from deckboard.runtime.events import (
     KeyEvent,
     TouchEvent,
 )
+from tests.conftest import STREAM_DECK_MINI
 
 
 @pytest.fixture
@@ -32,7 +34,7 @@ def mock_device():
 class TestTransportLifecycle:
     async def test_start_registers_callbacks(self, mock_device):
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         transport.start()
         mock_device.set_key_callback.assert_called_once_with(transport._on_key)
         mock_device.set_dial_callback.assert_called_once_with(transport._on_encoder)
@@ -41,9 +43,17 @@ class TestTransportLifecycle:
         )
         assert transport._running is True
 
+    async def test_start_no_encoders_skips_dial_callback(self, mock_device):
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_MINI)
+        transport.start()
+        mock_device.set_key_callback.assert_called_once()
+        mock_device.set_dial_callback.assert_not_called()
+        mock_device.set_touchscreen_callback.assert_not_called()
+
     async def test_stop_unregisters_callbacks(self, mock_device):
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         transport.start()
         transport.stop()
         mock_device.set_key_callback.assert_called_with(None)
@@ -51,10 +61,27 @@ class TestTransportLifecycle:
         mock_device.set_touchscreen_callback.assert_called_with(None)
         assert transport._running is False
 
+    async def test_stop_no_encoders_skips_dial_callback(self, mock_device):
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_MINI)
+        transport.start()
+        transport.stop()
+        # set_dial_callback should never have been called (not even with None)
+        mock_device.set_dial_callback.assert_not_called()
+
     async def test_queue_property(self, mock_device):
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         assert isinstance(transport.queue, asyncio.Queue)
+
+    async def test_start_with_no_caps_registers_all(self, mock_device):
+        """When caps is None, all callbacks are registered (backward compat)."""
+        loop = asyncio.get_running_loop()
+        transport = AsyncTransport(mock_device, loop, None)
+        transport.start()
+        mock_device.set_key_callback.assert_called_once()
+        mock_device.set_dial_callback.assert_called_once()
+        mock_device.set_touchscreen_callback.assert_called_once()
 
 
 # ── _enqueue ────────────────────────────────────────────────────────────
@@ -63,7 +90,7 @@ class TestTransportLifecycle:
 class TestTransportEnqueue:
     async def test_enqueue_puts_event(self, mock_device):
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         transport.start()
         event = KeyEvent(key=0, pressed=True)
         transport._enqueue(event)
@@ -74,7 +101,7 @@ class TestTransportEnqueue:
     async def test_enqueue_ignored_when_stopped(self, mock_device):
         """Events are dropped when transport is not running."""
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         # Don't call start() — transport._running is False
         event = KeyEvent(key=0, pressed=True)
         transport._enqueue(event)
@@ -88,7 +115,7 @@ class TestTransportEnqueue:
 class TestTransportOnKey:
     async def test_key_press(self, mock_device):
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         transport.start()
         transport._on_key(mock_device, 3, True)
         await asyncio.sleep(0.01)
@@ -99,7 +126,7 @@ class TestTransportOnKey:
 
     async def test_key_release(self, mock_device):
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         transport.start()
         transport._on_key(mock_device, 5, False)
         await asyncio.sleep(0.01)
@@ -116,7 +143,7 @@ class TestTransportOnEncoder:
         from StreamDeck.Devices.StreamDeck import DialEventType
 
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         transport.start()
         transport._on_encoder(mock_device, 1, DialEventType.PUSH, True)
         await asyncio.sleep(0.01)
@@ -129,7 +156,7 @@ class TestTransportOnEncoder:
         from StreamDeck.Devices.StreamDeck import DialEventType
 
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         transport.start()
         transport._on_encoder(mock_device, 2, DialEventType.PUSH, False)
         await asyncio.sleep(0.01)
@@ -141,7 +168,7 @@ class TestTransportOnEncoder:
         from StreamDeck.Devices.StreamDeck import DialEventType
 
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         transport.start()
         transport._on_encoder(mock_device, 0, DialEventType.TURN, 3)
         await asyncio.sleep(0.01)
@@ -154,7 +181,7 @@ class TestTransportOnEncoder:
         from StreamDeck.Devices.StreamDeck import DialEventType
 
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         transport.start()
         transport._on_encoder(mock_device, 1, DialEventType.TURN, -2)
         await asyncio.sleep(0.01)
@@ -171,7 +198,7 @@ class TestTransportOnTouch:
         from StreamDeck.Devices.StreamDeck import TouchscreenEventType
 
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         transport.start()
         transport._on_touch(
             mock_device,
@@ -191,7 +218,7 @@ class TestTransportOnTouch:
         from StreamDeck.Devices.StreamDeck import TouchscreenEventType
 
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         transport.start()
         transport._on_touch(
             mock_device,
@@ -206,7 +233,7 @@ class TestTransportOnTouch:
         from StreamDeck.Devices.StreamDeck import TouchscreenEventType
 
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         transport.start()
         transport._on_touch(
             mock_device,
@@ -225,7 +252,7 @@ class TestTransportOnTouch:
         from StreamDeck.Devices.StreamDeck import TouchscreenEventType
 
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         transport.start()
         transport._on_touch(
             mock_device,
@@ -240,7 +267,7 @@ class TestTransportOnTouch:
     async def test_unknown_touch_type_ignored(self, mock_device):
         """Unknown touch event types should be silently ignored."""
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         transport.start()
         unknown_type = MagicMock()
         transport._on_touch(mock_device, unknown_type, {"x": 0, "y": 0})
@@ -255,7 +282,7 @@ class TestTransportErrorHandling:
     async def test_key_callback_error_logged(self, mock_device):
         """Errors in key callback are caught and logged."""
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         transport.start()
         transport._enqueue = MagicMock(side_effect=RuntimeError("test error"))
         transport._on_key(mock_device, 0, True)
@@ -266,7 +293,7 @@ class TestTransportErrorHandling:
         from StreamDeck.Devices.StreamDeck import DialEventType
 
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         transport.start()
         transport._enqueue = MagicMock(side_effect=RuntimeError("test"))
         transport._on_encoder(mock_device, 0, DialEventType.PUSH, True)
@@ -276,7 +303,7 @@ class TestTransportErrorHandling:
         from StreamDeck.Devices.StreamDeck import TouchscreenEventType
 
         loop = asyncio.get_running_loop()
-        transport = AsyncTransport(mock_device, loop)
+        transport = AsyncTransport(mock_device, loop, STREAM_DECK_PLUS)
         transport.start()
         transport._enqueue = MagicMock(side_effect=RuntimeError("test"))
         transport._on_touch(mock_device, TouchscreenEventType.SHORT, {"x": 0, "y": 0})

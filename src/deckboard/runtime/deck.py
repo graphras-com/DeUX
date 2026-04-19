@@ -10,8 +10,9 @@ from typing import TYPE_CHECKING, Any
 from StreamDeck.DeviceManager import DeviceManager
 
 from ..render.key_renderer import render_blank_key, render_key_image
-from ..render.metrics import TOUCHSCREEN_HEIGHT, TOUCHSCREEN_WIDTH
+from ..render.metrics import RenderMetrics
 from ..render.touch_renderer import compose_touchstrip
+from .capabilities import DeviceCapabilities
 from .device_info import DeviceInfo
 from .events import (
     DeckEvent,
@@ -31,17 +32,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Stream Deck+ constants
-_KEY_COUNT = 8
-_ENCODER_COUNT = 4
-
 
 class DeckError(Exception):
     """Raised for deck-level errors."""
 
 
 class Deck:
-    """High-level, asyncio-native interface to an Elgato Stream Deck+.
+    """High-level, asyncio-native interface to Elgato Stream Deck devices.
+
+    Automatically discovers and connects to the first available visual
+    Stream Deck device.  Adapts key count, encoder count, touchscreen
+    dimensions, and info screen support to the connected hardware.
 
     Usage::
 
@@ -65,23 +66,24 @@ class Deck:
 
     def __init__(
         self,
-        device_type: str = "Stream Deck +",
+        serial_number: str | None = None,
         device_index: int = 0,
         brightness: int = 80,
     ) -> None:
         """
         Args:
-            device_type: Stream Deck model to search for.
-            device_index: If multiple decks match, which one to use.
+            serial_number: Target a specific device by serial number.
+                If ``None``, the first available visual device is used.
+            device_index: If multiple visual decks are found and no
+                serial_number is given, which one to use (0-based).
             brightness: Initial brightness (0-100).
         """
-        # Lazy import to avoid circular dependency at module level
-        from ..ui.screen import Screen
-
-        self._device_type = device_type
+        self._serial_number = serial_number
         self._device_index = device_index
         self._brightness = brightness
         self._device: Any = None  # low-level StreamDeck object
+        self._caps: DeviceCapabilities | None = None
+        self._metrics: RenderMetrics | None = None
         self._transport: AsyncTransport | None = None
         self._event_task: asyncio.Task | None = None
         self._closed_event = asyncio.Event()
@@ -119,36 +121,59 @@ class Deck:
         if not devices:
             raise DeckError("No Stream Deck devices found")
 
-        # Filter for target device type
-        matching = [d for d in devices if d.DECK_TYPE == self._device_type]
-        if not matching:
-            available = [d.DECK_TYPE for d in devices]
-            raise DeckError(f"No '{self._device_type}' found. Available: {available}")
+        # Filter for visual devices (skip Pedal)
+        visual = [d for d in devices if d.DECK_VISUAL]
+        if not visual:
+            raise DeckError("No visual Stream Deck devices found")
 
-        if self._device_index >= len(matching):
-            raise DeckError(
-                f"Device index {self._device_index} out of range "
-                f"(found {len(matching)} matching devices)"
-            )
+        # Select device
+        if self._serial_number is not None:
+            # Find by serial number — need to open each to read serial
+            target = None
+            for d in visual:
+                try:
+                    await loop.run_in_executor(self._executor, d.open)
+                    serial = d.get_serial_number()
+                    if serial == self._serial_number:
+                        target = d
+                        break
+                    await loop.run_in_executor(self._executor, d.close)
+                except Exception:
+                    continue
+            if target is None:
+                raise DeckError(
+                    f"No device with serial '{self._serial_number}' found"
+                )
+            self._device = target
+        else:
+            if self._device_index >= len(visual):
+                raise DeckError(
+                    f"Device index {self._device_index} out of range "
+                    f"(found {len(visual)} visual devices)"
+                )
+            self._device = visual[self._device_index]
+            await loop.run_in_executor(self._executor, self._device.open)
 
-        self._device = matching[self._device_index]
-
-        # Open device (blocking)
-        await loop.run_in_executor(self._executor, self._device.open)
         await loop.run_in_executor(self._executor, self._device.reset)
         await loop.run_in_executor(
             self._executor, self._device.set_brightness, self._brightness
         )
 
+        # Build capabilities and metrics
+        self._caps = DeviceCapabilities.from_device(self._device)
+        self._metrics = RenderMetrics(self._caps)
+
         logger.info(
-            "Opened %s (serial: %s, firmware: %s)",
+            "Opened %s (serial: %s, firmware: %s, keys: %d, dials: %d)",
             self._device.deck_type(),
             self._device.get_serial_number(),
             self._device.get_firmware_version(),
+            self._caps.key_count,
+            self._caps.dial_count,
         )
 
         # Set up async transport bridge
-        self._transport = AsyncTransport(self._device, loop)
+        self._transport = AsyncTransport(self._device, loop, self._caps)
         self._transport.start()
 
         self._running = True
@@ -195,6 +220,30 @@ class Deck:
         """Block until the deck is closed (e.g. by stop() or disconnect)."""
         await self._closed_event.wait()
 
+    # -- Device capabilities -----------------------------------------------
+
+    @property
+    def capabilities(self) -> DeviceCapabilities:
+        """The device capabilities for the connected device.
+
+        Raises:
+            DeckError: If the device is not opened.
+        """
+        if self._caps is None:
+            raise DeckError("Device not opened")
+        return self._caps
+
+    @property
+    def metrics(self) -> RenderMetrics:
+        """Rendering metrics for the connected device.
+
+        Raises:
+            DeckError: If the device is not opened.
+        """
+        if self._metrics is None:
+            raise DeckError("Device not opened")
+        return self._metrics
+
     # -- Device info -------------------------------------------------------
 
     @property
@@ -202,22 +251,17 @@ class Deck:
         """Get device information."""
         if not self._device:
             raise DeckError("Device not opened")
+        caps = self.capabilities
         return DeviceInfo(
-            deck_type=self._device.deck_type(),
+            deck_type=caps.deck_type,
             serial=self._device.get_serial_number(),
             firmware=self._device.get_firmware_version(),
-            key_count=self._device.key_count(),
-            key_layout=self._device.key_layout(),
-            encoder_count=self._device.dial_count(),
-            key_pixel_size=(
-                self._device.KEY_PIXEL_WIDTH,
-                self._device.KEY_PIXEL_HEIGHT,
-            ),
-            touchscreen_size=(
-                self._device.TOUCHSCREEN_PIXEL_WIDTH,
-                self._device.TOUCHSCREEN_PIXEL_HEIGHT,
-            ),
-            key_image_format=self._device.KEY_IMAGE_FORMAT,
+            key_count=caps.key_count,
+            key_layout=(caps.key_cols, caps.key_rows),
+            encoder_count=caps.dial_count,
+            key_pixel_size=caps.key_size,
+            touchscreen_size=(caps.touchscreen_width, caps.touchscreen_height),
+            key_image_format=caps.key_image_format,
         )
 
     # -- Brightness --------------------------------------------------------
@@ -251,7 +295,7 @@ class Deck:
         from ..ui.screen import Screen
 
         if name not in self._screens:
-            self._screens[name] = Screen(name)
+            self._screens[name] = Screen(name, self._caps)
         return self._screens[name]
 
     async def set_screen(self, name: str) -> None:
@@ -269,7 +313,10 @@ class Deck:
 
         # Render all keys and cards for this screen
         await self._render_all_keys()
-        await self._render_touchscreen()
+        if self._active_screen.touch_strip is not None:
+            await self._render_touchscreen()
+        if self._active_screen.info_screen is not None:
+            await self._render_info_screen()
 
     @property
     def active_screen(self) -> Screen | None:
@@ -286,15 +333,23 @@ class Deck:
         if not self._device or not screen:
             return
 
-        loop = asyncio.get_running_loop()
+        caps = self._caps
+        if caps is None:
+            return
 
-        for key_index in range(_KEY_COUNT):
+        loop = asyncio.get_running_loop()
+        metrics = self._metrics
+
+        for key_index in range(caps.key_count):
             key_slot = screen.keys.get(key_index)
             if key_slot and self._is_dsui_key(key_slot):
                 await self._render_dsui_key(key_slot)
             else:
                 # Blank key
-                image_bytes = render_blank_key()
+                image_bytes = render_blank_key(
+                    key_size=metrics.key_size if metrics else (120, 120),
+                    image_format=caps.key_image_format,
+                )
                 async with self._device_lock:
                     await loop.run_in_executor(
                         self._executor,
@@ -316,7 +371,10 @@ class Deck:
         from ..dsui.key import DsuiKey
 
         dsui_key: DsuiKey = key_slot  # type: ignore[assignment]
-        image_bytes = dsui_key.render_image()
+        image_bytes = dsui_key.render_image(
+            key_size=self._caps.key_size if self._caps else (120, 120),
+            image_format=self._caps.key_image_format if self._caps else "JPEG",
+        )
         dsui_key.set_rendered_image(image_bytes)
 
         loop = asyncio.get_running_loop()
@@ -331,7 +389,10 @@ class Deck:
     async def _render_touchscreen(self) -> None:
         """Render and push the full touch-strip image for the active screen."""
         screen = self._current_screen()
-        if not self._device or not screen:
+        if not self._device or not screen or not self._metrics:
+            return
+
+        if screen.touch_strip is None:
             return
 
         card_images = []
@@ -341,9 +402,18 @@ class Deck:
             card.set_rendered(img)
             card_images.append(img)
 
+        metrics = self._metrics
         touchstrip_bytes = compose_touchstrip(
             card_images,
             background=screen.touch_strip.background_color,
+            touchscreen_width=metrics.touchscreen_width,
+            touchscreen_height=metrics.touchscreen_height,
+            panel_count=metrics.panel_count,
+            panel_width=metrics.panel_width,
+            margin_left=metrics.margin_left,
+            margin_top=metrics.margin_top,
+            panel_gap=metrics.panel_gap,
+            image_format=self._caps.touchscreen_image_format if self._caps else "JPEG",
         )
 
         loop = asyncio.get_running_loop()
@@ -354,9 +424,34 @@ class Deck:
                 touchstrip_bytes,
                 0,
                 0,
-                TOUCHSCREEN_WIDTH,
-                TOUCHSCREEN_HEIGHT,
+                metrics.touchscreen_width,
+                metrics.touchscreen_height,
             )
+
+    async def _render_info_screen(self) -> None:
+        """Render and push the info screen image (e.g. Neo)."""
+        screen = self._current_screen()
+        if not self._device or not screen:
+            return
+
+        info = screen.info_screen
+        if info is None:
+            return
+
+        image_bytes = info.render_bytes()
+
+        loop = asyncio.get_running_loop()
+        async with self._device_lock:
+            await loop.run_in_executor(
+                self._executor,
+                self._device.set_screen_image,
+                image_bytes,
+                0,
+                0,
+                info.width,
+                info.height,
+            )
+        info.mark_clean()
 
     async def refresh(self) -> None:
         """Re-render and push all dirty controls on the active screen.
@@ -381,8 +476,12 @@ class Deck:
                     await self._render_dsui_key(key_slot)
 
         # Render the touch strip if any card is dirty
-        if screen.touch_strip.any_dirty:
+        if screen.touch_strip is not None and screen.touch_strip.any_dirty:
             await self._render_touchscreen()
+
+        # Render info screen if dirty
+        if screen.info_screen is not None and screen.info_screen.is_dirty:
+            await self._render_info_screen()
 
     # -- Event dispatch loop -----------------------------------------------
 
@@ -429,12 +528,7 @@ class Deck:
             self._closed_event.set()
 
     async def _drain_card_callbacks(self, card: Card) -> None:
-        """Drain and await all pending callbacks queued on a card.
-
-        Callbacks are enqueued by child elements (e.g. range controls) when
-        their value changes synchronously.  This method pops them all
-        and awaits each in order.
-        """
+        """Drain and await all pending callbacks queued on a card."""
         for handler, args in card.drain_pending_callbacks():
             await handler(*args)
 
@@ -455,27 +549,30 @@ class Deck:
             encoder = screen.encoders.get(event.encoder)
             if encoder:
                 await encoder.dispatch_turn(event.direction)
-            card = screen.touch_strip.card(event.encoder)
-            await card.dispatch_encoder_turn(event.direction)
-            await self._drain_card_callbacks(card)
-            if card.is_dirty:
-                await self.refresh()
+            if screen.touch_strip is not None:
+                card = screen.touch_strip.card(event.encoder)
+                await card.dispatch_encoder_turn(event.direction)
+                await self._drain_card_callbacks(card)
+                if card.is_dirty:
+                    await self.refresh()
 
         elif isinstance(event, EncoderPressEvent):
             encoder = screen.encoders.get(event.encoder)
             if encoder:
                 await encoder.dispatch_press(event.pressed)
-            card = screen.touch_strip.card(event.encoder)
-            card.set_refresh_callback(self.refresh)
-            if event.pressed:
-                await card.dispatch_encoder_press()
-            else:
-                await card.dispatch_encoder_release()
-            await self._drain_card_callbacks(card)
-            if card.is_dirty:
-                await self.refresh()
+            if screen.touch_strip is not None:
+                card = screen.touch_strip.card(event.encoder)
+                card.set_refresh_callback(self.refresh)
+                if event.pressed:
+                    await card.dispatch_encoder_press()
+                else:
+                    await card.dispatch_encoder_release()
+                await self._drain_card_callbacks(card)
+                if card.is_dirty:
+                    await self.refresh()
 
         elif isinstance(event, TouchEvent):
-            zone = event.zone
-            card = screen.touch_strip.card(zone)
-            await card.dispatch_touch(event)
+            if screen.touch_strip is not None and self._metrics is not None:
+                zone = event.compute_zone(self._metrics)
+                card = screen.touch_strip.card(zone)
+                await card.dispatch_touch(event)

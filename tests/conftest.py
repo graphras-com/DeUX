@@ -9,13 +9,101 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock
 import pytest
 from PIL import Image
 
+from deckboard.runtime.capabilities import (
+    DeviceCapabilities,
+    STREAM_DECK_PLUS,
+)
 from deckboard.ui.controls.key_slot import KeySlot
 from deckboard.ui.controls.encoder_slot import EncoderSlot
 from deckboard.ui.screen import Screen
-from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH, RenderMetrics
 from deckboard.ui.touch_strip import TouchStrip
 from deckboard.ui.cards.base import Card
 from deckboard.ui.cards.blank import BlankCard
+
+
+# -- Device capability presets ------------------------------------------------
+
+STREAM_DECK_MINI = DeviceCapabilities(
+    deck_type="Stream Deck Mini",
+    key_count=6,
+    key_cols=3,
+    key_rows=2,
+    key_pixel_width=80,
+    key_pixel_height=80,
+    key_image_format="BMP",
+    key_flip=(True, True),
+    key_rotation=90,
+    has_visual=True,
+    has_touch=False,
+    dial_count=0,
+    touchscreen_width=0,
+    touchscreen_height=0,
+    touchscreen_image_format="",
+    touchscreen_flip=(False, False),
+    touchscreen_rotation=0,
+    has_screen=False,
+    screen_width=0,
+    screen_height=0,
+    screen_image_format="",
+    screen_flip=(False, False),
+    screen_rotation=0,
+    touch_key_count=0,
+)
+
+STREAM_DECK_NEO = DeviceCapabilities(
+    deck_type="Stream Deck Neo",
+    key_count=8,
+    key_cols=4,
+    key_rows=2,
+    key_pixel_width=96,
+    key_pixel_height=96,
+    key_image_format="JPEG",
+    key_flip=(False, False),
+    key_rotation=0,
+    has_visual=True,
+    has_touch=False,
+    dial_count=0,
+    touchscreen_width=0,
+    touchscreen_height=0,
+    touchscreen_image_format="",
+    touchscreen_flip=(False, False),
+    touchscreen_rotation=0,
+    has_screen=True,
+    screen_width=248,
+    screen_height=58,
+    screen_image_format="JPEG",
+    screen_flip=(False, False),
+    screen_rotation=0,
+    touch_key_count=0,
+)
+
+STREAM_DECK_XL = DeviceCapabilities(
+    deck_type="Stream Deck XL",
+    key_count=32,
+    key_cols=8,
+    key_rows=4,
+    key_pixel_width=96,
+    key_pixel_height=96,
+    key_image_format="JPEG",
+    key_flip=(True, True),
+    key_rotation=0,
+    has_visual=True,
+    has_touch=False,
+    dial_count=0,
+    touchscreen_width=0,
+    touchscreen_height=0,
+    touchscreen_image_format="",
+    touchscreen_flip=(False, False),
+    touchscreen_rotation=0,
+    has_screen=False,
+    screen_width=0,
+    screen_height=0,
+    screen_image_format="",
+    screen_flip=(False, False),
+    screen_rotation=0,
+    touch_key_count=0,
+)
 
 
 # -- Minimal SVG templates for dsui tests ----------------------------------
@@ -210,14 +298,14 @@ def encoder():
 
 @pytest.fixture
 def touchscreen():
-    """A fresh TouchStrip with 4 blank cards."""
-    return TouchStrip()
+    """A fresh TouchStrip with 4 blank cards (Stream Deck+ default)."""
+    return TouchStrip(panel_count=4)
 
 
 @pytest.fixture
 def page():
-    """A fresh Screen named 'test'."""
-    return Screen("test")
+    """A fresh Screen named 'test' with Stream Deck+ capabilities."""
+    return Screen("test", STREAM_DECK_PLUS)
 
 
 @pytest.fixture
@@ -238,23 +326,35 @@ def sample_widget_image():
     return Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), (0, 0, 255))
 
 
-@pytest.fixture
-def mock_streamdeck_device():
-    """A MagicMock that mimics a StreamDeck device object."""
+def _make_mock_streamdeck(caps: DeviceCapabilities) -> MagicMock:
+    """Create a MagicMock mimicking a StreamDeck device from capabilities."""
     device = MagicMock()
-    device.DECK_TYPE = "Stream Deck +"
-    device.KEY_PIXEL_WIDTH = 120
-    device.KEY_PIXEL_HEIGHT = 120
-    device.TOUCHSCREEN_PIXEL_WIDTH = 800
-    device.TOUCHSCREEN_PIXEL_HEIGHT = 100
-    device.KEY_IMAGE_FORMAT = "JPEG"
+    device.DECK_TYPE = caps.deck_type
+    device.DECK_VISUAL = caps.has_visual
+    device.DECK_TOUCH = caps.has_touch
+    device.KEY_PIXEL_WIDTH = caps.key_pixel_width
+    device.KEY_PIXEL_HEIGHT = caps.key_pixel_height
+    device.KEY_IMAGE_FORMAT = caps.key_image_format
+    device.KEY_FLIP = list(caps.key_flip)
+    device.KEY_ROTATION = caps.key_rotation
+    device.TOUCHSCREEN_PIXEL_WIDTH = caps.touchscreen_width
+    device.TOUCHSCREEN_PIXEL_HEIGHT = caps.touchscreen_height
+    device.TOUCHSCREEN_IMAGE_FORMAT = caps.touchscreen_image_format
+    device.TOUCHSCREEN_FLIP = list(caps.touchscreen_flip)
+    device.TOUCHSCREEN_ROTATION = caps.touchscreen_rotation
+    device.SCREEN_PIXEL_WIDTH = caps.screen_width
+    device.SCREEN_PIXEL_HEIGHT = caps.screen_height
+    device.SCREEN_IMAGE_FORMAT = caps.screen_image_format
+    device.SCREEN_FLIP = list(caps.screen_flip)
+    device.SCREEN_ROTATION = caps.screen_rotation
+    device.TOUCH_KEY_COUNT = caps.touch_key_count
 
-    device.deck_type.return_value = "Stream Deck +"
+    device.deck_type.return_value = caps.deck_type
     device.get_serial_number.return_value = "TEST123"
     device.get_firmware_version.return_value = "1.0.0"
-    device.key_count.return_value = 8
-    device.key_layout.return_value = (4, 2)
-    device.dial_count.return_value = 4
+    device.key_count.return_value = caps.key_count
+    device.key_layout.return_value = (caps.key_cols, caps.key_rows)
+    device.dial_count.return_value = caps.dial_count
 
     device.open.return_value = None
     device.close.return_value = None
@@ -262,9 +362,34 @@ def mock_streamdeck_device():
     device.set_brightness.return_value = None
     device.set_key_image.return_value = None
     device.set_touchscreen_image.return_value = None
+    device.set_screen_image.return_value = None
 
     device.set_key_callback.return_value = None
     device.set_dial_callback.return_value = None
     device.set_touchscreen_callback.return_value = None
 
     return device
+
+
+@pytest.fixture
+def mock_streamdeck_device():
+    """A MagicMock that mimics a Stream Deck+ device object."""
+    return _make_mock_streamdeck(STREAM_DECK_PLUS)
+
+
+@pytest.fixture
+def mock_mini_device():
+    """A MagicMock that mimics a Stream Deck Mini device object."""
+    return _make_mock_streamdeck(STREAM_DECK_MINI)
+
+
+@pytest.fixture
+def mock_neo_device():
+    """A MagicMock that mimics a Stream Deck Neo device object."""
+    return _make_mock_streamdeck(STREAM_DECK_NEO)
+
+
+@pytest.fixture
+def mock_xl_device():
+    """A MagicMock that mimics a Stream Deck XL device object."""
+    return _make_mock_streamdeck(STREAM_DECK_XL)

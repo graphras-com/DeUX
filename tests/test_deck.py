@@ -8,8 +8,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from PIL import Image
 
-from deckboard.runtime.deck import Deck, DeckError, _KEY_COUNT
-from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from deckboard.runtime.deck import Deck, DeckError
+from deckboard.runtime.capabilities import STREAM_DECK_PLUS
+from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH, RenderMetrics
 from deckboard.ui.screen import Screen
 from deckboard.ui.cards.base import Card
 from deckboard.ui.cards.blank import BlankCard
@@ -40,7 +41,7 @@ def deck(tmp_path):
 
 class TestDeckInit:
     def test_defaults(self, deck):
-        assert deck._device_type == "Stream Deck +"
+        assert deck._serial_number is None
         assert deck._device_index == 0
         assert deck._brightness == 80
         assert deck._device is None
@@ -51,11 +52,11 @@ class TestDeckInit:
 
     def test_custom_params(self):
         d = Deck(
-            device_type="Stream Deck Mini",
+            serial_number="ABC123",
             device_index=1,
             brightness=50,
         )
-        assert d._device_type == "Stream Deck Mini"
+        assert d._serial_number == "ABC123"
         assert d._device_index == 1
         assert d._brightness == 50
 
@@ -370,6 +371,7 @@ class TestDeckDispatch:
         handler = AsyncMock()
         p.card(0).on_tap(handler)
         deck._active_page = p
+        deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
 
         await deck._dispatch(TouchEvent(event_type=EventType.TOUCH_SHORT, x=50, y=50))
         handler.assert_awaited_once()
@@ -379,6 +381,7 @@ class TestDeckDispatch:
         handler = AsyncMock()
         p.card(1).on_long_press(handler)
         deck._active_page = p
+        deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
 
         await deck._dispatch(TouchEvent(event_type=EventType.TOUCH_LONG, x=300, y=50))
         handler.assert_awaited_once()
@@ -388,6 +391,7 @@ class TestDeckDispatch:
         handler = AsyncMock()
         p.card(2).on_drag(handler)
         deck._active_page = p
+        deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
 
         await deck._dispatch(
             TouchEvent(
@@ -403,6 +407,7 @@ class TestDeckDispatch:
     async def test_touch_no_handler(self, deck):
         p = deck.screen("main")
         deck._active_page = p
+        deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
 
         await deck._dispatch(TouchEvent(event_type=EventType.TOUCH_SHORT, x=50, y=50))
 
@@ -412,6 +417,7 @@ class TestDeckDispatch:
         handler = AsyncMock()
         p.card(3).on_tap(handler)
         deck._active_page = p
+        deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
 
         await deck._dispatch(TouchEvent(event_type=EventType.TOUCH_SHORT, x=700, y=50))
         handler.assert_awaited_once()
@@ -503,12 +509,14 @@ class TestDeckRenderAllKeys:
 
     async def test_renders_with_device(self, deck, mock_streamdeck_device):
         deck._device = mock_streamdeck_device
+        deck._caps = STREAM_DECK_PLUS
+        deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
         p = deck.screen("main")
         deck._active_page = p
 
         await deck._render_all_keys()
         # Should have called set_key_image for all 8 keys (all blank)
-        assert mock_streamdeck_device.set_key_image.call_count == _KEY_COUNT
+        assert mock_streamdeck_device.set_key_image.call_count == STREAM_DECK_PLUS.key_count
 
 
 # ── Deck._render_touchscreen ───────────────────────────────────────────
@@ -522,6 +530,8 @@ class TestDeckRenderTouchscreen:
 
     async def test_renders_with_device(self, deck, mock_streamdeck_device):
         deck._device = mock_streamdeck_device
+        deck._caps = STREAM_DECK_PLUS
+        deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
         p = deck.screen("main")
         deck._active_page = p
 
@@ -530,6 +540,8 @@ class TestDeckRenderTouchscreen:
 
     async def test_renders_custom_cards(self, deck, mock_streamdeck_device):
         deck._device = mock_streamdeck_device
+        deck._caps = STREAM_DECK_PLUS
+        deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
         p = deck.screen("main")
         card = _TestCard(0)
         p.set_card(0, card)
@@ -549,6 +561,7 @@ class TestDeckInfo:
 
     def test_returns_device_info(self, deck, mock_streamdeck_device):
         deck._device = mock_streamdeck_device
+        deck._caps = STREAM_DECK_PLUS
         info = deck.info
         assert info.deck_type == "Stream Deck +"
         assert info.serial == "TEST123"
@@ -561,6 +574,28 @@ class TestDeckInfo:
         assert info.key_image_format == "JPEG"
 
 
+# ── Deck.capabilities / metrics ────────────────────────────────────────
+
+
+class TestDeckCapabilities:
+    def test_capabilities_not_opened(self, deck):
+        with pytest.raises(DeckError, match="Device not opened"):
+            _ = deck.capabilities
+
+    def test_metrics_not_opened(self, deck):
+        with pytest.raises(DeckError, match="Device not opened"):
+            _ = deck.metrics
+
+    def test_capabilities_after_set(self, deck):
+        deck._caps = STREAM_DECK_PLUS
+        assert deck.capabilities is STREAM_DECK_PLUS
+
+    def test_metrics_after_set(self, deck):
+        deck._caps = STREAM_DECK_PLUS
+        deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
+        assert deck.metrics.key_count == 8
+
+
 # ── Deck.start ──────────────────────────────────────────────────────────
 
 
@@ -571,18 +606,18 @@ class TestDeckStart:
             with pytest.raises(DeckError, match="No Stream Deck devices found"):
                 await deck.start()
 
-    async def test_no_matching_type(self, deck):
+    async def test_no_visual_devices(self, deck):
         mock_dev = MagicMock()
-        mock_dev.DECK_TYPE = "Stream Deck Mini"
+        mock_dev.DECK_VISUAL = False
         with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_dev]
-            with pytest.raises(DeckError, match="No 'Stream Deck \\+' found"):
+            with pytest.raises(DeckError, match="No visual Stream Deck devices found"):
                 await deck.start()
 
     async def test_device_index_out_of_range(self, deck):
         deck._device_index = 5
         mock_dev = MagicMock()
-        mock_dev.DECK_TYPE = "Stream Deck +"
+        mock_dev.DECK_VISUAL = True
         with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_dev]
             with pytest.raises(DeckError, match="Device index 5 out of range"):
@@ -595,6 +630,8 @@ class TestDeckStart:
             assert deck._running is True
             assert deck._device is mock_streamdeck_device
             assert deck._transport is not None
+            assert deck._caps is not None
+            assert deck._metrics is not None
             # Cleanup
             await deck.stop()
 
@@ -607,6 +644,22 @@ class TestDeckStart:
             # enumerate only called once
             assert mock_dm.return_value.enumerate.call_count == 1
             await deck.stop()
+
+    async def test_start_with_serial_number(self, mock_streamdeck_device):
+        d = Deck(serial_number="TEST123")
+        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
+            mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
+            await d.start()
+            assert d._device is mock_streamdeck_device
+            await d.stop()
+
+    async def test_start_serial_not_found(self, mock_streamdeck_device):
+        d = Deck(serial_number="NOMATCH")
+        mock_streamdeck_device.get_serial_number.return_value = "OTHER"
+        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
+            mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
+            with pytest.raises(DeckError, match="No device with serial"):
+                await d.start()
 
 
 # ── Deck.stop ───────────────────────────────────────────────────────────
