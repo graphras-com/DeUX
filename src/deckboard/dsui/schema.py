@@ -205,6 +205,13 @@ class EventMapping:
 # Sources that require the hold_ms field.
 HOLD_SOURCES = frozenset({"key_hold", "encoder_hold"})
 
+# Reasonable defaults applied when the user omits timing parameters.
+DEFAULT_MAX_DURATION_MS: int = 500
+"""Default max press duration (ms) for ``*_press_release`` events."""
+
+DEFAULT_HOLD_MS: int = 500
+"""Default hold duration (ms) for ``*_hold`` events."""
+
 
 @dataclass(frozen=True, slots=True)
 class Region:

@@ -14,6 +14,8 @@ from .schema import (
     BindingType,
     ColorBinding,
     EventMapping,
+    DEFAULT_HOLD_MS,
+    DEFAULT_MAX_DURATION_MS,
     HOLD_SOURCES,
     IconifyBinding,
     ImageBinding,
@@ -37,6 +39,9 @@ logger = logging.getLogger(__name__)
 
 # SVG namespace used by ElementTree
 _SVG_NS = {"svg": "http://www.w3.org/2000/svg"}
+
+# Sources that accept max_duration_ms.
+_PRESS_RELEASE_SOURCES = frozenset({"key_press_release", "encoder_press_release"})
 
 
 class PackageError(Exception):
@@ -277,16 +282,18 @@ def _parse_event(raw: dict[str, Any], index: int) -> EventMapping:
 
     hold_ms = raw.get("hold_ms")
     if source in HOLD_SOURCES:
-        if hold_ms is None:
-            raise PackageError(
-                f"Event '{name}': hold_ms is required for source '{source}'"
-            )
-        if not isinstance(hold_ms, int) or hold_ms <= 0:
+        if hold_ms is not None and (not isinstance(hold_ms, int) or hold_ms <= 0):
             raise PackageError(f"Event '{name}': hold_ms must be a positive integer")
     elif hold_ms is not None:
         raise PackageError(
             f"Event '{name}': hold_ms is only valid for key_hold/encoder_hold sources"
         )
+
+    # Apply reasonable defaults for omitted timing parameters.
+    if source in HOLD_SOURCES and hold_ms is None:
+        hold_ms = DEFAULT_HOLD_MS
+    if source in _PRESS_RELEASE_SOURCES and max_duration_ms is None:
+        max_duration_ms = DEFAULT_MAX_DURATION_MS
 
     return EventMapping(
         name=name,

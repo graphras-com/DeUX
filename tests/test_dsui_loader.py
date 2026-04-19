@@ -585,6 +585,20 @@ class TestLoadPackageInvalid:
         with pytest.raises(PackageError, match="invalid direction"):
             load_package(pkg)
 
+    def test_event_max_duration_ms_defaults_for_press_release(self, tmp_path):
+        pkg = tmp_path / "Good.dsui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Good\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "events:\n  - name: x\n    source: key_press_release",
+            encoding="utf-8",
+        )
+        spec = load_package(pkg)
+        ev = next(e for e in spec.events if e.name == "x")
+        assert ev.max_duration_ms == 500
+
     def test_event_invalid_duration(self, tmp_path):
         pkg = tmp_path / "Bad.dsui"
         pkg.mkdir()
@@ -598,31 +612,33 @@ class TestLoadPackageInvalid:
         with pytest.raises(PackageError, match="positive integer"):
             load_package(pkg)
 
-    def test_event_hold_ms_required_for_key_hold(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+    def test_event_hold_ms_defaults_for_key_hold(self, tmp_path):
+        pkg = tmp_path / "Good.dsui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
         (pkg / "manifest.yaml").write_text(
-            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "name: Good\ntype: Key\nversion: 1\nlayout: layout.svg\n"
             "events:\n  - name: x\n    source: key_hold",
             encoding="utf-8",
         )
-        with pytest.raises(PackageError, match="hold_ms is required"):
-            load_package(pkg)
+        spec = load_package(pkg)
+        ev = next(e for e in spec.events if e.name == "x")
+        assert ev.hold_ms == 500
 
-    def test_event_hold_ms_required_for_encoder_hold(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+    def test_event_hold_ms_defaults_for_encoder_hold(self, tmp_path):
+        pkg = tmp_path / "Good.dsui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
         (pkg / "manifest.yaml").write_text(
-            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "name: Good\ntype: Key\nversion: 1\nlayout: layout.svg\n"
             "events:\n  - name: x\n    source: encoder_hold",
             encoding="utf-8",
         )
-        with pytest.raises(PackageError, match="hold_ms is required"):
-            load_package(pkg)
+        spec = load_package(pkg)
+        ev = next(e for e in spec.events if e.name == "x")
+        assert ev.hold_ms == 500
 
     def test_event_hold_ms_invalid(self, tmp_path):
         pkg = tmp_path / "Bad.dsui"
