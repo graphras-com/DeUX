@@ -404,6 +404,17 @@ mypy src/deckboard/
 | `RasterizeError` | SVG rasterisation failure |
 | `PackageError` | Invalid .dsui manifest or layout |
 
+## Acknowledgments
+
+Deckboard is built on these excellent open-source libraries:
+
+- **[python-elgato-streamdeck](https://github.com/abcminiuser/python-elgato-streamdeck)** — Low-level HID interface for Stream Deck devices (MIT)
+- **[Pillow](https://github.com/python-pillow/Pillow)** — Image processing and rendering (HPND)
+- **[CairoSVG](https://github.com/Kozea/CairoSVG)** — SVG-to-PNG rasterisation (LGPL-3.0)
+- **[PyYAML](https://github.com/yaml/pyyaml)** — YAML parsing for .dsui manifests (MIT)
+
+See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for full license texts.
+
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE) for details.
