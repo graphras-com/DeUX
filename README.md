@@ -1,12 +1,26 @@
-# deckboard
+# Deckboard
 
-An asyncio-native Python 3.11+ library for building rich interfaces on the
-Elgato Stream Deck+.
+An asyncio-native Python 3.11+ library for building rich interfaces on
+Elgato Stream Deck devices.
 
-Deckboard wraps the low-level HID layer and gives you a high-level API for
-keys, rotary encoders, and the touchscreen strip. Define multi-screen layouts,
-register event handlers with decorators, and use declarative `.dsui` packages
-for SVG-based UI — the library handles rendering and device I/O.
+Deckboard auto-detects your connected Stream Deck and adapts to its hardware
+capabilities — key count, key image size, encoders, touchscreen, and info
+screen. Define multi-screen layouts, register event handlers with decorators,
+and use declarative `.dsui` packages for SVG-based UI. The library handles
+rendering, encoding, and device I/O.
+
+## Supported devices
+
+| Device | Keys | Key size | Encoders | Touchscreen | Info screen | Image format |
+|--------|------|----------|----------|-------------|-------------|--------------|
+| Mini | 6 (3×2) | 80×80 | — | — | — | BMP |
+| Original v1 | 15 (5×3) | 72×72 | — | — | — | BMP |
+| Original v2 | 15 (5×3) | 72×72 | — | — | — | JPEG |
+| XL | 32 (8×4) | 96×96 | — | — | — | JPEG |
+| **Plus** | 8 (4×2) | 120×120 | 4 | 800×100 | — | JPEG |
+| Neo | 8 (4×2) | 96×96 | — | — | 248×58 | JPEG |
+
+The Pedal is excluded — it has no visual output.
 
 ## Quick start
 
@@ -22,9 +36,11 @@ async def main():
         async def on_home():
             print("Home pressed!")
 
-        @screen.encoder(0).on_turn
-        async def on_turn(direction: int):
-            print(f"Encoder turned: {direction}")
+        # encoders are only available on devices that have them (e.g. Plus)
+        if deck.caps.has_encoders:
+            @screen.encoder(0).on_turn
+            async def on_turn(direction: int):
+                print(f"Encoder turned: {direction}")
 
         await deck.set_screen("main")
         await deck.wait_closed()
@@ -38,8 +54,8 @@ asyncio.run(main())
 pip install deckboard
 ```
 
-The library depends on system libraries for HID access and SVG rendering.
-Install them before using deckboard:
+Deckboard depends on system libraries for HID access and SVG rendering.
+Install them before using Deckboard:
 
 **macOS**
 
@@ -55,30 +71,34 @@ sudo apt install libhidapi-libusb0 libcairo2
 
 ## Features
 
-### Async context manager
+### Auto-detection
 
-`Deck` manages the full device lifecycle. Opening, event dispatch, rendering,
-and cleanup are handled automatically:
+`Deck()` discovers and connects to the first available visual Stream Deck.
+All layout sizes, image formats, and rendering parameters adapt automatically
+based on a `DeviceCapabilities` snapshot queried from the hardware.
 
 ```python
-async with Deck(brightness=90) as deck:
-    # device is open, event loop is running
-    ...
-# device is closed, resources are released
+async with Deck() as deck:
+    print(deck.caps.deck_type)      # e.g. "Stream Deck XL"
+    print(deck.caps.key_count)      # e.g. 32
+    print(deck.caps.key_size)       # e.g. (96, 96)
+    print(deck.caps.has_encoders)   # e.g. False
+    print(deck.caps.has_touchscreen)  # e.g. False
 ```
 
-The constructor accepts optional parameters:
+Constructor parameters:
 
-| Parameter        | Default            | Description                        |
-|------------------|--------------------|------------------------------------|
-| `device_type`    | `"Stream Deck +"`  | Stream Deck model to search for    |
-| `device_index`   | `0`                | Which device if multiple are found |
-| `brightness`     | `80`               | Initial brightness (0-100)         |
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `serial_number` | `None` | Target a specific device by serial number |
+| `device_index` | `0` | Which device if multiple visual decks are found |
+| `brightness` | `80` | Initial brightness (0–100) |
 
 ### Screens
 
-Screens are named layouts. Each screen holds up to 8 key slots, 4 encoder
-slots, and 4 touchscreen card zones. Switch between screens atomically:
+Screens are named layouts. Each screen holds key slots, encoder slots (if the
+device has encoders), and touchscreen card zones (if the device has a
+touchscreen). Counts adapt to the connected hardware.
 
 ```python
 main = deck.screen("main")
@@ -90,8 +110,8 @@ await deck.set_screen("settings")   # swap instantly
 
 ### Keys
 
-`KeySlot` wraps a single physical key (indices 0-7). Register press and
-release handlers with decorators:
+`KeySlot` wraps a single physical key. The valid index range depends on the
+device (0–5 for Mini, 0–7 for Plus/Neo, 0–14 for Original, 0–31 for XL).
 
 ```python
 @screen.key(0).on_press
@@ -103,11 +123,10 @@ async def handle_release():
     print("released")
 ```
 
-For keys with custom visual content, use `.dsui` key packages (see below).
-
 ### Encoders
 
-`EncoderSlot` wraps a rotary encoder (indices 0-3):
+`EncoderSlot` wraps a rotary encoder. Only available on devices with dials
+(currently the Plus with 4 encoders).
 
 ```python
 @screen.encoder(0).on_turn
@@ -118,21 +137,17 @@ async def on_turn(direction: int):
 @screen.encoder(0).on_press
 async def on_press():
     print("encoder pushed")
-
-@screen.encoder(0).on_release
-async def on_release():
-    print("encoder released")
 ```
 
 ### Touchscreen cards
 
-The 800x100 touchscreen is divided into 4 card zones. Cards are subclasses of
-the `Card` abstract base class. Implement `render()` to draw your content:
+On devices with a touchscreen (currently the Plus, 800×100), the strip is
+divided into card zones matching the encoder count. Cards are subclasses of
+the `Card` abstract base class:
 
 ```python
 from PIL import Image
 from deckboard import Card
-from deckboard.render import PANEL_WIDTH, PANEL_HEIGHT
 
 class StatusCard(Card):
     def __init__(self, index: int):
@@ -140,7 +155,7 @@ class StatusCard(Card):
         self.status = "OK"
 
     def render(self) -> Image.Image:
-        img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+        img = Image.new("RGB", (200, 100), "black")
         # draw status text, icons, etc.
         return img
 
@@ -163,16 +178,32 @@ async def on_long():
 @card.on_drag
 async def on_drag(x, y, x_out, y_out):
     print(f"drag from ({x},{y}) to ({x_out},{y_out})")
+```
 
-@card.on_encoder_turn
-async def on_enc_turn(direction: int):
-    print(f"encoder above card turned {direction}")
+### Info screen (Neo)
+
+The Neo has a 248×58 non-touch info display. Deckboard exposes it via the
+`InfoScreen` class with simple dirty-tracked image management:
+
+```python
+from PIL import Image
+
+async with Deck() as deck:
+    if deck.caps.has_info_screen:
+        screen = deck.screen("main")
+        info = screen.info_screen
+
+        img = Image.new("RGB", (248, 58), "black")
+        # draw status content...
+        info.set_image(img)
+        await deck.refresh()
 ```
 
 ### Dirty tracking and rendering
 
-Cards track whether they need re-rendering. After updating values
-programmatically, call `refresh()` to push changes to the device:
+Cards, keys, and the info screen track whether they need re-rendering. After
+updating values programmatically, call `refresh()` to push changes to the
+device:
 
 ```python
 card.set("title", "Updated")
@@ -181,7 +212,7 @@ await deck.refresh()
 
 ## Declarative UI packages (.dsui)
 
-For complex layouts, deckboard supports `.dsui` packages: directories
+For complex layouts, Deckboard supports `.dsui` packages: directories
 containing a YAML manifest and an SVG layout. The SVG is rendered with live
 data bindings and the manifest maps physical events to semantic handlers.
 
@@ -235,12 +266,12 @@ regions:
 
 ### Binding types
 
-| Type         | Description                                   |
-|--------------|-----------------------------------------------|
-| `text`       | Set text content on an SVG element            |
-| `image`      | Embed a PIL Image into an SVG `<image>` node  |
-| `visibility` | Toggle `display` attribute of an SVG element  |
-| `color`      | Set `fill` or `stroke` on an SVG element      |
+| Type | Description |
+|------|-------------|
+| `text` | Set text content on an SVG element |
+| `image` | Embed a PIL Image into an SVG `<image>` node |
+| `visibility` | Toggle `display` attribute of an SVG element |
+| `color` | Set `fill` or `stroke` on an SVG element |
 
 ### Event sources
 
@@ -286,7 +317,7 @@ async def main():
 
 ## Preview tool
 
-Preview SVG designs on a physical Stream Deck+ without writing application
+Preview SVG designs on a physical Stream Deck without writing application
 code:
 
 ```bash
@@ -305,13 +336,12 @@ Arguments: `--key0` through `--key7`, `--card0` through `--card3`,
 
 ```
 src/deckboard/
-  runtime/          # Device lifecycle, events, async transport
-  render/           # Image rendering, SVG rasterisation
-  ui/               # Screens, key slots, encoder slots, cards
+  runtime/          # Device lifecycle, capabilities, events, async transport
+  render/           # Image rendering, SVG rasterisation, info screen rendering
+  ui/               # Screens, key slots, encoder slots, cards, info screen
   dsui/             # Declarative .dsui package system
   tools/            # CLI utilities (preview)
 tests/              # Test suite (pytest, 95%+ coverage)
-examples/           # Usage examples and sample .dsui packages
 ```
 
 ## Development
@@ -334,44 +364,46 @@ mypy src/deckboard/
 
 ### Core classes
 
-| Class          | Module                      | Description                                |
-|----------------|-----------------------------|--------------------------------------------|
-| `Deck`         | `deckboard.runtime.deck`    | Main entry point, device lifecycle         |
-| `Screen`       | `deckboard.ui.screen`       | Named layout of keys, encoders, and cards  |
-| `KeySlot`      | `deckboard.ui.controls`     | Physical key (0-7)                         |
-| `EncoderSlot`  | `deckboard.ui.controls`     | Rotary encoder (0-3)                       |
-| `Card`         | `deckboard.ui.cards`        | Abstract base for touchscreen cards        |
-| `BlankCard`    | `deckboard.ui.cards`        | Default empty card                         |
-| `TouchStrip`   | `deckboard.ui.touch_strip`  | Container for 4 card zones                 |
-
+| Class | Module | Description |
+|-------|--------|-------------|
+| `Deck` | `deckboard.runtime.deck` | Main entry point, auto-detects device |
+| `DeviceCapabilities` | `deckboard.runtime.capabilities` | Frozen snapshot of device hardware |
+| `RenderMetrics` | `deckboard.render.metrics` | Computed rendering dimensions and margins |
+| `Screen` | `deckboard.ui.screen` | Named layout of keys, encoders, and cards |
+| `KeySlot` | `deckboard.ui.controls` | Physical key (index range varies by device) |
+| `EncoderSlot` | `deckboard.ui.controls` | Rotary encoder (Plus only) |
+| `Card` | `deckboard.ui.cards` | Abstract base for touchscreen cards |
+| `BlankCard` | `deckboard.ui.cards` | Default empty card |
+| `TouchStrip` | `deckboard.ui.touch_strip` | Container for touchscreen card zones |
+| `InfoScreen` | `deckboard.ui.info_screen` | Non-touch info display (Neo) |
 
 ### DSUI classes
 
-| Class          | Module                      | Description                                |
-|----------------|-----------------------------|--------------------------------------------|
-| `DsuiCard`     | `deckboard.dsui.card`       | Card backed by a .dsui package             |
-| `DsuiKey`      | `deckboard.dsui.key`        | Key backed by a .dsui package              |
-| `PackageSpec`  | `deckboard.dsui.schema`     | Immutable .dsui package manifest           |
-| `EventMap`     | `deckboard.dsui.event_map`  | Physical-to-semantic event routing         |
-| `SvgRenderer`  | `deckboard.dsui.svg_renderer` | SVG rendering with live data bindings    |
+| Class | Module | Description |
+|-------|--------|-------------|
+| `DsuiCard` | `deckboard.dsui.card` | Card backed by a .dsui package |
+| `DsuiKey` | `deckboard.dsui.key` | Key backed by a .dsui package |
+| `PackageSpec` | `deckboard.dsui.schema` | Immutable .dsui package manifest |
+| `EventMap` | `deckboard.dsui.event_map` | Physical-to-semantic event routing |
+| `SvgRenderer` | `deckboard.dsui.svg_renderer` | SVG rendering with live data bindings |
 
 ### Event types
 
-| Class               | Fields                                             |
-|---------------------|----------------------------------------------------|
-| `KeyEvent`          | `key: int`, `pressed: bool`                        |
-| `EncoderTurnEvent`  | `encoder: int`, `direction: int`                   |
-| `EncoderPressEvent` | `encoder: int`, `pressed: bool`                    |
-| `TouchEvent`        | `event_type: EventType`, `x`, `y`, `x_out`, `y_out` |
+| Class | Fields |
+|-------|--------|
+| `KeyEvent` | `key: int`, `pressed: bool` |
+| `EncoderTurnEvent` | `encoder: int`, `direction: int` |
+| `EncoderPressEvent` | `encoder: int`, `pressed: bool` |
+| `TouchEvent` | `event_type: EventType`, `x`, `y`, `x_out`, `y_out` |
 
 ### Exceptions
 
-| Exception      | Raised when                                |
-|----------------|--------------------------------------------|
-| `DeckError`       | Device not found, not opened, or HID error |
-| `RasterizeError`  | SVG rasterisation failure                  |
-| `PackageError`    | Invalid .dsui manifest or layout           |
+| Exception | Raised when |
+|-----------|-------------|
+| `DeckError` | Device not found, not opened, or HID error |
+| `RasterizeError` | SVG rasterisation failure |
+| `PackageError` | Invalid .dsui manifest or layout |
 
 ## License
 
-Apache 2.0 -- see [LICENSE](LICENSE) for details.
+Apache 2.0 — see [LICENSE](LICENSE) for details.
