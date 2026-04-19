@@ -32,31 +32,26 @@ async def main():
         screen = deck.screen("main")
 
         card = DsuiCard(spec)
-        volume = 0.5
         muted = False
 
-        card.set("volume", volume)
-        card.set("value_text", f"{int(volume * 100)}%")
+        card.set_range("volume", 50, min_val=0, max_val=100)
+        card.set("value_text", "50%")
         screen.set_card(0, card)
 
         @card.on("volume_up")
         async def on_up():
-            nonlocal volume
-            volume = min(1.0, volume + 0.05)
-            card.set("volume", volume)
-            card.set("value_text", f"{int(volume * 100)}%")
+            vol = card.adjust_range("volume", 5, min_val=0, max_val=100)
+            card.set("value_text", f"{int(vol)}%")
             if muted:
                 card.set("bar_color", "#dedede")
-            print(f"Volume: {int(volume * 100)}%")
+            print(f"Volume: {int(vol)}%")
             await deck.refresh()
 
         @card.on("volume_down")
         async def on_down():
-            nonlocal volume
-            volume = max(0.0, volume - 0.05)
-            card.set("volume", volume)
-            card.set("value_text", f"{int(volume * 100)}%")
-            print(f"Volume: {int(volume * 100)}%")
+            vol = card.adjust_range("volume", -5, min_val=0, max_val=100)
+            card.set("value_text", f"{int(vol)}%")
+            print(f"Volume: {int(vol)}%")
             await deck.refresh()
 
         @card.on("mute_toggle")
@@ -68,7 +63,8 @@ async def main():
                 card.set("value_text", "MUTED")
             else:
                 card.set("bar_color", "#dedede")
-                card.set("value_text", f"{int(volume * 100)}%")
+                vol = card.get_range("volume", min_val=0, max_val=100)
+                card.set("value_text", f"{int(vol)}%")
             print(f"{'Muted' if muted else 'Unmuted'}")
             await deck.refresh()
 

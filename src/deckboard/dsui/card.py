@@ -93,6 +93,89 @@ class DsuiCard(Card):
         """
         return self._renderer.get(name)
 
+    # -- Domain-scale range helpers ----------------------------------------
+
+    def set_range(
+        self, name: str, value: float, *, min_val: float = 0, max_val: float = 1
+    ) -> DsuiCard:
+        """Set a range/slider binding using a domain-scale value.
+
+        Normalises *value* from ``[min_val, max_val]`` to ``[0.0, 1.0]``
+        and delegates to :meth:`set`.
+
+        Args:
+            name: Binding name (must be a ``range`` or ``slider`` binding).
+            value: Value in domain units (e.g. 0–100 for a percentage).
+            min_val: Lower bound of the domain range.
+            max_val: Upper bound of the domain range.
+
+        Returns:
+            self, for method chaining.
+
+        Raises:
+            KeyError: If *name* is not a known binding.
+            ValueError: If *min_val* equals *max_val*.
+        """
+        if min_val == max_val:
+            raise ValueError("min_val and max_val must not be equal")
+        clamped = max(min_val, min(max_val, value))
+        normalised = (clamped - min_val) / (max_val - min_val)
+        return self.set(name, normalised)
+
+    def adjust_range(
+        self, name: str, delta: float, *, min_val: float = 0, max_val: float = 1
+    ) -> float:
+        """Adjust a range/slider binding by *delta* domain-scale units.
+
+        Reads the current normalised value, denormalises it, adds *delta*,
+        clamps, re-normalises, and calls :meth:`set`.
+
+        Args:
+            name: Binding name (must be a ``range`` or ``slider`` binding).
+            delta: Amount to add in domain units (negative to decrease).
+            min_val: Lower bound of the domain range.
+            max_val: Upper bound of the domain range.
+
+        Returns:
+            The new value in domain units (clamped to
+            ``[min_val, max_val]``), so callers can use it for display
+            without back-computing.
+
+        Raises:
+            KeyError: If *name* is not a known binding.
+            ValueError: If *min_val* equals *max_val*.
+        """
+        if min_val == max_val:
+            raise ValueError("min_val and max_val must not be equal")
+        current_norm = float(self.get(name) or 0.0)
+        current_domain = min_val + current_norm * (max_val - min_val)
+        new_domain = max(min_val, min(max_val, current_domain + delta))
+        normalised = (new_domain - min_val) / (max_val - min_val)
+        self.set(name, normalised)
+        return new_domain
+
+    def get_range(
+        self, name: str, *, min_val: float = 0, max_val: float = 1
+    ) -> float:
+        """Get a range/slider binding denormalised to domain units.
+
+        Args:
+            name: Binding name.
+            min_val: Lower bound of the domain range.
+            max_val: Upper bound of the domain range.
+
+        Returns:
+            The current value in domain units.
+
+        Raises:
+            KeyError: If *name* is not a known binding.
+            ValueError: If *min_val* equals *max_val*.
+        """
+        if min_val == max_val:
+            raise ValueError("min_val and max_val must not be equal")
+        current_norm = float(self.get(name) or 0.0)
+        return min_val + current_norm * (max_val - min_val)
+
     # -- Semantic event API ------------------------------------------------
 
     def on(self, event_name: str) -> Callable[[AsyncHandler], AsyncHandler]:

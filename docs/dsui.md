@@ -792,16 +792,13 @@ from deckboard.dsui import load_package, DsuiCard
 spec = load_package("./VolumeSlider.dsui")
 card = DsuiCard(spec)
 
-volume = 0.5
-card.set("volume", volume)
-card.set("value_text", f"{int(volume * 100)}%")
+card.set_range("volume", 50, min_val=0, max_val=100)
+card.set("value_text", "50%")
 
 @card.on("volume_up")
 async def up():
-    nonlocal volume
-    volume = min(1.0, volume + 0.05)
-    card.set("volume", volume)
-    card.set("value_text", f"{int(volume * 100)}%")
+    vol = card.adjust_range("volume", 5, min_val=0, max_val=100)
+    card.set("value_text", f"{int(vol)}%")
 
 @card.on("mute_toggle")
 async def mute():
@@ -893,6 +890,9 @@ suffix and loads each one.  Non-`.dsui` directories are ignored.
 | `.set(name, value)`     | Set a binding value. Returns `self`.                 |
 | `.set_many(**kwargs)`   | Set multiple bindings at once. Returns `self`.       |
 | `.get(name)`            | Get the current value of a binding.                  |
+| `.set_range(name, value, *, min_val, max_val)` | Set a range/slider binding in domain units. Normalises to 0–1. Returns `self`. |
+| `.adjust_range(name, delta, *, min_val, max_val)` | Adjust a range/slider by delta domain units. Returns the new domain value. |
+| `.get_range(name, *, min_val, max_val)` | Get a range/slider binding denormalised to domain units. |
 | `.on(event_name)`       | Decorator to register an async event handler.        |
 | `.bind_event(name, fn)` | Imperatively register an async event handler.        |
 | `.spec`                 | The `PackageSpec` backing this card.                 |
@@ -906,6 +906,9 @@ suffix and loads each one.  Non-`.dsui` directories are ignored.
 | `.set(name, value)`        | Set a binding value. Returns `self`.              |
 | `.set_many(**kwargs)`      | Set multiple bindings at once. Returns `self`.    |
 | `.get(name)`               | Get the current value of a binding.               |
+| `.set_range(name, value, *, min_val, max_val)` | Set a range/slider binding in domain units. Returns `self`. |
+| `.adjust_range(name, delta, *, min_val, max_val)` | Adjust a range/slider by delta domain units. Returns the new domain value. |
+| `.get_range(name, *, min_val, max_val)` | Get a range/slider binding denormalised to domain units. |
 | `.on_event(event_name)`    | Decorator to register an async event handler.     |
 | `.bind_event(name, fn)`    | Imperatively register an async event handler.     |
 | `.spec`                    | The `PackageSpec` backing this key.               |

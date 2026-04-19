@@ -33,39 +33,32 @@ async def main():
         screen = deck.screen("main")
 
         card = DsuiCard(spec)
-        brightness = 0.5
 
-        card.set("brightness", brightness)
-        card.set("value_text", f"{int(brightness * 100)}%")
+        card.set_range("brightness", 50, min_val=0, max_val=100)
+        card.set("value_text", "50%")
         screen.set_card(0, card)
 
         @card.on("brightness_up")
         async def on_up():
-            nonlocal brightness
-            brightness = min(1.0, brightness + 0.05)
-            card.set("brightness", brightness)
-            card.set("value_text", f"{int(brightness * 100)}%")
-            deck.set_brightness(int(brightness * 100))
-            print(f"Brightness: {int(brightness * 100)}%")
+            val = card.adjust_range("brightness", 5, min_val=0, max_val=100)
+            card.set("value_text", f"{int(val)}%")
+            deck.set_brightness(int(val))
+            print(f"Brightness: {int(val)}%")
             await deck.refresh()
 
         @card.on("brightness_down")
         async def on_down():
-            nonlocal brightness
-            brightness = max(0.0, brightness - 0.05)
-            card.set("brightness", brightness)
-            card.set("value_text", f"{int(brightness * 100)}%")
-            deck.set_brightness(int(brightness * 100))
-            print(f"Brightness: {int(brightness * 100)}%")
+            val = card.adjust_range("brightness", -5, min_val=0, max_val=100)
+            card.set("value_text", f"{int(val)}%")
+            deck.set_brightness(int(val))
+            print(f"Brightness: {int(val)}%")
             await deck.refresh()
 
         @card.on("brightness_reset")
         async def on_reset():
-            nonlocal brightness
-            brightness = 0.5
-            card.set("brightness", brightness)
-            card.set("value_text", f"{int(brightness * 100)}%")
-            deck.set_brightness(int(brightness * 100))
+            card.set_range("brightness", 50, min_val=0, max_val=100)
+            card.set("value_text", "50%")
+            deck.set_brightness(50)
             print("Brightness reset to 50%")
             await deck.refresh()
 
