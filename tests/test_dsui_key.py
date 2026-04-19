@@ -12,6 +12,7 @@ from deckboard.dsui.schema import (
     EventMapping,
     PackageSpec,
     PackageType,
+    RangeBinding,
     TextBinding,
     ToggleBinding,
 )
@@ -320,3 +321,60 @@ class TestDsuiKeyDirtyTracking:
         key = DsuiKey(spec)
         key.mark_clean()
         assert key.is_dirty is False
+
+
+_KEY_BAR_SVG = (
+    '<svg id="TestKey" xmlns="http://www.w3.org/2000/svg" width="120" height="120">'
+    '<rect id="bg" width="120" height="120" fill="#1c1c1c"/>'
+    '<rect id="bar" x="4" y="100" width="112" height="4" fill="#00ff00"/>'
+    "</svg>"
+)
+
+
+class TestDsuiKeyRangeHelpers:
+    """Tests for set_range, adjust_range, and get_range on DsuiKey."""
+
+    def _make_range_key(self, default: float = 0.0) -> DsuiKey:
+        spec = PackageSpec(
+            name="TestKey",
+            type=PackageType.KEY,
+            version=1,
+            svg_source=_KEY_BAR_SVG,
+            bindings={"level": RangeBinding(node="bar", default=default)},
+            events=(),
+        )
+        return DsuiKey(spec)
+
+    def test_set_range_normalises(self):
+        key = self._make_range_key()
+        key.set_range("level", 50, min_val=0, max_val=100)
+        assert key.get("level") == pytest.approx(0.5)
+
+    def test_set_range_returns_self(self):
+        key = self._make_range_key()
+        result = key.set_range("level", 50, min_val=0, max_val=100)
+        assert result is key
+
+    def test_set_range_clamps(self):
+        key = self._make_range_key()
+        key.set_range("level", 200, min_val=0, max_val=100)
+        assert key.get("level") == pytest.approx(1.0)
+
+    def test_adjust_range(self):
+        key = self._make_range_key(default=0.5)
+        new_val = key.adjust_range("level", 10, min_val=0, max_val=100)
+        assert new_val == pytest.approx(60.0)
+
+    def test_get_range(self):
+        key = self._make_range_key(default=0.75)
+        val = key.get_range("level", min_val=0, max_val=100)
+        assert val == pytest.approx(75.0)
+
+    def test_equal_min_max_raises(self):
+        key = self._make_range_key()
+        with pytest.raises(ValueError):
+            key.set_range("level", 5, min_val=5, max_val=5)
+        with pytest.raises(ValueError):
+            key.adjust_range("level", 1, min_val=5, max_val=5)
+        with pytest.raises(ValueError):
+            key.get_range("level", min_val=5, max_val=5)

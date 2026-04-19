@@ -162,6 +162,118 @@ class TestDsuiCardDataBinding:
         assert card.get("level") == 0.8
 
 
+class TestDsuiCardRangeHelpers:
+    """Tests for set_range, adjust_range, and get_range helpers."""
+
+    def _make_range_card(self, default: float = 0.0) -> DsuiCard:
+        spec = _make_card_spec(
+            bindings={"level": RangeBinding(node="bar", default=default)}
+        )
+        return DsuiCard(spec)
+
+    # -- set_range ---------------------------------------------------------
+
+    def test_set_range_normalises(self):
+        card = self._make_range_card()
+        card.set_range("level", 50, min_val=0, max_val=100)
+        assert card.get("level") == pytest.approx(0.5)
+
+    def test_set_range_clamps_high(self):
+        card = self._make_range_card()
+        card.set_range("level", 200, min_val=0, max_val=100)
+        assert card.get("level") == pytest.approx(1.0)
+
+    def test_set_range_clamps_low(self):
+        card = self._make_range_card()
+        card.set_range("level", -10, min_val=0, max_val=100)
+        assert card.get("level") == pytest.approx(0.0)
+
+    def test_set_range_returns_self(self):
+        card = self._make_range_card()
+        result = card.set_range("level", 50, min_val=0, max_val=100)
+        assert result is card
+
+    def test_set_range_marks_dirty(self):
+        card = self._make_range_card()
+        card.mark_clean()
+        card.set_range("level", 50, min_val=0, max_val=100)
+        assert card.is_dirty is True
+
+    def test_set_range_equal_min_max_raises(self):
+        card = self._make_range_card()
+        with pytest.raises(ValueError, match="must not be equal"):
+            card.set_range("level", 5, min_val=5, max_val=5)
+
+    def test_set_range_unknown_binding_raises(self):
+        card = self._make_range_card()
+        with pytest.raises(KeyError):
+            card.set_range("nonexistent", 50, min_val=0, max_val=100)
+
+    def test_set_range_custom_domain(self):
+        card = self._make_range_card()
+        card.set_range("level", 4000, min_val=2000, max_val=6000)
+        assert card.get("level") == pytest.approx(0.5)
+
+    # -- adjust_range ------------------------------------------------------
+
+    def test_adjust_range_increment(self):
+        card = self._make_range_card(default=0.5)
+        new_val = card.adjust_range("level", 10, min_val=0, max_val=100)
+        assert new_val == pytest.approx(60.0)
+        assert card.get("level") == pytest.approx(0.6)
+
+    def test_adjust_range_decrement(self):
+        card = self._make_range_card(default=0.5)
+        new_val = card.adjust_range("level", -20, min_val=0, max_val=100)
+        assert new_val == pytest.approx(30.0)
+        assert card.get("level") == pytest.approx(0.3)
+
+    def test_adjust_range_clamps_at_max(self):
+        card = self._make_range_card(default=0.9)
+        new_val = card.adjust_range("level", 20, min_val=0, max_val=100)
+        assert new_val == pytest.approx(100.0)
+        assert card.get("level") == pytest.approx(1.0)
+
+    def test_adjust_range_clamps_at_min(self):
+        card = self._make_range_card(default=0.1)
+        new_val = card.adjust_range("level", -20, min_val=0, max_val=100)
+        assert new_val == pytest.approx(0.0)
+        assert card.get("level") == pytest.approx(0.0)
+
+    def test_adjust_range_marks_dirty(self):
+        card = self._make_range_card(default=0.5)
+        card.mark_clean()
+        card.adjust_range("level", 5, min_val=0, max_val=100)
+        assert card.is_dirty is True
+
+    def test_adjust_range_equal_min_max_raises(self):
+        card = self._make_range_card()
+        with pytest.raises(ValueError, match="must not be equal"):
+            card.adjust_range("level", 5, min_val=5, max_val=5)
+
+    # -- get_range ---------------------------------------------------------
+
+    def test_get_range_denormalises(self):
+        card = self._make_range_card(default=0.75)
+        val = card.get_range("level", min_val=0, max_val=100)
+        assert val == pytest.approx(75.0)
+
+    def test_get_range_custom_domain(self):
+        card = self._make_range_card(default=0.5)
+        val = card.get_range("level", min_val=2000, max_val=6000)
+        assert val == pytest.approx(4000.0)
+
+    def test_get_range_equal_min_max_raises(self):
+        card = self._make_range_card()
+        with pytest.raises(ValueError, match="must not be equal"):
+            card.get_range("level", min_val=5, max_val=5)
+
+    def test_get_range_unknown_binding_raises(self):
+        card = self._make_range_card()
+        with pytest.raises(KeyError):
+            card.get_range("nonexistent", min_val=0, max_val=100)
+
+
 class TestDsuiCardToggleBinding:
     _TOGGLE_CARD_SVG = (
         '<svg id="TC" xmlns="http://www.w3.org/2000/svg" width="197" height="98">'
