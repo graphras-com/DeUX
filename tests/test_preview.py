@@ -44,7 +44,6 @@ from deckboard.tools.preview import (
     render_preview,
 )
 
-
 # -- Fixtures ----------------------------------------------------------------
 
 
@@ -693,10 +692,26 @@ class TestFindAndOpenDevice:
                 _find_and_open_device()
         assert "No Stream Deck devices found" in capsys.readouterr().err
 
-    def test_opens_first_device(self):
+    def test_no_visual_devices_exits(self, capsys: pytest.CaptureFixture[str]):
         from deckboard.tools.preview import _find_and_open_device
 
         device = MagicMock()
+        device.DECK_VISUAL = False
+        mock_dm = MagicMock()
+        mock_dm.return_value.enumerate.return_value = [device]
+        with patch(
+            "StreamDeck.DeviceManager.DeviceManager",
+            mock_dm,
+        ):
+            with pytest.raises(SystemExit):
+                _find_and_open_device()
+        assert "No visual Stream Deck devices found" in capsys.readouterr().err
+
+    def test_opens_first_visual_device(self):
+        from deckboard.tools.preview import _find_and_open_device
+
+        device = MagicMock()
+        device.DECK_VISUAL = True
         mock_dm = MagicMock()
         mock_dm.return_value.enumerate.return_value = [device]
         with patch(

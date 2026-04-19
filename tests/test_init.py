@@ -16,6 +16,7 @@ class TestPublicAPI:
             "Deck",
             "DeckError",
             "DeckEvent",
+            "DeviceCapabilities",
             "DeviceInfo",
             "DsuiCard",
             "DsuiKey",
@@ -23,10 +24,12 @@ class TestPublicAPI:
             "EncoderSlot",
             "EncoderTurnEvent",
             "EventType",
+            "InfoScreen",
             "KeyEvent",
             "KeySlot",
             "PackageError",
             "PackageSpec",
+            "RenderMetrics",
             "Screen",
             "TouchEvent",
             "TouchStrip",
@@ -125,3 +128,10 @@ class TestPublicAPI:
         assert Card is not None
         assert BlankCard is not None
         assert TouchStrip is not None
+
+    def test_new_multi_device_exports(self):
+        from deckboard import DeviceCapabilities, InfoScreen, RenderMetrics
+
+        assert DeviceCapabilities is not None
+        assert InfoScreen is not None
+        assert RenderMetrics is not None

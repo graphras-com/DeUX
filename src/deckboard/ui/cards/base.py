@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 class Card(ABC):
     """Abstract base for a single touch-strip zone under an encoder.
 
-    The Stream Deck+ touchscreen (800x100) is divided into 4 zones,
-    each aligned with one of the 4 encoders.  A margin is applied around
-    the usable area (top=0, bottom=2, left=2, right=2) and cards
-    are separated by a 2px gap, giving each zone 197x98 usable pixels.
+    The touchscreen is divided into zones aligned with the device's
+    encoders.  A margin is applied around the usable area and cards
+    are separated by a gap.  The exact dimensions depend on the
+    connected device (e.g. 197x98 per zone on Stream Deck+).
 
     Subclass this to build custom widgets.  At minimum, implement
     :meth:`render`.  Override the ``handle_encoder_*`` and

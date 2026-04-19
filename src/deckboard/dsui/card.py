@@ -24,7 +24,7 @@ class DsuiCard(Card):
     Instead of writing a Python class with imperative Pillow rendering,
     you describe the UI in an SVG layout and a YAML manifest.  The card
     loads the package, lets you set binding values, and renders the SVG
-    into a PIL Image for the Stream Deck+ touchscreen.
+    into a PIL Image for the Stream Deck touchscreen.
 
     Usage::
 

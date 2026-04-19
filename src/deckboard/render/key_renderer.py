@@ -1,4 +1,4 @@
-"""Key image rendering for Stream Deck+ button slots."""
+"""Key image rendering for Stream Deck button slots."""
 
 from __future__ import annotations
 
@@ -15,38 +15,62 @@ from .metrics import (
 def render_key_image(
     icon: Image.Image | None = None,
     background: str = "black",
+    key_size: tuple[int, int] | None = None,
+    image_format: str = "JPEG",
 ) -> bytes:
-    """Render a JPEG image for a Stream Deck+ key.
+    """Render an image for a Stream Deck key.
 
     Args:
         icon: Optional icon image to render on the key.
         background: Background colour name.
+        key_size: Key dimensions ``(width, height)``.  Defaults to
+            the Stream Deck+ size ``(120, 120)``.
+        image_format: Image encoding format (``"JPEG"`` or ``"BMP"``).
     """
-    img = Image.new("RGB", KEY_SIZE, background)
+    size = key_size or KEY_SIZE
+    icon_px = min(size[0], size[1]) * ICON_SIZE // KEY_SIZE[0]
+
+    img = Image.new("RGB", size, background)
 
     if icon is not None:
-        if icon.size != (ICON_SIZE, ICON_SIZE):
-            icon = icon.resize((ICON_SIZE, ICON_SIZE), Image.LANCZOS)
+        if icon.size != (icon_px, icon_px):
+            icon = icon.resize((icon_px, icon_px), Image.LANCZOS)
 
         # Centre icon on the key
-        x_offset = (KEY_SIZE[0] - ICON_SIZE) // 2
-        y_offset = (KEY_SIZE[1] - ICON_SIZE) // 2
+        x_offset = (size[0] - icon_px) // 2
+        y_offset = (size[1] - icon_px) // 2
 
         if icon.mode == "RGBA":
             img.paste(icon, (x_offset, y_offset), icon)
         else:
             img.paste(icon, (x_offset, y_offset))
 
-    return _encode_jpeg(img)
+    return _encode_image(img, image_format)
 
 
-def render_blank_key() -> bytes:
+def render_blank_key(
+    key_size: tuple[int, int] | None = None,
+    image_format: str = "JPEG",
+) -> bytes:
     """Render a blank key image."""
-    return render_key_image()
+    return render_key_image(key_size=key_size, image_format=image_format)
 
 
 def _encode_jpeg(img: Image.Image, quality: int = 90) -> bytes:
     """Encode a PIL image as JPEG bytes."""
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=quality)
+    return buf.getvalue()
+
+
+def _encode_image(
+    img: Image.Image, image_format: str = "JPEG", quality: int = 90
+) -> bytes:
+    """Encode a PIL image in the specified format."""
+    buf = io.BytesIO()
+    fmt = image_format.upper()
+    if fmt == "BMP":
+        img.save(buf, format="BMP")
+    else:
+        img.save(buf, format="JPEG", quality=quality)
     return buf.getvalue()

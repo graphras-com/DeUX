@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import pytest
 
+from deckboard.runtime.capabilities import STREAM_DECK_PLUS
 from deckboard.ui.controls.key_slot import KeySlot
 from deckboard.ui.controls.encoder_slot import EncoderSlot
 from deckboard.ui.screen import Screen
 from deckboard.ui.touch_strip import TouchStrip
 from deckboard.ui.cards.base import Card
 from deckboard.ui.cards.blank import BlankCard
+from tests.conftest import STREAM_DECK_MINI, STREAM_DECK_NEO
 
 
 class TestPageInit:
@@ -30,6 +32,57 @@ class TestPageInit:
 
     def test_cards_list(self, page: Screen):
         assert len(page.cards) == 4
+
+    def test_capabilities_property(self, page: Screen):
+        assert page.capabilities is STREAM_DECK_PLUS
+
+
+class TestScreenForMini:
+    """Screen for a device with no encoders and no touchscreen."""
+
+    def test_no_touchstrip(self):
+        screen = Screen("mini", STREAM_DECK_MINI)
+        assert screen.touch_strip is None
+
+    def test_no_cards(self):
+        screen = Screen("mini", STREAM_DECK_MINI)
+        assert screen.cards == []
+
+    def test_key_count(self):
+        screen = Screen("mini", STREAM_DECK_MINI)
+        for i in range(6):
+            k = screen.key(i)
+            assert k.index == i
+        with pytest.raises(IndexError, match="Key index must be 0-5"):
+            screen.key(6)
+
+    def test_encoder_raises(self):
+        screen = Screen("mini", STREAM_DECK_MINI)
+        with pytest.raises(IndexError, match="no encoders"):
+            screen.encoder(0)
+
+    def test_card_raises(self):
+        screen = Screen("mini", STREAM_DECK_MINI)
+        with pytest.raises(IndexError, match="no touchscreen"):
+            screen.card(0)
+
+    def test_touchstrip_background_default(self):
+        screen = Screen("mini", STREAM_DECK_MINI)
+        assert screen.touchstrip_background == "black"
+
+
+class TestScreenForNeo:
+    """Screen for Neo: 8 keys, no encoders, no touchscreen, info screen."""
+
+    def test_has_info_screen(self):
+        screen = Screen("neo", STREAM_DECK_NEO)
+        assert screen.info_screen is not None
+        assert screen.info_screen.width == 248
+        assert screen.info_screen.height == 58
+
+    def test_no_touchstrip(self):
+        screen = Screen("neo", STREAM_DECK_NEO)
+        assert screen.touch_strip is None
 
 
 class TestPageKey:
@@ -150,3 +203,8 @@ class TestPageSetCard:
         original_1 = page.card(1)
         page.set_card(0, BlankCard(0))
         assert page.card(1) is original_1
+
+    def test_set_card_no_touchscreen(self):
+        screen = Screen("mini", STREAM_DECK_MINI)
+        with pytest.raises(IndexError, match="no touchscreen"):
+            screen.set_card(0, BlankCard(0))
