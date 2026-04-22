@@ -5,6 +5,7 @@ from __future__ import annotations
 from .capabilities import DeviceCapabilities
 from .deck import Deck, DeckError
 from .device_info import DeviceInfo
+from .discovery import list_devices
 from .events import (
     AsyncHandler,
     DeckEvent,
@@ -14,6 +15,7 @@ from .events import (
     KeyEvent,
     TouchEvent,
 )
+from .manager import DeckManager
 from .transport import AsyncTransport
 
 __all__ = [
@@ -22,6 +24,7 @@ __all__ = [
     "Deck",
     "DeckError",
     "DeckEvent",
+    "DeckManager",
     "DeviceCapabilities",
     "DeviceInfo",
     "EncoderPressEvent",
@@ -29,4 +32,5 @@ __all__ = [
     "EventType",
     "KeyEvent",
     "TouchEvent",
+    "list_devices",
 ]
