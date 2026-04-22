@@ -92,7 +92,81 @@ Constructor parameters:
 |-----------|---------|-------------|
 | `serial_number` | `None` | Target a specific device by serial number |
 | `device_index` | `0` | Which device if multiple visual decks are found |
-| `brightness` | `80` | Initial brightness (0–100) |
+| `brightness` | `80` | Initial brightness (0-100) |
+| `deck_type` | `None` | Only connect to devices of this type (e.g. `"Stream Deck +"`) |
+| `auto_reconnect` | `False` | Automatically reconnect on USB disconnect |
+| `reconnect_poll_interval` | `2.0` | Seconds between reconnection attempts |
+
+### Device discovery
+
+Enumerate all connected devices without creating a `Deck`:
+
+```python
+from deckboard import list_devices
+
+devices = await list_devices()
+for info in devices:
+    print(f"{info.deck_type} serial={info.serial}")
+
+# Filter by type
+plus_devices = await list_devices(deck_type="Stream Deck +")
+```
+
+### Wait for device
+
+Wait for a matching device to be plugged in:
+
+```python
+deck = await Deck.wait_for_device(
+    deck_type="Stream Deck +",
+    poll_interval=1.0,
+)
+```
+
+### Auto-reconnect
+
+Survive USB disconnects automatically:
+
+```python
+async with Deck(auto_reconnect=True) as deck:
+    @deck.on_disconnect
+    async def on_lost():
+        print("Device disconnected, waiting...")
+
+    @deck.on_reconnect
+    async def on_back():
+        print("Reconnected! UI restored.")
+
+    await deck.set_screen("main")
+    await deck.wait_closed()
+```
+
+### Multi-device with DeckManager
+
+Orchestrate multiple Stream Decks with hot-plug detection:
+
+```python
+from deckboard import DeckManager
+
+manager = DeckManager(poll_interval=2.0)
+
+@manager.on_connect(deck_type="Stream Deck +")
+async def handle_plus(deck):
+    screen = deck.screen("main")
+
+    @screen.key(0).on_press
+    async def on_press():
+        print(f"Key pressed on {deck.info.serial}")
+
+    await deck.set_screen("main")
+
+@manager.on_disconnect
+async def handle_lost(info):
+    print(f"Lost: {info.serial}")
+
+async with manager:
+    await manager.wait_closed()
+```
 
 ### Screens
 
@@ -367,6 +441,7 @@ mypy src/deckboard/
 | Class | Module | Description |
 |-------|--------|-------------|
 | `Deck` | `deckboard.runtime.deck` | Main entry point, auto-detects device |
+| `DeckManager` | `deckboard.runtime.manager` | Multi-device orchestrator with hot-plug |
 | `DeviceCapabilities` | `deckboard.runtime.capabilities` | Frozen snapshot of device hardware |
 | `RenderMetrics` | `deckboard.render.metrics` | Computed rendering dimensions and margins |
 | `Screen` | `deckboard.ui.screen` | Named layout of keys, encoders, and cards |
@@ -403,6 +478,13 @@ mypy src/deckboard/
 | `DeckError` | Device not found, not opened, or HID error |
 | `RasterizeError` | SVG rasterisation failure |
 | `PackageError` | Invalid .dsui manifest or layout |
+
+### Functions
+
+| Function | Description |
+|----------|-------------|
+| `list_devices()` | Enumerate all connected Stream Deck devices |
+| `Deck.wait_for_device()` | Wait for a matching device to appear |
 
 ## Acknowledgments
 

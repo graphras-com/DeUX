@@ -16,6 +16,7 @@ class TestPublicAPI:
             "Deck",
             "DeckError",
             "DeckEvent",
+            "DeckManager",
             "DeviceCapabilities",
             "DeviceInfo",
             "DsuiCard",
@@ -33,6 +34,7 @@ class TestPublicAPI:
             "Screen",
             "TouchEvent",
             "TouchStrip",
+            "list_devices",
             "load_all_packages",
             "load_package",
         }

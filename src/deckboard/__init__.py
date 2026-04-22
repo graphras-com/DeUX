@@ -34,6 +34,7 @@ from .runtime import (
     Deck,
     DeckError,
     DeckEvent,
+    DeckManager,
     DeviceCapabilities,
     DeviceInfo,
     EncoderPressEvent,
@@ -41,6 +42,7 @@ from .runtime import (
     EventType,
     KeyEvent,
     TouchEvent,
+    list_devices,
 )
 from .ui import (
     BlankCard,
@@ -58,6 +60,7 @@ __all__ = [
     "Deck",
     "DeckError",
     "DeckEvent",
+    "DeckManager",
     "DeviceCapabilities",
     "DeviceInfo",
     "DsuiCard",
@@ -75,6 +78,7 @@ __all__ = [
     "Screen",
     "TouchEvent",
     "TouchStrip",
+    "list_devices",
     "load_all_packages",
     "load_package",
 ]
