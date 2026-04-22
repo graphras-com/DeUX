@@ -65,7 +65,7 @@ class TestDeckManagerInit:
         m = DeckManager()
         assert m._poll_interval == 2.0
         assert m._brightness == 80
-        assert m._auto_reconnect is False
+        assert m._auto_reconnect is True
         assert m._running is False
         assert m._decks == {}
 
@@ -360,3 +360,100 @@ class TestDeckManagerConnectHandlerError:
         assert "ERR1" in m._decks
         for d in m._decks.values():
             await d.stop()
+
+
+# ── DeckManager reconnection scenarios ──────────────────────────────────
+
+
+class TestDeckManagerReconnect:
+    async def test_reconnect_calls_on_connect_again(self):
+        """When a device disconnects and reappears, on_connect is called again."""
+        m = DeckManager(poll_interval=10.0, auto_reconnect=True)
+        connected_serials = []
+
+        @m.on_connect()
+        async def handler(deck):
+            connected_serials.append(deck._serial_number)
+
+        dev = _make_raw_device(serial="RECON1")
+
+        # First scan: device appears
+        with patch("deckboard.runtime.manager.DeviceManager") as mgr_dm:
+            mgr_dm.return_value.enumerate.return_value = [dev]
+            with patch("deckboard.runtime.deck.DeviceManager") as deck_dm:
+                deck_dm.return_value.enumerate.return_value = [dev]
+                await m._scan_once()
+
+        assert connected_serials == ["RECON1"]
+
+        # Second scan: device disappears
+        with patch("deckboard.runtime.manager.DeviceManager") as mgr_dm:
+            mgr_dm.return_value.enumerate.return_value = []
+            await m._scan_once()
+
+        assert "RECON1" not in m._decks
+
+        # Third scan: device reappears — on_connect should be called again
+        with patch("deckboard.runtime.manager.DeviceManager") as mgr_dm:
+            mgr_dm.return_value.enumerate.return_value = [dev]
+            with patch("deckboard.runtime.deck.DeviceManager") as deck_dm:
+                deck_dm.return_value.enumerate.return_value = [dev]
+                await m._scan_once()
+
+        assert connected_serials == ["RECON1", "RECON1"]
+        assert "RECON1" in m._decks
+
+        for d in m._decks.values():
+            await d.stop()
+
+    async def test_no_reconnect_when_disabled(self):
+        """With auto_reconnect=False, disconnect handler fires but device stays gone."""
+        m = DeckManager(poll_interval=10.0, auto_reconnect=False)
+        disconnected = []
+
+        @m.on_connect()
+        async def handler(deck):
+            pass
+
+        @m.on_disconnect
+        async def on_disc(info):
+            disconnected.append(info.serial)
+
+        dev = _make_raw_device(serial="NOREC1")
+
+        # Scan 1: connect
+        with patch("deckboard.runtime.manager.DeviceManager") as mgr_dm:
+            mgr_dm.return_value.enumerate.return_value = [dev]
+            with patch("deckboard.runtime.deck.DeviceManager") as deck_dm:
+                deck_dm.return_value.enumerate.return_value = [dev]
+                await m._scan_once()
+
+        assert "NOREC1" in m._decks
+
+        # Scan 2: disconnect
+        with patch("deckboard.runtime.manager.DeviceManager") as mgr_dm:
+            mgr_dm.return_value.enumerate.return_value = []
+            await m._scan_once()
+
+        assert disconnected == ["NOREC1"]
+        assert "NOREC1" not in m._decks
+
+    async def test_disconnect_handler_error_logged(self):
+        """Error in disconnect handler is caught, doesn't crash manager."""
+        m = DeckManager(poll_interval=10.0)
+
+        @m.on_disconnect
+        async def handler(info):
+            raise ValueError("disconnect handler error")
+
+        mock_deck = MagicMock()
+        mock_deck.stop = AsyncMock()
+        mock_deck.info = MagicMock()
+        mock_deck.info.serial = "DISC_ERR"
+        m._decks["DISC_ERR"] = mock_deck
+
+        with patch("deckboard.runtime.manager.DeviceManager") as mock_dm:
+            mock_dm.return_value.enumerate.return_value = []
+            await m._scan_once()  # Should not raise
+
+        assert "DISC_ERR" not in m._decks

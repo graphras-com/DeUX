@@ -1,4 +1,4 @@
-"""Deck class: main entry point for the deckboard library."""
+"""Deck class: per-device handle managed by DeckManager."""
 
 from __future__ import annotations
 
@@ -15,7 +15,6 @@ from ..render.touch_renderer import compose_touchstrip
 from .capabilities import DeviceCapabilities
 from .device_info import DeviceInfo
 from .events import (
-    AsyncHandler,
     DeckEvent,
     EncoderPressEvent,
     EncoderTurnEvent,
@@ -39,61 +38,28 @@ class DeckError(Exception):
 
 
 class Deck:
-    """High-level, asyncio-native interface to Elgato Stream Deck devices.
+    """Per-device handle for an Elgato Stream Deck.
 
-    Automatically discovers and connects to the first available visual
-    Stream Deck device.  Adapts key count, encoder count, touchscreen
-    dimensions, and info screen support to the connected hardware.
+    Instances are created and managed by :class:`DeckManager`.  Do not
+    instantiate ``Deck`` directly — use ``DeckManager.on_connect`` to
+    receive connected ``Deck`` instances.
 
-    Usage::
-
-        async with Deck() as deck:
-            main = deck.screen("main")
-
-            @main.key(0).on_press
-            async def on_home():
-                print("Home pressed!")
-
-            await deck.set_screen("main")
-            await deck.wait_closed()
-
-    Or without context manager::
-
-        deck = Deck()
-        await deck.start()
-        ...
-        await deck.stop()
+    The ``Deck`` object provides the per-device API for screens, keys,
+    encoders, touchscreen cards, brightness, and rendering.
     """
 
     def __init__(
         self,
-        serial_number: str | None = None,
-        device_index: int = 0,
+        serial_number: str,
         brightness: int = 80,
-        deck_type: str | None = None,
-        auto_reconnect: bool = False,
-        reconnect_poll_interval: float = 2.0,
     ) -> None:
         """
         Args:
-            serial_number: Target a specific device by serial number.
-                If ``None``, the first available visual device is used.
-            device_index: If multiple visual decks are found and no
-                serial_number is given, which one to use (0-based).
+            serial_number: The serial number of the target device.
             brightness: Initial brightness (0-100).
-            deck_type: If set, only connect to devices matching this
-                type string (e.g. ``"Stream Deck +"``).
-            auto_reconnect: If ``True``, automatically attempt to
-                reconnect when the device disconnects.
-            reconnect_poll_interval: Seconds between reconnection
-                attempts (default 2.0).
         """
         self._serial_number = serial_number
-        self._device_index = device_index
         self._brightness = brightness
-        self._deck_type = deck_type
-        self._auto_reconnect = auto_reconnect
-        self._reconnect_poll_interval = reconnect_poll_interval
         self._device: Any = None  # low-level StreamDeck object
         self._caps: DeviceCapabilities | None = None
         self._metrics: RenderMetrics | None = None
@@ -104,71 +70,16 @@ class Deck:
         self._executor = ThreadPoolExecutor(max_workers=2)
         self._device_lock = asyncio.Lock()
 
-        # Reconnect state
-        self._reconnecting = False
-        self._on_reconnect_handler: AsyncHandler | None = None
-        self._on_disconnect_handler: AsyncHandler | None = None
-
         # Screens
         self._screens: dict[str, Screen] = {}
         self._active_screen: Screen | None = None
         self._pages = self._screens
         self._active_page: Screen | None = None
 
-    # -- Async context manager ---------------------------------------------
-
-    @classmethod
-    async def wait_for_device(
-        cls,
-        serial_number: str | None = None,
-        deck_type: str | None = None,
-        poll_interval: float = 2.0,
-        brightness: int = 80,
-        auto_reconnect: bool = False,
-    ) -> Deck:
-        """Wait for a matching device to be connected, then return a started Deck.
-
-        Polls for devices periodically until one matching the given
-        criteria is found.
-
-        Args:
-            serial_number: Wait for a device with this serial.
-            deck_type: Wait for a device of this type.
-            poll_interval: Seconds between discovery attempts.
-            brightness: Initial brightness (0-100).
-            auto_reconnect: Enable auto-reconnect on the returned Deck.
-
-        Returns:
-            A started :class:`Deck` instance.
-        """
-        while True:
-            try:
-                deck = cls(
-                    serial_number=serial_number,
-                    deck_type=deck_type,
-                    brightness=brightness,
-                    auto_reconnect=auto_reconnect,
-                )
-                await deck.start()
-                return deck
-            except DeckError:
-                logger.debug(
-                    "No matching device found, retrying in %.1fs...",
-                    poll_interval,
-                )
-                await asyncio.sleep(poll_interval)
-
-    async def __aenter__(self) -> Deck:
-        await self.start()
-        return self
-
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        await self.stop()
-
     # -- Lifecycle ---------------------------------------------------------
 
     async def start(self) -> None:
-        """Discover the device, open it, and start the event loop."""
+        """Discover the device by serial, open it, and start the event loop."""
         if self._running:
             return
 
@@ -185,41 +96,23 @@ class Deck:
         if not visual:
             raise DeckError("No visual Stream Deck devices found")
 
-        # Filter by deck type if specified
-        if self._deck_type is not None:
-            visual = [d for d in visual if d.DECK_TYPE == self._deck_type]
-            if not visual:
-                raise DeckError(
-                    f"No devices of type '{self._deck_type}' found"
-                )
-
-        # Select device
-        if self._serial_number is not None:
-            # Find by serial number — need to open each to read serial
-            target = None
-            for d in visual:
-                try:
-                    await loop.run_in_executor(self._executor, d.open)
-                    serial = d.get_serial_number()
-                    if serial == self._serial_number:
-                        target = d
-                        break
-                    await loop.run_in_executor(self._executor, d.close)
-                except Exception:
-                    continue
-            if target is None:
-                raise DeckError(
-                    f"No device with serial '{self._serial_number}' found"
-                )
-            self._device = target
-        else:
-            if self._device_index >= len(visual):
-                raise DeckError(
-                    f"Device index {self._device_index} out of range "
-                    f"(found {len(visual)} visual devices)"
-                )
-            self._device = visual[self._device_index]
-            await loop.run_in_executor(self._executor, self._device.open)
+        # Find by serial number
+        target = None
+        for d in visual:
+            try:
+                await loop.run_in_executor(self._executor, d.open)
+                serial = d.get_serial_number()
+                if serial == self._serial_number:
+                    target = d
+                    break
+                await loop.run_in_executor(self._executor, d.close)
+            except Exception:
+                continue
+        if target is None:
+            raise DeckError(
+                f"No device with serial '{self._serial_number}' found"
+            )
+        self._device = target
 
         await loop.run_in_executor(self._executor, self._device.reset)
         await loop.run_in_executor(
@@ -229,10 +122,6 @@ class Deck:
         # Build capabilities and metrics
         self._caps = DeviceCapabilities.from_device(self._device)
         self._metrics = RenderMetrics(self._caps)
-
-        # Remember serial for reconnection
-        if self._serial_number is None:
-            self._serial_number = self._device.get_serial_number()
 
         logger.info(
             "Opened %s (serial: %s, firmware: %s, keys: %d, dials: %d)",
@@ -291,127 +180,12 @@ class Deck:
         """Block until the deck is closed (e.g. by stop() or disconnect)."""
         await self._closed_event.wait()
 
-    # -- Reconnect / disconnect callbacks ----------------------------------
-
-    def on_reconnect(self, handler: AsyncHandler) -> AsyncHandler:
-        """Register a callback invoked after a successful reconnection.
-
-        Can be used as a decorator::
-
-            @deck.on_reconnect
-            async def handle_reconnect():
-                await deck.set_screen("main")
-        """
-        self._on_reconnect_handler = handler
-        return handler
-
-    def on_disconnect(self, handler: AsyncHandler) -> AsyncHandler:
-        """Register a callback invoked when the device disconnects.
-
-        Can be used as a decorator::
-
-            @deck.on_disconnect
-            async def handle_disconnect():
-                print("Device lost!")
-        """
-        self._on_disconnect_handler = handler
-        return handler
-
-    async def _reconnect_loop(self) -> None:
-        """Poll for the device to reappear and re-open it."""
-        logger.info(
-            "Reconnect loop started (serial=%s, poll=%.1fs)",
-            self._serial_number,
-            self._reconnect_poll_interval,
-        )
-        self._reconnecting = True
-
-        loop = asyncio.get_running_loop()
-
-        while self._running:
-            await asyncio.sleep(self._reconnect_poll_interval)
-            if not self._running:
-                break
-
-            try:
-                devices = await loop.run_in_executor(
-                    self._executor, DeviceManager().enumerate
-                )
-                visual = [d for d in devices if d.DECK_VISUAL]
-
-                if self._deck_type is not None:
-                    visual = [d for d in visual if d.DECK_TYPE == self._deck_type]
-
-                target = None
-                for d in visual:
-                    try:
-                        await loop.run_in_executor(self._executor, d.open)
-                        serial = d.get_serial_number()
-                        if serial == self._serial_number:
-                            target = d
-                            break
-                        await loop.run_in_executor(self._executor, d.close)
-                    except Exception:
-                        continue
-
-                if target is None:
-                    continue
-
-                # Re-open successful
-                self._device = target
-                await loop.run_in_executor(self._executor, self._device.reset)
-                await loop.run_in_executor(
-                    self._executor, self._device.set_brightness, self._brightness
-                )
-
-                self._caps = DeviceCapabilities.from_device(self._device)
-                self._metrics = RenderMetrics(self._caps)
-
-                self._transport = AsyncTransport(self._device, loop, self._caps)
-                self._transport.start()
-
-                self._reconnecting = False
-
-                logger.info(
-                    "Reconnected to %s (serial: %s)",
-                    self._device.deck_type(),
-                    self._serial_number,
-                )
-
-                # Re-render active screen
-                if self._active_screen:
-                    await self._render_all_keys()
-                    if self._active_screen.touch_strip is not None:
-                        await self._render_touchscreen()
-                    if self._active_screen.info_screen is not None:
-                        await self._render_info_screen()
-
-                # Invoke user callback
-                if self._on_reconnect_handler:
-                    try:
-                        await self._on_reconnect_handler()
-                    except Exception:
-                        logger.exception("Error in reconnect handler")
-
-                return  # Exit reconnect loop, resume event loop
-
-            except Exception:
-                logger.debug("Reconnect attempt failed, retrying...")
-                continue
-
-        self._reconnecting = False
-
     # -- Device capabilities -----------------------------------------------
 
     @property
     def is_connected(self) -> bool:
         """Whether the device is currently connected and operational."""
-        return self._device is not None and self._running and not self._reconnecting
-
-    @property
-    def is_reconnecting(self) -> bool:
-        """Whether the deck is currently attempting to reconnect."""
-        return self._reconnecting
+        return self._device is not None and self._running
 
     @property
     def capabilities(self) -> DeviceCapabilities:
@@ -715,50 +489,7 @@ class Deck:
             pass
         except Exception:
             logger.exception("Event loop crashed")
-            if self._auto_reconnect and self._running:
-                await self._handle_disconnect()
-                return
         finally:
-            self._closed_event.set()
-
-    async def _handle_disconnect(self) -> None:
-        """Handle device disconnection: clean up and optionally reconnect."""
-        logger.info("Device disconnected (serial=%s)", self._serial_number)
-
-        # Clean up transport
-        if self._transport:
-            try:
-                self._transport.stop()
-            except Exception:
-                pass
-            self._transport = None
-
-        # Clean up device
-        if self._device:
-            try:
-                loop = asyncio.get_running_loop()
-                await loop.run_in_executor(self._executor, self._device.close)
-            except Exception:
-                pass
-            self._device = None
-
-        # Invoke user disconnect callback
-        if self._on_disconnect_handler:
-            try:
-                await self._on_disconnect_handler()
-            except Exception:
-                logger.exception("Error in disconnect handler")
-
-        # Attempt reconnection
-        await self._reconnect_loop()
-
-        if self._running and not self._reconnecting:
-            # Reconnected — restart event loop
-            self._closed_event.clear()
-            self._event_task = asyncio.create_task(
-                self._event_loop(), name="deckboard-events"
-            )
-        else:
             self._closed_event.set()
 
     async def _drain_card_callbacks(self, card: Card) -> None:

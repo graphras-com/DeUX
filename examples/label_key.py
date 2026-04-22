@@ -22,7 +22,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from deckboard import Deck, DsuiKey, load_package
+from deckboard import DeckManager, DsuiKey, load_package
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -45,7 +45,10 @@ async def main():
     print(f"  Bindings: {sorted(spec.bindings)}")
     print(f"  Events:   {[e.name for e in spec.events]}")
 
-    async with Deck(brightness=80) as deck:
+    manager = DeckManager(brightness=80)
+
+    @manager.on_connect()
+    async def handle(deck):
         screen = deck.screen("main")
 
         key = DsuiKey(spec)
@@ -73,7 +76,9 @@ async def main():
 
         await deck.set_screen("main")
         print("\nDeck ready! Press key 0 to cycle labels, long-hold to reset.")
-        await deck.wait_closed()
+
+    async with manager:
+        await manager.wait_closed()
 
 
 if __name__ == "__main__":

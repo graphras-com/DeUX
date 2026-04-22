@@ -20,7 +20,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from deckboard import Deck, DsuiCard, DsuiKey, load_package
+from deckboard import DeckManager, DsuiCard, DsuiKey, load_package
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -40,9 +40,12 @@ async def main():
     print(f"  Bindings: {sorted(power_spec.bindings)}")
     print(f"  Events:   {[e.name for e in power_spec.events]}")
 
-    # -- Set up the deck ---------------------------------------------------
+    # -- Set up the manager ------------------------------------------------
 
-    async with Deck(brightness=80) as deck:
+    manager = DeckManager(brightness=80)
+
+    @manager.on_connect()
+    async def handle(deck):
         screen = deck.screen("main")
 
         # Install the audio card on touch-strip zone 0
@@ -104,7 +107,7 @@ async def main():
             power.set("indicator_color", "#44ff44")  # flash green
             await deck.refresh()
             await asyncio.sleep(0.5)
-            await deck.stop()
+            await manager.stop()
 
         @power.on_event("long_hold")
         async def on_power_hold():
@@ -122,7 +125,9 @@ async def main():
         print("  Key 7 (Shutdown):")
         print("    Short press (<300ms): clean shutdown (green flash)")
         print("    Long hold  (>500ms):  force restart  (turns orange)")
-        await deck.wait_closed()
+
+    async with manager:
+        await manager.wait_closed()
 
 
 if __name__ == "__main__":

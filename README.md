@@ -26,10 +26,13 @@ The Pedal is excluded — it has no visual output.
 
 ```python
 import asyncio
-from deckboard import Deck, DsuiKey, load_package
+from deckboard import DeckManager
 
 async def main():
-    async with Deck() as deck:
+    manager = DeckManager()
+
+    @manager.on_connect()
+    async def handle(deck):
         screen = deck.screen("main")
 
         @screen.key(0).on_press
@@ -43,7 +46,9 @@ async def main():
                 print(f"Encoder turned: {direction}")
 
         await deck.set_screen("main")
-        await deck.wait_closed()
+
+    async with manager:
+        await manager.wait_closed()
 
 asyncio.run(main())
 ```
@@ -71,31 +76,43 @@ sudo apt install libhidapi-libusb0 libcairo2
 
 ## Features
 
-### Auto-detection
+### DeckManager
 
-`Deck()` discovers and connects to the first available visual Stream Deck.
-All layout sizes, image formats, and rendering parameters adapt automatically
-based on a `DeviceCapabilities` snapshot queried from the hardware.
+`DeckManager` is the sole entry point for device management. It handles
+auto-detection, hot-plug, reconnection, and multi-device orchestration.
+Register `on_connect` and `on_disconnect` handlers, then start the manager.
 
 ```python
-async with Deck() as deck:
-    print(deck.capabilities.deck_type)      # e.g. "Stream Deck XL"
-    print(deck.capabilities.key_count)      # e.g. 32
-    print(deck.capabilities.key_size)       # e.g. (96, 96)
-    print(deck.capabilities.has_encoders)   # e.g. False
-    print(deck.capabilities.has_touchscreen)  # e.g. False
+from deckboard import DeckManager
+
+manager = DeckManager()
+
+@manager.on_connect(deck_type="Stream Deck +")
+async def handle(deck):
+    print(deck.capabilities.deck_type)      # "Stream Deck +"
+    print(deck.capabilities.key_count)      # 8
+    print(deck.capabilities.key_size)       # (120, 120)
+    print(deck.capabilities.has_encoders)   # True
+    print(deck.capabilities.has_touchscreen)  # True
+
+async with manager:
+    await manager.wait_closed()
 ```
 
 Constructor parameters:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `serial_number` | `None` | Target a specific device by serial number |
-| `device_index` | `0` | Which device if multiple visual decks are found |
-| `brightness` | `80` | Initial brightness (0-100) |
-| `deck_type` | `None` | Only connect to devices of this type (e.g. `"Stream Deck +"`) |
-| `auto_reconnect` | `False` | Automatically reconnect on USB disconnect |
-| `reconnect_poll_interval` | `2.0` | Seconds between reconnection attempts |
+| `poll_interval` | `2.0` | Seconds between device scans |
+| `brightness` | `80` | Default brightness for new devices (0-100) |
+| `auto_reconnect` | `True` | Automatically reconnect on USB disconnect |
+
+Handler filters:
+
+| Filter | Description |
+|--------|-------------|
+| `serial` | Only match a specific serial number |
+| `deck_type` | Only match a specific device type (e.g. `"Stream Deck +"`) |
 
 ### Device discovery
 
@@ -112,43 +129,38 @@ for info in devices:
 plus_devices = await list_devices(deck_type="Stream Deck +")
 ```
 
-### Wait for device
-
-Wait for a matching device to be plugged in:
-
-```python
-deck = await Deck.wait_for_device(
-    deck_type="Stream Deck +",
-    poll_interval=1.0,
-)
-```
-
 ### Auto-reconnect
 
-Survive USB disconnects automatically:
+When `auto_reconnect=True` (the default), the manager automatically
+re-discovers devices that disconnect. When a device reappears, the
+`on_connect` handler is called again, rebuilding the UI from scratch:
 
 ```python
-async with Deck(auto_reconnect=True) as deck:
-    @deck.on_disconnect
-    async def on_lost():
-        print("Device disconnected, waiting...")
+manager = DeckManager()
 
-    @deck.on_reconnect
-    async def on_back():
-        print("Reconnected! UI restored.")
-
+@manager.on_connect()
+async def handle(deck):
+    screen = deck.screen("main")
+    # ... set up UI ...
     await deck.set_screen("main")
-    await deck.wait_closed()
+
+@manager.on_disconnect
+async def lost(info):
+    print(f"Lost: {info.serial}")
+
+async with manager:
+    await manager.wait_closed()
 ```
 
-### Multi-device with DeckManager
+### Multi-device
 
-Orchestrate multiple Stream Decks with hot-plug detection:
+The manager supports multiple Stream Decks simultaneously. Register
+separate handlers per device type or serial:
 
 ```python
 from deckboard import DeckManager
 
-manager = DeckManager(poll_interval=2.0)
+manager = DeckManager()
 
 @manager.on_connect(deck_type="Stream Deck +")
 async def handle_plus(deck):
@@ -158,6 +170,12 @@ async def handle_plus(deck):
     async def on_press():
         print(f"Key pressed on {deck.info.serial}")
 
+    await deck.set_screen("main")
+
+@manager.on_connect(deck_type="Stream Deck Mini")
+async def handle_mini(deck):
+    screen = deck.screen("main")
+    # ... Mini-specific UI ...
     await deck.set_screen("main")
 
 @manager.on_disconnect
@@ -261,8 +279,12 @@ The Neo has a 248×58 non-touch info display. Deckboard exposes it via the
 
 ```python
 from PIL import Image
+from deckboard import DeckManager
 
-async with Deck() as deck:
+manager = DeckManager()
+
+@manager.on_connect()
+async def handle(deck):
     if deck.capabilities.has_info_screen:
         screen = deck.screen("main")
         info = screen.info_screen
@@ -270,6 +292,7 @@ async with Deck() as deck:
         img = Image.new("RGB", (248, 58), "black")
         # draw status content...
         info.set_image(img)
+        await deck.set_screen("main")
         await deck.refresh()
 ```
 
@@ -356,10 +379,13 @@ regions:
 ### Using .dsui packages
 
 ```python
-from deckboard import Deck, DsuiCard, DsuiKey, load_package
+from deckboard import DeckManager, DsuiCard, DsuiKey, load_package
 
 async def main():
-    async with Deck() as deck:
+    manager = DeckManager()
+
+    @manager.on_connect()
+    async def handle(deck):
         audio_spec = load_package("AudioCard.dsui")
         power_spec = load_package("PowerKey.dsui")
 
@@ -386,7 +412,9 @@ async def main():
             print("power activated")
 
         await deck.set_screen("main")
-        await deck.wait_closed()
+
+    async with manager:
+        await manager.wait_closed()
 ```
 
 ## Preview tool
@@ -440,8 +468,8 @@ mypy src/deckboard/
 
 | Class | Module | Description |
 |-------|--------|-------------|
-| `Deck` | `deckboard.runtime.deck` | Main entry point, auto-detects device |
-| `DeckManager` | `deckboard.runtime.manager` | Multi-device orchestrator with hot-plug |
+| `DeckManager` | `deckboard.runtime.manager` | Sole entry point — device discovery, hot-plug, reconnection |
+| `Deck` | `deckboard.runtime.deck` | Per-device handle (created by DeckManager, not instantiated directly) |
 | `DeviceCapabilities` | `deckboard.runtime.capabilities` | Frozen snapshot of device hardware |
 | `RenderMetrics` | `deckboard.render.metrics` | Computed rendering dimensions and margins |
 | `Screen` | `deckboard.ui.screen` | Named layout of keys, encoders, and cards |
@@ -484,7 +512,6 @@ mypy src/deckboard/
 | Function | Description |
 |----------|-------------|
 | `list_devices()` | Enumerate all connected Stream Deck devices |
-| `Deck.wait_for_device()` | Wait for a matching device to appear |
 
 ## Acknowledgments
 
