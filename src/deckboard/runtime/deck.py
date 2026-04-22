@@ -183,6 +183,13 @@ class Deck:
     # -- Device capabilities -----------------------------------------------
 
     @property
+    def device_path(self) -> str | None:
+        """HID device path, or ``None`` if not opened."""
+        if self._device is None:
+            return None
+        return self._device.id()
+
+    @property
     def is_connected(self) -> bool:
         """Whether the device is currently connected and operational."""
         return self._device is not None and self._running
