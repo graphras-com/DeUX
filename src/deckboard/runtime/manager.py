@@ -1,4 +1,4 @@
-"""DeckManager: multi-device orchestrator with hot-plug detection."""
+"""DeckManager: the sole entry point for managing Stream Deck devices."""
 
 from __future__ import annotations
 
@@ -20,23 +20,28 @@ ConnectHandler = Callable[["Deck"], Any]
 
 
 class DeckManager:
-    """Orchestrates multiple Stream Deck devices with hot-plug detection.
+    """The main entry point for the deckboard library.
 
-    Periodically scans for connected devices, tracks which are claimed,
-    and invokes callbacks when devices appear or disappear.
+    Manages one or more Stream Deck devices with automatic discovery,
+    hot-plug detection, and reconnection.  Register ``on_connect`` and
+    ``on_disconnect`` handlers, then start the manager.
 
     Usage::
 
         manager = DeckManager()
 
         @manager.on_connect(deck_type="Stream Deck +")
-        async def handle_plus(deck: Deck):
+        async def handle(deck: Deck):
             screen = deck.screen("main")
-            # set up UI...
+
+            @screen.key(0).on_press
+            async def on_home():
+                print("Home pressed!")
+
             await deck.set_screen("main")
 
         @manager.on_disconnect
-        async def handle_lost(info: DeviceInfo):
+        async def lost(info: DeviceInfo):
             print(f"Lost: {info.serial}")
 
         async with manager:
@@ -44,17 +49,17 @@ class DeckManager:
 
     Args:
         poll_interval: Seconds between device scans (default 2.0).
-        brightness: Default brightness for new Deck instances.
-        auto_reconnect: Whether individual Deck instances should
-            auto-reconnect (default ``False``; the manager handles
-            reconnection at a higher level).
+        brightness: Default brightness for new Deck instances (0-100).
+        auto_reconnect: If ``True`` (default), automatically reconnect
+            devices that disconnect.  The ``on_connect`` handler is
+            called again on reconnection.
     """
 
     def __init__(
         self,
         poll_interval: float = 2.0,
         brightness: int = 80,
-        auto_reconnect: bool = False,
+        auto_reconnect: bool = True,
     ) -> None:
         self._poll_interval = poll_interval
         self._brightness = brightness
@@ -138,6 +143,9 @@ class DeckManager:
             @manager.on_connect(deck_type="Stream Deck +")
             async def handle(deck: Deck):
                 ...
+
+        The handler is also called on reconnection when
+        ``auto_reconnect`` is enabled.
 
         Args:
             serial: Only match this serial number.
@@ -255,13 +263,16 @@ class DeckManager:
                     except Exception:
                         logger.exception("Error in disconnect handler")
 
+                # If auto_reconnect is disabled, device is simply gone.
+                # If enabled, the next scan will pick it up as a new device
+                # and call the on_connect handler again.
+
         # Detect new connections
         for serial in connected_serials:
             if serial in self._decks:
                 continue
 
             # New device — find a matching connect handler
-            # Read device type
             raw_device = device_by_serial.get(serial)
             if raw_device is None:
                 continue
@@ -281,7 +292,6 @@ class DeckManager:
                     deck = Deck(
                         serial_number=serial,
                         brightness=self._brightness,
-                        auto_reconnect=self._auto_reconnect,
                     )
                     await deck.start()
                     self._decks[serial] = deck

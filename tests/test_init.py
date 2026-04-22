@@ -13,7 +13,6 @@ class TestPublicAPI:
         expected = {
             "BlankCard",
             "Card",
-            "Deck",
             "DeckError",
             "DeckEvent",
             "DeckManager",
@@ -44,11 +43,6 @@ class TestPublicAPI:
         from deckboard import KeySlot
 
         assert KeySlot is not None
-
-    def test_deck_importable(self):
-        from deckboard import Deck
-
-        assert Deck is not None
 
     def test_deck_error_importable(self):
         from deckboard import DeckError

@@ -3,18 +3,23 @@
 Example::
 
     import asyncio
-    from deckboard import Deck
+    from deckboard import DeckManager
 
     async def main():
-        async with Deck() as deck:
-            main = deck.screen("main")
+        manager = DeckManager()
 
-            @main.key(0).on_press
+        @manager.on_connect()
+        async def handle(deck):
+            screen = deck.screen("main")
+
+            @screen.key(0).on_press
             async def on_home():
                 print("Home pressed!")
 
             await deck.set_screen("main")
-            await deck.wait_closed()
+
+        async with manager:
+            await manager.wait_closed()
 
     asyncio.run(main())
 """
@@ -31,7 +36,6 @@ from .dsui import (
 )
 from .render import RenderMetrics
 from .runtime import (
-    Deck,
     DeckError,
     DeckEvent,
     DeckManager,
@@ -57,7 +61,6 @@ from .ui import (
 __all__ = [
     "BlankCard",
     "Card",
-    "Deck",
     "DeckError",
     "DeckEvent",
     "DeckManager",
