@@ -44,6 +44,7 @@ def _make_raw_device(
     d.key_layout.return_value = (4, 2)
     d.dial_count.return_value = 4
 
+    d.id.return_value = f"/dev/hid/{serial}"
     d.open.return_value = None
     d.close.return_value = None
     d.reset.return_value = None
@@ -209,6 +210,7 @@ class TestDeckManagerScanOnce:
         mock_deck.stop = AsyncMock()
         mock_deck.info = MagicMock()
         mock_deck.info.serial = "GONE1"
+        mock_deck.device_path = "/dev/hid/GONE1"
         m._decks["GONE1"] = mock_deck
 
         with patch("deckboard.runtime.manager.DeviceManager") as mock_dm:
@@ -229,7 +231,9 @@ class TestDeckManagerScanOnce:
             connect_count += 1
 
         # Pre-populate
-        m._decks["EXISTING"] = MagicMock()
+        mock_existing = MagicMock()
+        mock_existing.device_path = "/dev/hid/EXISTING"
+        m._decks["EXISTING"] = mock_existing
 
         dev = _make_raw_device(serial="EXISTING")
 
@@ -325,6 +329,7 @@ class TestDeckManagerDisconnectInfoError:
         mock_deck = MagicMock()
         mock_deck.stop = AsyncMock()
         type(mock_deck).info = property(lambda self: (_ for _ in ()).throw(Exception("no device")))
+        mock_deck.device_path = "/dev/hid/FALLBACK1"
         m._decks["FALLBACK1"] = mock_deck
 
         with patch("deckboard.runtime.manager.DeviceManager") as mock_dm:
@@ -450,6 +455,7 @@ class TestDeckManagerReconnect:
         mock_deck.stop = AsyncMock()
         mock_deck.info = MagicMock()
         mock_deck.info.serial = "DISC_ERR"
+        mock_deck.device_path = "/dev/hid/DISC_ERR"
         m._decks["DISC_ERR"] = mock_deck
 
         with patch("deckboard.runtime.manager.DeviceManager") as mock_dm:

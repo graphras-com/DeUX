@@ -220,11 +220,28 @@ class DeckManager:
 
         visual = [d for d in devices if d.DECK_VISUAL]
 
-        # Read serials from all connected devices
+        # Build a set of HID device paths owned by running Decks.  We must
+        # never re-open these — opening an HID device that is already held by
+        # a running Deck steals the file descriptor and causes an immediate
+        # disconnect / reconnect loop.
+        managed_paths: dict[str, str] = {}  # path -> serial
+        for serial, deck in self._decks.items():
+            path = deck.device_path
+            if path is not None:
+                managed_paths[path] = serial
+
+        # Match enumerated devices to tracked decks by HID path, and only
+        # open unknown devices to read their serial.
         connected_serials: set[str] = set()
         device_by_serial: dict[str, Any] = {}
 
         for d in visual:
+            dev_path = d.id()
+            if dev_path in managed_paths:
+                # Device is already managed — mark as still connected
+                # without touching the HID handle.
+                connected_serials.add(managed_paths[dev_path])
+                continue
             try:
                 await loop.run_in_executor(self._executor, d.open)
                 serial = d.get_serial_number()
