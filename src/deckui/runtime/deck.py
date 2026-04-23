@@ -60,7 +60,7 @@ class Deck:
         """
         self._serial_number = serial_number
         self._brightness = brightness
-        self._device: Any = None  # low-level StreamDeck object
+        self._device: Any = None
         self._caps: DeviceCapabilities | None = None
         self._metrics: RenderMetrics | None = None
         self._transport: AsyncTransport | None = None
@@ -70,11 +70,8 @@ class Deck:
         self._executor = ThreadPoolExecutor(max_workers=2)
         self._device_lock = asyncio.Lock()
 
-        # Screens
         self._screens: dict[str, Screen] = {}
         self._active_screen: Screen | None = None
-
-    # -- Lifecycle ---------------------------------------------------------
 
     async def start(self) -> None:
         """Discover the device by serial, open it, and start the event loop."""
@@ -83,18 +80,15 @@ class Deck:
 
         loop = asyncio.get_running_loop()
 
-        # Discover devices (blocking call, run in executor)
         devices = await loop.run_in_executor(self._executor, DeviceManager().enumerate)
 
         if not devices:
             raise DeckError("No Stream Deck devices found")
 
-        # Filter for visual devices (skip Pedal)
         visual = [d for d in devices if d.DECK_VISUAL]
         if not visual:
             raise DeckError("No visual Stream Deck devices found")
 
-        # Find by serial number
         target = None
         for d in visual:
             try:
@@ -117,7 +111,6 @@ class Deck:
             self._executor, self._device.set_brightness, self._brightness
         )
 
-        # Build capabilities and metrics
         self._caps = DeviceCapabilities.from_device(self._device)
         self._metrics = RenderMetrics(self._caps)
 
@@ -130,14 +123,12 @@ class Deck:
             self._caps.dial_count,
         )
 
-        # Set up async transport bridge
         self._transport = AsyncTransport(self._device, loop, self._caps)
         self._transport.start()
 
         self._running = True
         self._closed_event.clear()
 
-        # Start event dispatch loop
         self._event_task = asyncio.create_task(
             self._event_loop(), name="deckui-events"
         )
@@ -149,17 +140,14 @@ class Deck:
 
         self._running = False
 
-        # Stop transport
         if self._transport:
             self._transport.stop()
 
-        # Cancel event task
         if self._event_task and not self._event_task.done():
             self._event_task.cancel()
             with suppress(asyncio.CancelledError):
                 await self._event_task
 
-        # Close device (blocking)
         if self._device:
             loop = asyncio.get_running_loop()
             try:
@@ -175,8 +163,6 @@ class Deck:
     async def wait_closed(self) -> None:
         """Block until the deck is closed (e.g. by stop() or disconnect)."""
         await self._closed_event.wait()
-
-    # -- Device capabilities -----------------------------------------------
 
     @property
     def device_path(self) -> str | None:
@@ -212,8 +198,6 @@ class Deck:
             raise DeckError("Device not opened")
         return self._metrics
 
-    # -- Device info -------------------------------------------------------
-
     @property
     def info(self) -> DeviceInfo:
         """Get device information."""
@@ -232,8 +216,6 @@ class Deck:
             key_image_format=caps.key_image_format,
         )
 
-    # -- Brightness --------------------------------------------------------
-
     @property
     def brightness(self) -> int:
         """Current brightness level (0-100)."""
@@ -248,8 +230,6 @@ class Deck:
                 await loop.run_in_executor(
                     self._executor, self._device.set_brightness, self._brightness
                 )
-
-    # -- Screen management -------------------------------------------------
 
     def screen(self, name: str) -> Screen:
         """Get or create a screen by name.
@@ -278,7 +258,6 @@ class Deck:
         self._active_screen = self._screens[name]
         logger.info("Switching to screen: %s", name)
 
-        # Render all keys and cards for this screen
         await self._render_all_keys()
         if self._active_screen.touch_strip is not None:
             await self._render_touchscreen()
@@ -291,8 +270,6 @@ class Deck:
 
     def _current_screen(self) -> Screen | None:
         return self._active_screen
-
-    # -- Rendering ---------------------------------------------------------
 
     async def _render_all_keys(self) -> None:
         """Render and push all key images for the active screen."""
@@ -312,7 +289,6 @@ class Deck:
             if key_slot and self._is_dsui_key(key_slot):
                 await self._render_dsui_key(key_slot)
             else:
-                # Blank key
                 image_bytes = render_blank_key(
                     key_size=metrics.key_size if metrics else (120, 120),
                     image_format=caps.key_image_format,
@@ -431,24 +407,18 @@ class Deck:
         if not screen:
             return
 
-        # Drain pending callbacks from all cards (programmatic set_value)
         for card in screen.cards:
             await self._drain_card_callbacks(card)
 
-        # Render dirty keys
         for key_slot in screen.keys.values():
             if key_slot.is_dirty and self._is_dsui_key(key_slot):
                 await self._render_dsui_key(key_slot)
 
-        # Render the touch strip if any card is dirty
         if screen.touch_strip is not None and screen.touch_strip.any_dirty:
             await self._render_touchscreen()
 
-        # Render info screen if dirty
         if screen.info_screen is not None and screen.info_screen.is_dirty:
             await self._render_info_screen()
-
-    # -- Event dispatch loop -----------------------------------------------
 
     async def _check_timeouts(self) -> None:
         """Check all card selection timeouts on the active screen."""

@@ -37,10 +37,8 @@ from .schema import (
 
 logger = logging.getLogger(__name__)
 
-# SVG namespace used by ElementTree
 _SVG_NS = {"svg": "http://www.w3.org/2000/svg"}
 
-# Sources that accept max_duration_ms.
 _PRESS_RELEASE_SOURCES = frozenset({"key_press_release", "encoder_press_release"})
 
 
@@ -77,7 +75,6 @@ def _parse_binding(name: str, raw: dict[str, Any]) -> Binding:
             f"Binding '{name}' has invalid type '{raw_type}'. Valid types: {valid}"
         ) from None
 
-    # Toggle bindings use node_on/node_off instead of a single node.
     if binding_type == BindingType.TOGGLE:
         node_on = raw.get("node_on")
         if not node_on or not isinstance(node_on, str):
@@ -244,7 +241,6 @@ def _parse_binding(name: str, raw: dict[str, Any]) -> Binding:
             default=str(default_raw) if default_raw is not None else "",
         )
 
-    # BindingType.COLOR
     return ColorBinding(
         node=node,
         attribute=str(raw.get("attribute", "fill")),
@@ -289,7 +285,6 @@ def _parse_event(raw: dict[str, Any], index: int) -> EventMapping:
             f"Event '{name}': hold_ms is only valid for key_hold/encoder_hold sources"
         )
 
-    # Apply reasonable defaults for omitted timing parameters.
     if source in HOLD_SOURCES and hold_ms is None:
         hold_ms = DEFAULT_HOLD_MS
     if source in _PRESS_RELEASE_SOURCES and max_duration_ms is None:
@@ -353,7 +348,6 @@ def load_package(path: str | Path) -> PackageSpec:
     if not pkg_dir.is_dir():
         raise PackageError(f"Package path is not a directory: {pkg_dir}")
 
-    # --- manifest.yaml ---
     manifest_path = pkg_dir / "manifest.yaml"
     if not manifest_path.exists():
         raise PackageError(f"Missing manifest.yaml in {pkg_dir}")
@@ -367,7 +361,6 @@ def load_package(path: str | Path) -> PackageSpec:
     if not isinstance(manifest, dict):
         raise PackageError("manifest.yaml must be a YAML mapping")
 
-    # --- Required top-level fields ---
     name = manifest.get("name")
     if not name or not isinstance(name, str):
         raise PackageError("manifest.yaml missing or invalid 'name'")
@@ -389,7 +382,6 @@ def load_package(path: str | Path) -> PackageSpec:
     if not isinstance(version, int) or version < 1:
         raise PackageError("'version' must be a positive integer")
 
-    # --- Layout SVG ---
     layout_file = manifest.get("layout")
     if not layout_file or not isinstance(layout_file, str):
         raise PackageError("manifest.yaml missing or invalid 'layout'")
@@ -401,7 +393,6 @@ def load_package(path: str | Path) -> PackageSpec:
     svg_source = layout_path.read_text(encoding="utf-8")
     svg_ids = _find_svg_ids(svg_source)
 
-    # --- Bindings ---
     bindings: dict[str, Binding] = {}
     raw_bindings = manifest.get("bindings", {})
     if raw_bindings and not isinstance(raw_bindings, dict):
@@ -410,7 +401,6 @@ def load_package(path: str | Path) -> PackageSpec:
         if not isinstance(binding_raw, dict):
             raise PackageError(f"Binding '{binding_name}' must be a mapping")
         binding = _parse_binding(binding_name, binding_raw)
-        # Validate node(s) exist in SVG
         if isinstance(binding, ToggleBinding):
             if binding.node_on not in svg_ids:
                 raise PackageError(
@@ -431,7 +421,6 @@ def load_package(path: str | Path) -> PackageSpec:
                     f"which does not exist in the SVG. "
                     f"Available ids: {sorted(svg_ids)}"
                 )
-            # Validate placeholder_node for image bindings
             if (
                 isinstance(binding, ImageBinding)
                 and binding.placeholder_node
@@ -443,7 +432,6 @@ def load_package(path: str | Path) -> PackageSpec:
                 )
         bindings[binding_name] = binding
 
-    # --- Events ---
     events: list[EventMapping] = []
     raw_events = manifest.get("events", [])
     if raw_events and not isinstance(raw_events, list):
@@ -458,7 +446,6 @@ def load_package(path: str | Path) -> PackageSpec:
         seen_names.add(event.name)
         events.append(event)
 
-    # --- Regions ---
     regions: list[Region] = []
     raw_regions = manifest.get("regions", {})
     if raw_regions and not isinstance(raw_regions, dict):
@@ -469,7 +456,6 @@ def load_package(path: str | Path) -> PackageSpec:
         region = _parse_region(region_name, region_raw)
         regions.append(region)
 
-    # --- Assets ---
     assets: dict[str, bytes] = {}
     assets_dir = pkg_dir / "assets"
     if assets_dir.is_dir():

@@ -36,7 +36,6 @@ class TestParseName:
 
     def test_multi_colon_rest_joined(self):
         """Only the first colon splits; the remainder becomes the name."""
-        # Iconify names shouldn't contain colons but be permissive on parse.
         prefix, icon = _parse_name("mdi:account:alt")
         assert prefix == "mdi"
         assert icon == "account:alt"
@@ -63,7 +62,7 @@ class TestParseName:
 
     def test_non_string_raises(self):
         with pytest.raises(IconifyError, match="non-empty"):
-            _parse_name(None)  # type: ignore[arg-type]
+            _parse_name(None)
 
 
 class TestFetchIcon:
@@ -72,7 +71,6 @@ class TestFetchIcon:
             result = fetch_icon("line-md:home")
         assert result == _SAMPLE_SVG
         mock.assert_called_once()
-        # URL should combine the configured API base with the icon path.
         url_arg = mock.call_args.args[0]
         assert url_arg.endswith("/line-md/home.svg")
 
@@ -92,7 +90,6 @@ class TestFetchIcon:
         with patch.object(iconify_mod, "_http_get", side_effect=side_effect) as mock:
             a = fetch_icon("line-md:home")
             b = fetch_icon("line-md:settings")
-            # repeat — should be cached
             fetch_icon("line-md:home")
             fetch_icon("line-md:settings")
         assert mock.call_count == 2
@@ -106,7 +103,6 @@ class TestFetchIcon:
         with patch.object(iconify_mod, "_http_get", return_value="404") as mock:
             with pytest.raises(IconifyError, match="not found"):
                 fetch_icon("fake:missing")
-            # Second call must not re-hit the network.
             with pytest.raises(IconifyError, match="previously failed"):
                 fetch_icon("fake:missing")
         assert mock.call_count == 1
@@ -123,7 +119,6 @@ class TestFetchIcon:
         with patch.object(iconify_mod, "_http_get", side_effect=err) as mock:
             with pytest.raises(IconifyError, match="Failed to fetch"):
                 fetch_icon("line-md:offline")
-            # Negative lookup cached — no retry.
             with pytest.raises(IconifyError, match="previously failed"):
                 fetch_icon("line-md:offline")
         assert mock.call_count == 1
@@ -185,17 +180,13 @@ class TestHttpGet:
             def __exit__(self, *exc: object) -> None:
                 return None
 
-        def fake_urlopen(req, timeout):  # noqa: ARG001
+        def fake_urlopen(req, timeout):
             captured["request"] = req
             return _FakeResp()
 
-        # urlopen normally gets a Request with a ``.headers`` mapping.
-        # Capture it and verify the UA was attached.
         with patch.object(iconify_mod.urllib.request, "urlopen", fake_urlopen):
             result = iconify_mod._http_get("https://example.test/x.svg")
 
         assert result == _SAMPLE_SVG
         req = captured["request"]
-        # urllib normalises header names to Capitalized form via
-        # ``Request.add_header``; ``get_header`` does a case-insensitive lookup.
         assert req.get_header("User-agent") == USER_AGENT

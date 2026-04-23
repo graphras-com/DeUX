@@ -45,15 +45,12 @@ class EventMap:
         self._regions = regions
         self._handlers: dict[str, AsyncHandler] = {}
 
-        # Gesture state
         self._press_time: float | None = None
         self._pressed = False
 
-        # Hold timer state
         self._hold_task: asyncio.Task[None] | None = None
         self._hold_fired = False
 
-        # Pre-index mappings by source for fast lookup
         self._by_source: dict[str, list[EventMapping]] = {}
         for mapping in events:
             self._by_source.setdefault(mapping.source, []).append(mapping)
@@ -79,8 +76,6 @@ class EventMap:
     def event_names(self) -> list[str]:
         """All semantic event names defined in this map."""
         return [m.name for m in self._mappings]
-
-    # -- Hold timer --------------------------------------------------------
 
     def _start_hold_timer(self, source: str) -> None:
         """Start a hold timer for the first matching hold mapping.
@@ -113,8 +108,6 @@ class EventMap:
             self._hold_task.cancel()
             self._hold_task = None
 
-    # -- Encoder events ----------------------------------------------------
-
     def handle_encoder_turn(self, direction: int) -> AsyncHandler | None:
         """Match an encoder turn to a semantic event.
 
@@ -124,17 +117,13 @@ class EventMap:
         Returns:
             The handler to call, or ``None`` if no mapping matched.
         """
-        # Check encoder_press_turn first (turn while pressed)
         if self._pressed:
-            # A turn during a press cancels the hold timer — the user is
-            # performing a press-turn gesture, not a hold gesture.
             self._cancel_hold_timer()
 
             for mapping in self._by_source.get("encoder_press_turn", []):
                 if self._direction_matches(mapping, direction):
                     return self._handlers.get(mapping.name)
 
-        # Then regular encoder_turn
         for mapping in self._by_source.get("encoder_turn", []):
             if self._direction_matches(mapping, direction):
                 return self._handlers.get(mapping.name)
@@ -183,11 +172,12 @@ class EventMap:
 
         handlers: list[AsyncHandler] = []
 
-        # Compound press_release gesture — suppressed after a hold
         if not hold_fired and self._press_time is not None:
             elapsed_ms = (time.monotonic() - self._press_time) * 1000
 
             for mapping in self._by_source.get("encoder_press_release", []):
+
+
                 max_ms = mapping.max_duration_ms
                 if max_ms is None or elapsed_ms <= max_ms:
                     handler = self._handlers.get(mapping.name)
@@ -196,15 +186,12 @@ class EventMap:
 
         self._press_time = None
 
-        # Simple encoder_release always fires
         for mapping in self._by_source.get("encoder_release", []):
             handler = self._handlers.get(mapping.name)
             if handler is not None:
                 handlers.append(handler)
 
         return handlers
-
-    # -- Key events --------------------------------------------------------
 
     def handle_key_press(self) -> list[AsyncHandler]:
         """Match a key press to semantic events.
@@ -248,7 +235,6 @@ class EventMap:
 
         handlers: list[AsyncHandler] = []
 
-        # Compound press_release gesture — suppressed after a hold
         if not hold_fired and self._press_time is not None:
             elapsed_ms = (time.monotonic() - self._press_time) * 1000
 
@@ -261,15 +247,12 @@ class EventMap:
 
         self._press_time = None
 
-        # Simple key_release always fires
         for mapping in self._by_source.get("key_release", []):
             handler = self._handlers.get(mapping.name)
             if handler is not None:
                 handlers.append(handler)
 
         return handlers
-
-    # -- Touch events ------------------------------------------------------
 
     def handle_touch(
         self, event_type: EventType, x: int, y: int
@@ -286,7 +269,6 @@ class EventMap:
         """
         from ..runtime.events import EventType as ET_Enum
 
-        # Map EventType to region event name
         if event_type == ET_Enum.TOUCH_SHORT:
             touch_name = "tap"
         elif event_type == ET_Enum.TOUCH_LONG:
@@ -294,7 +276,6 @@ class EventMap:
         else:
             return None
 
-        # Check which region contains the touch point
         for region in self._regions:
             if touch_name not in region.events:
                 continue
@@ -302,17 +283,13 @@ class EventMap:
                 region.x <= x < region.x + region.width
                 and region.y <= y < region.y + region.height
             ):
-                # Find a mapping for this source type
                 for mapping in self._by_source.get(touch_name, []):
                     return self._handlers.get(mapping.name)
 
-        # Also check top-level tap/long_press events (no region required)
         for mapping in self._by_source.get(touch_name, []):
             return self._handlers.get(mapping.name)
 
         return None
-
-    # -- Helpers -----------------------------------------------------------
 
     @staticmethod
     def _direction_matches(mapping: EventMapping, direction: int) -> bool:

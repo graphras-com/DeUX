@@ -16,22 +16,12 @@ from typing import cast
 
 logger = logging.getLogger(__name__)
 
-# Base URL of the Iconify HTTP API.  Exposed as a module attribute so
-# tests can monkeypatch it.
 ICONIFY_API_URL = "https://api.iconify.design"
 
-# Timeout for HTTP requests, in seconds.
 _REQUEST_TIMEOUT = 10.0
 
-# User-Agent sent with icon requests.  The Iconify CDN returns 403 to
-# the default ``Python-urllib/x.y`` UA, so we identify ourselves with
-# the library name.  Exposed as a module attribute so tests and users
-# can override it if needed.
 USER_AGENT = "deckui/0.1.0 (+https://github.com/graphras-com/DeckUI)"
 
-# In-process cache: maps "prefix:name" -> SVG source bytes.  ``None``
-# marks a name that has been looked up and failed to load, so we do not
-# spam the Iconify API for a broken icon reference.
 _cache: dict[str, str | None] = {}
 _cache_lock = threading.Lock()
 
@@ -110,8 +100,6 @@ def fetch_icon(name: str) -> str:
             _cache[key] = None
         raise IconifyError(f"Failed to fetch Iconify icon '{key}': {exc}") from exc
 
-    # The Iconify API returns a 200 with literal text "404" in the body
-    # when the icon does not exist.  Treat that as a failed lookup.
     stripped = body.strip()
     if stripped == "404" or not stripped.startswith("<"):
         with _cache_lock:

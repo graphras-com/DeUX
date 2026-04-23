@@ -22,8 +22,6 @@ from deckui.dsui.schema import (
 from deckui.ui.controls.key_slot import KeySlot
 from deckui.ui.screen import Screen
 
-# -- Helpers ---------------------------------------------------------------
-
 _KEY_SVG = (
     '<svg id="K" xmlns="http://www.w3.org/2000/svg" width="120" height="120">'
     '<rect id="bg" width="120" height="120" fill="#333"/>'
@@ -78,7 +76,7 @@ class TestScreenSetKey:
     def test_set_key_validates_type(self):
         screen = Screen("test")
         with pytest.raises(TypeError):
-            screen.set_key(0, "not a key")  # type: ignore[arg-type]
+            screen.set_key(0, "not a key")
 
     def test_set_key_replaces_existing(self):
         screen = Screen("test")
@@ -225,11 +223,9 @@ class TestEndToEnd:
         handler = AsyncMock()
         card.bind_event("toggle_play", handler)
 
-        # Simulate press + release
         await card.dispatch_encoder_press()
         await card.dispatch_encoder_release()
 
-        # Drain pending callbacks and invoke them
         callbacks = card.drain_pending_callbacks()
         for h, args in callbacks:
             await h(*args)
@@ -242,8 +238,8 @@ class TestEndToEnd:
         handler = AsyncMock()
         key.bind_event("activate", handler)
 
-        await key.dispatch(True)  # press
-        await key.dispatch(False)  # release
+        await key.dispatch(True)
+        await key.dispatch(False)
         handler.assert_awaited_once()
 
     def test_load_all_and_use(self, dsui_packages_dir):

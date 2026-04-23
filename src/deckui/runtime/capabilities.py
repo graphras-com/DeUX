@@ -118,8 +118,6 @@ class DeviceCapabilities:
         return self.dial_count
 
 
-# -- Default capabilities for Stream Deck+ (used when no device present) ------
-
 STREAM_DECK_PLUS = DeviceCapabilities(
     deck_type="Stream Deck +",
     key_count=8,

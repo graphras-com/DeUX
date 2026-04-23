@@ -111,7 +111,6 @@ class TestRenderMetricsMini:
 
     def test_key_margins_proportional(self):
         m = RenderMetrics(STREAM_DECK_MINI)
-        # 80 * 7/120 = 4.67 -> round = 5
         assert m.key_margin_top == 5
         assert m.key_usable_width == 80 - 2 * 5
 

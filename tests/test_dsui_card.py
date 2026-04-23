@@ -21,8 +21,6 @@ from deckui.runtime.events import EventType, TouchEvent
 from deckui.ui.cards.base import Card
 from deckui.ui.screen import Screen
 
-# -- Helpers ---------------------------------------------------------------
-
 _CARD_SVG = (
     '<svg id="TestCard" xmlns="http://www.w3.org/2000/svg" width="197" height="98">'
     '<rect id="bg" width="197" height="98" fill="#1c1c1c"/>'
@@ -170,7 +168,6 @@ class TestDsuiCardRangeHelpers:
         )
         return DsuiCard(spec)
 
-    # -- set_range ---------------------------------------------------------
 
     def test_set_range_normalises(self):
         card = self._make_range_card()
@@ -213,7 +210,6 @@ class TestDsuiCardRangeHelpers:
         card.set_range("level", 4000, min_val=2000, max_val=6000)
         assert card.get("level") == pytest.approx(0.5)
 
-    # -- adjust_range ------------------------------------------------------
 
     def test_adjust_range_increment(self):
         card = self._make_range_card(default=0.5)
@@ -250,7 +246,6 @@ class TestDsuiCardRangeHelpers:
         with pytest.raises(ValueError, match="must not be equal"):
             card.adjust_range("level", 5, min_val=5, max_val=5)
 
-    # -- get_range ---------------------------------------------------------
 
     def test_get_range_denormalises(self):
         card = self._make_range_card(default=0.75)
@@ -306,7 +301,7 @@ class TestDsuiCardToggleBinding:
         spec = self._make_toggle_spec()
         card = DsuiCard(spec)
         card.mark_clean()
-        card.set("lights", False)  # same as default
+        card.set("lights", False)
         assert card.is_dirty is False
 
     def test_get_toggle_value(self):
@@ -354,7 +349,6 @@ class TestDsuiCardPrepareAssets:
         spec = _make_card_spec()
         card = DsuiCard(spec)
         await card.prepare_assets()
-        # Should not raise or call anything
 
 
 class TestDsuiCardEvents:
@@ -377,7 +371,6 @@ class TestDsuiCardEvents:
         card = DsuiCard(spec)
         handler = AsyncMock()
         card.bind_event("play", handler)
-        # Event should be routed
         card.handle_encoder_press()
         callbacks = card.drain_pending_callbacks()
         assert len(callbacks) == 1
@@ -407,7 +400,7 @@ class TestDsuiCardEvents:
         handler = AsyncMock()
         card.bind_event("next", handler)
 
-        card.handle_encoder_turn(-1)  # left, not right
+        card.handle_encoder_turn(-1)
         callbacks = card.drain_pending_callbacks()
         assert len(callbacks) == 0
 
@@ -431,7 +424,7 @@ class TestDsuiCardEvents:
         handler = AsyncMock()
         card.bind_event("release", handler)
 
-        card.handle_encoder_press()  # set state
+        card.handle_encoder_press()
         card.handle_encoder_release()
         callbacks = card.drain_pending_callbacks()
         assert len(callbacks) == 1
@@ -452,7 +445,7 @@ class TestDsuiCardEvents:
         handler.assert_awaited_once()
 
     async def test_dispatch_touch_falls_back_to_base(self):
-        spec = _make_card_spec()  # no events
+        spec = _make_card_spec()
         card = DsuiCard(spec)
         base_handler = AsyncMock()
         card.on_tap(base_handler)
@@ -498,9 +491,8 @@ class TestDsuiCardEvents:
         handler = AsyncMock()
         card.bind_event("release", handler)
 
-        # Must press first to set state
         await card.dispatch_encoder_press()
-        card.drain_pending_callbacks()  # clear press callbacks
+        card.drain_pending_callbacks()
         await card.dispatch_encoder_release()
         callbacks = card.drain_pending_callbacks()
         assert len(callbacks) == 1

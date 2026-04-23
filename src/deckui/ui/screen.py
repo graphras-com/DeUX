@@ -46,7 +46,6 @@ class Screen:
         self._keys: dict[int, KeySlot] = {}
         self._encoders: dict[int, EncoderSlot] = {}
 
-        # Touch strip: only created if the device has encoders + touchscreen
         if self._caps.has_touchscreen and self._caps.dial_count > 0:
             from ..render.metrics import RenderMetrics
 
@@ -57,7 +56,6 @@ class Screen:
         else:
             self._touch_strip = None
 
-        # Info screen: only for devices with a non-touch screen (Neo)
         if self._caps.has_info_screen:
             self._info_screen: InfoScreen | None = InfoScreen(
                 width=self._caps.screen_width,

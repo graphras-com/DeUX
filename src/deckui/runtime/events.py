@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from ..render.metrics import RenderMetrics
 
-# Type alias for async event handlers
 AsyncHandler = Callable[..., Coroutine[Any, Any, None]]
 
 
@@ -36,7 +35,7 @@ class EncoderTurnEvent:
     """An encoder rotation event."""
 
     encoder: int
-    direction: int  # positive = clockwise, negative = counter-clockwise
+    direction: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,11 +50,11 @@ class EncoderPressEvent:
 class TouchEvent:
     """A touchscreen interaction event."""
 
-    event_type: EventType  # TOUCH_SHORT, TOUCH_LONG, or TOUCH_DRAG
+    event_type: EventType
     x: int
     y: int
-    x_out: int | None = None  # only for DRAG
-    y_out: int | None = None  # only for DRAG
+    x_out: int | None = None
+    y_out: int | None = None
 
     def compute_zone(self, metrics: RenderMetrics) -> int:
         """Compute which touch-strip zone this touch falls in.

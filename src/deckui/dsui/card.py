@@ -58,8 +58,6 @@ class DsuiCard(Card):
         """The package specification backing this card."""
         return self._spec
 
-    # -- Data binding API --------------------------------------------------
-
     def set(self, name: str, value: Any) -> DsuiCard:
         """Set a binding value.  Marks the card dirty if changed.
 
@@ -94,8 +92,6 @@ class DsuiCard(Card):
             KeyError: If *name* is not a known binding.
         """
         return self._renderer.get(name)
-
-    # -- Domain-scale range helpers ----------------------------------------
 
     def set_range(
         self, name: str, value: float, *, min_val: float = 0, max_val: float = 1
@@ -178,8 +174,6 @@ class DsuiCard(Card):
         current_norm = float(self.get(name) or 0.0)
         return min_val + current_norm * (max_val - min_val)
 
-    # -- Semantic event API ------------------------------------------------
-
     def on(self, event_name: str) -> Callable[[AsyncHandler], AsyncHandler]:
         """Decorator to register a handler for a named semantic event.
 
@@ -211,8 +205,6 @@ class DsuiCard(Card):
         """
         self._events.on(event_name, handler)
 
-    # -- Card protocol: rendering ------------------------------------------
-
     def render(self) -> Image.Image:
         """Render the SVG layout with current bindings to a PIL Image.
 
@@ -223,8 +215,6 @@ class DsuiCard(Card):
 
     async def prepare_assets(self) -> None:
         """No-op — .dui cards manage their own assets via the SVG."""
-
-    # -- Card protocol: encoder event hooks --------------------------------
 
     def handle_encoder_turn(self, direction: int) -> None:
         """Route encoder turn through the event map."""
@@ -242,8 +232,6 @@ class DsuiCard(Card):
         for handler in self._events.handle_encoder_release():
             self.queue_pending_callback(handler, ())
 
-    # -- Card protocol: touch event dispatch override ----------------------
-
     async def dispatch_touch(self, event: TouchEvent) -> None:
         """Dispatch touch events through regions and the event map.
 
@@ -254,5 +242,4 @@ class DsuiCard(Card):
         if handler is not None:
             await handler()
         else:
-            # Fall back to base Card touch handling
             await super().dispatch_touch(event)

@@ -31,8 +31,6 @@ class EncoderSlot:
     def index(self) -> int:
         return self._index
 
-    # -- Decorator-based event registration --------------------------------
-
     def on_turn(self, handler: AsyncHandler) -> AsyncHandler:
         """Decorator to register a handler for encoder turn events.
 

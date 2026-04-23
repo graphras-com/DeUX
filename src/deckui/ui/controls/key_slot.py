@@ -26,13 +26,11 @@ class KeySlot:
         self._press_handler: AsyncHandler | None = None
         self._release_handler: AsyncHandler | None = None
         self._image_bytes: bytes | None = None
-        self._dirty = True  # needs re-render
+        self._dirty = True
 
     @property
     def index(self) -> int:
         return self._index
-
-    # -- Decorator-based event registration --------------------------------
 
     def on_press(self, handler: AsyncHandler) -> AsyncHandler:
         """Decorator to register a handler for key press events.
@@ -63,8 +61,6 @@ class KeySlot:
         handler = self._press_handler if pressed else self._release_handler
         if handler is not None:
             await handler()
-
-    # -- Internal methods --------------------------------------------------
 
     @property
     def is_dirty(self) -> bool:

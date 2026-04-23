@@ -35,9 +35,6 @@ def deck(tmp_path):
     return Deck(serial_number="TEST123")
 
 
-# ── Deck.__init__ ───────────────────────────────────────────────────────
-
-
 class TestDeckInit:
     def test_defaults(self, deck):
         assert deck._serial_number == "TEST123"
@@ -52,9 +49,6 @@ class TestDeckInit:
         d = Deck(serial_number="ABC123", brightness=50)
         assert d._serial_number == "ABC123"
         assert d._brightness == 50
-
-
-# ── Deck.page ───────────────────────────────────────────────────────────
 
 
 class TestDeckPage:
@@ -81,9 +75,6 @@ class TestDeckPage:
         assert b.name == "settings"
 
 
-# ── Deck.brightness ─────────────────────────────────────────────────────
-
-
 class TestDeckBrightness:
     def test_initial_brightness(self, deck):
         assert deck.brightness == 80
@@ -104,9 +95,6 @@ class TestDeckBrightness:
         deck._device = mock_streamdeck_device
         await deck.set_brightness(60)
         assert deck.brightness == 60
-
-
-# ── Deck.set_page ───────────────────────────────────────────────────────
 
 
 class TestDeckSetPage:
@@ -133,25 +121,18 @@ class TestDeckSetPage:
         deck._render_touchscreen.assert_awaited_once()
 
 
-# ── Deck.active_screen ────────────────────────────────────────────────────
-
-
 class TestDeckActivePage:
     def test_initially_none(self, deck):
         assert deck.active_screen is None
 
 
-# ── Deck.refresh ────────────────────────────────────────────────────────
-
-
 class TestDeckRefresh:
     async def test_no_active_screen(self, deck):
         """refresh() is a no-op when no active page."""
-        await deck.refresh()  # Should not raise
+        await deck.refresh()
 
     async def test_renders_dirty_touchscreen(self, deck):
         p = deck.screen("main")
-        # BlankCards start dirty, so touch strip is dirty by default
         deck._active_screen = p
         deck._render_touchscreen = AsyncMock()
 
@@ -170,14 +151,11 @@ class TestDeckRefresh:
         deck._render_touchscreen.assert_not_awaited()
 
 
-# ── Deck._dispatch ──────────────────────────────────────────────────────
-
-
 class TestDeckDispatch:
     async def test_no_active_screen(self, deck):
         """_dispatch is a no-op with no active page."""
         event = KeyEvent(key=0, pressed=True)
-        await deck._dispatch(event)  # Should not raise
+        await deck._dispatch(event)
 
     async def test_key_press_dispatches(self, deck):
         p = deck.screen("main")
@@ -200,17 +178,17 @@ class TestDeckDispatch:
     async def test_key_press_no_handler(self, deck):
         """No error when key has no handler."""
         p = deck.screen("main")
-        p.key(0)  # No handler registered
+        p.key(0)
         deck._active_screen = p
 
-        await deck._dispatch(KeyEvent(key=0, pressed=True))  # Should not raise
+        await deck._dispatch(KeyEvent(key=0, pressed=True))
 
     async def test_key_event_unknown_key(self, deck):
         """No error when event targets a key that doesn't exist on the page."""
         p = deck.screen("main")
         deck._active_screen = p
 
-        await deck._dispatch(KeyEvent(key=7, pressed=True))  # No key 7
+        await deck._dispatch(KeyEvent(key=7, pressed=True))
 
     async def test_key_press_refreshes_when_dirty(self, deck):
         """refresh() is called after key dispatch if the key is dirty."""
@@ -406,9 +384,6 @@ class TestDeckDispatch:
         handler.assert_awaited_once()
 
 
-# ── Deck._dispatch — card event callbacks ────────────────────────────────
-
-
 class TestDeckDispatchCardCallbacks:
     """Tests for card-level encoder decorators and pending callback draining."""
 
@@ -463,7 +438,6 @@ class TestDeckDispatchCardCallbacks:
 
         await deck._drain_card_callbacks(card)
         assert results == [("h1", 1.0), ("h2", 2.0)]
-        # Queue should be empty after drain
         assert card.drain_pending_callbacks() == []
 
     async def test_refresh_drains_pending_callbacks(self, deck):
@@ -481,14 +455,11 @@ class TestDeckDispatchCardCallbacks:
         change_handler.assert_awaited_once_with(42.0)
 
 
-# ── Deck._render_all_keys ──────────────────────────────────────────────
-
-
 class TestDeckRenderAllKeys:
     async def test_no_device(self, deck):
         """No-op when device is None."""
         deck._active_screen = deck.screen("main")
-        await deck._render_all_keys()  # Should not raise
+        await deck._render_all_keys()
 
     async def test_renders_with_device(self, deck, mock_streamdeck_device):
         deck._device = mock_streamdeck_device
@@ -498,18 +469,14 @@ class TestDeckRenderAllKeys:
         deck._active_screen = p
 
         await deck._render_all_keys()
-        # Should have called set_key_image for all 8 keys (all blank)
         assert mock_streamdeck_device.set_key_image.call_count == STREAM_DECK_PLUS.key_count
-
-
-# ── Deck._render_touchscreen ───────────────────────────────────────────
 
 
 class TestDeckRenderTouchscreen:
     async def test_no_device(self, deck):
         """No-op when device is None."""
         deck._active_screen = deck.screen("main")
-        await deck._render_touchscreen()  # Should not raise
+        await deck._render_touchscreen()
 
     async def test_renders_with_device(self, deck, mock_streamdeck_device):
         deck._device = mock_streamdeck_device
@@ -534,9 +501,6 @@ class TestDeckRenderTouchscreen:
         mock_streamdeck_device.set_touchscreen_image.assert_called_once()
 
 
-# ── Deck.info ───────────────────────────────────────────────────────────
-
-
 class TestDeckInfo:
     def test_no_device_raises(self, deck):
         with pytest.raises(DeckError, match="Device not opened"):
@@ -557,9 +521,6 @@ class TestDeckInfo:
         assert info.key_image_format == "JPEG"
 
 
-# ── Deck.capabilities / metrics ────────────────────────────────────────
-
-
 class TestDeckCapabilities:
     def test_capabilities_not_opened(self, deck):
         with pytest.raises(DeckError, match="Device not opened"):
@@ -577,9 +538,6 @@ class TestDeckCapabilities:
         deck._caps = STREAM_DECK_PLUS
         deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
         assert deck.metrics.key_count == 8
-
-
-# ── Deck.start ──────────────────────────────────────────────────────────
 
 
 class TestDeckStart:
@@ -607,7 +565,6 @@ class TestDeckStart:
             assert d._transport is not None
             assert d._caps is not None
             assert d._metrics is not None
-            # Cleanup
             await d.stop()
 
     async def test_already_running_noop(self, mock_streamdeck_device):
@@ -615,9 +572,7 @@ class TestDeckStart:
         with patch("deckui.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
             await d.start()
-            # Second call should be no-op
             await d.start()
-            # enumerate only called once
             assert mock_dm.return_value.enumerate.call_count == 1
             await d.stop()
 
@@ -630,13 +585,10 @@ class TestDeckStart:
                 await d.start()
 
 
-# ── Deck.stop ───────────────────────────────────────────────────────────
-
-
 class TestDeckStop:
     async def test_stop_when_not_running(self, deck):
         """stop() is a no-op when not running."""
-        await deck.stop()  # Should not raise
+        await deck.stop()
 
     async def test_stop_closes_device(self, mock_streamdeck_device):
         d = Deck(serial_number="TEST123")
@@ -664,10 +616,7 @@ class TestDeckStop:
         with patch("deckui.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
             await d.start()
-            await d.stop()  # Should not raise
-
-
-# ── Deck.wait_closed ────────────────────────────────────────────────────
+            await d.stop()
 
 
 class TestDeckWaitClosed:
@@ -685,9 +634,6 @@ class TestDeckWaitClosed:
             await asyncio.wait_for(d.wait_closed(), timeout=2.0)
 
 
-# ── Deck.is_connected ──────────────────────────────────────────────────
-
-
 class TestDeckIsConnected:
     def test_not_connected_initially(self):
         d = Deck(serial_number="TEST123")
@@ -700,21 +646,17 @@ class TestDeckIsConnected:
         assert d.is_connected is True
 
 
-# ── Deck._check_timeouts ───────────────────────────────────────────────
-
-
 class TestDeckCheckTimeouts:
     """Tests for _check_timeouts — periodic card selection timeout checks."""
 
     async def test_no_active_screen_is_noop(self, deck):
         """_check_timeouts does nothing when no page is active."""
         deck._active_screen = None
-        await deck._check_timeouts()  # Should not raise
+        await deck._check_timeouts()
 
     async def test_no_expired_timeouts_no_refresh(self, deck):
         """No refresh when no card has an expired timeout."""
         p = deck.screen("main")
-        # Default BlankCards always return False for check_selection_timeout
         deck._active_screen = p
 
         with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
@@ -725,8 +667,7 @@ class TestDeckCheckTimeouts:
         """Card with expired timeout triggers a refresh."""
         p = deck.screen("main")
         card = _TestCard(0)
-        # Override check_selection_timeout to return True (simulating expiry)
-        card.check_selection_timeout = lambda: True  # type: ignore[assignment]
+        card.check_selection_timeout = lambda: True
         p.set_card(0, card)
         deck._active_screen = p
 

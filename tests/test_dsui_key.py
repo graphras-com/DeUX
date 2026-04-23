@@ -19,8 +19,6 @@ from deckui.dsui.schema import (
 from deckui.ui.controls.key_slot import KeySlot
 from deckui.ui.screen import Screen
 
-# -- Helpers ---------------------------------------------------------------
-
 _KEY_SVG = (
     '<svg id="TestKey" xmlns="http://www.w3.org/2000/svg" width="120" height="120">'
     '<rect id="bg" width="120" height="120" fill="#1c1c1c"/>'
@@ -135,7 +133,6 @@ class TestDsuiKeyRender:
         data = key.render_image()
         assert isinstance(data, bytes)
         assert len(data) > 0
-        # Should be JPEG
         assert data[:2] == b"\xff\xd8"
 
     def test_render_image_is_120x120(self):
@@ -203,7 +200,7 @@ class TestDsuiKeyToggleBinding:
         spec = self._make_toggle_spec()
         key = DsuiKey(spec)
         key.mark_clean()
-        key.set("state", False)  # same as default
+        key.set("state", False)
         assert key.is_dirty is False
 
     def test_get_toggle_value(self):
@@ -264,12 +261,12 @@ class TestDsuiKeyEvents:
         handler = AsyncMock()
         key.bind_event("up", handler)
 
-        await key.dispatch(True)  # press first (sets state)
-        await key.dispatch(False)  # release
+        await key.dispatch(True)
+        await key.dispatch(False)
         handler.assert_awaited_once()
 
     async def test_dispatch_falls_back_to_base(self):
-        spec = _make_key_spec()  # no events
+        spec = _make_key_spec()
         key = DsuiKey(spec)
         base_handler = AsyncMock()
         key.on_press(base_handler)
@@ -298,8 +295,8 @@ class TestDsuiKeyEvents:
         handler = AsyncMock()
         key.bind_event("tap", handler)
 
-        await key.dispatch(True)  # press
-        await key.dispatch(False)  # release (fast)
+        await key.dispatch(True)
+        await key.dispatch(False)
         handler.assert_awaited_once()
 
 

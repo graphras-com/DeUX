@@ -32,8 +32,6 @@ from deckui.dsui.svg_renderer import (
     _wrap_text,
 )
 
-# -- Helper SVGs -----------------------------------------------------------
-
 _BASIC_SVG = (
     '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="100" height="50">'
     '<rect id="bg" width="100" height="50" fill="#000000"/>'
@@ -115,7 +113,7 @@ class TestTextTruncation:
 
     def test_very_small_max_width(self):
         result = _truncate_text("Hello World", 7, OverflowMode.ELLIPSIS)
-        assert len(result) <= 2  # 1 char + ellipsis
+        assert len(result) <= 2
 
 
 class TestImageFit:
@@ -128,7 +126,6 @@ class TestImageFit:
         img = Image.new("RGB", (200, 100))
         result = _fit_image(img, 50, 50, ImageFit.CONTAIN)
         assert result.size == (50, 50)
-        # The actual image should be letterboxed
 
     def test_cover(self):
         img = Image.new("RGB", (200, 100))
@@ -138,7 +135,7 @@ class TestImageFit:
     def test_zero_target(self):
         img = Image.new("RGB", (50, 50))
         result = _fit_image(img, 0, 50, ImageFit.FILL)
-        assert result.size == (50, 50)  # unchanged
+        assert result.size == (50, 50)
 
     def test_contain_portrait(self):
         img = Image.new("RGB", (100, 200))
@@ -185,7 +182,6 @@ class TestSvgRendererSet:
         renderer = SvgRenderer(spec)
         img = Image.new("RGB", (10, 10))
         assert renderer.set("pic", img) is True
-        # Set same image again — still True (identity unreliable)
         assert renderer.set("pic", img) is True
 
     def test_set_unknown_raises(self):
@@ -287,7 +283,6 @@ class TestSvgRendererRender:
         renderer.set("label", "Changed")
         img_after = renderer.render()
 
-        # Images should differ (different text)
         assert img_before.tobytes() != img_after.tobytes()
 
     def test_visibility_binding(self):
@@ -352,10 +347,8 @@ class TestSvgRendererRender:
         )
         renderer = SvgRenderer(spec)
 
-        # No image — placeholder should be visible
         img_no_pic = renderer.render()
 
-        # Set an image
         cover = Image.new("RGB", (40, 40), (0, 255, 0))
         renderer.set("pic", cover)
         img_with_pic = renderer.render()
@@ -387,7 +380,6 @@ class TestSvgRendererRender:
             },
         )
         renderer = SvgRenderer(spec)
-        # Initially None
         img = renderer.render()
         assert img.size == (100, 50)
 
@@ -405,7 +397,6 @@ class TestSvgRendererRender:
         )
         renderer = SvgRenderer(spec)
         renderer.set("label", "A very long piece of text that should be truncated")
-        # Should not raise
         img = renderer.render()
         assert img.size == (100, 50)
 
@@ -418,7 +409,6 @@ class TestSvgRendererRender:
         renderer.set("label", "Modified")
         renderer.render()
 
-        # Reset to default and render again — should work
         renderer.set("label", "Original")
         img = renderer.render()
         assert img.size == (100, 50)
@@ -429,7 +419,7 @@ class TestSvgRendererRender:
             bindings={"pic": ImageBinding(node="pic")},
         )
         renderer = SvgRenderer(spec)
-        renderer.set("pic", 12345)  # unsupported type
+        renderer.set("pic", 12345)
         import logging
 
         with caplog.at_level(logging.WARNING):
@@ -461,7 +451,6 @@ class TestSvgRendererInlineAssets:
             '<image id="icon" href="assets/test.png" width="20" height="20"/>'
             "</svg>"
         )
-        # Create a test PNG
         img = Image.new("RGB", (20, 20), "red")
         buf = io.BytesIO()
         img.save(buf, format="PNG")
@@ -587,7 +576,6 @@ class TestSvgRendererRange:
         renderer.set("bar", 5.0)
         img_over = renderer.render()
 
-        # Both should produce the same output (clamped to 1.0)
         assert img_one.tobytes() == img_over.tobytes()
 
     def test_range_clamped_below_zero(self):
@@ -601,7 +589,6 @@ class TestSvgRendererRange:
         renderer.set("bar", -0.5)
         img_neg = renderer.render()
 
-        # Both should produce the same output (clamped to 0.0)
         assert img_zero.tobytes() == img_neg.tobytes()
 
     def test_range_missing_node_logs_warning(self, caplog):
@@ -620,8 +607,6 @@ class TestSvgRendererRange:
             renderer.render()
         assert "not found in SVG" in caplog.text
 
-
-# -- Slider SVGs ---------------------------------------------------------------
 
 _SLIDER_SVG = (
     '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="200" height="50">'
@@ -748,7 +733,6 @@ class TestSvgRendererSlider:
         renderer.set("pos", 5.0)
         img_over = renderer.render()
 
-        # Both should produce the same output (clamped to 1.0)
         assert img_one.tobytes() == img_over.tobytes()
 
     def test_slider_clamped_below_zero(self):
@@ -766,7 +750,6 @@ class TestSvgRendererSlider:
         renderer.set("pos", -0.5)
         img_neg = renderer.render()
 
-        # Both should produce the same output (clamped to 0.0)
         assert img_zero.tobytes() == img_neg.tobytes()
 
     def test_slider_midpoint_position(self):
@@ -781,8 +764,6 @@ class TestSvgRendererSlider:
         )
         renderer = SvgRenderer(spec)
         renderer.set("pos", 0.5)
-        # Check the calculated position via internal rendering
-        # midpoint = 10.0 + 0.5 * (190.0 - 10.0) = 100.0
         import copy
 
         root = copy.deepcopy(renderer._base_root)
@@ -878,9 +859,6 @@ class TestSvgRendererSlider:
         assert "not found in SVG" in caplog.text
 
 
-# -- Toggle tests -------------------------------------------------------------
-
-
 class TestSvgRendererToggleSet:
     def test_set_toggle_returns_true_on_change(self):
         spec = _make_spec(
@@ -969,8 +947,8 @@ class TestSvgRendererToggleRender:
         elem_off = _find_element_by_id(root, "icon_off")
         renderer._apply_toggle(elem_on, elem_off, True)
 
-        assert elem_on.get("display") is None  # visible
-        assert elem_off.get("display") == "none"  # hidden
+        assert elem_on.get("display") is None
+        assert elem_off.get("display") == "none"
 
     def test_toggle_false_shows_off_hides_on(self):
         """Verify SVG DOM manipulation: False → node_off visible, node_on hidden."""
@@ -992,8 +970,8 @@ class TestSvgRendererToggleRender:
         elem_off = _find_element_by_id(root, "icon_off")
         renderer._apply_toggle(elem_on, elem_off, False)
 
-        assert elem_on.get("display") == "none"  # hidden
-        assert elem_off.get("display") is None  # visible
+        assert elem_on.get("display") == "none"
+        assert elem_off.get("display") is None
 
     def test_toggle_switch_from_true_to_false(self):
         spec = _make_spec(
@@ -1095,8 +1073,6 @@ class TestSvgRendererToggleRender:
         assert "node_off 'ghost_off' not found" in caplog.text
 
 
-# -- Text wrapping tests -------------------------------------------------------
-
 _WRAP_SVG = (
     '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="106" height="106"'
     ' font-family="Arial,sans-serif">'
@@ -1155,7 +1131,6 @@ class TestResolveFontAttrs:
 
         elem = _find_element_by_id(root, "label")
         family, size = _resolve_font_attrs(root, elem)
-        # Should fall back to defaults
         assert family == "sans-serif"
         assert size == 16.0
 
@@ -1189,7 +1164,6 @@ class TestLoadFont:
         from PIL import ImageFont
 
         font = _load_font("ArialMT", 15)
-        # Should succeed either via ArialMT or by stripping to Arial
         assert isinstance(font, (ImageFont.FreeTypeFont, ImageFont.ImageFont))
 
     def test_unknown_font_returns_default_and_warns(self, caplog):
@@ -1199,7 +1173,6 @@ class TestLoadFont:
         with caplog.at_level(logging.WARNING):
             font = _load_font("TotallyFakeFont12345", 15)
         assert "Could not load font" in caplog.text
-        # Should still return a usable font
         assert hasattr(font, "getlength")
         _load_font.cache_clear()
 
@@ -1223,7 +1196,6 @@ class TestWrapText:
         font = _load_font("Arial", 15)
         lines = _wrap_text("Arthur Olsen's Favorites", 80, font, OverflowMode.ELLIPSIS)
         assert len(lines) >= 2
-        # All words should be present across lines
         joined = " ".join(lines)
         assert "Arthur" in joined
         assert "Favorites" in joined
@@ -1240,7 +1212,6 @@ class TestWrapText:
 
     def test_single_word_per_line(self):
         font = _load_font("Arial", 15)
-        # Very narrow width — each word gets its own line
         lines = _wrap_text("One Two Three", 30, font, OverflowMode.ELLIPSIS)
         assert len(lines) >= 3
 
@@ -1254,9 +1225,7 @@ class TestWrapText:
             max_height=36,
             line_height=18.0,
         )
-        # max_height=36, line_height=18 → max 2 lines
         assert len(lines) <= 2
-        # Last line should end with ellipsis
         assert lines[-1].endswith("\u2026")
 
     def test_max_height_no_truncation_needed(self):
@@ -1282,20 +1251,17 @@ class TestWrapText:
             max_height=36,
             line_height=18.0,
         )
-        # CLIP mode should still truncate lines but NOT add ellipsis
         assert len(lines) <= 2
         assert not lines[-1].endswith("\u2026")
 
     def test_long_single_word(self):
         font = _load_font("Arial", 15)
         lines = _wrap_text("Supercalifragilistic", 50, font, OverflowMode.ELLIPSIS)
-        # Single word that doesn't fit — goes on one line
         assert len(lines) == 1
         assert lines[0] == "Supercalifragilistic"
 
     def test_custom_line_height(self):
         font = _load_font("Arial", 15)
-        # line_height=10 with max_height=25 → 2 lines
         lines = _wrap_text(
             "A B C D E F G H",
             40,
@@ -1332,10 +1298,8 @@ class TestSvgRendererWrappedText:
 
         tspans = list(elem)
         assert len(tspans) >= 2
-        # Each tspan should inherit the x attribute from the parent
         for tspan in tspans:
             assert tspan.get("x") == "53"
-        # First tspan has dy="0", subsequent have the line height
         assert tspans[0].get("dy") == "0"
         for tspan in tspans[1:]:
             assert float(tspan.get("dy")) > 0
@@ -1435,9 +1399,7 @@ class TestSvgRendererWrappedText:
         )
 
         tspans = list(elem)
-        # font-size=15, line_height=15*1.2=18, max_height=36 → max 2 lines
         assert len(tspans) <= 2
-        # Last line should contain ellipsis
         assert tspans[-1].text.endswith("\u2026")
 
     def test_wrap_custom_line_height(self):
@@ -1466,7 +1428,6 @@ class TestSvgRendererWrappedText:
 
         tspans = list(elem)
         assert len(tspans) >= 2
-        # Second tspan should have dy=20.0
         assert tspans[1].get("dy") == "20.0"
 
     def test_wrap_clears_previous_tspans(self):
@@ -1492,7 +1453,7 @@ class TestSvgRendererWrappedText:
         renderer._apply_text(root, elem, binding, "Short")
         second_count = len(list(elem))
 
-        assert second_count == 1  # "Short" fits one line
+        assert second_count == 1
         assert first_count > second_count
 
     def test_wrap_disabled_uses_truncation(self):
@@ -1521,7 +1482,6 @@ class TestSvgRendererWrappedText:
             root, elem, binding, "A very long piece of text that should be truncated"
         )
 
-        # No tspan children — text is set directly
         assert len(list(elem)) == 0
         assert elem.text is not None
         assert elem.text.endswith("\u2026")
@@ -1568,8 +1528,6 @@ class TestSvgRendererWrappedText:
         assert img_before.tobytes() != img_after.tobytes()
 
 
-# -- Iconify binding -------------------------------------------------------
-
 _ICONIFY_SVG = (
     '<svg id="IconKey" xmlns="http://www.w3.org/2000/svg" '
     'width="106" height="106">'
@@ -1610,7 +1568,6 @@ class TestIconifyBindingRendering:
         root = copy.deepcopy(renderer._base_root)
         for name, binding in renderer._spec.bindings.items():
             renderer._apply_binding(root, name, binding, renderer._values.get(name))
-        # Round-trip through a string to normalise namespaces
         xml = ET.tostring(root, encoding="unicode")
         return ET.fromstring(xml)
 
@@ -1632,7 +1589,6 @@ class TestIconifyBindingRendering:
         assert inner.tag == f"{{{_SVG_NS}}}svg"
         assert inner.get("width") == "55"
         assert inner.get("height") == "55"
-        # The embedded <path> from the sample icon must be preserved.
         assert any(c.tag == f"{{{_SVG_NS}}}path" for c in inner.iter())
 
     def test_set_changes_icon(self, monkeypatch):
@@ -1708,11 +1664,9 @@ class TestIconifyBindingRendering:
         renderer = SvgRenderer(spec)
         root = self._serialise_with_bindings(renderer)
         g = _find_by_id(root, "icon")
-        # Only the new <svg> child should remain.
         children = list(g)
         assert len(children) == 1
         assert children[0].tag == f"{{{_SVG_NS}}}svg"
-        # "stale" must be gone.
         assert _find_by_id(root, "stale") is None
 
     def test_iconify_error_leaves_group_empty(self, monkeypatch, caplog):

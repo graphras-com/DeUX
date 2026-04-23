@@ -45,8 +45,6 @@ from deckui.tools.preview import (
     render_preview,
 )
 
-# -- Fixtures ----------------------------------------------------------------
-
 
 @pytest.fixture
 def tiny_svg(tmp_path: Path) -> Path:
@@ -85,9 +83,6 @@ def wide_svg(tmp_path: Path) -> Path:
     p = tmp_path / "wide.svg"
     p.write_bytes(svg)
     return p
-
-
-# -- parse_hex_color ---------------------------------------------------------
 
 
 class TestParseHexColor:
@@ -130,9 +125,6 @@ class TestParseHexColor:
             parse_hex_color("#")
 
 
-# -- load_svg ----------------------------------------------------------------
-
-
 class TestLoadSvg:
     def test_returns_rgba_image(self, tiny_svg: Path):
         img = load_svg(tiny_svg, 80, 80)
@@ -161,15 +153,11 @@ class TestLoadSvg:
         assert img.height <= PANEL_HEIGHT
 
 
-# -- compose_key_image -------------------------------------------------------
-
-
 class TestComposeKeyImage:
     def test_returns_jpeg_bytes(self):
         svg_img = Image.new("RGBA", (80, 80), (255, 0, 0, 255))
         result = compose_key_image(svg_img)
         assert isinstance(result, bytes)
-        # Verify it's valid JPEG
         decoded = Image.open(io.BytesIO(result))
         assert decoded.format == "JPEG"
         assert decoded.size == KEY_SIZE
@@ -181,7 +169,6 @@ class TestComposeKeyImage:
         decoded = Image.open(io.BytesIO(result)).convert("RGB")
         assert decoded.size == KEY_SIZE
 
-        # Expected centre of the usable area
         cx = KEY_MARGIN_LEFT + KEY_USABLE_WIDTH // 2
         cy = KEY_MARGIN_TOP + KEY_USABLE_HEIGHT // 2
         r, g, b = decoded.getpixel((cx, cy))
@@ -197,7 +184,6 @@ class TestComposeKeyImage:
         result = compose_key_image(svg_img)
         decoded = Image.open(io.BytesIO(result)).convert("RGB")
         mid_y = KEY_SIZE[1] // 2
-        # Check the outermost column — JPEG bleed doesn't reach x=0.
         r, g, b = decoded.getpixel((0, mid_y))
         assert r < 20, f"Left margin edge pixel (0, {mid_y}) not black: ({r},{g},{b})"
 
@@ -211,7 +197,6 @@ class TestComposeKeyImage:
         result = compose_key_image(svg_img)
         decoded = Image.open(io.BytesIO(result)).convert("RGB")
         mid_y = KEY_SIZE[1] // 2
-        # Check the outermost column — JPEG bleed doesn't reach the far edge.
         last_x = KEY_SIZE[0] - 1
         r, g, b = decoded.getpixel((last_x, mid_y))
         assert r < 20, (
@@ -235,14 +220,10 @@ class TestComposeKeyImage:
         result = compose_key_image(svg_img)
         decoded = Image.open(io.BytesIO(result)).convert("RGB")
         assert decoded.size == KEY_SIZE
-        # Centre of usable area should be red
         cx = KEY_MARGIN_LEFT + KEY_USABLE_WIDTH // 2
         cy = KEY_MARGIN_TOP + KEY_USABLE_HEIGHT // 2
         r, _, _ = decoded.getpixel((cx, cy))
         assert r > 200
-
-
-# -- compose_card_image ------------------------------------------------------
 
 
 class TestComposeCardImage:
@@ -257,7 +238,6 @@ class TestComposeCardImage:
         svg_img = Image.new("RGBA", (100, 50), (255, 0, 0, 255))
         result = compose_card_image(svg_img)
         assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
-        # The non-black centre should contain the image
         centre_pixel = result.getpixel((PANEL_WIDTH // 2, PANEL_HEIGHT // 2))
         assert centre_pixel != (0, 0, 0)
 
@@ -270,7 +250,6 @@ class TestComposeCardImage:
         """A card with no SVG coverage should show the custom background."""
         svg_img = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
         result = compose_card_image(svg_img, background="#ff0000")
-        # A corner pixel (outside the tiny transparent SVG) should be red.
         px = result.getpixel((0, 0))
         assert px == (255, 0, 0)
 
@@ -279,9 +258,6 @@ class TestComposeCardImage:
         result = compose_card_image(svg_img)
         px = result.getpixel((0, 0))
         assert px == (0, 0, 0)
-
-
-# -- compose_touchstrip ------------------------------------------------------
 
 
 class TestComposeTouchstrip:
@@ -296,7 +272,6 @@ class TestComposeTouchstrip:
         cards: list[Image.Image | None] = [None] * PANEL_COUNT
         result = compose_touchstrip(cards)
         decoded = Image.open(io.BytesIO(result)).convert("RGB")
-        # Should be mostly black (JPEG compression may introduce slight noise)
         px = decoded.getpixel((0, 0))
         assert all(c < 10 for c in px)
 
@@ -305,9 +280,8 @@ class TestComposeTouchstrip:
         cards: list[Image.Image | None] = [red_card, None, None, None]
         result = compose_touchstrip(cards)
         decoded = Image.open(io.BytesIO(result)).convert("RGB")
-        # Card 0 should be at x=MARGIN_LEFT
         px = decoded.getpixel((MARGIN_LEFT + 5, MARGIN_TOP + 5))
-        assert px[0] > 200  # red channel high
+        assert px[0] > 200
 
     def test_excess_cards_ignored(self):
         """More than PANEL_COUNT cards should be silently truncated."""
@@ -323,22 +297,19 @@ class TestComposeTouchstrip:
         cards: list[Image.Image | None] = [None] * PANEL_COUNT
         result = compose_touchstrip(cards, background="#00ff00")
         decoded = Image.open(io.BytesIO(result)).convert("RGB")
-        # Top-left corner is in the margin area — should be green.
         px = decoded.getpixel((0, 0))
-        assert px[1] > 200  # green channel high
-        assert px[0] < 30  # red channel low
-        assert px[2] < 30  # blue channel low
+        assert px[1] > 200
+        assert px[0] < 30
+        assert px[2] < 30
 
     def test_custom_background_between_panels(self):
         """The background colour should fill the gap between card panels."""
-        # Use None cards so the entire canvas is background colour.
         cards: list[Image.Image | None] = [None, None, None, None]
         result = compose_touchstrip(cards, background="#0000ff")
         decoded = Image.open(io.BytesIO(result)).convert("RGB")
-        # The gap area between where card 0 and card 1 would be.
         gap_x = MARGIN_LEFT + PANEL_WIDTH + PANEL_GAP // 2
         px = decoded.getpixel((gap_x, TOUCHSCREEN_HEIGHT // 2))
-        assert px[2] > 200  # blue channel high
+        assert px[2] > 200
 
     def test_default_background_is_black(self):
         cards: list[Image.Image | None] = [None] * PANEL_COUNT
@@ -346,9 +317,6 @@ class TestComposeTouchstrip:
         decoded = Image.open(io.BytesIO(result)).convert("RGB")
         px = decoded.getpixel((0, 0))
         assert all(c < 10 for c in px)
-
-
-# -- build_parser / parse_args -----------------------------------------------
 
 
 class TestParser:
@@ -420,9 +388,6 @@ class TestParser:
             parse_args(["--background", "nope"])
 
 
-# -- render_preview ----------------------------------------------------------
-
-
 class TestRenderPreview:
     def test_no_files(self):
         args = parse_args([])
@@ -478,7 +443,6 @@ class TestRenderPreview:
         args = parse_args(["--card0", str(wide_svg), "--background", "#00ff00"])
         _, touchstrip = render_preview(args)
         decoded = Image.open(io.BytesIO(touchstrip)).convert("RGB")
-        # Top-left corner is margin area — should be green.
         px = decoded.getpixel((0, 0))
         assert px[1] > 200
 
@@ -488,9 +452,6 @@ class TestRenderPreview:
         decoded = Image.open(io.BytesIO(touchstrip)).convert("RGB")
         px = decoded.getpixel((0, 0))
         assert all(c < 10 for c in px)
-
-
-# -- main / push_to_device ---------------------------------------------------
 
 
 class TestMain:
@@ -525,20 +486,17 @@ class TestMain:
         main(["--background", "#aabbcc"])
         mock_push.assert_awaited_once()
         _, touchstrip, _ = mock_push.call_args[0]
-        # The touchstrip should contain the background colour.
         decoded = Image.open(io.BytesIO(touchstrip)).convert("RGB")
         px = decoded.getpixel((0, 0))
-        # #aabbcc = (170, 187, 204) — allow for JPEG compression.
-        assert px[0] > 150  # R
-        assert px[1] > 160  # G
-        assert px[2] > 180  # B
+        assert px[0] > 150
+        assert px[1] > 160
+        assert px[2] > 180
 
 
 class TestPushToDevice:
     async def test_push_opens_and_pushes(self, mock_streamdeck_device: MagicMock):
         from deckui.tools.preview import push_to_device
 
-        # Create minimal key image and touchstrip
         blank_key = Image.new("RGB", KEY_SIZE, "black")
         buf = io.BytesIO()
         blank_key.save(buf, format="JPEG")
@@ -597,9 +555,6 @@ class TestPushToDevice:
         mock_streamdeck_device.set_brightness.assert_called_once_with(100)
 
 
-# -- _wait_for_interrupt ------------------------------------------------------
-
-
 class TestWaitForInterrupt:
     async def test_returns_on_sigint(self):
         """The coroutine completes when SIGINT is delivered."""
@@ -609,7 +564,6 @@ class TestWaitForInterrupt:
 
         loop = asyncio.get_running_loop()
 
-        # Schedule SIGINT delivery shortly after the wait starts.
         loop.call_later(0.05, os.kill, os.getpid(), signal.SIGINT)
         await asyncio.wait_for(_wait_for_interrupt(), timeout=1.0)
 
@@ -623,18 +577,12 @@ class TestWaitForInterrupt:
         loop.call_later(0.05, os.kill, os.getpid(), signal.SIGINT)
         await asyncio.wait_for(_wait_for_interrupt(), timeout=1.0)
 
-        # After returning, the default handler should be restored, meaning
-        # remove_signal_handler returns False (nothing left to remove).
         assert loop.remove_signal_handler(signal.SIGINT) is False
-
-
-# -- _svg_to_png_fit ---------------------------------------------------------
 
 
 class TestSvgToPngFit:
     def test_tall_svg_constrained_by_height(self, tmp_path: Path):
         """An SVG taller than max_height triggers the height-constrained path."""
-        # 20x200 SVG → when constrained to width=80, result is 80x800 → too tall
         svg = (
             b'<svg xmlns="http://www.w3.org/2000/svg" width="20" height="200">'
             b'<rect width="20" height="200" fill="red"/>'
@@ -674,9 +622,6 @@ class TestSvgToPngFit:
             side_effect=FileNotFoundError("no rsvg"),
         ), pytest.raises(RasterizeError, match="No SVG renderer"):
             _svg_to_png_fit(svg, 80, 80)
-
-
-# -- _find_and_open_device ---------------------------------------------------
 
 
 class TestFindAndOpenDevice:
@@ -722,16 +667,13 @@ class TestFindAndOpenDevice:
         assert result is device
 
 
-# -- __main__ ----------------------------------------------------------------
-
-
 class TestMainModule:
     @patch("deckui.tools.preview.main")
     def test_main_module(self, mock_main: MagicMock):
         """Importing __main__ should call main()."""
         import importlib
 
-        import deckui.tools.__main__  # noqa: F811
+        import deckui.tools.__main__
 
         importlib.reload(deckui.tools.__main__)
         mock_main.assert_called()
