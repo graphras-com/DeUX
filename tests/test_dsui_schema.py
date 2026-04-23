@@ -1,10 +1,10 @@
-"""Tests for deckboard.dsui.schema — data model classes."""
+"""Tests for deckui.dsui.schema — data model classes."""
 
 from __future__ import annotations
 
 import pytest
 
-from deckboard.dsui.schema import (
+from deckui.dsui.schema import (
     BindingType,
     ColorBinding,
     EventMapping,

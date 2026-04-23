@@ -24,13 +24,13 @@
 - [Loading packages](#loading-packages)
 - [API summary](#api-summary)
 
-DSUI (`.dsui`) packages let you describe Stream Deck+ UIs declaratively
+DSUI (`.dui`) packages let you describe Stream Deck+ UIs declaratively
 using an SVG layout and a YAML manifest instead of writing imperative
-Python rendering code.  A package is a directory with a `.dsui` suffix
+Python rendering code.  A package is a directory with a `.dui` suffix
 containing:
 
 ```
-MyPackage.dsui/
+MyPackage.dui/
   manifest.yaml      # Required — package metadata, bindings, events, regions
   layout.svg         # Required — the SVG layout referenced by the manifest
   assets/            # Optional — binary assets (images, icons) inlined at render time
@@ -40,9 +40,9 @@ MyPackage.dsui/
 Load a package and use it as a card or key:
 
 ```python
-from deckboard.dsui import load_package, DsuiCard, DsuiKey
+from deckui.dsui import load_package, DsuiCard, DsuiKey
 
-spec = load_package("./AudioCard.dsui")
+spec = load_package("./AudioCard.dui")
 card = DsuiCard(spec)
 card.set("artist", "Ash Walker")
 
@@ -591,7 +591,7 @@ directory will have its reference replaced with a base64 data URI before
 rasterisation.
 
 ```
-MyCard.dsui/
+MyCard.dui/
   manifest.yaml
   layout.svg
   assets/
@@ -672,9 +672,9 @@ regions:
 ```
 
 ```python
-from deckboard.dsui import load_package, DsuiCard
+from deckui.dsui import load_package, DsuiCard
 
-spec = load_package("./AudioCard.dsui")
+spec = load_package("./AudioCard.dui")
 card = DsuiCard(spec)
 
 card.set("artist", "Ash Walker").set("title", "Aquamarine")
@@ -730,9 +730,9 @@ events:
 ```
 
 ```python
-from deckboard.dsui import load_package, DsuiKey
+from deckui.dsui import load_package, DsuiKey
 
-spec = load_package("./PowerKey.dsui")
+spec = load_package("./PowerKey.dui")
 key = DsuiKey(spec)
 
 key.set("label", "Shutdown")
@@ -787,9 +787,9 @@ events:
 ```
 
 ```python
-from deckboard.dsui import load_package, DsuiCard
+from deckui.dsui import load_package, DsuiCard
 
-spec = load_package("./VolumeSlider.dsui")
+spec = load_package("./VolumeSlider.dui")
 card = DsuiCard(spec)
 
 card.set_range("volume", 50, min_val=0, max_val=100)
@@ -839,9 +839,9 @@ events:
 ```
 
 ```python
-from deckboard.dsui import load_package, DsuiKey
+from deckui.dsui import load_package, DsuiKey
 
-spec = load_package("./LightsKey.dsui")
+spec = load_package("./LightsKey.dui")
 key = DsuiKey(spec)
 
 lights_on = False
@@ -861,12 +861,12 @@ async def on_toggle():
 ## Loading packages
 
 ```python
-from deckboard.dsui import load_package, load_all_packages
+from deckui.dsui import load_package, load_all_packages
 
 # Load a single package
-spec = load_package("./AudioCard.dsui")
+spec = load_package("./AudioCard.dui")
 
-# Load all .dsui packages from a directory
+# Load all .dui packages from a directory
 packages = load_all_packages("./packages/")
 # Returns: {"AudioCard": PackageSpec, "PowerKey": PackageSpec, ...}
 ```
@@ -875,8 +875,8 @@ packages = load_all_packages("./packages/")
 exist in the SVG, verifies event source/parameter rules, and loads
 assets.  It raises `PackageError` if anything is invalid.
 
-`load_all_packages` scans a directory for subdirectories with a `.dsui`
-suffix and loads each one.  Non-`.dsui` directories are ignored.
+`load_all_packages` scans a directory for subdirectories with a `.dui`
+suffix and loads each one.  Non-`.dui` directories are ignored.
 
 ---
 
@@ -886,7 +886,7 @@ suffix and loads each one.  Non-`.dsui` directories are ignored.
 
 | Method / Property       | Description                                          |
 |-------------------------|------------------------------------------------------|
-| `DsuiCard(spec)`        | Create a card from a `.dsui` package.            |
+| `DsuiCard(spec)`        | Create a card from a `.dui` package.            |
 | `.set(name, value)`     | Set a binding value. Returns `self`.                 |
 | `.set_many(**kwargs)`   | Set multiple bindings at once. Returns `self`.       |
 | `.get(name)`            | Get the current value of a binding.                  |
@@ -902,7 +902,7 @@ suffix and loads each one.  Non-`.dsui` directories are ignored.
 
 | Method / Property          | Description                                       |
 |----------------------------|---------------------------------------------------|
-| `DsuiKey(spec)`            | Create a key from a `.dsui` package.              |
+| `DsuiKey(spec)`            | Create a key from a `.dui` package.              |
 | `.set(name, value)`        | Set a binding value. Returns `self`.              |
 | `.set_many(**kwargs)`      | Set multiple bindings at once. Returns `self`.    |
 | `.get(name)`               | Get the current value of a binding.               |

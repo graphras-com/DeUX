@@ -1,4 +1,4 @@
-"""Async bridge between Stream Deck callbacks and the deckboard event loop."""
+"""Async bridge between Stream Deck callbacks and the deckui event loop."""
 
 from __future__ import annotations
 

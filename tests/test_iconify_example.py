@@ -1,4 +1,4 @@
-"""End-to-end tests for the IconKey.dsui example package."""
+"""End-to-end tests for the IconKey.dui example package."""
 
 from __future__ import annotations
 
@@ -6,17 +6,17 @@ from pathlib import Path
 
 import pytest
 
-import deckboard.dsui.svg_renderer as svg_renderer_mod
-from deckboard.dsui import DsuiKey, load_package
-from deckboard.dsui.iconify import clear_cache
-from deckboard.dsui.schema import IconifyBinding, TextBinding
+import deckui.dsui.svg_renderer as svg_renderer_mod
+from deckui.dsui import DsuiKey, load_package
+from deckui.dsui.iconify import clear_cache
+from deckui.dsui.schema import IconifyBinding, TextBinding
 
 _SAMPLE_ICON_SVG = (
     '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" '
     'viewBox="0 0 24 24"><path fill="currentColor" d="M0 0"/></svg>'
 )
 
-_EXAMPLE_DIR = Path(__file__).resolve().parent.parent / "examples" / "IconKey.dsui"
+_EXAMPLE_DIR = Path(__file__).resolve().parent.parent / "examples" / "IconKey.dui"
 
 
 @pytest.fixture(autouse=True)

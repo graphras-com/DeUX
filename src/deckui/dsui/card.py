@@ -1,4 +1,4 @@
-"""DsuiCard: a touchscreen card backed by a .dsui package."""
+"""DsuiCard: a touchscreen card backed by a .dui package."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class DsuiCard(Card):
-    """A touchscreen card whose layout and events are defined by a .dsui package.
+    """A touchscreen card whose layout and events are defined by a .dui package.
 
     Instead of writing a Python class with imperative Pillow rendering,
     you describe the UI in an SVG layout and a YAML manifest.  The card
@@ -28,9 +28,9 @@ class DsuiCard(Card):
 
     Usage::
 
-        from deckboard.dsui import load_package, DsuiCard
+        from deckui.dsui import load_package, DsuiCard
 
-        spec = load_package("./AudioCard.dsui")
+        spec = load_package("./AudioCard.dui")
         card = DsuiCard(spec)
         card.set("artist", "Ash Walker")
 
@@ -39,10 +39,10 @@ class DsuiCard(Card):
             ...
 
     The card index is assigned automatically when you install the card
-    on a screen with :meth:`~deckboard.ui.screen.Screen.set_card`.
+    on a screen with :meth:`~deckui.ui.screen.Screen.set_card`.
 
     Args:
-        spec: A validated :class:`~deckboard.dsui.schema.PackageSpec`.
+        spec: A validated :class:`~deckui.dsui.schema.PackageSpec`.
     """
 
     def __init__(self, spec: PackageSpec) -> None:
@@ -220,7 +220,7 @@ class DsuiCard(Card):
         return self._renderer.render()
 
     async def prepare_assets(self) -> None:
-        """No-op — .dsui cards manage their own assets via the SVG."""
+        """No-op — .dui cards manage their own assets via the SVG."""
 
     # -- Card protocol: encoder event hooks --------------------------------
 

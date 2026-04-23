@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Example: brightness slider using a .dsui slider binding.
+"""Example: brightness slider using a .dui slider binding.
 
 Demonstrates the ``slider`` binding type which translates an SVG
 element between two fixed positions (min_pos and max_pos) proportional
@@ -15,7 +15,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from deckboard import DeckManager, DsuiCard, load_package
+from deckui import DeckManager, DsuiCard, load_package
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -23,7 +23,7 @@ EXAMPLES_DIR = Path(__file__).parent
 
 
 async def main():
-    spec = load_package(EXAMPLES_DIR / "BrightnessSlider.dsui")
+    spec = load_package(EXAMPLES_DIR / "BrightnessSlider.dui")
 
     print(f"Loaded: {spec.name} (v{spec.version})")
     print(f"  Bindings: {sorted(spec.bindings)}")

@@ -1,4 +1,4 @@
-"""Tests for deckboard.runtime.discovery — list_devices function."""
+"""Tests for deckui.runtime.discovery — list_devices function."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from deckboard.runtime.discovery import list_devices
+from deckui.runtime.discovery import list_devices
 
 
 def _make_raw_device(
@@ -36,14 +36,14 @@ def _make_raw_device(
 
 class TestListDevices:
     async def test_no_devices(self):
-        with patch("deckboard.runtime.discovery.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.discovery.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = []
             result = await list_devices()
             assert result == []
 
     async def test_returns_device_info(self):
         dev = _make_raw_device()
-        with patch("deckboard.runtime.discovery.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.discovery.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [dev]
             result = await list_devices()
             assert len(result) == 1
@@ -53,14 +53,14 @@ class TestListDevices:
 
     async def test_filters_non_visual(self):
         dev = _make_raw_device(visual=False)
-        with patch("deckboard.runtime.discovery.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.discovery.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [dev]
             result = await list_devices()
             assert result == []
 
     async def test_visual_only_false_includes_all(self):
         dev = _make_raw_device(visual=False, serial="PEDAL1")
-        with patch("deckboard.runtime.discovery.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.discovery.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [dev]
             result = await list_devices(visual_only=False)
             assert len(result) == 1
@@ -69,7 +69,7 @@ class TestListDevices:
     async def test_filter_by_deck_type(self):
         plus = _make_raw_device(deck_type="Stream Deck +", serial="PLUS1")
         mini = _make_raw_device(deck_type="Stream Deck Mini", serial="MINI1")
-        with patch("deckboard.runtime.discovery.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.discovery.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [plus, mini]
             result = await list_devices(deck_type="Stream Deck +")
             assert len(result) == 1
@@ -77,7 +77,7 @@ class TestListDevices:
 
     async def test_filter_by_deck_type_no_match(self):
         dev = _make_raw_device(deck_type="Stream Deck Mini")
-        with patch("deckboard.runtime.discovery.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.discovery.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [dev]
             result = await list_devices(deck_type="Stream Deck XL")
             assert result == []
@@ -85,7 +85,7 @@ class TestListDevices:
     async def test_multiple_devices(self):
         d1 = _make_raw_device(serial="DEV1")
         d2 = _make_raw_device(serial="DEV2")
-        with patch("deckboard.runtime.discovery.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.discovery.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [d1, d2]
             result = await list_devices()
             assert len(result) == 2
@@ -96,7 +96,7 @@ class TestListDevices:
         d1 = _make_raw_device(serial="OK1")
         d2 = _make_raw_device(serial="BAD1")
         d2.open.side_effect = OSError("HID error")
-        with patch("deckboard.runtime.discovery.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.discovery.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [d1, d2]
             result = await list_devices()
             assert len(result) == 1

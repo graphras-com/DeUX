@@ -1,4 +1,4 @@
-"""Shared fixtures for deckboard tests."""
+"""Shared fixtures for deckui tests."""
 
 from __future__ import annotations
 
@@ -9,17 +9,17 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock
 import pytest
 from PIL import Image
 
-from deckboard.runtime.capabilities import (
+from deckui.runtime.capabilities import (
     DeviceCapabilities,
     STREAM_DECK_PLUS,
 )
-from deckboard.ui.controls.key_slot import KeySlot
-from deckboard.ui.controls.encoder_slot import EncoderSlot
-from deckboard.ui.screen import Screen
-from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH, RenderMetrics
-from deckboard.ui.touch_strip import TouchStrip
-from deckboard.ui.cards.base import Card
-from deckboard.ui.cards.blank import BlankCard
+from deckui.ui.controls.key_slot import KeySlot
+from deckui.ui.controls.encoder_slot import EncoderSlot
+from deckui.ui.screen import Screen
+from deckui.render.metrics import PANEL_HEIGHT, PANEL_WIDTH, RenderMetrics
+from deckui.ui.touch_strip import TouchStrip
+from deckui.ui.cards.base import Card
+from deckui.ui.cards.blank import BlankCard
 
 
 # -- Device capability presets ------------------------------------------------
@@ -133,8 +133,8 @@ MINIMAL_KEY_SVG = (
 
 
 def _write_card_dsui_package(base_dir: Path) -> Path:
-    """Create a valid TouchStripCard .dsui package on disk."""
-    pkg_dir = base_dir / "TestCard.dsui"
+    """Create a valid TouchStripCard .dui package on disk."""
+    pkg_dir = base_dir / "TestCard.dui"
     pkg_dir.mkdir(parents=True, exist_ok=True)
 
     (pkg_dir / "layout.svg").write_text(MINIMAL_CARD_SVG, encoding="utf-8")
@@ -213,8 +213,8 @@ regions:
 
 
 def _write_key_dsui_package(base_dir: Path) -> Path:
-    """Create a valid Key .dsui package on disk."""
-    pkg_dir = base_dir / "TestKey.dsui"
+    """Create a valid Key .dui package on disk."""
+    pkg_dir = base_dir / "TestKey.dui"
     pkg_dir.mkdir(parents=True, exist_ok=True)
 
     (pkg_dir / "layout.svg").write_text(MINIMAL_KEY_SVG, encoding="utf-8")
@@ -250,20 +250,20 @@ events:
 
 @pytest.fixture
 def card_dsui_path(tmp_path):
-    """Path to a valid TouchStripCard .dsui package."""
+    """Path to a valid TouchStripCard .dui package."""
     return _write_card_dsui_package(tmp_path)
 
 
 @pytest.fixture
 def key_dsui_path(tmp_path):
-    """Path to a valid Key .dsui package."""
+    """Path to a valid Key .dui package."""
     return _write_key_dsui_package(tmp_path)
 
 
 @pytest.fixture
 def card_package_spec(card_dsui_path):
     """A loaded PackageSpec for a TouchStripCard."""
-    from deckboard.dsui.loader import load_package
+    from deckui.dsui.loader import load_package
 
     return load_package(card_dsui_path)
 
@@ -271,14 +271,14 @@ def card_package_spec(card_dsui_path):
 @pytest.fixture
 def key_package_spec(key_dsui_path):
     """A loaded PackageSpec for a Key."""
-    from deckboard.dsui.loader import load_package
+    from deckui.dsui.loader import load_package
 
     return load_package(key_dsui_path)
 
 
 @pytest.fixture
 def dsui_packages_dir(tmp_path):
-    """A directory containing multiple .dsui packages."""
+    """A directory containing multiple .dui packages."""
     _write_card_dsui_package(tmp_path)
     _write_key_dsui_package(tmp_path)
     return tmp_path

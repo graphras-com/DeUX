@@ -52,7 +52,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest --cov=deckboard --cov-report=term-missing --cov-report=xml --cov-fail-under=${{ inputs.coverage-threshold }}
+          pytest --cov=deckui --cov-report=term-missing --cov-report=xml --cov-fail-under=${{ inputs.coverage-threshold }}
 
       - name: Upload coverage report
         if: always() && matrix.python-version == '3.12'

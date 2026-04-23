@@ -25,7 +25,7 @@ from .events import (
 from .transport import AsyncTransport
 
 if TYPE_CHECKING:
-    from ..dsui.key import DsuiKey
+    from ..dui.key import DsuiKey
     from ..ui.cards.base import Card
     from ..ui.controls.key_slot import KeySlot
     from ..ui.screen import Screen
@@ -141,7 +141,7 @@ class Deck:
 
         # Start event dispatch loop
         self._event_task = asyncio.create_task(
-            self._event_loop(), name="deckboard-events"
+            self._event_loop(), name="deckui-events"
         )
 
     async def stop(self) -> None:
@@ -340,7 +340,7 @@ class Deck:
         if not self._device:
             return
 
-        from ..dsui.key import DsuiKey
+        from ..dui.key import DsuiKey
 
         dsui_key: DsuiKey = key_slot  # type: ignore[assignment]
         image_bytes = dsui_key.render_image(

@@ -1,9 +1,9 @@
-"""deckboard - A high-level, asyncio-native library for Elgato Stream Deck devices.
+"""deckui - A high-level, asyncio-native library for Elgato Stream Deck devices.
 
 Example::
 
     import asyncio
-    from deckboard import DeckManager
+    from deckui import DeckManager
 
     async def main():
         manager = DeckManager()

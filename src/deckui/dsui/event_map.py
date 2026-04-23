@@ -1,4 +1,4 @@
-"""Physical-to-semantic event routing for .dsui packages."""
+"""Physical-to-semantic event routing for .dui packages."""
 
 from __future__ import annotations
 

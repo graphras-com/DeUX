@@ -1,8 +1,8 @@
-"""Tests for deckboard.render.metrics — RenderMetrics class."""
+"""Tests for deckui.render.metrics — RenderMetrics class."""
 
 from __future__ import annotations
 
-from deckboard.render.metrics import (
+from deckui.render.metrics import (
     ICON_PADDING,
     ICON_SIZE,
     KEY_MARGIN_BOTTOM,
@@ -26,7 +26,7 @@ from deckboard.render.metrics import (
     USABLE_HEIGHT,
     USABLE_WIDTH,
 )
-from deckboard.runtime.capabilities import STREAM_DECK_PLUS
+from deckui.runtime.capabilities import STREAM_DECK_PLUS
 from tests.conftest import STREAM_DECK_MINI, STREAM_DECK_NEO, STREAM_DECK_XL
 
 

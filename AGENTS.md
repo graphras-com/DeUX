@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Instructions for AI coding agents working on the **deckboard** repository.
+Instructions for AI coding agents working on the **deckui** repository.
 
 ## Mandatory workflow — read this FIRST
 
@@ -14,7 +14,7 @@ You MUST follow this sequence for every task. Do not write any code before step 
 2. **Do the work.**
 3. **Run the full test suite** — every test must pass before you commit:
    ```
-   python -m pytest tests/ --cov=deckboard --cov-report=term-missing --cov-fail-under=95
+   python -m pytest tests/ --cov=deckui --cov-report=term-missing --cov-fail-under=95
    ```
 4. **Commit** — only after all tests pass.
 5. **Push and create a PR**:
@@ -27,14 +27,14 @@ You MUST follow this sequence for every task. Do not write any code before step 
 
 ## Project overview
 
-Deckboard is an asyncio-native Python 3.11+ library for Elgato Stream Deck+ devices. It wraps the low-level `python-elgato-streamdeck` HID library and provides a high-level API for key slots, encoder slots, touchscreen cards, icons, screen management, and declarative `.dsui` UI packages.
+DeckUI is an asyncio-native Python 3.11+ library for Elgato Stream Deck+ devices. It wraps the low-level `python-elgato-streamdeck` HID library and provides a high-level API for key slots, encoder slots, touchscreen cards, icons, screen management, and declarative `.dui` UI packages.
 
 ### Repository structure
 
 The codebase is organized into five top-level packages:
 
 ```
-src/deckboard/              # Library source
+src/deckui/              # Library source
   __init__.py               # Public API surface — re-exports from runtime, render, ui, dsui
   py.typed                  # PEP 561 marker for typed package
 
@@ -67,18 +67,18 @@ src/deckboard/              # Library source
       key_slot.py           # KeySlot class — wraps a physical key (0-7)
       encoder_slot.py       # EncoderSlot class — wraps a rotary encoder (0-3)
 
-  dsui/                     # Declarative UI packages (.dsui format)
+  dsui/                     # Declarative UI packages (.dui format)
     __init__.py             # Re-exports: DsuiCard, DsuiKey, PackageSpec, loader, schema types
-    schema.py               # Data model for .dsui package manifests (PackageSpec, bindings, events, regions)
-    loader.py               # Load and validate .dsui packages from disk (YAML + SVG)
-    card.py                 # DsuiCard — touchscreen card backed by a .dsui package
-    key.py                  # DsuiKey — physical key backed by a .dsui package
-    event_map.py            # Physical-to-semantic event routing for .dsui packages
+    schema.py               # Data model for .dui package manifests (PackageSpec, bindings, events, regions)
+    loader.py               # Load and validate .dui packages from disk (YAML + SVG)
+    card.py                 # DsuiCard — touchscreen card backed by a .dui package
+    key.py                  # DsuiKey — physical key backed by a .dui package
+    event_map.py            # Physical-to-semantic event routing for .dui packages
     svg_renderer.py         # SVG-to-PIL rendering engine with live data bindings
 
   tools/                    # CLI utilities
     __init__.py             # Package marker
-    __main__.py             # Entry point for `python -m deckboard.tools`
+    __main__.py             # Entry point for `python -m deckui.tools`
     preview.py              # Preview SVG designs on a physical Stream Deck+ device
 
 tests/                      # One test file per source module
@@ -103,7 +103,7 @@ The canonical class names reflect their hardware role:
 | `EventMap`       | `dsui.event_map`                |
 | `SvgRenderer`    | `dsui.svg_renderer`             |
 
-All public classes are exported from `deckboard.__init__`. There are no backward-compatible aliases.
+All public classes are exported from `deckui.__init__`. There are no backward-compatible aliases.
 
 ## Build / lint / test commands
 
@@ -112,7 +112,7 @@ All public classes are exported from `deckboard.__init__`. There are no backward
 pip install -e ".[test]"
 
 # Full test suite with coverage (CI gate = 95%)
-python -m pytest tests/ --cov=deckboard --cov-report=term-missing --cov-fail-under=95
+python -m pytest tests/ --cov=deckui --cov-report=term-missing --cov-fail-under=95
 
 # Single test file
 python -m pytest tests/test_deck.py -v
@@ -127,7 +127,7 @@ python -m pytest tests/test_deck.py::TestDeckEventLoop::test_event_loop_timeout_
 ruff check src/ tests/
 
 # Type check (mypy strict)
-mypy src/deckboard/
+mypy src/deckui/
 ```
 
 ## Code style
@@ -149,7 +149,7 @@ from typing import TYPE_CHECKING
 
 from PIL import Image                   # third-party
 
-from deckboard.runtime.events import AsyncHandler  # local
+from deckui.runtime.events import AsyncHandler  # local
 ```
 
 Use `TYPE_CHECKING` blocks for imports only needed by type checkers (Ruff `TCH` rule):
@@ -221,11 +221,11 @@ target-version = "py311"
 ### Example test structure
 
 ```python
-"""Tests for deckboard.ui.controls.key_slot — KeySlot class."""
+"""Tests for deckui.ui.controls.key_slot — KeySlot class."""
 
 from __future__ import annotations
 import pytest
-from deckboard.ui.controls.key_slot import KeySlot
+from deckui.ui.controls.key_slot import KeySlot
 
 class TestKeySlotRendering:
     def test_set_rendered_image(self, key_slot: KeySlot):

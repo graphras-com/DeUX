@@ -1,4 +1,4 @@
-"""Tests for deckboard.render — rendering helpers."""
+"""Tests for deckui.render — rendering helpers."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import io
 
 from PIL import Image
 
-from deckboard.render.metrics import (
+from deckui.render.metrics import (
     ICON_PADDING,
     ICON_SIZE,
     KEY_MARGIN_BOTTOM,
@@ -22,12 +22,12 @@ from deckboard.render.metrics import (
     PANEL_HEIGHT,
     PANEL_WIDTH,
 )
-from deckboard.render.key_renderer import (
+from deckui.render.key_renderer import (
     _encode_jpeg,
     render_blank_key,
     render_key_image,
 )
-from deckboard.render.touch_renderer import (
+from deckui.render.touch_renderer import (
     compose_touchstrip,
     render_blank_touchscreen,
 )

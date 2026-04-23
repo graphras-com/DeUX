@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-Deckboard depends on the following open-source libraries. We are grateful to
+DeckUI depends on the following open-source libraries. We are grateful to
 their authors and contributors.
 
 ---

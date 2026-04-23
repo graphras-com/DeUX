@@ -1,4 +1,4 @@
-"""Tests for deckboard.dsui.event_map — event routing and gesture detection."""
+"""Tests for deckui.dsui.event_map — event routing and gesture detection."""
 
 from __future__ import annotations
 
@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from deckboard.dsui.event_map import EventMap
-from deckboard.dsui.schema import EventMapping, Region
-from deckboard.runtime.events import EventType
+from deckui.dsui.event_map import EventMap
+from deckui.dsui.schema import EventMapping, Region
+from deckui.runtime.events import EventType
 
 
 # -- Fixtures --------------------------------------------------------------

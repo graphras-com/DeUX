@@ -1,4 +1,4 @@
-"""Tests for deckboard.dsui integration — Screen.set_key, Deck rendering, public API."""
+"""Tests for deckui.dsui integration — Screen.set_key, Deck rendering, public API."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from PIL import Image
 
-from deckboard.dsui import (
+from deckui.dsui import (
     DsuiCard,
     DsuiKey,
     PackageError,
@@ -15,13 +15,13 @@ from deckboard.dsui import (
     load_all_packages,
     load_package,
 )
-from deckboard.dsui.schema import (
+from deckui.dsui.schema import (
     EventMapping,
     PackageType,
     TextBinding,
 )
-from deckboard.ui.controls.key_slot import KeySlot
-from deckboard.ui.screen import Screen
+from deckui.ui.controls.key_slot import KeySlot
+from deckui.ui.screen import Screen
 
 
 # -- Helpers ---------------------------------------------------------------
@@ -109,13 +109,13 @@ class TestDeckDsuiKeyRendering:
     """Test that Deck._is_dsui_key correctly identifies DsuiKeys."""
 
     def test_is_dsui_key_true(self):
-        from deckboard.runtime.deck import Deck
+        from deckui.runtime.deck import Deck
 
         key = DsuiKey(_key_spec())
         assert Deck._is_dsui_key(key) is True
 
     def test_is_dsui_key_false_for_regular(self):
-        from deckboard.runtime.deck import Deck
+        from deckui.runtime.deck import Deck
 
         key = KeySlot(0)
         assert Deck._is_dsui_key(key) is False
@@ -125,37 +125,37 @@ class TestPublicApiImports:
     """Verify that all dsui types are importable from the top-level package."""
 
     def test_dsui_card_importable(self):
-        from deckboard import DsuiCard
+        from deckui import DsuiCard
 
         assert DsuiCard is not None
 
     def test_dsui_key_importable(self):
-        from deckboard import DsuiKey
+        from deckui import DsuiKey
 
         assert DsuiKey is not None
 
     def test_load_package_importable(self):
-        from deckboard import load_package
+        from deckui import load_package
 
         assert load_package is not None
 
     def test_load_all_packages_importable(self):
-        from deckboard import load_all_packages
+        from deckui import load_all_packages
 
         assert load_all_packages is not None
 
     def test_package_error_importable(self):
-        from deckboard import PackageError
+        from deckui import PackageError
 
         assert PackageError is not None
 
     def test_package_spec_importable(self):
-        from deckboard import PackageSpec
+        from deckui import PackageSpec
 
         assert PackageSpec is not None
 
     def test_all_in_dunder_all(self):
-        import deckboard
+        import deckui
 
         for name in [
             "DsuiCard",
@@ -165,14 +165,14 @@ class TestPublicApiImports:
             "load_package",
             "load_all_packages",
         ]:
-            assert name in deckboard.__all__
+            assert name in deckui.__all__
 
 
 class TestDsuiInitExports:
-    """Verify that all types are exported from deckboard.dsui."""
+    """Verify that all types are exported from deckui.dsui."""
 
     def test_all_exports(self):
-        from deckboard import dsui
+        from deckui import dsui
 
         expected = [
             "DsuiCard",

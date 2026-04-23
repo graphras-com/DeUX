@@ -1,4 +1,4 @@
-"""Load and validate .dsui packages from disk."""
+"""Load and validate .dui packages from disk."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ _PRESS_RELEASE_SOURCES = frozenset({"key_press_release", "encoder_press_release"
 
 
 class PackageError(Exception):
-    """Raised when a .dsui package is invalid or cannot be loaded."""
+    """Raised when a .dui package is invalid or cannot be loaded."""
 
 
 def _find_svg_ids(svg_source: str) -> set[str]:
@@ -336,15 +336,15 @@ def _parse_region(name: str, raw: dict[str, Any]) -> Region:
 
 
 def load_package(path: str | Path) -> PackageSpec:
-    """Load a .dsui package directory into a validated PackageSpec.
+    """Load a .dui package directory into a validated PackageSpec.
 
     Args:
-        path: Path to the ``.dsui`` directory.
+        path: Path to the ``.dui`` directory.
 
     Returns:
         A frozen :class:`PackageSpec` ready to be used by
-        :class:`~deckboard.dsui.card.DsuiCard` or
-        :class:`~deckboard.dsui.key.DsuiKey`.
+        :class:`~deckui.dsui.card.DsuiCard` or
+        :class:`~deckui.dsui.key.DsuiKey`.
 
     Raises:
         PackageError: If the package is invalid or incomplete.
@@ -475,7 +475,7 @@ def load_package(path: str | Path) -> PackageSpec:
                 assets[asset_file.name] = asset_file.read_bytes()
 
     logger.info(
-        "Loaded .dsui package '%s' (%s, %d bindings, %d events)",
+        "Loaded .dui package '%s' (%s, %d bindings, %d events)",
         name,
         pkg_type.value,
         len(bindings),
@@ -495,10 +495,10 @@ def load_package(path: str | Path) -> PackageSpec:
 
 
 def load_all_packages(directory: str | Path) -> dict[str, PackageSpec]:
-    """Load all .dsui packages from a directory.
+    """Load all .dui packages from a directory.
 
     Args:
-        directory: Path to scan for ``.dsui`` subdirectories.
+        directory: Path to scan for ``.dui`` subdirectories.
 
     Returns:
         A dict mapping package names to their specs.
@@ -512,9 +512,9 @@ def load_all_packages(directory: str | Path) -> dict[str, PackageSpec]:
 
     packages: dict[str, PackageSpec] = {}
     for entry in sorted(base.iterdir()):
-        if entry.is_dir() and entry.suffix == ".dsui":
+        if entry.is_dir() and entry.suffix == ".dui":
             spec = load_package(entry)
             packages[spec.name] = spec
 
-    logger.info("Loaded %d .dsui packages from %s", len(packages), base)
+    logger.info("Loaded %d .dui packages from %s", len(packages), base)
     return packages

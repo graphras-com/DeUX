@@ -142,7 +142,7 @@ class Card(ABC):
     def set_refresh_callback(self, callback: AsyncHandler) -> None:
         """Register an async callback the card can invoke to request a refresh.
 
-        This is set automatically by :class:`~deckboard.runtime.deck.Deck`
+        This is set automatically by :class:`~deckui.runtime.deck.Deck`
         when dispatching events so that cards with internal timers (e.g.
         long-press detection) can trigger a re-render without a direct
         reference to the deck.
@@ -166,7 +166,7 @@ class Card(ABC):
 
         Called by child elements (e.g. sliders) when their value changes
         synchronously.  The queued callbacks are drained and awaited by
-        :class:`~deckboard.runtime.deck.Deck` during event dispatch or refresh.
+        :class:`~deckui.runtime.deck.Deck` during event dispatch or refresh.
 
         Args:
             handler: The async callback to invoke.
@@ -247,7 +247,7 @@ class Card(ABC):
         """Render this card as a PANEL_WIDTH x PANEL_HEIGHT PIL Image.
 
         Return ``None`` to let the touchstrip background colour show
-        through (used by :class:`~deckboard.ui.cards.blank.BlankCard`).
+        through (used by :class:`~deckui.ui.cards.blank.BlankCard`).
 
         Returns:
             A PANEL_WIDTH x PANEL_HEIGHT RGB :class:`~PIL.Image.Image`,

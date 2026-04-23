@@ -1,4 +1,4 @@
-"""Tests for deckboard.runtime.manager — DeckManager class."""
+"""Tests for deckui.runtime.manager — DeckManager class."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from deckboard.runtime.manager import DeckManager
+from deckui.runtime.manager import DeckManager
 
 
 def _make_raw_device(
@@ -139,7 +139,7 @@ class TestDeckManagerLifecycle:
         async def handler(deck):
             pass
 
-        with patch("deckboard.runtime.manager.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = []
             await m.start()
             assert m._running is True
@@ -151,7 +151,7 @@ class TestDeckManagerLifecycle:
     async def test_start_already_running(self):
         m = DeckManager(poll_interval=0.05)
 
-        with patch("deckboard.runtime.manager.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = []
             await m.start()
             await m.start()  # no-op
@@ -162,7 +162,7 @@ class TestDeckManagerLifecycle:
         await m.stop()  # no-op, should not raise
 
     async def test_context_manager(self):
-        with patch("deckboard.runtime.manager.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = []
             async with DeckManager(poll_interval=0.05) as m:
                 assert m._running is True
@@ -184,9 +184,9 @@ class TestDeckManagerScanOnce:
         dev = _make_raw_device(serial="SCAN1")
 
         # Patch both the manager's enumeration and the Deck's enumeration
-        with patch("deckboard.runtime.manager.DeviceManager") as mgr_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mgr_dm:
             mgr_dm.return_value.enumerate.return_value = [dev]
-            with patch("deckboard.runtime.deck.DeviceManager") as deck_dm:
+            with patch("deckui.runtime.deck.DeviceManager") as deck_dm:
                 deck_dm.return_value.enumerate.return_value = [dev]
                 await m._scan_once()
 
@@ -213,7 +213,7 @@ class TestDeckManagerScanOnce:
         mock_deck.device_path = "/dev/hid/GONE1"
         m._decks["GONE1"] = mock_deck
 
-        with patch("deckboard.runtime.manager.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = []
             await m._scan_once()
 
@@ -237,7 +237,7 @@ class TestDeckManagerScanOnce:
 
         dev = _make_raw_device(serial="EXISTING")
 
-        with patch("deckboard.runtime.manager.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [dev]
             await m._scan_once()
 
@@ -253,7 +253,7 @@ class TestDeckManagerScanOnce:
 
         dev_mini = _make_raw_device(deck_type="Stream Deck Mini", serial="MINI1")
 
-        with patch("deckboard.runtime.manager.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [dev_mini]
             await m._scan_once()
 
@@ -269,7 +269,7 @@ class TestDeckManagerScanOnce:
 
         dev = _make_raw_device(serial="UNWANTED")
 
-        with patch("deckboard.runtime.manager.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [dev]
             await m._scan_once()
 
@@ -278,7 +278,7 @@ class TestDeckManagerScanOnce:
     async def test_scan_enumeration_failure(self):
         m = DeckManager(poll_interval=10.0)
 
-        with patch("deckboard.runtime.manager.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.side_effect = OSError("HID error")
             await m._scan_once()  # Should not raise
 
@@ -292,7 +292,7 @@ class TestDeckManagerScanOnce:
         dev = _make_raw_device(serial="BAD_OPEN")
         dev.open.side_effect = OSError("HID error")
 
-        with patch("deckboard.runtime.manager.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [dev]
             await m._scan_once()
 
@@ -332,7 +332,7 @@ class TestDeckManagerDisconnectInfoError:
         mock_deck.device_path = "/dev/hid/FALLBACK1"
         m._decks["FALLBACK1"] = mock_deck
 
-        with patch("deckboard.runtime.manager.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = []
             await m._scan_once()
 
@@ -355,9 +355,9 @@ class TestDeckManagerConnectHandlerError:
 
         dev = _make_raw_device(serial="ERR1")
 
-        with patch("deckboard.runtime.manager.DeviceManager") as mgr_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mgr_dm:
             mgr_dm.return_value.enumerate.return_value = [dev]
-            with patch("deckboard.runtime.deck.DeviceManager") as deck_dm:
+            with patch("deckui.runtime.deck.DeviceManager") as deck_dm:
                 deck_dm.return_value.enumerate.return_value = [dev]
                 await m._scan_once()
 
@@ -383,25 +383,25 @@ class TestDeckManagerReconnect:
         dev = _make_raw_device(serial="RECON1")
 
         # First scan: device appears
-        with patch("deckboard.runtime.manager.DeviceManager") as mgr_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mgr_dm:
             mgr_dm.return_value.enumerate.return_value = [dev]
-            with patch("deckboard.runtime.deck.DeviceManager") as deck_dm:
+            with patch("deckui.runtime.deck.DeviceManager") as deck_dm:
                 deck_dm.return_value.enumerate.return_value = [dev]
                 await m._scan_once()
 
         assert connected_serials == ["RECON1"]
 
         # Second scan: device disappears
-        with patch("deckboard.runtime.manager.DeviceManager") as mgr_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mgr_dm:
             mgr_dm.return_value.enumerate.return_value = []
             await m._scan_once()
 
         assert "RECON1" not in m._decks
 
         # Third scan: device reappears — on_connect should be called again
-        with patch("deckboard.runtime.manager.DeviceManager") as mgr_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mgr_dm:
             mgr_dm.return_value.enumerate.return_value = [dev]
-            with patch("deckboard.runtime.deck.DeviceManager") as deck_dm:
+            with patch("deckui.runtime.deck.DeviceManager") as deck_dm:
                 deck_dm.return_value.enumerate.return_value = [dev]
                 await m._scan_once()
 
@@ -427,16 +427,16 @@ class TestDeckManagerReconnect:
         dev = _make_raw_device(serial="NOREC1")
 
         # Scan 1: connect
-        with patch("deckboard.runtime.manager.DeviceManager") as mgr_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mgr_dm:
             mgr_dm.return_value.enumerate.return_value = [dev]
-            with patch("deckboard.runtime.deck.DeviceManager") as deck_dm:
+            with patch("deckui.runtime.deck.DeviceManager") as deck_dm:
                 deck_dm.return_value.enumerate.return_value = [dev]
                 await m._scan_once()
 
         assert "NOREC1" in m._decks
 
         # Scan 2: disconnect
-        with patch("deckboard.runtime.manager.DeviceManager") as mgr_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mgr_dm:
             mgr_dm.return_value.enumerate.return_value = []
             await m._scan_once()
 
@@ -458,7 +458,7 @@ class TestDeckManagerReconnect:
         mock_deck.device_path = "/dev/hid/DISC_ERR"
         m._decks["DISC_ERR"] = mock_deck
 
-        with patch("deckboard.runtime.manager.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.manager.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = []
             await m._scan_once()  # Should not raise
 

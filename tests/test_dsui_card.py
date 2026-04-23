@@ -1,4 +1,4 @@
-"""Tests for deckboard.dsui.card — DsuiCard class."""
+"""Tests for deckui.dsui.card — DsuiCard class."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from PIL import Image
 
-from deckboard.dsui.card import DsuiCard
-from deckboard.dsui.schema import (
+from deckui.dsui.card import DsuiCard
+from deckui.dsui.schema import (
     EventMapping,
     PackageSpec,
     PackageType,
@@ -17,9 +17,9 @@ from deckboard.dsui.schema import (
     TextBinding,
     ToggleBinding,
 )
-from deckboard.runtime.events import EventType, TouchEvent
-from deckboard.ui.cards.base import Card
-from deckboard.ui.screen import Screen
+from deckui.runtime.events import EventType, TouchEvent
+from deckui.ui.cards.base import Card
+from deckui.ui.screen import Screen
 
 
 # -- Helpers ---------------------------------------------------------------

@@ -1,7 +1,7 @@
 """Rendering metrics derived from device capabilities.
 
 Instead of hardcoded constants, all metrics are computed from a
-:class:`~deckboard.runtime.capabilities.DeviceCapabilities` instance.
+:class:`~deckui.runtime.capabilities.DeviceCapabilities` instance.
 Default module-level constants are provided for backward compatibility
 with the Stream Deck+ profile.
 """
@@ -19,7 +19,7 @@ class RenderMetrics:
 
     All layout constants (key sizes, touchscreen panel dimensions,
     info-screen dimensions) are derived from the device's
-    :class:`~deckboard.runtime.capabilities.DeviceCapabilities`.
+    :class:`~deckui.runtime.capabilities.DeviceCapabilities`.
 
     Args:
         caps: Device capabilities to derive metrics from.

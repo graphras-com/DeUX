@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Example: multi-device management with device discovery.
 
-Demonstrates the core deckboard features:
+Demonstrates the core deckui features:
 
 - ``list_devices()`` — enumerate connected Stream Decks
 - ``DeckManager`` — orchestrate multiple devices with hot-plug detection
@@ -16,7 +16,7 @@ Run with::
 import asyncio
 import logging
 
-from deckboard import DeckManager, DeviceInfo, list_devices
+from deckui import DeckManager, DeviceInfo, list_devices
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 

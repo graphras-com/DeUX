@@ -2,7 +2,7 @@
 
 Run with::
 
-    python -m deckboard.tools.preview \\
+    python -m deckui.tools.preview \\
         --card0 my_card.svg --key0 my_key.svg \\
         --background "#1a2b3c"
 
@@ -31,9 +31,9 @@ from pathlib import Path
 
 from PIL import Image
 
-from deckboard.render.svg_rasterize import RasterizeError
-from deckboard.render.key_renderer import _encode_image
-from deckboard.render.metrics import (
+from deckui.render.svg_rasterize import RasterizeError
+from deckui.render.key_renderer import _encode_image
+from deckui.render.metrics import (
     KEY_MARGIN_LEFT,
     KEY_MARGIN_TOP,
     KEY_SIZE,
@@ -49,7 +49,7 @@ from deckboard.render.metrics import (
     TOUCHSCREEN_HEIGHT,
     TOUCHSCREEN_WIDTH,
 )
-from deckboard.runtime.capabilities import DeviceCapabilities, STREAM_DECK_PLUS
+from deckui.runtime.capabilities import DeviceCapabilities, STREAM_DECK_PLUS
 
 logger = logging.getLogger(__name__)
 
@@ -216,7 +216,7 @@ def compose_touchstrip(
 def build_parser() -> argparse.ArgumentParser:
     """Build the ``argparse`` parser for the preview tool."""
     parser = argparse.ArgumentParser(
-        prog="python -m deckboard.tools.preview",
+        prog="python -m deckui.tools.preview",
         description="Preview SVG designs on a Stream Deck+ device.",
     )
     for i in range(_KEY_COUNT):

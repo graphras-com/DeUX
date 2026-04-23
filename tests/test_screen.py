@@ -1,16 +1,16 @@
-"""Tests for deckboard.ui.screen — Screen class."""
+"""Tests for deckui.ui.screen — Screen class."""
 
 from __future__ import annotations
 
 import pytest
 
-from deckboard.runtime.capabilities import STREAM_DECK_PLUS
-from deckboard.ui.controls.key_slot import KeySlot
-from deckboard.ui.controls.encoder_slot import EncoderSlot
-from deckboard.ui.screen import Screen
-from deckboard.ui.touch_strip import TouchStrip
-from deckboard.ui.cards.base import Card
-from deckboard.ui.cards.blank import BlankCard
+from deckui.runtime.capabilities import STREAM_DECK_PLUS
+from deckui.ui.controls.key_slot import KeySlot
+from deckui.ui.controls.encoder_slot import EncoderSlot
+from deckui.ui.screen import Screen
+from deckui.ui.touch_strip import TouchStrip
+from deckui.ui.cards.base import Card
+from deckui.ui.cards.blank import BlankCard
 from tests.conftest import STREAM_DECK_MINI, STREAM_DECK_NEO
 
 
