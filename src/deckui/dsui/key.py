@@ -54,15 +54,12 @@ class DsuiKey(KeySlot):
         self._spec = spec
         self._renderer = SvgRenderer(spec)
         self._events = EventMap(spec.events)
-        # Mark dirty so it renders on first screen activation
         self._dirty = True
 
     @property
     def spec(self) -> PackageSpec:
         """The package specification backing this key."""
         return self._spec
-
-    # -- Data binding API --------------------------------------------------
 
     def set(self, name: str, value: Any) -> DsuiKey:
         """Set a binding value.  Marks the key dirty if changed.
@@ -98,8 +95,6 @@ class DsuiKey(KeySlot):
             KeyError: If *name* is not a known binding.
         """
         return self._renderer.get(name)
-
-    # -- Domain-scale range helpers ----------------------------------------
 
     def set_range(
         self, name: str, value: float, *, min_val: float = 0, max_val: float = 1
@@ -182,8 +177,6 @@ class DsuiKey(KeySlot):
         current_norm = float(self.get(name) or 0.0)
         return min_val + current_norm * (max_val - min_val)
 
-    # -- Semantic event API ------------------------------------------------
-
     def on_event(self, event_name: str) -> Callable[[AsyncHandler], AsyncHandler]:
         """Decorator to register a handler for a named semantic event.
 
@@ -214,8 +207,6 @@ class DsuiKey(KeySlot):
             handler: The async callable to invoke.
         """
         self._events.on(event_name, handler)
-
-    # -- Rendering ---------------------------------------------------------
 
     def render_image(
         self,
@@ -248,8 +239,6 @@ class DsuiKey(KeySlot):
         """Always ``True`` — this key is backed by a .dui package."""
         return True
 
-    # -- Override dispatch to use the event map ----------------------------
-
     async def dispatch(self, pressed: bool) -> None:
         """Dispatch a key press/release through the event map.
 
@@ -267,5 +256,4 @@ class DsuiKey(KeySlot):
             for handler in handlers:
                 await handler()
         else:
-            # Fall back to base KeySlot on_press/on_release decorators
             await super().dispatch(pressed)

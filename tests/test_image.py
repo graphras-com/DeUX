@@ -35,9 +35,6 @@ def _decode_jpeg(data: bytes) -> Image.Image:
     return Image.open(io.BytesIO(data))
 
 
-# ── render_key_image ────────────────────────────────────────────────────
-
-
 class TestRenderKeyImage:
     def test_blank_returns_bytes(self):
         result = render_key_image()
@@ -73,11 +70,7 @@ class TestRenderKeyImage:
 
     def test_is_jpeg(self):
         result = render_key_image()
-        # JPEG magic bytes: 0xFF 0xD8 0xFF
         assert result[:2] == b"\xff\xd8"
-
-
-# ── Key margin constants ────────────────────────────────────────────────
 
 
 class TestKeyMarginConstants:
@@ -105,22 +98,15 @@ class TestKeyMarginConstants:
         assert KEY_MARGIN_LEFT > 0
 
 
-# ── Key margin rendering behaviour ─────────────────────────────────────
-
-
 class TestKeyMarginRendering:
     def test_icon_within_margins(self, sample_icon):
         """An icon-only key should have content only inside the margin area."""
         result = render_key_image(icon=sample_icon)
         img = _decode_jpeg(result)
 
-        # The icon is red (255, 0, 0) on a black background.
-        # Check that the left margin area is black.
         for x in range(KEY_MARGIN_LEFT):
             for y in range(KEY_SIZE[1]):
                 r, g, b = img.getpixel((x, y))
-                # JPEG compression means values won't be exactly 0,
-                # but they should be very dark in the margin area.
                 assert r < 20 and g < 20 and b < 20, (
                     f"Non-black pixel at ({x}, {y}) in left margin: ({r}, {g}, {b})"
                 )
@@ -136,9 +122,6 @@ class TestKeyMarginRendering:
                 assert r < 20 and g < 20 and b < 20, (
                     f"Non-black pixel at ({x}, {y}) in right margin: ({r}, {g}, {b})"
                 )
-
-
-# ── compose_touchstrip ─────────────────────────────────────────────────
 
 
 class TestComposeTouchscreen:
@@ -181,9 +164,8 @@ class TestComposeTouchscreen:
         result = compose_touchstrip([None] * 4, background="#ff0000")
         img = _decode_jpeg(result)
         assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
-        # Top-left corner (0,0) is in the margin area — should be red-ish
         r, g, b = img.getpixel((0, 0))
-        assert r > 200  # JPEG compression may shift values slightly
+        assert r > 200
         assert g < 50
         assert b < 50
 
@@ -197,9 +179,6 @@ class TestComposeTouchscreen:
         assert b < 10
 
 
-# ── render_blank_key ────────────────────────────────────────────────────
-
-
 class TestRenderBlankKey:
     def test_returns_bytes(self):
         result = render_blank_key()
@@ -211,9 +190,6 @@ class TestRenderBlankKey:
 
     def test_is_jpeg(self):
         assert render_blank_key()[:2] == b"\xff\xd8"
-
-
-# ── render_blank_touchscreen ────────────────────────────────────────────
 
 
 class TestRenderBlankTouchscreen:
@@ -234,9 +210,6 @@ class TestRenderBlankTouchscreen:
         assert b < 50
 
 
-# ── _encode_image ───────────────────────────────────────────────────────
-
-
 class TestEncodeImage:
     def test_returns_bytes(self):
         img = Image.new("RGB", (10, 10), "red")
@@ -251,12 +224,10 @@ class TestEncodeImage:
         img = Image.new("RGB", (100, 100), "red")
         low = _encode_image(img, quality=10)
         high = _encode_image(img, quality=95)
-        # Lower quality should produce smaller file
         assert len(low) < len(high)
 
     def test_bmp_format(self):
         img = Image.new("RGB", (10, 10), "red")
         result = _encode_image(img, image_format="BMP")
         assert isinstance(result, bytes)
-        # BMP magic bytes: "BM"
         assert result[:2] == b"BM"

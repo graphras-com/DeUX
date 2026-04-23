@@ -28,7 +28,6 @@ class RenderMetrics:
     def __init__(self, caps: DeviceCapabilities) -> None:
         self._caps = caps
 
-        # Key metrics
         self.key_size: tuple[int, int] = (caps.key_pixel_width, caps.key_pixel_height)
         self.key_margin_top = max(1, round(caps.key_pixel_height * 7 / 120))
         self.key_margin_right = max(1, round(caps.key_pixel_width * 7 / 120))
@@ -43,7 +42,6 @@ class RenderMetrics:
         self.icon_size = max(1, round(caps.key_pixel_width * 80 / 120))
         self.icon_padding = max(0, (self.key_usable_width - self.icon_size) // 2)
 
-        # Touchscreen metrics
         self.touchscreen_width = caps.touchscreen_width
         self.touchscreen_height = caps.touchscreen_height
         self.panel_count = caps.panel_count
@@ -70,11 +68,9 @@ class RenderMetrics:
 
         self.panel_height = self.usable_height if caps.has_touchscreen else 0
 
-        # Info screen metrics (Neo)
         self.screen_width = caps.screen_width
         self.screen_height = caps.screen_height
 
-        # Key image format
         self.key_image_format = caps.key_image_format
         self.key_count = caps.key_count
         self.dial_count = caps.dial_count
@@ -87,8 +83,6 @@ def _default_metrics() -> RenderMetrics:
     return RenderMetrics(STREAM_DECK_PLUS)
 
 
-# Module-level constants for the Stream Deck+ profile.
-# Used by the preview tool and as convenient defaults.
 _DEFAULT = _default_metrics()
 
 KEY_SIZE = _DEFAULT.key_size

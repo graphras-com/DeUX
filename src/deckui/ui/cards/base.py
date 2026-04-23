@@ -58,8 +58,6 @@ class Card(ABC):
     def index(self) -> int:
         return self._index
 
-    # -- Decorator-based event registration --------------------------------
-
     def on_tap(self, handler: AsyncHandler) -> AsyncHandler:
         """Decorator to register a handler for short tap events in this zone.
 
@@ -138,8 +136,6 @@ class Card(ABC):
         self._encoder_release_handler = handler
         return handler
 
-    # -- Refresh callback (set by Deck) ------------------------------------
-
     def set_refresh_callback(self, callback: AsyncHandler) -> None:
         """Register an async callback the card can invoke to request a refresh.
 
@@ -157,8 +153,6 @@ class Card(ABC):
         """
         if self._request_refresh is not None:
             await self._request_refresh()
-
-    # -- Pending callbacks (deferred async invocation) ---------------------
 
     def queue_pending_callback(
         self, handler: AsyncHandler, args: tuple[object, ...]
@@ -185,8 +179,6 @@ class Card(ABC):
         callbacks = self._pending_callbacks
         self._pending_callbacks = []
         return callbacks
-
-    # -- Dirty tracking ----------------------------------------------------
 
     @property
     def is_dirty(self) -> bool:
@@ -242,8 +234,6 @@ class Card(ABC):
         ):
             await self._drag_handler(event.x, event.y, event.x_out, event.y_out)
 
-    # -- Rendering (abstract) ----------------------------------------------
-
     @abstractmethod
     def render(self) -> Image.Image | None:
         """Render this card as a PANEL_WIDTH x PANEL_HEIGHT PIL Image.
@@ -255,8 +245,6 @@ class Card(ABC):
             A PANEL_WIDTH x PANEL_HEIGHT RGB :class:`~PIL.Image.Image`,
             or ``None`` for a transparent/empty slot.
         """
-
-    # -- Encoder interaction hooks (default no-ops) ------------------------
 
     def handle_encoder_turn(self, direction: int) -> None:
         """Called when the encoder above this widget is turned.

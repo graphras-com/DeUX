@@ -56,9 +56,6 @@ def _make_raw_device(
     return d
 
 
-# ── DeckManager.__init__ ─────────────────────────────────────────────────
-
-
 class TestDeckManagerInit:
     def test_defaults(self):
         m = DeckManager()
@@ -73,9 +70,6 @@ class TestDeckManagerInit:
         assert m._poll_interval == 5.0
         assert m._brightness == 50
         assert m._auto_reconnect is True
-
-
-# ── DeckManager.on_connect / on_disconnect ───────────────────────────────
 
 
 class TestDeckManagerHandlers:
@@ -125,14 +119,10 @@ class TestDeckManagerHandlers:
         assert len(m._connect_handlers) == 2
 
 
-# ── DeckManager lifecycle ────────────────────────────────────────────────
-
-
 class TestDeckManagerLifecycle:
     async def test_start_stop(self):
         m = DeckManager(poll_interval=0.05)
 
-        # Register a dummy handler so scan works
         @m.on_connect()
         async def handler(deck):
             pass
@@ -152,12 +142,12 @@ class TestDeckManagerLifecycle:
         with patch("deckui.runtime.manager.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = []
             await m.start()
-            await m.start()  # no-op
+            await m.start()
             await m.stop()
 
     async def test_stop_when_not_running(self):
         m = DeckManager()
-        await m.stop()  # no-op, should not raise
+        await m.stop()
 
     async def test_context_manager(self):
         with patch("deckui.runtime.manager.DeviceManager") as mock_dm:
@@ -165,9 +155,6 @@ class TestDeckManagerLifecycle:
             async with DeckManager(poll_interval=0.05) as m:
                 assert m._running is True
             assert m._running is False
-
-
-# ── DeckManager._scan_once ───────────────────────────────────────────────
 
 
 class TestDeckManagerScanOnce:
@@ -181,7 +168,6 @@ class TestDeckManagerScanOnce:
 
         dev = _make_raw_device(serial="SCAN1")
 
-        # Patch both the manager's enumeration and the Deck's enumeration
         with patch("deckui.runtime.manager.DeviceManager") as mgr_dm:
             mgr_dm.return_value.enumerate.return_value = [dev]
             with patch("deckui.runtime.deck.DeviceManager") as deck_dm:
@@ -191,7 +177,6 @@ class TestDeckManagerScanOnce:
         assert len(connected_decks) == 1
         assert "SCAN1" in m._decks
 
-        # Clean up
         for d in m._decks.values():
             await d.stop()
 
@@ -203,7 +188,6 @@ class TestDeckManagerScanOnce:
         async def handler(info):
             disconnected.append(info)
 
-        # Pre-populate a managed deck
         mock_deck = MagicMock()
         mock_deck.stop = AsyncMock()
         mock_deck.info = MagicMock()
@@ -228,7 +212,6 @@ class TestDeckManagerScanOnce:
             nonlocal connect_count
             connect_count += 1
 
-        # Pre-populate
         mock_existing = MagicMock()
         mock_existing.device_path = "/dev/hid/EXISTING"
         m._decks["EXISTING"] = mock_existing
@@ -255,7 +238,7 @@ class TestDeckManagerScanOnce:
             mock_dm.return_value.enumerate.return_value = [dev_mini]
             await m._scan_once()
 
-        assert connected_types == []  # Mini doesn't match Plus filter
+        assert connected_types == []
 
     async def test_scan_filters_by_serial(self):
         m = DeckManager(poll_interval=10.0)
@@ -278,7 +261,7 @@ class TestDeckManagerScanOnce:
 
         with patch("deckui.runtime.manager.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.side_effect = OSError("HID error")
-            await m._scan_once()  # Should not raise
+            await m._scan_once()
 
     async def test_scan_device_open_error_skipped(self):
         m = DeckManager(poll_interval=10.0)
@@ -297,21 +280,14 @@ class TestDeckManagerScanOnce:
         assert m._decks == {}
 
 
-# ── DeckManager.decks property ──────────────────────────────────────────
-
-
 class TestDeckManagerDecks:
     def test_decks_returns_copy(self):
         m = DeckManager()
         m._decks["X"] = MagicMock()
         d = m.decks
         assert "X" in d
-        # Modifying the copy should not affect internal state
         d.pop("X")
         assert "X" in m._decks
-
-
-# ── DeckManager disconnect with info error ──────────────────────────────
 
 
 class TestDeckManagerDisconnectInfoError:
@@ -339,9 +315,6 @@ class TestDeckManagerDisconnectInfoError:
         assert disconnected[0].deck_type == "unknown"
 
 
-# ── DeckManager connect handler error ────────────────────────────────────
-
-
 class TestDeckManagerConnectHandlerError:
     async def test_connect_handler_error_logged(self):
         """Error in connect handler is caught, doesn't crash manager."""
@@ -359,13 +332,9 @@ class TestDeckManagerConnectHandlerError:
                 deck_dm.return_value.enumerate.return_value = [dev]
                 await m._scan_once()
 
-        # Deck was still added despite handler error
         assert "ERR1" in m._decks
         for d in m._decks.values():
             await d.stop()
-
-
-# ── DeckManager reconnection scenarios ──────────────────────────────────
 
 
 class TestDeckManagerReconnect:
@@ -380,7 +349,6 @@ class TestDeckManagerReconnect:
 
         dev = _make_raw_device(serial="RECON1")
 
-        # First scan: device appears
         with patch("deckui.runtime.manager.DeviceManager") as mgr_dm:
             mgr_dm.return_value.enumerate.return_value = [dev]
             with patch("deckui.runtime.deck.DeviceManager") as deck_dm:
@@ -389,14 +357,12 @@ class TestDeckManagerReconnect:
 
         assert connected_serials == ["RECON1"]
 
-        # Second scan: device disappears
         with patch("deckui.runtime.manager.DeviceManager") as mgr_dm:
             mgr_dm.return_value.enumerate.return_value = []
             await m._scan_once()
 
         assert "RECON1" not in m._decks
 
-        # Third scan: device reappears — on_connect should be called again
         with patch("deckui.runtime.manager.DeviceManager") as mgr_dm:
             mgr_dm.return_value.enumerate.return_value = [dev]
             with patch("deckui.runtime.deck.DeviceManager") as deck_dm:
@@ -424,7 +390,6 @@ class TestDeckManagerReconnect:
 
         dev = _make_raw_device(serial="NOREC1")
 
-        # Scan 1: connect
         with patch("deckui.runtime.manager.DeviceManager") as mgr_dm:
             mgr_dm.return_value.enumerate.return_value = [dev]
             with patch("deckui.runtime.deck.DeviceManager") as deck_dm:
@@ -433,7 +398,6 @@ class TestDeckManagerReconnect:
 
         assert "NOREC1" in m._decks
 
-        # Scan 2: disconnect
         with patch("deckui.runtime.manager.DeviceManager") as mgr_dm:
             mgr_dm.return_value.enumerate.return_value = []
             await m._scan_once()
@@ -458,6 +422,6 @@ class TestDeckManagerReconnect:
 
         with patch("deckui.runtime.manager.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = []
-            await m._scan_once()  # Should not raise
+            await m._scan_once()
 
         assert "DISC_ERR" not in m._decks

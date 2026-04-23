@@ -95,8 +95,6 @@ def parse_hex_color(value: str) -> str:
     return f"#{m.group(1).lower()}"
 
 
-# -- SVG loading -------------------------------------------------------------
-
 
 def _svg_to_png_fit(svg_data: bytes, max_width: int, max_height: int) -> bytes:
     """Rasterise SVG bytes to PNG, fitting within a bounding box.
@@ -114,7 +112,6 @@ def _svg_to_png_fit(svg_data: bytes, max_width: int, max_height: int) -> bytes:
 
         import cairosvg
 
-        # First pass: constrain by width to get natural aspect ratio.
         png_bytes = cast(
             "bytes",
             cairosvg.svg2png(
@@ -124,7 +121,6 @@ def _svg_to_png_fit(svg_data: bytes, max_width: int, max_height: int) -> bytes:
         )
         img = Image.open(io.BytesIO(png_bytes))
         if img.height > max_height:
-            # Width-constrained result is too tall; constrain by height.
             png_bytes = cast(
                 "bytes",
                 cairosvg.svg2png(
@@ -176,12 +172,10 @@ def load_svg(path: Path, max_width: int, max_height: int) -> Image.Image:
     svg_data = path.read_bytes()
     png_bytes = _svg_to_png_fit(svg_data, max_width, max_height)
     img = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
-    # Final safety net — thumbnail never upscales, only shrinks.
     img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
     return img
 
 
-# -- Image composition -------------------------------------------------------
 
 
 def compose_key_image(svg_img: Image.Image) -> bytes:
@@ -239,7 +233,6 @@ def compose_touchstrip(
     return _encode_image(img)
 
 
-# -- CLI argument parsing -----------------------------------------------------
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -293,7 +286,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return build_parser().parse_args(argv)
 
 
-# -- Device interaction -------------------------------------------------------
 
 
 def _find_and_open_device() -> PreviewDeckDevice:
@@ -383,7 +375,6 @@ async def _wait_for_interrupt() -> None:
         loop.remove_signal_handler(signal.SIGINT)
 
 
-# -- Orchestration ------------------------------------------------------------
 
 
 def render_preview(

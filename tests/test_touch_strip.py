@@ -10,8 +10,6 @@ from deckui.ui.cards.base import Card
 from deckui.ui.cards.blank import BlankCard
 from deckui.ui.touch_strip import TouchStrip
 
-# ── Card (abstract base) ──────────────────────────────────────────────
-
 
 class _ConcreteWidget(Card):
     """Minimal concrete subclass for testing the abstract base."""
@@ -23,7 +21,7 @@ class _ConcreteWidget(Card):
 class TestWidgetAbstractBase:
     def test_cannot_instantiate_directly(self):
         with pytest.raises(TypeError):
-            Card(0)  # type: ignore[abstract]
+            Card(0)
 
     def test_index(self):
         w = _ConcreteWidget(0)
@@ -121,15 +119,15 @@ class TestWidgetAbstractBase:
 
     def test_handle_encoder_turn_noop(self):
         w = _ConcreteWidget(0)
-        w.handle_encoder_turn(1)  # should not raise
+        w.handle_encoder_turn(1)
 
     def test_handle_encoder_press_noop(self):
         w = _ConcreteWidget(0)
-        w.handle_encoder_press()  # should not raise
+        w.handle_encoder_press()
 
     def test_handle_encoder_release_noop(self):
         w = _ConcreteWidget(0)
-        w.handle_encoder_release()  # should not raise
+        w.handle_encoder_release()
 
     def test_check_selection_timeout_returns_false(self):
         w = _ConcreteWidget(0)
@@ -260,7 +258,7 @@ class TestWidgetDispatch:
 
     async def test_dispatch_encoder_turn_no_handler(self):
         w = _ConcreteWidget(0)
-        await w.dispatch_encoder_turn(1)  # should not raise
+        await w.dispatch_encoder_turn(1)
 
     async def test_dispatch_encoder_press_with_handler(self):
         w = _ConcreteWidget(0)
@@ -346,14 +344,11 @@ class TestWidgetRefreshCallback:
 
     async def test_request_refresh_no_callback(self):
         w = _ConcreteWidget(0)
-        await w.request_refresh()  # no-op, should not raise
+        await w.request_refresh()
 
     async def test_prepare_assets_noop(self):
         w = _ConcreteWidget(0)
-        await w.prepare_assets()  # should not raise
-
-
-# ── BlankCard ──────────────────────────────────────────────────────────
+        await w.prepare_assets()
 
 
 class TestBlankCard:
@@ -372,9 +367,6 @@ class TestBlankCard:
     def test_initially_dirty(self):
         b = BlankCard(0)
         assert b.is_dirty is True
-
-
-# ── TouchStrip ─────────────────────────────────────────────────────────
 
 
 class TestTouchStripInit:
@@ -435,7 +427,7 @@ class TestTouchStripSetCard:
 
     def test_rejects_non_card(self, touchscreen: TouchStrip):
         with pytest.raises(TypeError, match="Expected a Card instance"):
-            touchscreen.set_card(0, "not a card")  # type: ignore[arg-type]
+            touchscreen.set_card(0, "not a card")
 
 
 class TestTouchStripBackgroundColor:
@@ -462,7 +454,7 @@ class TestTouchStripBackgroundColor:
     def test_setter_same_value_does_not_mark_dirty(self, touchscreen: TouchStrip):
         for card in touchscreen.cards:
             card.mark_clean()
-        touchscreen.background_color = "black"  # same as default
+        touchscreen.background_color = "black"
         assert touchscreen.any_dirty is False
 
 

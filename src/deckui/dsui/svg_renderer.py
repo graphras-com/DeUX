@@ -33,11 +33,9 @@ from .schema import (
 
 logger = logging.getLogger(__name__)
 
-# SVG namespace — ElementTree requires explicit namespace handling
 _SVG_NS = "http://www.w3.org/2000/svg"
 _XLINK_NS = "http://www.w3.org/1999/xlink"
 
-# Register namespaces so output uses short prefixes
 ET.register_namespace("", _SVG_NS)
 ET.register_namespace("xlink", _XLINK_NS)
 
@@ -82,7 +80,6 @@ def _fit_image(
         canvas.paste(resized, (paste_x, paste_y))
         return canvas
 
-    # ImageFit.COVER — scale up so image covers target, then center-crop
     ratio = max(target_w / src_w, target_h / src_h)
     new_w = max(1, int(src_w * ratio))
     new_h = max(1, int(src_h * ratio))
@@ -103,23 +100,14 @@ def _truncate_text(text: str, max_width: int, overflow: OverflowMode) -> str:
     if overflow == OverflowMode.CLIP:
         return text
 
-    # Rough estimate: assume average char width ~ 0.55 * font-size.
-    # Since we don't know font-size here, treat max_width as a
-    # generous pixel budget.  For typical 10-20px fonts on a 197px
-    # panel, max_width=90 ≈ ~12-15 chars.  We use a conservative
-    # 7px average char width for the estimation.
     avg_char_width = 7
     max_chars = max(1, max_width // avg_char_width)
 
     if len(text) <= max_chars:
         return text
 
-    return text[: max(1, max_chars - 1)] + "\u2026"  # ellipsis character
+    return text[: max(1, max_chars - 1)] + "\u2026"
 
-
-# ---------------------------------------------------------------------------
-# Font resolution and text wrapping
-# ---------------------------------------------------------------------------
 
 _DEFAULT_FONT_FAMILY = "sans-serif"
 _DEFAULT_FONT_SIZE = 16.0
@@ -139,13 +127,11 @@ def _resolve_font_attrs(root: ET.Element, elem: ET.Element) -> tuple[str, float]
     family: str | None = None
     size: float | None = None
 
-    # Build a parent map so we can walk upward
     parent_map: dict[ET.Element, ET.Element] = {}
     for parent in root.iter():
         for child in parent:
             parent_map[child] = parent
 
-    # Walk from elem upward
     current: ET.Element | None = elem
     while current is not None:
         if family is None:
@@ -178,13 +164,11 @@ def _load_font(family: str, size: int) -> ImageFont.FreeTypeFont | ImageFont.Ima
         family: Font family name (e.g. ``"ArialMT"``).
         size: Font size in pixels (integer for cache-key hashability).
     """
-    # Build candidate names: original, stripped suffixes, lowercase
     candidates: list[str] = [family]
     for suffix in ("MT", "Bold", "Italic", "-Regular", "-Bold"):
         if family.endswith(suffix):
             candidates.append(family[: -len(suffix)])
     candidates.append(family.lower())
-    # Deduplicate while preserving order
     seen: set[str] = set()
     unique: list[str] = []
     for c in candidates:
@@ -256,19 +240,14 @@ def _wrap_text(
 
     lines.append(current_line)
 
-    # Apply max_height constraint
     if max_height is not None and line_height > 0:
         max_lines = max(1, math.floor(max_height / line_height))
         if len(lines) > max_lines:
-            # Truncate to max_lines; handle last-line overflow
             lines = lines[:max_lines]
             if overflow == OverflowMode.ELLIPSIS:
                 last = lines[-1]
-                # Re-join remaining text that was cut off is implicit
-                # — we just need to mark the last line with ellipsis
                 ellipsis = "\u2026"
                 if font.getlength(last + ellipsis) > max_width:
-                    # Trim characters until it fits
                     while len(last) > 1 and font.getlength(last + ellipsis) > max_width:
                         last = last[:-1]
                     lines[-1] = last.rstrip() + ellipsis
@@ -296,13 +275,11 @@ class SvgRenderer:
         self._base_root: ET.Element = ET.fromstring(spec.svg_source)  # noqa: S314
         self._range_extents: dict[str, float] = {}
 
-        # Initialise defaults from bindings
         for name, binding in spec.bindings.items():
             if isinstance(binding, (TextBinding, VisibilityBinding, ColorBinding)):
                 self._values[name] = binding.default
             elif isinstance(binding, RangeBinding):
                 self._values[name] = binding.default
-                # Cache the original extent from the SVG template
                 elem = _find_element_by_id(self._base_root, binding.node)
                 if elem is not None:
                     attr = (
@@ -313,7 +290,6 @@ class SvgRenderer:
                     self._range_extents[name] = float(elem.get(attr, "0"))
             elif isinstance(binding, (SliderBinding, ToggleBinding, IconifyBinding)):
                 self._values[name] = binding.default
-            # ImageBinding defaults to None (no image)
 
     def set(self, name: str, value: Any) -> bool:
         """Set a binding value.
@@ -336,7 +312,6 @@ class SvgRenderer:
             )
 
         old = self._values.get(name)
-        # For images, always consider it changed (identity comparison is unreliable)
         binding = self._spec.bindings[name]
         if isinstance(binding, ImageBinding):
             self._values[name] = value
@@ -384,10 +359,8 @@ class SvgRenderer:
             value = self._values.get(name)
             self._apply_binding(root, name, binding, value)
 
-        # Inline any asset references that use relative paths
         self._inline_assets(root)
 
-        # Serialise and rasterise
         svg_bytes = ET.tostring(root, encoding="unicode", xml_declaration=True)
         return self._rasterise(svg_bytes.encode("utf-8"))
 
@@ -399,7 +372,6 @@ class SvgRenderer:
         value: Any,
     ) -> None:
         """Apply a single binding to the SVG tree."""
-        # Toggle bindings address two nodes instead of one.
         if isinstance(binding, ToggleBinding):
             elem_on = _find_element_by_id(root, binding.node_on)
             elem_off = _find_element_by_id(root, binding.node_off)
@@ -471,7 +443,6 @@ class SvgRenderer:
         attribute so that ``text-anchor`` alignment is respected on
         every line.
         """
-        # Resolve font from the SVG tree
         family, size_f = _resolve_font_attrs(root, elem)
         font = _load_font(family, int(size_f))
 
@@ -486,12 +457,10 @@ class SvgRenderer:
             line_height=line_height,
         )
 
-        # Clear existing content and children
         elem.text = None
         for child in list(elem):
             elem.remove(child)
 
-        # Inherit x from the parent <text> so text-anchor is respected
         x_attr = elem.get("x", "0")
 
         for i, line in enumerate(lines):
@@ -509,7 +478,6 @@ class SvgRenderer:
     ) -> None:
         """Set an image element's href to a data URI."""
         if value is None:
-            # No image — hide this element, show placeholder if configured
             elem.set("href", "")
             elem.set("display", "none")
             if binding.placeholder_node:
@@ -518,14 +486,12 @@ class SvgRenderer:
                     placeholder.attrib.pop("display", None)
             return
 
-        # We have an image — show it, hide placeholder
         elem.attrib.pop("display", None)
         if binding.placeholder_node:
             placeholder = _find_element_by_id(root, binding.placeholder_node)
             if placeholder is not None:
                 placeholder.set("display", "none")
 
-        # Get target dimensions from the SVG element
         target_w = int(float(elem.get("width", "0")))
         target_h = int(float(elem.get("height", "0")))
 
@@ -545,7 +511,6 @@ class SvgRenderer:
 
         data_uri = _image_to_data_uri(img)
         elem.set("href", data_uri)
-        # Also set xlink:href for compatibility
         elem.set(f"{{{_XLINK_NS}}}href", data_uri)
 
     def _apply_visibility(self, elem: ET.Element, value: Any) -> None:
@@ -619,15 +584,10 @@ class SvgRenderer:
         ``<svg>`` child that contains the icon.  Passing ``None`` or an
         empty string clears the group.
         """
-        # Always clear existing content — either we replace it with the
-        # new icon, or we leave the group empty.
         elem.text = None
         for child in list(elem):
             elem.remove(child)
 
-        # ``None`` and empty string both clear the group.  The binding's
-        # default is applied at construction time via ``_values`` and is
-        # not re-used here so users can explicitly unset the icon.
         if value is None or value == "":
             return
         name = str(value)
@@ -648,8 +608,6 @@ class SvgRenderer:
             )
             return
 
-        # Force the embedded icon to our requested pixel size.  The
-        # original viewBox is preserved, so the icon scales uniformly.
         size = str(binding.size)
         icon_root.set("width", size)
         icon_root.set("height", size)
@@ -666,7 +624,6 @@ class SvgRenderer:
             if not href:
                 continue
 
-            # Check if href matches an asset path like "assets/foo.png"
             asset_name: str | None = None
             if href.startswith("assets/"):
                 asset_name = href[len("assets/") :]
@@ -683,7 +640,6 @@ class SvgRenderer:
         """Rasterise SVG bytes to a PIL Image via CairoSVG."""
         from ..render.svg_rasterize import _svg_to_png
 
-        # Read target dimensions from the SVG root
         width = int(float(self._base_root.get("width", "197")))
         height = int(float(self._base_root.get("height", "98")))
 

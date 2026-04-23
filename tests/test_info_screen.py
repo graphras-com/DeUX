@@ -82,7 +82,6 @@ class TestInfoScreenRenderBytes:
         data = s.render_bytes()
         assert isinstance(data, bytes)
         assert len(data) > 0
-        # JPEG magic bytes
         assert data[:2] == b"\xff\xd8"
 
     def test_render_with_image(self):
@@ -96,7 +95,6 @@ class TestInfoScreenRenderBytes:
         s = InfoScreen(248, 58, image_format="BMP")
         data = s.render_bytes()
         assert isinstance(data, bytes)
-        # BMP magic bytes
         assert data[:2] == b"BM"
 
     def test_render_rgba_image(self):

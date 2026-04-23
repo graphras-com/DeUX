@@ -21,7 +21,6 @@ from deckui.ui.touch_strip import TouchStrip
 if TYPE_CHECKING:
     from pathlib import Path
 
-# -- Device capability presets ------------------------------------------------
 
 STREAM_DECK_MINI = DeviceCapabilities(
     deck_type="Stream Deck Mini",
@@ -104,8 +103,6 @@ STREAM_DECK_XL = DeviceCapabilities(
     touch_key_count=0,
 )
 
-
-# -- Minimal SVG templates for dsui tests ----------------------------------
 
 MINIMAL_CARD_SVG = (
     '<svg id="TestCard" xmlns="http://www.w3.org/2000/svg" '
@@ -202,7 +199,6 @@ regions:
 """
     (pkg_dir / "manifest.yaml").write_text(manifest, encoding="utf-8")
 
-    # Create a small test asset
     assets_dir = pkg_dir / "assets"
     assets_dir.mkdir(exist_ok=True)
     img = Image.new("RGB", (10, 10), (255, 0, 0))

@@ -17,8 +17,6 @@ from deckui.runtime.events import (
     TouchEvent,
 )
 
-# ── EventType enum ──────────────────────────────────────────────────────
-
 
 class TestEventType:
     def test_members_exist(self):
@@ -35,9 +33,6 @@ class TestEventType:
         assert len(values) == len(set(values))
 
 
-# ── KeyEvent ────────────────────────────────────────────────────────────
-
-
 class TestKeyEvent:
     def test_construction(self):
         e = KeyEvent(key=3, pressed=True)
@@ -47,7 +42,7 @@ class TestKeyEvent:
     def test_frozen(self):
         e = KeyEvent(key=0, pressed=False)
         with pytest.raises(dataclasses.FrozenInstanceError):
-            e.key = 1  # type: ignore[misc]
+            e.key = 1
 
     def test_equality(self):
         a = KeyEvent(key=1, pressed=True)
@@ -58,9 +53,6 @@ class TestKeyEvent:
         a = KeyEvent(key=1, pressed=True)
         b = KeyEvent(key=1, pressed=False)
         assert a != b
-
-
-# ── EncoderTurnEvent ────────────────────────────────────────────────────
 
 
 class TestEncoderTurnEvent:
@@ -76,15 +68,12 @@ class TestEncoderTurnEvent:
     def test_frozen(self):
         e = EncoderTurnEvent(encoder=0, direction=1)
         with pytest.raises(dataclasses.FrozenInstanceError):
-            e.encoder = 2  # type: ignore[misc]
+            e.encoder = 2
 
     def test_equality(self):
         assert EncoderTurnEvent(encoder=1, direction=2) == EncoderTurnEvent(
             encoder=1, direction=2
         )
-
-
-# ── EncoderPressEvent ──────────────────────────────────────────────────
 
 
 class TestEncoderPressEvent:
@@ -96,15 +85,12 @@ class TestEncoderPressEvent:
     def test_frozen(self):
         e = EncoderPressEvent(encoder=0, pressed=False)
         with pytest.raises(dataclasses.FrozenInstanceError):
-            e.pressed = True  # type: ignore[misc]
+            e.pressed = True
 
     def test_equality(self):
         assert EncoderPressEvent(encoder=0, pressed=True) == EncoderPressEvent(
             encoder=0, pressed=True
         )
-
-
-# ── TouchEvent ──────────────────────────────────────────────────────────
 
 
 class TestTouchEvent:
@@ -130,14 +116,12 @@ class TestTouchEvent:
     def test_frozen(self):
         e = TouchEvent(event_type=EventType.TOUCH_SHORT, x=0, y=0)
         with pytest.raises(dataclasses.FrozenInstanceError):
-            e.x = 5  # type: ignore[misc]
+            e.x = 5
 
     def test_zone_first_widget(self):
         """Touches within the first widget zone (left margin to end of widget 0)."""
         metrics = RenderMetrics(STREAM_DECK_PLUS)
-        # Left edge of screen (within left margin) still maps to zone 0
         assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=0, y=0).compute_zone(metrics) == 0
-        # Inside widget 0 area
         assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=4, y=0).compute_zone(metrics) == 0
         assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=198, y=0).compute_zone(metrics) == 0
 
@@ -163,9 +147,6 @@ class TestTouchEvent:
         metrics = RenderMetrics(STREAM_DECK_PLUS)
         assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=1000, y=0).compute_zone(metrics) == 3
         assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=800, y=0).compute_zone(metrics) == 3
-
-
-# ── DeviceInfo ──────────────────────────────────────────────────────────
 
 
 class TestDeviceInfo:
@@ -205,10 +186,7 @@ class TestDeviceInfo:
             key_image_format="x",
         )
         with pytest.raises(dataclasses.FrozenInstanceError):
-            info.deck_type = "changed"  # type: ignore[misc]
-
-
-# ── DeckEvent union ─────────────────────────────────────────────────────
+            info.deck_type = "changed"
 
 
 class TestDeckEvent:

@@ -19,7 +19,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Type alias for the connect callback that receives a Deck
 ConnectHandler = Callable[["Deck"], Any]
 
 
@@ -73,14 +72,10 @@ class DeckManager:
         self._executor = ThreadPoolExecutor(max_workers=2)
         self._scan_task: asyncio.Task[None] | None = None
 
-        # Tracked decks keyed by serial number
         self._decks: dict[str, Deck] = {}
 
-        # Connect handlers: list of (filter_kwargs, handler)
         self._connect_handlers: list[tuple[dict[str, str | None], AsyncHandler]] = []
         self._disconnect_handler: AsyncHandler | None = None
-
-    # -- Async context manager ---------------------------------------------
 
     async def __aenter__(self) -> DeckManager:
         await self.start()
@@ -88,8 +83,6 @@ class DeckManager:
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         await self.stop()
-
-    # -- Lifecycle ---------------------------------------------------------
 
     async def start(self) -> None:
         """Start the device scanning loop."""
@@ -108,13 +101,11 @@ class DeckManager:
             return
         self._running = False
 
-        # Cancel scan task
         if self._scan_task and not self._scan_task.done():
             self._scan_task.cancel()
             with suppress(asyncio.CancelledError):
                 await self._scan_task
 
-        # Stop all managed decks
         for serial, deck in list(self._decks.items()):
             try:
                 await deck.stop()
@@ -129,8 +120,6 @@ class DeckManager:
     async def wait_closed(self) -> None:
         """Block until the manager is stopped."""
         await self._closed_event.wait()
-
-    # -- Handler registration ----------------------------------------------
 
     def on_connect(
         self,
@@ -181,18 +170,13 @@ class DeckManager:
 
         return decorator
 
-    # -- Properties --------------------------------------------------------
-
     @property
     def decks(self) -> dict[str, Deck]:
         """Currently managed decks, keyed by serial number."""
         return dict(self._decks)
 
-    # -- Scanning ----------------------------------------------------------
-
     async def _scan_loop(self) -> None:
         """Periodically enumerate devices and manage connections."""
-        # Do an initial scan immediately
         await self._scan_once()
 
         try:
@@ -222,26 +206,18 @@ class DeckManager:
 
         visual = [d for d in devices if d.DECK_VISUAL]
 
-        # Build a set of HID device paths owned by running Decks.  We must
-        # never re-open these — opening an HID device that is already held by
-        # a running Deck steals the file descriptor and causes an immediate
-        # disconnect / reconnect loop.
-        managed_paths: dict[str, str] = {}  # path -> serial
+        managed_paths: dict[str, str] = {}
         for serial, deck in self._decks.items():
             path = deck.device_path
             if path is not None:
                 managed_paths[path] = serial
 
-        # Match enumerated devices to tracked decks by HID path, and only
-        # open unknown devices to read their serial.
         connected_serials: set[str] = set()
         device_by_serial: dict[str, Any] = {}
 
         for d in visual:
             dev_path = d.id()
             if dev_path in managed_paths:
-                # Device is already managed — mark as still connected
-                # without touching the HID handle.
                 connected_serials.add(managed_paths[dev_path])
                 continue
             try:
@@ -253,7 +229,6 @@ class DeckManager:
             except Exception:
                 continue
 
-        # Detect disconnections
         for serial in list(self._decks):
             if serial not in connected_serials:
                 deck = self._decks.pop(serial)
@@ -280,16 +255,10 @@ class DeckManager:
                     except Exception:
                         logger.exception("Error in disconnect handler")
 
-                # If auto_reconnect is disabled, device is simply gone.
-                # If enabled, the next scan will pick it up as a new device
-                # and call the on_connect handler again.
-
-        # Detect new connections
         for serial in connected_serials:
             if serial in self._decks:
                 continue
 
-            # New device — find a matching connect handler
             raw_device = device_by_serial.get(serial)
             if raw_device is None:
                 continue
@@ -304,7 +273,6 @@ class DeckManager:
                 ):
                     continue
 
-                # Match found — create and start a Deck
                 try:
                     deck = Deck(
                         serial_number=serial,
@@ -322,4 +290,4 @@ class DeckManager:
                     logger.debug("Failed to start deck for %s", serial)
                 except Exception:
                     logger.exception("Unexpected error starting deck %s", serial)
-                break  # Only first matching handler
+                break

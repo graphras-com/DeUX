@@ -11,7 +11,7 @@ class TestRenderInfoScreen:
     def test_blank(self):
         data = render_info_screen(None, 248, 58)
         assert isinstance(data, bytes)
-        assert data[:2] == b"\xff\xd8"  # JPEG
+        assert data[:2] == b"\xff\xd8"
 
     def test_with_image(self):
         img = Image.new("RGB", (248, 58), "red")

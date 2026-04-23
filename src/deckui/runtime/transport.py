@@ -70,7 +70,6 @@ class AsyncTransport:
         self._running = True
         self._device.set_key_callback(self._on_key)
 
-        # Only register dial/touch callbacks if the device has those features
         if self._caps is None or self._caps.has_encoders:
             self._device.set_dial_callback(self._on_encoder)
         if self._caps is None or self._caps.has_touchscreen:

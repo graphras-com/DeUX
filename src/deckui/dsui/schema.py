@@ -168,7 +168,6 @@ Binding = (
     | IconifyBinding
 )
 
-# Valid event source names and their physical origins
 VALID_SOURCES = frozenset(
     {
         "encoder_press",
@@ -202,10 +201,8 @@ class EventMapping:
     hold_ms: int | None = None
 
 
-# Sources that require the hold_ms field.
 HOLD_SOURCES = frozenset({"key_hold", "encoder_hold"})
 
-# Reasonable defaults applied when the user omits timing parameters.
 DEFAULT_MAX_DURATION_MS: int = 500
 """Default max press duration (ms) for ``*_press_release`` events."""
 
