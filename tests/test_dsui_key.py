@@ -19,7 +19,6 @@ from deckui.dsui.schema import (
 from deckui.ui.controls.key_slot import KeySlot
 from deckui.ui.screen import Screen
 
-
 _KEY_SVG = (
     '<svg id="TestKey" xmlns="http://www.w3.org/2000/svg" width="120" height="120">'
     '<rect id="bg" width="120" height="120" fill="#1c1c1c"/>'

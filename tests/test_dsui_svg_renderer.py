@@ -32,7 +32,6 @@ from deckui.dsui.svg_renderer import (
     _wrap_text,
 )
 
-
 _BASIC_SVG = (
     '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="100" height="50">'
     '<rect id="bg" width="100" height="50" fill="#000000"/>'

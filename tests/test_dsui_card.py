@@ -21,7 +21,6 @@ from deckui.runtime.events import EventType, TouchEvent
 from deckui.ui.cards.base import Card
 from deckui.ui.screen import Screen
 
-
 _CARD_SVG = (
     '<svg id="TestCard" xmlns="http://www.w3.org/2000/svg" width="197" height="98">'
     '<rect id="bg" width="197" height="98" fill="#1c1c1c"/>'
