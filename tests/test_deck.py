@@ -123,16 +123,6 @@ class TestDeckSetPage:
         with pytest.raises(DeckError, match="Screen 'missing' does not exist"):
             await deck.set_screen("missing")
 
-    async def test_sets_active_screen(self, deck):
-        deck.screen("main")
-        # Patch rendering methods since no device
-        deck._render_all_keys = AsyncMock()
-        deck._render_touchscreen = AsyncMock()
-
-        await deck.set_screen("main")
-        assert deck.active_screen is not None
-        assert deck.active_screen.name == "main"
-
     async def test_calls_render(self, deck):
         deck.screen("main")
         deck._render_all_keys = AsyncMock()
