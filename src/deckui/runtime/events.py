@@ -76,19 +76,4 @@ class TouchEvent:
         zone = rel // stride
         return max(0, min(zone, metrics.panel_count - 1))
 
-    @property
-    def zone(self) -> int:
-        """Which touch-strip zone (0-3) this touch falls in.
-
-        Uses default Stream Deck+ metrics. For multi-device support,
-        use :meth:`compute_zone` with the device's render metrics.
-        """
-        from ..render.metrics import MARGIN_LEFT, PANEL_GAP, PANEL_WIDTH
-
-        rel = self.x - MARGIN_LEFT
-        stride = PANEL_WIDTH + PANEL_GAP
-        zone = rel // stride
-        return max(0, min(zone, 3))
-
-
 DeckEvent = KeyEvent | EncoderTurnEvent | EncoderPressEvent | TouchEvent

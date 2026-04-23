@@ -6,6 +6,8 @@ import dataclasses
 
 import pytest
 
+from deckui.render.metrics import RenderMetrics
+from deckui.runtime.capabilities import STREAM_DECK_PLUS
 from deckui.runtime.device_info import DeviceInfo
 from deckui.runtime.events import (
     EncoderPressEvent,
@@ -132,30 +134,35 @@ class TestTouchEvent:
 
     def test_zone_first_widget(self):
         """Touches within the first widget zone (left margin to end of widget 0)."""
+        metrics = RenderMetrics(STREAM_DECK_PLUS)
         # Left edge of screen (within left margin) still maps to zone 0
-        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=0, y=0).zone == 0
+        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=0, y=0).compute_zone(metrics) == 0
         # Inside widget 0 area
-        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=4, y=0).zone == 0
-        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=198, y=0).zone == 0
+        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=4, y=0).compute_zone(metrics) == 0
+        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=198, y=0).compute_zone(metrics) == 0
 
     def test_zone_second_widget(self):
         """Touches within the second widget zone."""
-        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=203, y=0).zone == 1
-        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=397, y=0).zone == 1
+        metrics = RenderMetrics(STREAM_DECK_PLUS)
+        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=203, y=0).compute_zone(metrics) == 1
+        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=397, y=0).compute_zone(metrics) == 1
 
     def test_zone_third_widget(self):
         """Touches within the third widget zone."""
-        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=402, y=0).zone == 2
+        metrics = RenderMetrics(STREAM_DECK_PLUS)
+        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=402, y=0).compute_zone(metrics) == 2
 
     def test_zone_fourth_widget(self):
         """Touches within the fourth widget zone."""
-        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=601, y=0).zone == 3
-        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=799, y=0).zone == 3
+        metrics = RenderMetrics(STREAM_DECK_PLUS)
+        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=601, y=0).compute_zone(metrics) == 3
+        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=799, y=0).compute_zone(metrics) == 3
 
     def test_zone_capped_at_3(self):
         """x >= 800 should still return zone 3 (capped)."""
-        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=1000, y=0).zone == 3
-        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=800, y=0).zone == 3
+        metrics = RenderMetrics(STREAM_DECK_PLUS)
+        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=1000, y=0).compute_zone(metrics) == 3
+        assert TouchEvent(event_type=EventType.TOUCH_SHORT, x=800, y=0).compute_zone(metrics) == 3
 
 
 # ── DeviceInfo ──────────────────────────────────────────────────────────
@@ -184,8 +191,8 @@ class TestDeviceInfo:
         assert info.touchscreen_size == (800, 100)
         assert info.key_image_format == "JPEG"
 
-    def test_is_mutable(self):
-        """DeviceInfo is a regular (non-frozen) dataclass."""
+    def test_is_frozen(self):
+        """DeviceInfo is a frozen dataclass."""
         info = DeviceInfo(
             deck_type="x",
             serial="x",
@@ -197,8 +204,8 @@ class TestDeviceInfo:
             touchscreen_size=(0, 0),
             key_image_format="x",
         )
-        info.deck_type = "changed"
-        assert info.deck_type == "changed"
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            info.deck_type = "changed"  # type: ignore[misc]
 
 
 # ── DeckEvent union ─────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ import io
 from PIL import Image
 
 from deckui.render.key_renderer import (
-    _encode_jpeg,
+    _encode_image,
     render_blank_key,
     render_key_image,
 )
@@ -234,22 +234,29 @@ class TestRenderBlankTouchscreen:
         assert b < 50
 
 
-# ── _encode_jpeg ────────────────────────────────────────────────────────
+# ── _encode_image ───────────────────────────────────────────────────────
 
 
-class TestEncodeJpeg:
+class TestEncodeImage:
     def test_returns_bytes(self):
         img = Image.new("RGB", (10, 10), "red")
-        result = _encode_jpeg(img)
+        result = _encode_image(img)
         assert isinstance(result, bytes)
 
-    def test_is_jpeg(self):
+    def test_is_jpeg_by_default(self):
         img = Image.new("RGB", (10, 10))
-        assert _encode_jpeg(img)[:2] == b"\xff\xd8"
+        assert _encode_image(img)[:2] == b"\xff\xd8"
 
     def test_quality_parameter(self):
         img = Image.new("RGB", (100, 100), "red")
-        low = _encode_jpeg(img, quality=10)
-        high = _encode_jpeg(img, quality=95)
+        low = _encode_image(img, quality=10)
+        high = _encode_image(img, quality=95)
         # Lower quality should produce smaller file
         assert len(low) < len(high)
+
+    def test_bmp_format(self):
+        img = Image.new("RGB", (10, 10), "red")
+        result = _encode_image(img, image_format="BMP")
+        assert isinstance(result, bytes)
+        # BMP magic bytes: "BM"
+        assert result[:2] == b"BM"
