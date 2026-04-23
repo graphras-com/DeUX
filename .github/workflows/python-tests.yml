@@ -1,0 +1,84 @@
+name: Reusable Python Tests
+
+on:
+  workflow_call:
+    inputs:
+      python-versions:
+        description: JSON array of Python versions.
+        required: false
+        type: string
+        default: '["3.11","3.12","3.13"]'
+      install-spec:
+        description: Pip install spec, e.g. .[test]
+        required: false
+        type: string
+        default: ".[test]"
+      coverage-target:
+        description: Coverage target path.
+        required: false
+        type: string
+        default: "deckui"
+      coverage-threshold:
+        description: Coverage fail-under percentage.
+        required: false
+        type: number
+        default: 95
+      pytest-args:
+        description: Additional pytest args.
+        required: false
+        type: string
+        default: "tests/"
+      system-packages:
+        description: Apt packages required before tests.
+        required: false
+        type: string
+        default: "libcairo2-dev libhidapi-dev"
+
+jobs:
+  pytest:
+    name: Pytest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ${{ fromJSON(inputs.python-versions) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install system dependencies
+        if: ${{ inputs.system-packages != '' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ inputs.system-packages }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "${{ inputs.install-spec }}"
+          python -m pip install pytest-cov
+
+      - name: Run tests with coverage
+        run: |
+          python -m pytest \
+            --cov=${{ inputs.coverage-target }} \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=${{ inputs.coverage-threshold }} \
+            ${{ inputs.pytest-args }}
+
+      - name: Upload coverage report
+        if: always() && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 14
