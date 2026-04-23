@@ -45,8 +45,8 @@ class TestDeckInit:
         assert deck._device is None
         assert deck._transport is None
         assert deck._running is False
-        assert deck._active_page is None
-        assert deck._pages == {}
+        assert deck._active_screen is None
+        assert deck._screens == {}
 
     def test_custom_brightness(self):
         d = Deck(serial_number="ABC123", brightness=50)
@@ -73,7 +73,7 @@ class TestDeckPage:
         b = deck.screen("main")
         assert a is b
 
-    def test_different_pages(self, deck):
+    def test_different_screens(self, deck):
         a = deck.screen("main")
         b = deck.screen("settings")
         assert a is not b
@@ -123,7 +123,7 @@ class TestDeckSetPage:
         with pytest.raises(DeckError, match="Screen 'missing' does not exist"):
             await deck.set_screen("missing")
 
-    async def test_sets_active_page(self, deck):
+    async def test_sets_active_screen(self, deck):
         deck.screen("main")
         # Patch rendering methods since no device
         deck._render_all_keys = AsyncMock()
@@ -155,14 +155,14 @@ class TestDeckActivePage:
 
 
 class TestDeckRefresh:
-    async def test_no_active_page(self, deck):
+    async def test_no_active_screen(self, deck):
         """refresh() is a no-op when no active page."""
         await deck.refresh()  # Should not raise
 
     async def test_renders_dirty_touchscreen(self, deck):
         p = deck.screen("main")
         # BlankCards start dirty, so touch strip is dirty by default
-        deck._active_page = p
+        deck._active_screen = p
         deck._render_touchscreen = AsyncMock()
 
         await deck.refresh()
@@ -173,7 +173,7 @@ class TestDeckRefresh:
         for w in p.cards:
             w.mark_clean()
 
-        deck._active_page = p
+        deck._active_screen = p
         deck._render_touchscreen = AsyncMock()
 
         await deck.refresh()
@@ -184,7 +184,7 @@ class TestDeckRefresh:
 
 
 class TestDeckDispatch:
-    async def test_no_active_page(self, deck):
+    async def test_no_active_screen(self, deck):
         """_dispatch is a no-op with no active page."""
         event = KeyEvent(key=0, pressed=True)
         await deck._dispatch(event)  # Should not raise
@@ -193,7 +193,7 @@ class TestDeckDispatch:
         p = deck.screen("main")
         handler = AsyncMock()
         p.key(0).on_press(handler)
-        deck._active_page = p
+        deck._active_screen = p
 
         await deck._dispatch(KeyEvent(key=0, pressed=True))
         handler.assert_awaited_once()
@@ -202,7 +202,7 @@ class TestDeckDispatch:
         p = deck.screen("main")
         handler = AsyncMock()
         p.key(0).on_release(handler)
-        deck._active_page = p
+        deck._active_screen = p
 
         await deck._dispatch(KeyEvent(key=0, pressed=False))
         handler.assert_awaited_once()
@@ -211,14 +211,14 @@ class TestDeckDispatch:
         """No error when key has no handler."""
         p = deck.screen("main")
         p.key(0)  # No handler registered
-        deck._active_page = p
+        deck._active_screen = p
 
         await deck._dispatch(KeyEvent(key=0, pressed=True))  # Should not raise
 
     async def test_key_event_unknown_key(self, deck):
         """No error when event targets a key that doesn't exist on the page."""
         p = deck.screen("main")
-        deck._active_page = p
+        deck._active_screen = p
 
         await deck._dispatch(KeyEvent(key=7, pressed=True))  # No key 7
 
@@ -231,7 +231,7 @@ class TestDeckDispatch:
             key_slot._dirty = True
 
         key_slot.on_press(mark_dirty)
-        deck._active_page = p
+        deck._active_screen = p
         key_slot._dirty = False
 
         with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
@@ -243,7 +243,7 @@ class TestDeckDispatch:
         p = deck.screen("main")
         key_slot = p.key(0)
         key_slot.on_press(AsyncMock())
-        deck._active_page = p
+        deck._active_screen = p
         key_slot._dirty = False
 
         with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
@@ -254,7 +254,7 @@ class TestDeckDispatch:
         p = deck.screen("main")
         handler = AsyncMock()
         p.encoder(1).on_turn(handler)
-        deck._active_page = p
+        deck._active_screen = p
 
         await deck._dispatch(EncoderTurnEvent(encoder=1, direction=3))
         handler.assert_awaited_once_with(3)
@@ -262,13 +262,13 @@ class TestDeckDispatch:
     async def test_encoder_turn_no_handler(self, deck):
         p = deck.screen("main")
         p.encoder(1)
-        deck._active_page = p
+        deck._active_screen = p
 
         await deck._dispatch(EncoderTurnEvent(encoder=1, direction=1))
 
     async def test_encoder_turn_unknown_encoder(self, deck):
         p = deck.screen("main")
-        deck._active_page = p
+        deck._active_screen = p
 
         await deck._dispatch(EncoderTurnEvent(encoder=2, direction=1))
 
@@ -277,7 +277,7 @@ class TestDeckDispatch:
         p = deck.screen("main")
         card = _TestCard(1)
         p.set_card(1, card)
-        deck._active_page = p
+        deck._active_screen = p
 
         turn_handler = AsyncMock()
         card.on_encoder_turn(turn_handler)
@@ -291,7 +291,7 @@ class TestDeckDispatch:
         p = deck.screen("main")
         handler = AsyncMock()
         p.encoder(0).on_press(handler)
-        deck._active_page = p
+        deck._active_screen = p
 
         await deck._dispatch(EncoderPressEvent(encoder=0, pressed=True))
         handler.assert_awaited_once()
@@ -300,7 +300,7 @@ class TestDeckDispatch:
         p = deck.screen("main")
         handler = AsyncMock()
         p.encoder(0).on_release(handler)
-        deck._active_page = p
+        deck._active_screen = p
 
         await deck._dispatch(EncoderPressEvent(encoder=0, pressed=False))
         handler.assert_awaited_once()
@@ -308,13 +308,13 @@ class TestDeckDispatch:
     async def test_encoder_press_no_handler(self, deck):
         p = deck.screen("main")
         p.encoder(0)
-        deck._active_page = p
+        deck._active_screen = p
 
         await deck._dispatch(EncoderPressEvent(encoder=0, pressed=True))
 
     async def test_encoder_press_unknown_encoder(self, deck):
         p = deck.screen("main")
-        deck._active_page = p
+        deck._active_screen = p
 
         await deck._dispatch(EncoderPressEvent(encoder=3, pressed=True))
 
@@ -323,7 +323,7 @@ class TestDeckDispatch:
         p = deck.screen("main")
         card = _TestCard(0)
         p.set_card(0, card)
-        deck._active_page = p
+        deck._active_screen = p
 
         press_handler = AsyncMock()
         card.on_encoder_press(press_handler)
@@ -338,7 +338,7 @@ class TestDeckDispatch:
         p = deck.screen("main")
         card = _TestCard(0)
         p.set_card(0, card)
-        deck._active_page = p
+        deck._active_screen = p
 
         release_handler = AsyncMock()
         card.on_encoder_release(release_handler)
@@ -351,7 +351,7 @@ class TestDeckDispatch:
         p = deck.screen("main")
         card = _TestCard(0)
         p.set_card(0, card)
-        deck._active_page = p
+        deck._active_screen = p
 
         handler = AsyncMock()
         card.on_encoder_press(handler)
@@ -363,7 +363,7 @@ class TestDeckDispatch:
         p = deck.screen("main")
         handler = AsyncMock()
         p.card(0).on_tap(handler)
-        deck._active_page = p
+        deck._active_screen = p
         deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
 
         await deck._dispatch(TouchEvent(event_type=EventType.TOUCH_SHORT, x=50, y=50))
@@ -373,7 +373,7 @@ class TestDeckDispatch:
         p = deck.screen("main")
         handler = AsyncMock()
         p.card(1).on_long_press(handler)
-        deck._active_page = p
+        deck._active_screen = p
         deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
 
         await deck._dispatch(TouchEvent(event_type=EventType.TOUCH_LONG, x=300, y=50))
@@ -383,7 +383,7 @@ class TestDeckDispatch:
         p = deck.screen("main")
         handler = AsyncMock()
         p.card(2).on_drag(handler)
-        deck._active_page = p
+        deck._active_screen = p
         deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
 
         await deck._dispatch(
@@ -399,7 +399,7 @@ class TestDeckDispatch:
 
     async def test_touch_no_handler(self, deck):
         p = deck.screen("main")
-        deck._active_page = p
+        deck._active_screen = p
         deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
 
         await deck._dispatch(TouchEvent(event_type=EventType.TOUCH_SHORT, x=50, y=50))
@@ -409,7 +409,7 @@ class TestDeckDispatch:
         p = deck.screen("main")
         handler = AsyncMock()
         p.card(3).on_tap(handler)
-        deck._active_page = p
+        deck._active_screen = p
         deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
 
         await deck._dispatch(TouchEvent(event_type=EventType.TOUCH_SHORT, x=700, y=50))
@@ -427,7 +427,7 @@ class TestDeckDispatchCardCallbacks:
         p = deck.screen("main")
         card = _TestCard(0)
         p.set_card(0, card)
-        deck._active_page = p
+        deck._active_screen = p
 
         handler = AsyncMock()
         card.on_encoder_turn(handler)
@@ -442,7 +442,7 @@ class TestDeckDispatchCardCallbacks:
         p = deck.screen("main")
         card = _TestCard(0)
         p.set_card(0, card)
-        deck._active_page = p
+        deck._active_screen = p
 
         call_order = []
 
@@ -481,7 +481,7 @@ class TestDeckDispatchCardCallbacks:
         p = deck.screen("main")
         card = _TestCard(0)
         p.set_card(0, card)
-        deck._active_page = p
+        deck._active_screen = p
         deck._render_touchscreen = AsyncMock()
 
         change_handler = AsyncMock()
@@ -497,7 +497,7 @@ class TestDeckDispatchCardCallbacks:
 class TestDeckRenderAllKeys:
     async def test_no_device(self, deck):
         """No-op when device is None."""
-        deck._active_page = deck.screen("main")
+        deck._active_screen = deck.screen("main")
         await deck._render_all_keys()  # Should not raise
 
     async def test_renders_with_device(self, deck, mock_streamdeck_device):
@@ -505,7 +505,7 @@ class TestDeckRenderAllKeys:
         deck._caps = STREAM_DECK_PLUS
         deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
         p = deck.screen("main")
-        deck._active_page = p
+        deck._active_screen = p
 
         await deck._render_all_keys()
         # Should have called set_key_image for all 8 keys (all blank)
@@ -518,7 +518,7 @@ class TestDeckRenderAllKeys:
 class TestDeckRenderTouchscreen:
     async def test_no_device(self, deck):
         """No-op when device is None."""
-        deck._active_page = deck.screen("main")
+        deck._active_screen = deck.screen("main")
         await deck._render_touchscreen()  # Should not raise
 
     async def test_renders_with_device(self, deck, mock_streamdeck_device):
@@ -526,7 +526,7 @@ class TestDeckRenderTouchscreen:
         deck._caps = STREAM_DECK_PLUS
         deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
         p = deck.screen("main")
-        deck._active_page = p
+        deck._active_screen = p
 
         await deck._render_touchscreen()
         mock_streamdeck_device.set_touchscreen_image.assert_called_once()
@@ -538,7 +538,7 @@ class TestDeckRenderTouchscreen:
         p = deck.screen("main")
         card = _TestCard(0)
         p.set_card(0, card)
-        deck._active_page = p
+        deck._active_screen = p
 
         await deck._render_touchscreen()
         mock_streamdeck_device.set_touchscreen_image.assert_called_once()
@@ -716,16 +716,16 @@ class TestDeckIsConnected:
 class TestDeckCheckTimeouts:
     """Tests for _check_timeouts — periodic card selection timeout checks."""
 
-    async def test_no_active_page_is_noop(self, deck):
+    async def test_no_active_screen_is_noop(self, deck):
         """_check_timeouts does nothing when no page is active."""
-        deck._active_page = None
+        deck._active_screen = None
         await deck._check_timeouts()  # Should not raise
 
     async def test_no_expired_timeouts_no_refresh(self, deck):
         """No refresh when no card has an expired timeout."""
         p = deck.screen("main")
         # Default BlankCards always return False for check_selection_timeout
-        deck._active_page = p
+        deck._active_screen = p
 
         with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
             await deck._check_timeouts()
@@ -738,7 +738,7 @@ class TestDeckCheckTimeouts:
         # Override check_selection_timeout to return True (simulating expiry)
         card.check_selection_timeout = lambda: True  # type: ignore[assignment]
         p.set_card(0, card)
-        deck._active_page = p
+        deck._active_screen = p
 
         with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
             await deck._check_timeouts()
@@ -774,13 +774,13 @@ class TestDeckEventLoop:
             mock_check.assert_awaited()
         assert deck._closed_event.is_set()
 
-    async def test_event_loop_no_active_page_continues(self, deck):
+    async def test_event_loop_no_active_screen_continues(self, deck):
         """Event received but no active page -> continue."""
         transport = MagicMock()
         transport.queue = asyncio.Queue()
         deck._transport = transport
         deck._running = True
-        deck._active_page = None
+        deck._active_screen = None
 
         await transport.queue.put(KeyEvent(key=0, pressed=True))
 
@@ -798,7 +798,7 @@ class TestDeckEventLoop:
         transport.queue = asyncio.Queue()
         deck._transport = transport
         deck._running = True
-        deck._active_page = deck.screen("main")
+        deck._active_screen = deck.screen("main")
 
         deck._dispatch = AsyncMock(side_effect=ValueError("handler error"))
 

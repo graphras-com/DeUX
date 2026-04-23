@@ -73,8 +73,6 @@ class Deck:
         # Screens
         self._screens: dict[str, Screen] = {}
         self._active_screen: Screen | None = None
-        self._pages = self._screens
-        self._active_page: Screen | None = None
 
     # -- Lifecycle ---------------------------------------------------------
 
@@ -278,7 +276,6 @@ class Deck:
             raise DeckError(f"Screen '{name}' does not exist")
 
         self._active_screen = self._screens[name]
-        self._active_page = self._active_screen
         logger.info("Switching to screen: %s", name)
 
         # Render all keys and cards for this screen
@@ -293,7 +290,7 @@ class Deck:
         return self._active_screen
 
     def _current_screen(self) -> Screen | None:
-        return self._active_screen or self._active_page
+        return self._active_screen
 
     # -- Rendering ---------------------------------------------------------
 

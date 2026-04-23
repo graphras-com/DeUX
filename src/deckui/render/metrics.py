@@ -1,9 +1,9 @@
 """Rendering metrics derived from device capabilities.
 
-Instead of hardcoded constants, all metrics are computed from a
+All metrics are computed from a
 :class:`~deckui.runtime.capabilities.DeviceCapabilities` instance.
-Default module-level constants are provided for backward compatibility
-with the Stream Deck+ profile.
+Default module-level constants are provided as convenience aliases
+for the Stream Deck+ profile.
 """
 
 from __future__ import annotations
@@ -87,8 +87,8 @@ def _default_metrics() -> RenderMetrics:
     return RenderMetrics(STREAM_DECK_PLUS)
 
 
-# Module-level constants for backward compatibility.
-# These match the original Stream Deck+ hardcoded values.
+# Module-level constants for the Stream Deck+ profile.
+# Used by the preview tool and as convenient defaults.
 _DEFAULT = _default_metrics()
 
 KEY_SIZE = _DEFAULT.key_size

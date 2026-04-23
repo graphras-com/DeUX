@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class DeviceInfo:
     """Information about a connected Stream Deck device."""
 
