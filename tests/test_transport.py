@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 import pytest
 
 from deckui.runtime.capabilities import STREAM_DECK_PLUS
-from deckui.runtime.transport import AsyncTransport
 from deckui.runtime.events import (
     EncoderPressEvent,
     EncoderTurnEvent,
@@ -16,6 +15,7 @@ from deckui.runtime.events import (
     KeyEvent,
     TouchEvent,
 )
+from deckui.runtime.transport import AsyncTransport
 from tests.conftest import STREAM_DECK_MINI
 
 

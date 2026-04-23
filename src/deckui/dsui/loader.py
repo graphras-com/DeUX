@@ -10,13 +10,16 @@ from typing import Any
 import yaml
 
 from .schema import (
+    DEFAULT_HOLD_MS,
+    DEFAULT_MAX_DURATION_MS,
+    HOLD_SOURCES,
+    VALID_DIRECTIONS,
+    VALID_REGION_EVENTS,
+    VALID_SOURCES,
     Binding,
     BindingType,
     ColorBinding,
     EventMapping,
-    DEFAULT_HOLD_MS,
-    DEFAULT_MAX_DURATION_MS,
-    HOLD_SOURCES,
     IconifyBinding,
     ImageBinding,
     ImageFit,
@@ -29,9 +32,6 @@ from .schema import (
     SliderBinding,
     TextBinding,
     ToggleBinding,
-    VALID_DIRECTIONS,
-    VALID_REGION_EVENTS,
-    VALID_SOURCES,
     VisibilityBinding,
 )
 
@@ -216,7 +216,8 @@ def _parse_binding(name: str, raw: dict[str, Any]) -> Binding:
             raise PackageError(f"Binding '{name}': max_pos must be a number")
         if float(min_pos_raw) > float(max_pos_raw):
             raise PackageError(
-                f"Binding '{name}': min_pos ({min_pos_raw}) must be <= max_pos ({max_pos_raw})"
+                f"Binding '{name}': min_pos ({min_pos_raw}) must be <= "
+                f"max_pos ({max_pos_raw})"
             )
         return SliderBinding(
             node=node,
@@ -274,11 +275,10 @@ def _parse_event(raw: dict[str, Any], index: int) -> EventMapping:
         )
 
     max_duration_ms = raw.get("max_duration_ms")
-    if max_duration_ms is not None:
-        if not isinstance(max_duration_ms, int) or max_duration_ms <= 0:
-            raise PackageError(
-                f"Event '{name}': max_duration_ms must be a positive integer"
-            )
+    if max_duration_ms is not None and (
+        not isinstance(max_duration_ms, int) or max_duration_ms <= 0
+    ):
+        raise PackageError(f"Event '{name}': max_duration_ms must be a positive integer")
 
     hold_ms = raw.get("hold_ms")
     if source in HOLD_SOURCES:
@@ -432,12 +432,15 @@ def load_package(path: str | Path) -> PackageSpec:
                     f"Available ids: {sorted(svg_ids)}"
                 )
             # Validate placeholder_node for image bindings
-            if isinstance(binding, ImageBinding) and binding.placeholder_node:
-                if binding.placeholder_node not in svg_ids:
-                    raise PackageError(
-                        f"Binding '{binding_name}' references placeholder_node "
-                        f"'{binding.placeholder_node}' which does not exist in the SVG"
-                    )
+            if (
+                isinstance(binding, ImageBinding)
+                and binding.placeholder_node
+                and binding.placeholder_node not in svg_ids
+            ):
+                raise PackageError(
+                    f"Binding '{binding_name}' references placeholder_node "
+                    f"'{binding.placeholder_node}' which does not exist in the SVG"
+                )
         bindings[binding_name] = binding
 
     # --- Events ---

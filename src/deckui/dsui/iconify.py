@@ -12,6 +12,7 @@ import logging
 import threading
 import urllib.error
 import urllib.request
+from typing import cast
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +70,7 @@ def _http_get(url: str) -> str:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=_REQUEST_TIMEOUT) as resp:
         charset = resp.headers.get_content_charset() or "utf-8"
-        return resp.read().decode(charset)
+        return cast("str", resp.read().decode(charset))
 
 
 def fetch_icon(name: str) -> str:

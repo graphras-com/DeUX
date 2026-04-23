@@ -20,11 +20,11 @@ from deckui.render.metrics import (
     PANEL_GAP,
     PANEL_HEIGHT,
     PANEL_WIDTH,
-    RenderMetrics,
     TOUCHSCREEN_HEIGHT,
     TOUCHSCREEN_WIDTH,
     USABLE_HEIGHT,
     USABLE_WIDTH,
+    RenderMetrics,
 )
 from deckui.runtime.capabilities import STREAM_DECK_PLUS
 from tests.conftest import STREAM_DECK_MINI, STREAM_DECK_NEO, STREAM_DECK_XL

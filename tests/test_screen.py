@@ -5,12 +5,12 @@ from __future__ import annotations
 import pytest
 
 from deckui.runtime.capabilities import STREAM_DECK_PLUS
-from deckui.ui.controls.key_slot import KeySlot
-from deckui.ui.controls.encoder_slot import EncoderSlot
-from deckui.ui.screen import Screen
-from deckui.ui.touch_strip import TouchStrip
 from deckui.ui.cards.base import Card
 from deckui.ui.cards.blank import BlankCard
+from deckui.ui.controls.encoder_slot import EncoderSlot
+from deckui.ui.controls.key_slot import KeySlot
+from deckui.ui.screen import Screen
+from deckui.ui.touch_strip import TouchStrip
 from tests.conftest import STREAM_DECK_MINI, STREAM_DECK_NEO
 
 

@@ -34,7 +34,7 @@ def render_key_image(
 
     if icon is not None:
         if icon.size != (icon_px, icon_px):
-            icon = icon.resize((icon_px, icon_px), Image.LANCZOS)
+            icon = icon.resize((icon_px, icon_px), Image.Resampling.LANCZOS)
 
         # Centre icon on the key
         x_offset = (size[0] - icon_px) // 2

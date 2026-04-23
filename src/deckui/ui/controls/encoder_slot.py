@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
-from ...runtime.events import AsyncHandler
+if TYPE_CHECKING:
+    from ...runtime.events import AsyncHandler
 
 logger = logging.getLogger(__name__)
 

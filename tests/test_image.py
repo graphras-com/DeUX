@@ -6,6 +6,11 @@ import io
 
 from PIL import Image
 
+from deckui.render.key_renderer import (
+    _encode_jpeg,
+    render_blank_key,
+    render_key_image,
+)
 from deckui.render.metrics import (
     ICON_PADDING,
     ICON_SIZE,
@@ -18,14 +23,6 @@ from deckui.render.metrics import (
     KEY_USABLE_WIDTH,
     TOUCHSCREEN_HEIGHT,
     TOUCHSCREEN_WIDTH,
-    PANEL_COUNT,
-    PANEL_HEIGHT,
-    PANEL_WIDTH,
-)
-from deckui.render.key_renderer import (
-    _encode_jpeg,
-    render_blank_key,
-    render_key_image,
 )
 from deckui.render.touch_renderer import (
     compose_touchstrip,
@@ -85,10 +82,10 @@ class TestRenderKeyImage:
 
 class TestKeyMarginConstants:
     def test_usable_width(self):
-        assert KEY_USABLE_WIDTH == KEY_SIZE[0] - KEY_MARGIN_LEFT - KEY_MARGIN_RIGHT
+        assert KEY_SIZE[0] - KEY_MARGIN_LEFT - KEY_MARGIN_RIGHT == KEY_USABLE_WIDTH
 
     def test_usable_height(self):
-        assert KEY_USABLE_HEIGHT == KEY_SIZE[1] - KEY_MARGIN_TOP - KEY_MARGIN_BOTTOM
+        assert KEY_SIZE[1] - KEY_MARGIN_TOP - KEY_MARGIN_BOTTOM == KEY_USABLE_HEIGHT
 
     def test_usable_area_is_106x106(self):
         assert KEY_USABLE_WIDTH == 106

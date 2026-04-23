@@ -28,10 +28,10 @@ import signal
 import subprocess
 import sys
 from pathlib import Path
+from typing import Protocol, cast
 
 from PIL import Image
 
-from deckui.render.svg_rasterize import RasterizeError
 from deckui.render.key_renderer import _encode_image
 from deckui.render.metrics import (
     KEY_MARGIN_LEFT,
@@ -45,17 +45,39 @@ from deckui.render.metrics import (
     PANEL_GAP,
     PANEL_HEIGHT,
     PANEL_WIDTH,
-    RenderMetrics,
     TOUCHSCREEN_HEIGHT,
     TOUCHSCREEN_WIDTH,
 )
-from deckui.runtime.capabilities import DeviceCapabilities, STREAM_DECK_PLUS
+from deckui.render.svg_rasterize import RasterizeError
+from deckui.runtime.capabilities import STREAM_DECK_PLUS
 
 logger = logging.getLogger(__name__)
 
 _KEY_COUNT = STREAM_DECK_PLUS.key_count
 
 _HEX_RE = re.compile(r"^#?([0-9a-fA-F]{6})$")
+
+
+class PreviewDeckDevice(Protocol):
+    """Protocol for the low-level Stream Deck device used by the preview tool."""
+
+    DECK_VISUAL: bool
+
+    def open(self) -> None: ...
+    def close(self) -> None: ...
+    def reset(self) -> None: ...
+    def id(self) -> str | None: ...
+    def deck_type(self) -> str: ...
+    def set_brightness(self, value: int) -> None: ...
+    def set_key_image(self, key: int, image: bytes) -> None: ...
+    def set_touchscreen_image(
+        self,
+        image: bytes,
+        x_pos: int,
+        y_pos: int,
+        width: int,
+        height: int,
+    ) -> None: ...
 
 
 def parse_hex_color(value: str) -> str:
@@ -90,19 +112,25 @@ def _svg_to_png_fit(svg_data: bytes, max_width: int, max_height: int) -> bytes:
             if brew_lib.exists():
                 os.environ.setdefault("DYLD_FALLBACK_LIBRARY_PATH", str(brew_lib))
 
-        import cairosvg  # noqa: delayed import
+        import cairosvg
 
         # First pass: constrain by width to get natural aspect ratio.
-        png_bytes = cairosvg.svg2png(
-            bytestring=svg_data,
-            output_width=max_width,
+        png_bytes = cast(
+            "bytes",
+            cairosvg.svg2png(
+                bytestring=svg_data,
+                output_width=max_width,
+            ),
         )
         img = Image.open(io.BytesIO(png_bytes))
         if img.height > max_height:
             # Width-constrained result is too tall; constrain by height.
-            png_bytes = cairosvg.svg2png(
-                bytestring=svg_data,
-                output_height=max_height,
+            png_bytes = cast(
+                "bytes",
+                cairosvg.svg2png(
+                    bytestring=svg_data,
+                    output_height=max_height,
+                ),
             )
         return png_bytes
     except (OSError, ImportError) as exc:
@@ -131,7 +159,8 @@ def _svg_to_png_fit(svg_data: bytes, max_width: int, max_height: int) -> bytes:
 
     raise RasterizeError(
         "No SVG renderer available. Install one of:\n"
-        "  - System library: brew install cairo  (macOS) or apt install libcairo2 (Linux)\n"
+        "  - System library: brew install cairo  (macOS) or apt install libcairo2 "
+        "(Linux)\n"
         "  - CLI tool: apt install librsvg2-bin\n"
         "  - Python package: pip install cairosvg"
     )
@@ -148,7 +177,7 @@ def load_svg(path: Path, max_width: int, max_height: int) -> Image.Image:
     png_bytes = _svg_to_png_fit(svg_data, max_width, max_height)
     img = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
     # Final safety net — thumbnail never upscales, only shrinks.
-    img.thumbnail((max_width, max_height), Image.LANCZOS)
+    img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
     return img
 
 
@@ -267,12 +296,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 # -- Device interaction -------------------------------------------------------
 
 
-def _find_and_open_device() -> object:
+def _find_and_open_device() -> PreviewDeckDevice:
     """Discover, open, and return the first visual Stream Deck device.
 
     Prints an error and exits if no device is found.
     """
-    from StreamDeck.DeviceManager import DeviceManager  # type: ignore[import-untyped]
+    from StreamDeck.DeviceManager import DeviceManager
 
     devices = DeviceManager().enumerate()
     if not devices:
@@ -284,7 +313,7 @@ def _find_and_open_device() -> object:
         print("ERROR: No visual Stream Deck devices found", file=sys.stderr)  # noqa: T201
         sys.exit(1)
 
-    deck = visual[0]
+    deck = cast("PreviewDeckDevice", visual[0])
     deck.open()
     logger.debug("Opened device: %s", deck.deck_type())
     return deck
@@ -309,7 +338,7 @@ async def push_to_device(
         await loop.run_in_executor(
             None,
             deck.set_brightness,
-            brightness,  # type: ignore[union-attr]
+            brightness,
         )
 
         for key_index in range(_KEY_COUNT):
@@ -319,12 +348,12 @@ async def push_to_device(
                     None,
                     deck.set_key_image,
                     key_index,
-                    jpeg,  # type: ignore[union-attr]
+                    jpeg,
                 )
 
         await loop.run_in_executor(
             None,
-            deck.set_touchscreen_image,  # type: ignore[union-attr]
+            deck.set_touchscreen_image,
             touchstrip_bytes,
             0,
             0,
@@ -335,8 +364,8 @@ async def push_to_device(
         print("Preview pushed — press Ctrl+C to exit", file=sys.stderr)  # noqa: T201
         await _wait_for_interrupt()
     finally:
-        await loop.run_in_executor(None, deck.reset)  # type: ignore[union-attr]
-        await loop.run_in_executor(None, deck.close)  # type: ignore[union-attr]
+        await loop.run_in_executor(None, deck.reset)
+        await loop.run_in_executor(None, deck.close)
 
 
 async def _wait_for_interrupt() -> None:

@@ -7,10 +7,9 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from .schema import EventMapping, Region
-
 if TYPE_CHECKING:
     from ..runtime.events import AsyncHandler, EventType
+    from .schema import EventMapping, Region
 
 logger = logging.getLogger(__name__)
 
@@ -322,6 +321,4 @@ class EventMap:
             return True
         if mapping.direction == "left" and direction < 0:
             return True
-        if mapping.direction == "right" and direction > 0:
-            return True
-        return False
+        return mapping.direction == "right" and direction > 0

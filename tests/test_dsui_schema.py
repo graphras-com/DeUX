@@ -5,10 +5,13 @@ from __future__ import annotations
 import pytest
 
 from deckui.dsui.schema import (
+    HOLD_SOURCES,
+    VALID_DIRECTIONS,
+    VALID_REGION_EVENTS,
+    VALID_SOURCES,
     BindingType,
     ColorBinding,
     EventMapping,
-    HOLD_SOURCES,
     IconifyBinding,
     ImageBinding,
     ImageFit,
@@ -21,9 +24,6 @@ from deckui.dsui.schema import (
     SliderBinding,
     TextBinding,
     ToggleBinding,
-    VALID_DIRECTIONS,
-    VALID_REGION_EVENTS,
-    VALID_SOURCES,
     VisibilityBinding,
 )
 
@@ -323,10 +323,10 @@ class TestValidSets:
         assert "long_press" in VALID_SOURCES
 
     def test_hold_sources(self):
-        assert HOLD_SOURCES == frozenset({"key_hold", "encoder_hold"})
+        assert frozenset({"key_hold", "encoder_hold"}) == HOLD_SOURCES
 
     def test_valid_directions(self):
-        assert VALID_DIRECTIONS == frozenset({"left", "right"})
+        assert frozenset({"left", "right"}) == VALID_DIRECTIONS
 
     def test_valid_region_events(self):
-        assert VALID_REGION_EVENTS == frozenset({"tap", "long_press"})
+        assert frozenset({"tap", "long_press"}) == VALID_REGION_EVENTS

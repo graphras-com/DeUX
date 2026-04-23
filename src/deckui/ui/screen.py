@@ -5,8 +5,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from .cards.base import Card
-from .cards.blank import BlankCard
 from .controls.encoder_slot import EncoderSlot
 from .controls.key_slot import KeySlot
 from .info_screen import InfoScreen
@@ -14,6 +12,7 @@ from .touch_strip import TouchStrip
 
 if TYPE_CHECKING:
     from ..runtime.capabilities import DeviceCapabilities
+    from .cards.base import Card
 
 logger = logging.getLogger(__name__)
 

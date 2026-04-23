@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from deckui.dsui.loader import PackageError, load_all_packages, load_package
@@ -139,7 +137,8 @@ class TestLoadPackageValid:
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
         (pkg / "manifest.yaml").write_text(
             "name: R\ntype: Key\nversion: 1\nlayout: layout.svg\n"
-            "bindings:\n  level:\n    type: range\n    node: bar\n    direction: vertical\n    default: 1.0",
+            "bindings:\n  level:\n    type: range\n    node: bar\n"
+            "    direction: vertical\n    default: 1.0",
             encoding="utf-8",
         )
         spec = load_package(pkg)
@@ -725,7 +724,8 @@ class TestLoadPackageInvalid:
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
         (pkg / "manifest.yaml").write_text(
             "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
-            "regions:\n  r:\n    x: 0\n    y: 0\n    width: 100\n    height: 50\n    events: [swipe]",
+            "regions:\n  r:\n    x: 0\n    y: 0\n    width: 100\n"
+            "    height: 50\n    events: [swipe]",
             encoding="utf-8",
         )
         with pytest.raises(PackageError, match="invalid event 'swipe'"):
@@ -904,7 +904,8 @@ class TestLoadPackageInvalid:
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
         (pkg / "manifest.yaml").write_text(
             "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
-            "bindings:\n  bar:\n    type: slider\n    node: bar\n    min_pos: left\n    max_pos: 100",
+            "bindings:\n  bar:\n    type: slider\n    node: bar\n"
+            "    min_pos: left\n    max_pos: 100",
             encoding="utf-8",
         )
         with pytest.raises(PackageError, match="min_pos must be a number"):
@@ -917,7 +918,8 @@ class TestLoadPackageInvalid:
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
         (pkg / "manifest.yaml").write_text(
             "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
-            "bindings:\n  bar:\n    type: slider\n    node: bar\n    min_pos: 0\n    max_pos: right",
+            "bindings:\n  bar:\n    type: slider\n    node: bar\n"
+            "    min_pos: 0\n    max_pos: right",
             encoding="utf-8",
         )
         with pytest.raises(PackageError, match="max_pos must be a number"):

@@ -21,11 +21,11 @@ from .metrics import (
     PANEL_GAP,
     PANEL_HEIGHT,
     PANEL_WIDTH,
-    RenderMetrics,
     TOUCHSCREEN_HEIGHT,
     TOUCHSCREEN_WIDTH,
     USABLE_HEIGHT,
     USABLE_WIDTH,
+    RenderMetrics,
 )
 from .screen_renderer import render_info_screen
 from .svg_rasterize import RasterizeError

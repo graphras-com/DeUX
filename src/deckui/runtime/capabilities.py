@@ -9,6 +9,13 @@ if TYPE_CHECKING:
     from StreamDeck.Devices.StreamDeck import StreamDeck
 
 
+def _coerce_flip(value: object) -> tuple[bool, bool]:
+    """Coerce a device flip tuple to a typed `(bool, bool)` pair."""
+    if isinstance(value, tuple) and len(value) == 2:
+        return (bool(value[0]), bool(value[1]))
+    return (False, False)
+
+
 @dataclass(frozen=True, slots=True)
 class DeviceCapabilities:
     """Immutable snapshot of a Stream Deck device's hardware capabilities.
@@ -62,7 +69,7 @@ class DeviceCapabilities:
             key_pixel_width=device.KEY_PIXEL_WIDTH,
             key_pixel_height=device.KEY_PIXEL_HEIGHT,
             key_image_format=device.KEY_IMAGE_FORMAT,
-            key_flip=tuple(device.KEY_FLIP),  # type: ignore[arg-type]
+            key_flip=_coerce_flip(device.KEY_FLIP),
             key_rotation=device.KEY_ROTATION,
             has_visual=device.DECK_VISUAL,
             has_touch=getattr(device, "DECK_TOUCH", False),
@@ -72,7 +79,7 @@ class DeviceCapabilities:
             touchscreen_image_format=getattr(
                 device, "TOUCHSCREEN_IMAGE_FORMAT", ""
             ),
-            touchscreen_flip=tuple(  # type: ignore[arg-type]
+            touchscreen_flip=_coerce_flip(
                 getattr(device, "TOUCHSCREEN_FLIP", (False, False))
             ),
             touchscreen_rotation=getattr(device, "TOUCHSCREEN_ROTATION", 0),
@@ -80,9 +87,7 @@ class DeviceCapabilities:
             screen_width=getattr(device, "SCREEN_PIXEL_WIDTH", 0),
             screen_height=getattr(device, "SCREEN_PIXEL_HEIGHT", 0),
             screen_image_format=getattr(device, "SCREEN_IMAGE_FORMAT", ""),
-            screen_flip=tuple(  # type: ignore[arg-type]
-                getattr(device, "SCREEN_FLIP", (False, False))
-            ),
+            screen_flip=_coerce_flip(getattr(device, "SCREEN_FLIP", (False, False))),
             screen_rotation=getattr(device, "SCREEN_ROTATION", 0),
             touch_key_count=getattr(device, "TOUCH_KEY_COUNT", 0),
         )

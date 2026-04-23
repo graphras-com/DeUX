@@ -6,16 +6,14 @@ import argparse
 import asyncio
 import io
 import os
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from PIL import Image
 
 from deckui.render.metrics import (
-    KEY_MARGIN_BOTTOM,
     KEY_MARGIN_LEFT,
-    KEY_MARGIN_RIGHT,
     KEY_MARGIN_TOP,
     KEY_SIZE,
     KEY_USABLE_HEIGHT,
@@ -30,6 +28,9 @@ from deckui.render.metrics import (
     TOUCHSCREEN_WIDTH,
 )
 from deckui.render.svg_rasterize import RasterizeError
+
+if TYPE_CHECKING:
+    from pathlib import Path
 from deckui.tools.preview import (
     _KEY_COUNT,
     _svg_to_png_fit,
@@ -359,7 +360,7 @@ class TestParser:
             assert getattr(args, f"card{i}") is None
 
     def test_key_arg(self, tmp_path: Path):
-        args = parse_args([f"--key0", str(tmp_path / "k.svg")])
+        args = parse_args(["--key0", str(tmp_path / "k.svg")])
         assert args.key0 == tmp_path / "k.svg"
 
     def test_card_arg(self, tmp_path: Path):
@@ -655,24 +656,24 @@ class TestSvgToPngFit:
         fake_png.save(buf, format="PNG")
         fake_png_bytes = buf.getvalue()
 
-        with patch.dict("sys.modules", {"cairosvg": None}):
-            with patch("subprocess.run") as mock_run:
-                mock_run.return_value = MagicMock(stdout=fake_png_bytes)
-                result = _svg_to_png_fit(svg, 80, 80)
-                assert result == fake_png_bytes
-                mock_run.assert_called_once()
+        with (
+            patch.dict("sys.modules", {"cairosvg": None}),
+            patch("subprocess.run") as mock_run,
+        ):
+            mock_run.return_value = MagicMock(stdout=fake_png_bytes)
+            result = _svg_to_png_fit(svg, 80, 80)
+            assert result == fake_png_bytes
+            mock_run.assert_called_once()
 
     def test_no_renderer_raises(self):
         """When both cairosvg and rsvg-convert fail, raise RasterizeError."""
         svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>'
 
-        with patch.dict("sys.modules", {"cairosvg": None}):
-            with patch(
-                "subprocess.run",
-                side_effect=FileNotFoundError("no rsvg"),
-            ):
-                with pytest.raises(RasterizeError, match="No SVG renderer"):
-                    _svg_to_png_fit(svg, 80, 80)
+        with patch.dict("sys.modules", {"cairosvg": None}), patch(
+            "subprocess.run",
+            side_effect=FileNotFoundError("no rsvg"),
+        ), pytest.raises(RasterizeError, match="No SVG renderer"):
+            _svg_to_png_fit(svg, 80, 80)
 
 
 # -- _find_and_open_device ---------------------------------------------------
@@ -687,9 +688,8 @@ class TestFindAndOpenDevice:
         with patch(
             "StreamDeck.DeviceManager.DeviceManager",
             mock_dm,
-        ):
-            with pytest.raises(SystemExit):
-                _find_and_open_device()
+        ), pytest.raises(SystemExit):
+            _find_and_open_device()
         assert "No Stream Deck devices found" in capsys.readouterr().err
 
     def test_no_visual_devices_exits(self, capsys: pytest.CaptureFixture[str]):
@@ -702,9 +702,8 @@ class TestFindAndOpenDevice:
         with patch(
             "StreamDeck.DeviceManager.DeviceManager",
             mock_dm,
-        ):
-            with pytest.raises(SystemExit):
-                _find_and_open_device()
+        ), pytest.raises(SystemExit):
+            _find_and_open_device()
         assert "No visual Stream Deck devices found" in capsys.readouterr().err
 
     def test_opens_first_visual_device(self):

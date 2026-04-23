@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 from deckui.runtime.capabilities import (
-    DeviceCapabilities,
     STREAM_DECK_PLUS,
+    DeviceCapabilities,
 )
 from tests.conftest import STREAM_DECK_MINI, STREAM_DECK_NEO, STREAM_DECK_XL
 

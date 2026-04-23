@@ -5,11 +5,12 @@ from __future__ import annotations
 import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Any
+from contextlib import suppress
+from typing import TYPE_CHECKING, Any, cast
 
 from StreamDeck.DeviceManager import DeviceManager
 
-from ..render.key_renderer import render_blank_key, render_key_image
+from ..render.key_renderer import render_blank_key
 from ..render.metrics import RenderMetrics
 from ..render.touch_renderer import compose_touchstrip
 from .capabilities import DeviceCapabilities
@@ -18,14 +19,13 @@ from .events import (
     DeckEvent,
     EncoderPressEvent,
     EncoderTurnEvent,
-    EventType,
     KeyEvent,
     TouchEvent,
 )
 from .transport import AsyncTransport
 
 if TYPE_CHECKING:
-    from ..dui.key import DsuiKey
+    from ..dsui.key import DsuiKey
     from ..ui.cards.base import Card
     from ..ui.controls.key_slot import KeySlot
     from ..ui.screen import Screen
@@ -64,7 +64,7 @@ class Deck:
         self._caps: DeviceCapabilities | None = None
         self._metrics: RenderMetrics | None = None
         self._transport: AsyncTransport | None = None
-        self._event_task: asyncio.Task | None = None
+        self._event_task: asyncio.Task[None] | None = None
         self._closed_event = asyncio.Event()
         self._running = False
         self._executor = ThreadPoolExecutor(max_workers=2)
@@ -158,10 +158,8 @@ class Deck:
         # Cancel event task
         if self._event_task and not self._event_task.done():
             self._event_task.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await self._event_task
-            except asyncio.CancelledError:
-                pass
 
         # Close device (blocking)
         if self._device:
@@ -187,7 +185,7 @@ class Deck:
         """HID device path, or ``None`` if not opened."""
         if self._device is None:
             return None
-        return self._device.id()
+        return cast("str | None", self._device.id())
 
     @property
     def is_connected(self) -> bool:
@@ -340,9 +338,8 @@ class Deck:
         if not self._device:
             return
 
-        from ..dui.key import DsuiKey
 
-        dsui_key: DsuiKey = key_slot  # type: ignore[assignment]
+        dsui_key = cast("DsuiKey", key_slot)
         image_bytes = dsui_key.render_image(
             key_size=self._caps.key_size if self._caps else (120, 120),
             image_format=self._caps.key_image_format if self._caps else "JPEG",
@@ -443,9 +440,8 @@ class Deck:
 
         # Render dirty keys
         for key_slot in screen.keys.values():
-            if key_slot.is_dirty:
-                if self._is_dsui_key(key_slot):
-                    await self._render_dsui_key(key_slot)
+            if key_slot.is_dirty and self._is_dsui_key(key_slot):
+                await self._render_dsui_key(key_slot)
 
         # Render the touch strip if any card is dirty
         if screen.touch_strip is not None and screen.touch_strip.any_dirty:
@@ -480,7 +476,7 @@ class Deck:
                     event = await asyncio.wait_for(
                         self._transport.queue.get(), timeout=0.5
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     await self._check_timeouts()
                     continue
 

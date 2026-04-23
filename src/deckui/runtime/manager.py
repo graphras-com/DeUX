@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable
+from contextlib import suppress
+from typing import TYPE_CHECKING, Any
 
 from StreamDeck.DeviceManager import DeviceManager
 
 from .deck import Deck, DeckError
 from .device_info import DeviceInfo
-from .events import AsyncHandler
+
+if TYPE_CHECKING:
+    from .events import AsyncHandler
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +71,7 @@ class DeckManager:
         self._running = False
         self._closed_event = asyncio.Event()
         self._executor = ThreadPoolExecutor(max_workers=2)
-        self._scan_task: asyncio.Task | None = None
+        self._scan_task: asyncio.Task[None] | None = None
 
         # Tracked decks keyed by serial number
         self._decks: dict[str, Deck] = {}
@@ -107,10 +111,8 @@ class DeckManager:
         # Cancel scan task
         if self._scan_task and not self._scan_task.done():
             self._scan_task.cancel()
-            try:
+            with suppress(asyncio.CancelledError):
                 await self._scan_task
-            except asyncio.CancelledError:
-                pass
 
         # Stop all managed decks
         for serial, deck in list(self._decks.items()):
@@ -270,10 +272,8 @@ class DeckManager:
                         touchscreen_size=(0, 0),
                         key_image_format="",
                     )
-                try:
+                with suppress(Exception):
                     await deck.stop()
-                except Exception:
-                    pass
                 if self._disconnect_handler:
                     try:
                         await self._disconnect_handler(info)

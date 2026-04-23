@@ -43,6 +43,7 @@ Issues = "https://github.com/Graphras-com/DeckUI/issues"
 packages = ["src/deckui"]
 
 [tool.ruff]
+line-length = 100
 target-version = "py311"
 src = ["src"]
 
@@ -54,6 +55,7 @@ test = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
     "pytest-cov>=6.0",
+    "types-PyYAML>=6.0",
 ]
 
 [tool.pytest.ini_options]
@@ -63,3 +65,10 @@ asyncio_mode = "auto"
 [tool.mypy]
 python_version = "3.11"
 strict = true
+
+[[tool.mypy.overrides]]
+module = [
+    "StreamDeck.*",
+    "cairosvg",
+]
+ignore_missing_imports = true
