@@ -36,7 +36,7 @@ on:
 
 jobs:
   pytest:
-    name: Pytest (Python ${{ matrix.python-version }})
+    name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
 
     strategy:
