@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import io
 import logging
 from typing import TYPE_CHECKING, Any
 
 from PIL import Image
 
+from ..render.key_renderer import _encode_image
 from ..render.metrics import KEY_SIZE
 from ..ui.controls.key_slot import KeySlot
 from .event_map import EventMap
@@ -239,7 +239,9 @@ class DsuiKey(KeySlot):
         img = self._renderer.render()
         if img.size != size:
             img = img.resize(size, Image.Resampling.LANCZOS)
-        return self._encode_image(img, image_format)
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        return _encode_image(img, image_format)
 
     @property
     def has_dsui_content(self) -> bool:
@@ -267,20 +269,3 @@ class DsuiKey(KeySlot):
         else:
             # Fall back to base KeySlot on_press/on_release decorators
             await super().dispatch(pressed)
-
-    # -- Private helpers ---------------------------------------------------
-
-    @staticmethod
-    def _encode_image(
-        img: Image.Image, image_format: str = "JPEG", quality: int = 90
-    ) -> bytes:
-        """Encode a PIL image in the specified format."""
-        buf = io.BytesIO()
-        if img.mode != "RGB":
-            img = img.convert("RGB")
-        fmt = image_format.upper()
-        if fmt == "BMP":
-            img.save(buf, format="BMP")
-        else:
-            img.save(buf, format="JPEG", quality=quality)
-        return buf.getvalue()

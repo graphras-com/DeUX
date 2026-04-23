@@ -56,13 +56,6 @@ def render_blank_key(
     return render_key_image(key_size=key_size, image_format=image_format)
 
 
-def _encode_jpeg(img: Image.Image, quality: int = 90) -> bytes:
-    """Encode a PIL image as JPEG bytes."""
-    buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=quality)
-    return buf.getvalue()
-
-
 def _encode_image(
     img: Image.Image, image_format: str = "JPEG", quality: int = 90
 ) -> bytes:
