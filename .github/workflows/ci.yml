@@ -67,7 +67,7 @@ jobs:
       install-spec: ${{ vars.CI_PYTHON_INSTALL_SPEC || '.[test]' }}
 
   py-test:
-    name: Python Test
+    name: Test Suite
     if: needs.detect-stack.outputs.has-python == 'true'
     needs: [detect-stack]
     uses: ./.github/workflows/python-tests.yml
