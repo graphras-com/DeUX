@@ -35,9 +35,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Graphras-com/deckui"
-Repository = "https://github.com/Graphras-com/deckui"
-Issues = "https://github.com/Graphras-com/deckui/issues"
+Homepage = "https://github.com/Graphras-com/DeckUI"
+Repository = "https://github.com/Graphras-com/DeckUI"
+Issues = "https://github.com/Graphras-com/DeckUI/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/deckui"]
