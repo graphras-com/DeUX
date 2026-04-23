@@ -1,4 +1,4 @@
-"""Runtime event models and handler types for deckboard."""
+"""Runtime event models and handler types for deckui."""
 
 from __future__ import annotations
 

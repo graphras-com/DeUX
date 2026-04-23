@@ -1,4 +1,4 @@
-"""Tests for deckboard.dsui.loader — package loading and validation."""
+"""Tests for deckui.dsui.loader — package loading and validation."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from deckboard.dsui.loader import PackageError, load_all_packages, load_package
-from deckboard.dsui.schema import (
+from deckui.dsui.loader import PackageError, load_all_packages, load_package
+from deckui.dsui.schema import (
     ColorBinding,
     IconifyBinding,
     ImageBinding,
@@ -24,7 +24,7 @@ from deckboard.dsui.schema import (
 
 
 class TestLoadPackageValid:
-    """Test loading valid .dsui packages."""
+    """Test loading valid .dui packages."""
 
     def test_loads_card_package(self, card_dsui_path):
         spec = load_package(card_dsui_path)
@@ -63,7 +63,7 @@ class TestLoadPackageValid:
         assert b.line_height is None
 
     def test_text_binding_wrap_true(self, tmp_path):
-        pkg = tmp_path / "Wrap.dsui"
+        pkg = tmp_path / "Wrap.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -84,7 +84,7 @@ class TestLoadPackageValid:
 
     def test_text_binding_wrap_without_max_height(self, tmp_path):
         """wrap=true without max_height is valid (unlimited vertical space)."""
-        pkg = tmp_path / "WrapNoH.dsui"
+        pkg = tmp_path / "WrapNoH.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -131,7 +131,7 @@ class TestLoadPackageValid:
         assert b.direction == RangeDirection.HORIZONTAL
 
     def test_range_binding_vertical(self, tmp_path):
-        pkg = tmp_path / "R.dsui"
+        pkg = tmp_path / "R.dui"
         pkg.mkdir()
         svg = (
             '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar" height="80"/></svg>'
@@ -149,7 +149,7 @@ class TestLoadPackageValid:
         assert b.default == 1.0
 
     def test_toggle_binding_parsed(self, tmp_path):
-        pkg = tmp_path / "T.dsui"
+        pkg = tmp_path / "T.dui"
         pkg.mkdir()
         svg = (
             '<svg xmlns="http://www.w3.org/2000/svg">'
@@ -170,7 +170,7 @@ class TestLoadPackageValid:
         assert b.default is True
 
     def test_toggle_binding_default_false(self, tmp_path):
-        pkg = tmp_path / "TF.dsui"
+        pkg = tmp_path / "TF.dui"
         pkg.mkdir()
         svg = (
             '<svg xmlns="http://www.w3.org/2000/svg">'
@@ -188,7 +188,7 @@ class TestLoadPackageValid:
         assert b.default is False
 
     def test_iconify_binding_parsed(self, tmp_path):
-        pkg = tmp_path / "I.dsui"
+        pkg = tmp_path / "I.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -206,7 +206,7 @@ class TestLoadPackageValid:
         assert b.default == "line-md:home"
 
     def test_iconify_binding_default_empty(self, tmp_path):
-        pkg = tmp_path / "IE.dsui"
+        pkg = tmp_path / "IE.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -222,7 +222,7 @@ class TestLoadPackageValid:
         assert b.default == ""
 
     def test_slider_binding_parsed(self, tmp_path):
-        pkg = tmp_path / "S.dsui"
+        pkg = tmp_path / "S.dui"
         pkg.mkdir()
         svg = (
             '<svg xmlns="http://www.w3.org/2000/svg">'
@@ -245,7 +245,7 @@ class TestLoadPackageValid:
         assert b.max_pos == 183.5
 
     def test_slider_binding_vertical(self, tmp_path):
-        pkg = tmp_path / "SV.dsui"
+        pkg = tmp_path / "SV.dui"
         pkg.mkdir()
         svg = (
             '<svg xmlns="http://www.w3.org/2000/svg">'
@@ -267,7 +267,7 @@ class TestLoadPackageValid:
 
     def test_slider_binding_equal_min_max(self, tmp_path):
         """min_pos == max_pos is valid (indicator is pinned to one position)."""
-        pkg = tmp_path / "SP.dsui"
+        pkg = tmp_path / "SP.dui"
         pkg.mkdir()
         svg = (
             '<svg xmlns="http://www.w3.org/2000/svg">'
@@ -342,32 +342,32 @@ class TestLoadPackageInvalid:
     """Test error handling for invalid packages."""
 
     def test_not_a_directory(self, tmp_path):
-        fake = tmp_path / "notexist.dsui"
+        fake = tmp_path / "notexist.dui"
         with pytest.raises(PackageError, match="not a directory"):
             load_package(fake)
 
     def test_missing_manifest(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         with pytest.raises(PackageError, match="Missing manifest.yaml"):
             load_package(pkg)
 
     def test_invalid_yaml(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         (pkg / "manifest.yaml").write_text(": [\ninvalid", encoding="utf-8")
         with pytest.raises(PackageError, match="Invalid YAML"):
             load_package(pkg)
 
     def test_manifest_not_mapping(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         (pkg / "manifest.yaml").write_text("- list_item", encoding="utf-8")
         with pytest.raises(PackageError, match="must be a YAML mapping"):
             load_package(pkg)
 
     def test_missing_name(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         (pkg / "manifest.yaml").write_text(
             "type: Key\nversion: 1\nlayout: l.svg", encoding="utf-8"
@@ -376,7 +376,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_missing_type(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         (pkg / "manifest.yaml").write_text(
             "name: Bad\nversion: 1\nlayout: l.svg", encoding="utf-8"
@@ -385,7 +385,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_invalid_type(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         (pkg / "manifest.yaml").write_text(
             "name: Bad\ntype: Widget\nversion: 1\nlayout: l.svg",
@@ -395,7 +395,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_missing_version(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         (pkg / "manifest.yaml").write_text(
             "name: Bad\ntype: Key\nlayout: l.svg", encoding="utf-8"
@@ -404,7 +404,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_invalid_version(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         (pkg / "manifest.yaml").write_text(
             "name: Bad\ntype: Key\nversion: 0\nlayout: l.svg", encoding="utf-8"
@@ -413,7 +413,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_missing_layout(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         (pkg / "manifest.yaml").write_text(
             "name: Bad\ntype: Key\nversion: 1", encoding="utf-8"
@@ -422,7 +422,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_layout_file_not_found(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         (pkg / "manifest.yaml").write_text(
             "name: Bad\ntype: Key\nversion: 1\nlayout: missing.svg",
@@ -432,7 +432,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_invalid_svg(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         (pkg / "layout.svg").write_text("not xml at all {{{", encoding="utf-8")
         (pkg / "manifest.yaml").write_text(
@@ -443,7 +443,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_binding_missing_type(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -456,7 +456,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_binding_invalid_type(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -469,7 +469,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_binding_missing_node(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -482,7 +482,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_binding_node_not_in_svg(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -495,7 +495,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_binding_invalid_overflow(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -508,7 +508,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_binding_invalid_fit(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><image id="img"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -521,7 +521,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_image_placeholder_not_in_svg(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><image id="img"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -534,7 +534,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_event_missing_name(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -547,7 +547,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_event_missing_source(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -560,7 +560,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_event_invalid_source(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -573,7 +573,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_event_invalid_direction(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -586,7 +586,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_event_max_duration_ms_defaults_for_press_release(self, tmp_path):
-        pkg = tmp_path / "Good.dsui"
+        pkg = tmp_path / "Good.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -600,7 +600,7 @@ class TestLoadPackageInvalid:
         assert ev.max_duration_ms == 500
 
     def test_event_invalid_duration(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -613,7 +613,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_event_hold_ms_defaults_for_key_hold(self, tmp_path):
-        pkg = tmp_path / "Good.dsui"
+        pkg = tmp_path / "Good.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -627,7 +627,7 @@ class TestLoadPackageInvalid:
         assert ev.hold_ms == 500
 
     def test_event_hold_ms_defaults_for_encoder_hold(self, tmp_path):
-        pkg = tmp_path / "Good.dsui"
+        pkg = tmp_path / "Good.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -641,7 +641,7 @@ class TestLoadPackageInvalid:
         assert ev.hold_ms == 500
 
     def test_event_hold_ms_invalid(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -654,7 +654,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_event_hold_ms_zero(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -667,7 +667,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_event_hold_ms_not_allowed_on_other_sources(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -680,7 +680,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_duplicate_event_name(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -693,7 +693,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_region_missing_field(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -706,7 +706,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_region_negative_value(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -719,7 +719,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_region_invalid_event(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -732,7 +732,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_bindings_not_mapping(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -744,7 +744,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_events_not_list(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -756,7 +756,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_event_entry_not_mapping(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -769,7 +769,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_regions_not_mapping(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -781,7 +781,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_region_entry_not_mapping(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -794,7 +794,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_region_events_not_list(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -807,7 +807,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_binding_entry_not_mapping(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -820,7 +820,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_range_binding_invalid_direction(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -833,7 +833,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_range_binding_default_out_of_range(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -846,7 +846,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_range_binding_default_negative(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -859,7 +859,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_range_binding_default_not_number(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -872,7 +872,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_slider_binding_missing_min_pos(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -885,7 +885,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_slider_binding_missing_max_pos(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -898,7 +898,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_slider_binding_min_pos_not_number(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -911,7 +911,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_slider_binding_max_pos_not_number(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -924,7 +924,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_slider_binding_min_greater_than_max(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -937,7 +937,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_slider_binding_invalid_direction(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -951,7 +951,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_slider_binding_default_out_of_range(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -965,7 +965,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_slider_binding_default_not_number(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect id="bar"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -979,7 +979,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_toggle_binding_missing_node_on(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><path id="off" d="M0 0"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -992,7 +992,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_toggle_binding_missing_node_off(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = (
             '<svg xmlns="http://www.w3.org/2000/svg">'
@@ -1008,7 +1008,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_toggle_binding_node_on_not_in_svg(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = (
             '<svg xmlns="http://www.w3.org/2000/svg">'
@@ -1024,7 +1024,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_toggle_binding_node_off_not_in_svg(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = (
             '<svg xmlns="http://www.w3.org/2000/svg">'
@@ -1040,7 +1040,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_text_binding_wrap_without_max_width(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -1053,7 +1053,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_text_binding_max_height_invalid(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -1067,7 +1067,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_text_binding_max_height_zero(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -1081,7 +1081,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_text_binding_max_height_not_int(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -1095,7 +1095,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_text_binding_line_height_invalid(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -1109,7 +1109,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_text_binding_line_height_zero(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -1123,7 +1123,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_text_binding_line_height_not_number(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><text id="t"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -1137,7 +1137,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_version_string_invalid(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -1149,7 +1149,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_iconify_binding_missing_size(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -1162,7 +1162,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_iconify_binding_size_not_int(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -1175,7 +1175,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_iconify_binding_size_zero(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -1188,7 +1188,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_iconify_binding_size_negative(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -1202,7 +1202,7 @@ class TestLoadPackageInvalid:
 
     def test_iconify_binding_size_bool_rejected(self, tmp_path):
         """YAML's ``true`` coerces to int(1) in Python; reject explicitly."""
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -1215,7 +1215,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_iconify_binding_missing_node(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -1228,7 +1228,7 @@ class TestLoadPackageInvalid:
             load_package(pkg)
 
     def test_iconify_binding_node_not_in_svg(self, tmp_path):
-        pkg = tmp_path / "Bad.dsui"
+        pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon"/></svg>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")
@@ -1268,7 +1268,7 @@ class TestLoadPackageNoBindingsOrEvents:
     """Test that a minimal package with no bindings, events, or regions loads."""
 
     def test_minimal_package(self, tmp_path):
-        pkg = tmp_path / "Minimal.dsui"
+        pkg = tmp_path / "Minimal.dui"
         pkg.mkdir()
         svg = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"/>'
         (pkg / "layout.svg").write_text(svg, encoding="utf-8")

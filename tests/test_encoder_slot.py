@@ -1,8 +1,8 @@
-"""Tests for deckboard.ui.controls.encoder_slot — EncoderSlot class."""
+"""Tests for deckui.ui.controls.encoder_slot — EncoderSlot class."""
 
 from __future__ import annotations
 
-from deckboard.ui.controls.encoder_slot import EncoderSlot
+from deckui.ui.controls.encoder_slot import EncoderSlot
 
 
 class TestEncoderSlotInit:

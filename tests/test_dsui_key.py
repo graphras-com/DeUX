@@ -1,4 +1,4 @@
-"""Tests for deckboard.dsui.key — DsuiKey class."""
+"""Tests for deckui.dsui.key — DsuiKey class."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock
 import pytest
 from PIL import Image
 
-from deckboard.dsui.key import DsuiKey
-from deckboard.dsui.schema import (
+from deckui.dsui.key import DsuiKey
+from deckui.dsui.schema import (
     EventMapping,
     PackageSpec,
     PackageType,
@@ -16,8 +16,8 @@ from deckboard.dsui.schema import (
     TextBinding,
     ToggleBinding,
 )
-from deckboard.ui.controls.key_slot import KeySlot
-from deckboard.ui.screen import Screen
+from deckui.ui.controls.key_slot import KeySlot
+from deckui.ui.screen import Screen
 
 
 # -- Helpers ---------------------------------------------------------------

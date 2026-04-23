@@ -1,10 +1,10 @@
-"""Tests for deckboard.runtime.capabilities — DeviceCapabilities class."""
+"""Tests for deckui.runtime.capabilities — DeviceCapabilities class."""
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from deckboard.runtime.capabilities import (
+from deckui.runtime.capabilities import (
     DeviceCapabilities,
     STREAM_DECK_PLUS,
 )

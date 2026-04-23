@@ -1,10 +1,10 @@
-"""Tests for deckboard.ui.controls.key_slot — KeySlot class."""
+"""Tests for deckui.ui.controls.key_slot — KeySlot class."""
 
 from __future__ import annotations
 
 import pytest
 
-from deckboard.ui.controls.key_slot import KeySlot
+from deckui.ui.controls.key_slot import KeySlot
 
 
 class TestKeySlotInit:

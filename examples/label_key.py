@@ -6,7 +6,7 @@ long text into multiple lines using ``<tspan>`` elements.  Font metrics
 are auto-detected from the SVG ``<text>`` element and Pillow is used for
 pixel-accurate text measurement.
 
-The LabelKey.dsui package defines:
+The LabelKey.dui package defines:
 - A ``text`` binding named ``label`` with ``wrap: true``, ``max_width: 90``,
   and ``max_height: 54``.  Long labels word-wrap across multiple lines and
   overflow is truncated with an ellipsis.
@@ -22,7 +22,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from deckboard import DeckManager, DsuiKey, load_package
+from deckui import DeckManager, DsuiKey, load_package
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -39,7 +39,7 @@ LABELS = [
 
 
 async def main():
-    spec = load_package(EXAMPLES_DIR / "LabelKey.dsui")
+    spec = load_package(EXAMPLES_DIR / "LabelKey.dui")
 
     print(f"Loaded: {spec.name} (v{spec.version})")
     print(f"  Bindings: {sorted(spec.bindings)}")

@@ -1,4 +1,4 @@
-"""Tests for deckboard.dsui.iconify — icon fetch and cache."""
+"""Tests for deckui.dsui.iconify — icon fetch and cache."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from unittest.mock import patch
 
 import pytest
 
-from deckboard.dsui import iconify as iconify_mod
-from deckboard.dsui.iconify import (
+from deckui.dsui import iconify as iconify_mod
+from deckui.dsui.iconify import (
     USER_AGENT,
     IconifyError,
     _parse_name,

@@ -1,4 +1,4 @@
-"""Tests for deckboard.runtime.events — events, enums, and dataclasses."""
+"""Tests for deckui.runtime.events — events, enums, and dataclasses."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import dataclasses
 
 import pytest
 
-from deckboard.runtime.events import (
+from deckui.runtime.events import (
     DeckEvent,
     EncoderPressEvent,
     EncoderTurnEvent,
@@ -14,7 +14,7 @@ from deckboard.runtime.events import (
     KeyEvent,
     TouchEvent,
 )
-from deckboard.runtime.device_info import DeviceInfo
+from deckui.runtime.device_info import DeviceInfo
 
 
 # ── EventType enum ──────────────────────────────────────────────────────

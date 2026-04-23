@@ -5,7 +5,7 @@ Demonstrates the ``toggle`` binding type which switches between two SVG
 elements based on a boolean value — ideal for on/off indicators like
 lights, mute/unmute, play/pause, etc.
 
-The LightsKey.dsui package defines:
+The LightsKey.dui package defines:
 - A ``toggle`` binding named ``lights`` that swaps between a lit bulb icon
   (``lights_on``) and a crossed-out bulb icon (``lights_off``).
 - A ``color`` binding for an indicator strip below the label.
@@ -20,7 +20,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from deckboard import DeckManager, DsuiKey, load_package
+from deckui import DeckManager, DsuiKey, load_package
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -28,7 +28,7 @@ EXAMPLES_DIR = Path(__file__).parent
 
 
 async def main():
-    spec = load_package(EXAMPLES_DIR / "LightsKey.dsui")
+    spec = load_package(EXAMPLES_DIR / "LightsKey.dui")
 
     print(f"Loaded: {spec.name} (v{spec.version})")
     print(f"  Bindings: {sorted(spec.bindings)}")

@@ -1,14 +1,14 @@
-"""Tests for deckboard.ui — Card (abstract), BlankCard, and TouchStrip."""
+"""Tests for deckui.ui — Card (abstract), BlankCard, and TouchStrip."""
 
 from __future__ import annotations
 
 import pytest
 from PIL import Image
 
-from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
-from deckboard.ui.touch_strip import TouchStrip
-from deckboard.ui.cards.base import Card
-from deckboard.ui.cards.blank import BlankCard
+from deckui.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from deckui.ui.touch_strip import TouchStrip
+from deckui.ui.cards.base import Card
+from deckui.ui.cards.blank import BlankCard
 
 
 # ── Card (abstract base) ──────────────────────────────────────────────
@@ -286,7 +286,7 @@ class TestWidgetDispatch:
         assert called == [True]
 
     async def test_dispatch_touch_tap(self):
-        from deckboard.runtime.events import EventType, TouchEvent
+        from deckui.runtime.events import EventType, TouchEvent
 
         w = _ConcreteWidget(0)
         called = []
@@ -299,7 +299,7 @@ class TestWidgetDispatch:
         assert called == ["tap"]
 
     async def test_dispatch_touch_long_press(self):
-        from deckboard.runtime.events import EventType, TouchEvent
+        from deckui.runtime.events import EventType, TouchEvent
 
         w = _ConcreteWidget(0)
         called = []
@@ -312,7 +312,7 @@ class TestWidgetDispatch:
         assert called == ["long"]
 
     async def test_dispatch_touch_drag(self):
-        from deckboard.runtime.events import EventType, TouchEvent
+        from deckui.runtime.events import EventType, TouchEvent
 
         w = _ConcreteWidget(0)
         called = []
@@ -327,7 +327,7 @@ class TestWidgetDispatch:
         assert called == [(10, 20, 30, 40)]
 
     async def test_dispatch_touch_no_handler(self):
-        from deckboard.runtime.events import EventType, TouchEvent
+        from deckui.runtime.events import EventType, TouchEvent
 
         w = _ConcreteWidget(0)
         await w.dispatch_touch(TouchEvent(event_type=EventType.TOUCH_SHORT, x=10, y=10))

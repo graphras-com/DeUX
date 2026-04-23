@@ -26,7 +26,7 @@ _REQUEST_TIMEOUT = 10.0
 # the default ``Python-urllib/x.y`` UA, so we identify ourselves with
 # the library name.  Exposed as a module attribute so tests and users
 # can override it if needed.
-USER_AGENT = "deckboard/0.1.0 (+https://github.com/graphras-com/deckboard)"
+USER_AGENT = "deckui/0.1.0 (+https://github.com/graphras-com/deckui)"
 
 # In-process cache: maps "prefix:name" -> SVG source bytes.  ``None``
 # marks a name that has been looked up and failed to load, so we do not

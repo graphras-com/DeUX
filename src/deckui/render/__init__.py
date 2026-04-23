@@ -1,4 +1,4 @@
-"""Rendering helpers for deckboard keys, cards, and touchscreen."""
+"""Rendering helpers for deckui keys, cards, and touchscreen."""
 
 from __future__ import annotations
 

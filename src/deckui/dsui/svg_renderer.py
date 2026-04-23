@@ -1,4 +1,4 @@
-"""SVG-to-PIL rendering engine for .dsui packages."""
+"""SVG-to-PIL rendering engine for .dui packages."""
 
 from __future__ import annotations
 
@@ -280,7 +280,7 @@ def _wrap_text(
 
 
 class SvgRenderer:
-    """Render a .dsui SVG layout with live data bindings.
+    """Render a .dui SVG layout with live data bindings.
 
     The renderer holds a parsed copy of the SVG template.  Each call
     to :meth:`render` clones the template, applies current binding

@@ -1,4 +1,4 @@
-"""Data model for .dsui package manifests."""
+"""Data model for .dui package manifests."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from enum import Enum
 
 
 class PackageType(Enum):
-    """Hardware target for a .dsui package."""
+    """Hardware target for a .dui package."""
 
     TOUCH_STRIP_CARD = "TouchStripCard"
     KEY = "Key"
@@ -227,7 +227,7 @@ class Region:
 
 @dataclass(frozen=True, slots=True)
 class PackageSpec:
-    """Fully validated, immutable representation of a loaded .dsui package."""
+    """Fully validated, immutable representation of a loaded .dui package."""
 
     name: str
     type: PackageType

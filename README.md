@@ -1,12 +1,12 @@
-# Deckboard
+# DeckUI
 
 An asyncio-native Python 3.11+ library for building rich interfaces on
 Elgato Stream Deck devices.
 
-Deckboard auto-detects your connected Stream Deck and adapts to its hardware
+DeckUI auto-detects your connected Stream Deck and adapts to its hardware
 capabilities — key count, key image size, encoders, touchscreen, and info
 screen. Define multi-screen layouts, register event handlers with decorators,
-and use declarative `.dsui` packages for SVG-based UI. The library handles
+and use declarative `.dui` packages for SVG-based UI. The library handles
 rendering, encoding, and device I/O.
 
 ## Supported devices
@@ -26,7 +26,7 @@ The Pedal is excluded — it has no visual output.
 
 ```python
 import asyncio
-from deckboard import DeckManager
+from deckui import DeckManager
 
 async def main():
     manager = DeckManager()
@@ -56,11 +56,11 @@ asyncio.run(main())
 ## Installation
 
 ```bash
-pip install deckboard
+pip install deckui
 ```
 
-Deckboard depends on system libraries for HID access and SVG rendering.
-Install them before using Deckboard:
+DeckUI depends on system libraries for HID access and SVG rendering.
+Install them before using DeckUI:
 
 **macOS**
 
@@ -83,7 +83,7 @@ auto-detection, hot-plug, reconnection, and multi-device orchestration.
 Register `on_connect` and `on_disconnect` handlers, then start the manager.
 
 ```python
-from deckboard import DeckManager
+from deckui import DeckManager
 
 manager = DeckManager()
 
@@ -119,7 +119,7 @@ Handler filters:
 Enumerate all connected devices without creating a `Deck`:
 
 ```python
-from deckboard import list_devices
+from deckui import list_devices
 
 devices = await list_devices()
 for info in devices:
@@ -158,7 +158,7 @@ The manager supports multiple Stream Decks simultaneously. Register
 separate handlers per device type or serial:
 
 ```python
-from deckboard import DeckManager
+from deckui import DeckManager
 
 manager = DeckManager()
 
@@ -239,7 +239,7 @@ the `Card` abstract base class:
 
 ```python
 from PIL import Image
-from deckboard import Card
+from deckui import Card
 
 class StatusCard(Card):
     def __init__(self, index: int):
@@ -274,12 +274,12 @@ async def on_drag(x, y, x_out, y_out):
 
 ### Info screen (Neo)
 
-The Neo has a 248×58 non-touch info display. Deckboard exposes it via the
+The Neo has a 248×58 non-touch info display. DeckUI exposes it via the
 `InfoScreen` class with simple dirty-tracked image management:
 
 ```python
 from PIL import Image
-from deckboard import DeckManager
+from deckui import DeckManager
 
 manager = DeckManager()
 
@@ -307,16 +307,16 @@ card.set("title", "Updated")
 await deck.refresh()
 ```
 
-## Declarative UI packages (.dsui)
+## Declarative UI packages (.dui)
 
-For complex layouts, Deckboard supports `.dsui` packages: directories
+For complex layouts, DeckUI supports `.dui` packages: directories
 containing a YAML manifest and an SVG layout. The SVG is rendered with live
 data bindings and the manifest maps physical events to semantic handlers.
 
 ### Package structure
 
 ```
-AudioCard.dsui/
+AudioCard.dui/
   manifest.yaml
   layout.svg
   assets/          # optional binary assets
@@ -376,22 +376,22 @@ regions:
 `encoder_press_turn`, `key_press`, `key_release`, `key_press_release`, `tap`,
 `long_press`
 
-### Using .dsui packages
+### Using .dui packages
 
 ```python
-from deckboard import DeckManager, DsuiCard, DsuiKey, load_package
+from deckui import DeckManager, DsuiCard, DsuiKey, load_package
 
 async def main():
     manager = DeckManager()
 
     @manager.on_connect()
     async def handle(deck):
-        audio_spec = load_package("AudioCard.dsui")
-        power_spec = load_package("PowerKey.dsui")
+        audio_spec = load_package("AudioCard.dui")
+        power_spec = load_package("PowerKey.dui")
 
         screen = deck.screen("main")
 
-        # touchscreen card from .dsui
+        # touchscreen card from .dui
         card = DsuiCard(audio_spec)
         card.set("title", "Bohemian Rhapsody")
         card.set("artist", "Queen")
@@ -402,7 +402,7 @@ async def main():
             card.set("title", "Another One Bites the Dust")
             await deck.refresh()
 
-        # key from .dsui
+        # key from .dui
         power = DsuiKey(power_spec)
         power.set("ring_color", "#00ff00")
         screen.set_key(0, power)
@@ -423,7 +423,7 @@ Preview SVG designs on a physical Stream Deck without writing application
 code:
 
 ```bash
-python -m deckboard.tools.preview \
+python -m deckui.tools.preview \
     --key0 power_button.svg \
     --card0 media_card.svg \
     --card1 status_card.svg \
@@ -437,11 +437,11 @@ Arguments: `--key0` through `--key7`, `--card0` through `--card3`,
 ## Project structure
 
 ```
-src/deckboard/
+src/deckui/
   runtime/          # Device lifecycle, capabilities, events, async transport
   render/           # Image rendering, SVG rasterisation, info screen rendering
   ui/               # Screens, key slots, encoder slots, cards, info screen
-  dsui/             # Declarative .dsui package system
+  dsui/             # Declarative .dui package system
   tools/            # CLI utilities (preview)
 tests/              # Test suite (pytest, 95%+ coverage)
 ```
@@ -453,13 +453,13 @@ tests/              # Test suite (pytest, 95%+ coverage)
 pip install -e ".[test]"
 
 # run the full test suite
-python -m pytest tests/ --cov=deckboard --cov-report=term-missing --cov-fail-under=95
+python -m pytest tests/ --cov=deckui --cov-report=term-missing --cov-fail-under=95
 
 # lint
 ruff check src/ tests/
 
 # type check
-mypy src/deckboard/
+mypy src/deckui/
 ```
 
 ## API reference
@@ -468,27 +468,27 @@ mypy src/deckboard/
 
 | Class | Module | Description |
 |-------|--------|-------------|
-| `DeckManager` | `deckboard.runtime.manager` | Sole entry point — device discovery, hot-plug, reconnection |
-| `Deck` | `deckboard.runtime.deck` | Per-device handle (created by DeckManager, not instantiated directly) |
-| `DeviceCapabilities` | `deckboard.runtime.capabilities` | Frozen snapshot of device hardware |
-| `RenderMetrics` | `deckboard.render.metrics` | Computed rendering dimensions and margins |
-| `Screen` | `deckboard.ui.screen` | Named layout of keys, encoders, and cards |
-| `KeySlot` | `deckboard.ui.controls` | Physical key (index range varies by device) |
-| `EncoderSlot` | `deckboard.ui.controls` | Rotary encoder (Plus only) |
-| `Card` | `deckboard.ui.cards` | Abstract base for touchscreen cards |
-| `BlankCard` | `deckboard.ui.cards` | Default empty card |
-| `TouchStrip` | `deckboard.ui.touch_strip` | Container for touchscreen card zones |
-| `InfoScreen` | `deckboard.ui.info_screen` | Non-touch info display (Neo) |
+| `DeckManager` | `deckui.runtime.manager` | Sole entry point — device discovery, hot-plug, reconnection |
+| `Deck` | `deckui.runtime.deck` | Per-device handle (created by DeckManager, not instantiated directly) |
+| `DeviceCapabilities` | `deckui.runtime.capabilities` | Frozen snapshot of device hardware |
+| `RenderMetrics` | `deckui.render.metrics` | Computed rendering dimensions and margins |
+| `Screen` | `deckui.ui.screen` | Named layout of keys, encoders, and cards |
+| `KeySlot` | `deckui.ui.controls` | Physical key (index range varies by device) |
+| `EncoderSlot` | `deckui.ui.controls` | Rotary encoder (Plus only) |
+| `Card` | `deckui.ui.cards` | Abstract base for touchscreen cards |
+| `BlankCard` | `deckui.ui.cards` | Default empty card |
+| `TouchStrip` | `deckui.ui.touch_strip` | Container for touchscreen card zones |
+| `InfoScreen` | `deckui.ui.info_screen` | Non-touch info display (Neo) |
 
 ### DSUI classes
 
 | Class | Module | Description |
 |-------|--------|-------------|
-| `DsuiCard` | `deckboard.dsui.card` | Card backed by a .dsui package |
-| `DsuiKey` | `deckboard.dsui.key` | Key backed by a .dsui package |
-| `PackageSpec` | `deckboard.dsui.schema` | Immutable .dsui package manifest |
-| `EventMap` | `deckboard.dsui.event_map` | Physical-to-semantic event routing |
-| `SvgRenderer` | `deckboard.dsui.svg_renderer` | SVG rendering with live data bindings |
+| `DsuiCard` | `deckui.dsui.card` | Card backed by a .dui package |
+| `DsuiKey` | `deckui.dsui.key` | Key backed by a .dui package |
+| `PackageSpec` | `deckui.dsui.schema` | Immutable .dui package manifest |
+| `EventMap` | `deckui.dsui.event_map` | Physical-to-semantic event routing |
+| `SvgRenderer` | `deckui.dsui.svg_renderer` | SVG rendering with live data bindings |
 
 ### Event types
 
@@ -505,7 +505,7 @@ mypy src/deckboard/
 |-----------|-------------|
 | `DeckError` | Device not found, not opened, or HID error |
 | `RasterizeError` | SVG rasterisation failure |
-| `PackageError` | Invalid .dsui manifest or layout |
+| `PackageError` | Invalid .dui manifest or layout |
 
 ### Functions
 
@@ -515,12 +515,12 @@ mypy src/deckboard/
 
 ## Acknowledgments
 
-Deckboard is built on these excellent open-source libraries:
+DeckUI is built on these excellent open-source libraries:
 
 - **[python-elgato-streamdeck](https://github.com/abcminiuser/python-elgato-streamdeck)** — Low-level HID interface for Stream Deck devices (MIT)
 - **[Pillow](https://github.com/python-pillow/Pillow)** — Image processing and rendering (HPND)
 - **[CairoSVG](https://github.com/Kozea/CairoSVG)** — SVG-to-PNG rasterisation (LGPL-3.0)
-- **[PyYAML](https://github.com/yaml/pyyaml)** — YAML parsing for .dsui manifests (MIT)
+- **[PyYAML](https://github.com/yaml/pyyaml)** — YAML parsing for .dui manifests (MIT)
 
 See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for full license texts.
 

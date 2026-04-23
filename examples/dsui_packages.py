@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Example: declarative UI packages (.dsui) for Stream Deck+.
+"""Example: declarative UI packages (.dui) for Stream Deck+.
 
-Demonstrates how to use .dsui packages to define touchscreen cards and
+Demonstrates how to use .dui packages to define touchscreen cards and
 physical keys with SVG layouts and YAML manifests — no rendering code needed.
 
-The AudioCard.dsui package defines a media player card with text bindings
+The AudioCard.dui package defines a media player card with text bindings
 for artist/title/album, an image binding for album art, and encoder events
 for play/pause and track navigation.
 
-The PowerKey.dsui package defines a power button key with colour bindings
+The PowerKey.dui package defines a power button key with colour bindings
 and press/hold events.
 
 Run with::
@@ -20,7 +20,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from deckboard import DeckManager, DsuiCard, DsuiKey, load_package
+from deckui import DeckManager, DsuiCard, DsuiKey, load_package
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -28,10 +28,10 @@ EXAMPLES_DIR = Path(__file__).parent
 
 
 async def main():
-    # -- Load .dsui packages -----------------------------------------------
+    # -- Load .dui packages -----------------------------------------------
 
-    audio_spec = load_package(EXAMPLES_DIR / "AudioCard.dsui")
-    power_spec = load_package(EXAMPLES_DIR / "PowerKey.dsui")
+    audio_spec = load_package(EXAMPLES_DIR / "AudioCard.dui")
+    power_spec = load_package(EXAMPLES_DIR / "PowerKey.dui")
 
     print(f"Loaded: {audio_spec.name} (v{audio_spec.version})")
     print(f"  Bindings: {sorted(audio_spec.bindings)}")

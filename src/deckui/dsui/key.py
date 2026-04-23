@@ -1,4 +1,4 @@
-"""DsuiKey: a physical key backed by a .dsui package."""
+"""DsuiKey: a physical key backed by a .dui package."""
 
 from __future__ import annotations
 
@@ -21,18 +21,18 @@ logger = logging.getLogger(__name__)
 
 
 class DsuiKey(KeySlot):
-    """A physical key whose layout and events are defined by a .dsui package.
+    """A physical key whose layout and events are defined by a .dui package.
 
-    ``DsuiKey`` extends :class:`~deckboard.ui.controls.key_slot.KeySlot`
+    ``DsuiKey`` extends :class:`~deckui.ui.controls.key_slot.KeySlot`
     so that it is accepted wherever a ``KeySlot`` is expected.  It
     replaces the icon + label rendering with SVG-based rendering from
-    a ``.dsui`` package.
+    a ``.dui`` package.
 
     Usage::
 
-        from deckboard.dsui import load_package, DsuiKey
+        from deckui.dsui import load_package, DsuiKey
 
-        spec = load_package("./PowerKey.dsui")
+        spec = load_package("./PowerKey.dui")
         key = DsuiKey(spec)
         key.set("label", "Shutdown")
 
@@ -41,10 +41,10 @@ class DsuiKey(KeySlot):
             ...
 
     The key index is assigned automatically when you install the key
-    on a screen with :meth:`~deckboard.ui.screen.Screen.set_key`.
+    on a screen with :meth:`~deckui.ui.screen.Screen.set_key`.
 
     Args:
-        spec: A validated :class:`~deckboard.dsui.schema.PackageSpec`.
+        spec: A validated :class:`~deckui.dsui.schema.PackageSpec`.
     """
 
     def __init__(self, spec: PackageSpec) -> None:
@@ -241,7 +241,7 @@ class DsuiKey(KeySlot):
 
     @property
     def has_dsui_content(self) -> bool:
-        """Always ``True`` — this key is backed by a .dsui package."""
+        """Always ``True`` — this key is backed by a .dui package."""
         return True
 
     # -- Override dispatch to use the event map ----------------------------

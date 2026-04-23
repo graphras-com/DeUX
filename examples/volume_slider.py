@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Example: volume slider using a .dsui range binding.
+"""Example: volume slider using a .dui range binding.
 
 Demonstrates the ``range`` binding type which scales an SVG element's
 width (or height) proportionally to a 0.0-1.0 value.  The encoder
@@ -14,7 +14,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from deckboard import DeckManager, DsuiCard, load_package
+from deckui import DeckManager, DsuiCard, load_package
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -22,7 +22,7 @@ EXAMPLES_DIR = Path(__file__).parent
 
 
 async def main():
-    spec = load_package(EXAMPLES_DIR / "VolumeSlider.dsui")
+    spec = load_package(EXAMPLES_DIR / "VolumeSlider.dui")
 
     print(f"Loaded: {spec.name} (v{spec.version})")
     print(f"  Bindings: {sorted(spec.bindings)}")

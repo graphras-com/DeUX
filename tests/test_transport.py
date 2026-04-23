@@ -1,4 +1,4 @@
-"""Tests for deckboard.runtime.transport — AsyncTransport class."""
+"""Tests for deckui.runtime.transport — AsyncTransport class."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ from unittest.mock import MagicMock, call
 
 import pytest
 
-from deckboard.runtime.capabilities import STREAM_DECK_PLUS
-from deckboard.runtime.transport import AsyncTransport
-from deckboard.runtime.events import (
+from deckui.runtime.capabilities import STREAM_DECK_PLUS
+from deckui.runtime.transport import AsyncTransport
+from deckui.runtime.events import (
     EncoderPressEvent,
     EncoderTurnEvent,
     EventType,

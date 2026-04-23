@@ -1,4 +1,4 @@
-"""Tests for deckboard.runtime.deck — Deck class."""
+"""Tests for deckui.runtime.deck — Deck class."""
 
 from __future__ import annotations
 
@@ -8,13 +8,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from PIL import Image
 
-from deckboard.runtime.deck import Deck, DeckError
-from deckboard.runtime.capabilities import STREAM_DECK_PLUS
-from deckboard.render.metrics import PANEL_HEIGHT, PANEL_WIDTH, RenderMetrics
-from deckboard.ui.screen import Screen
-from deckboard.ui.cards.base import Card
-from deckboard.ui.cards.blank import BlankCard
-from deckboard.runtime.events import (
+from deckui.runtime.deck import Deck, DeckError
+from deckui.runtime.capabilities import STREAM_DECK_PLUS
+from deckui.render.metrics import PANEL_HEIGHT, PANEL_WIDTH, RenderMetrics
+from deckui.ui.screen import Screen
+from deckui.ui.cards.base import Card
+from deckui.ui.cards.blank import BlankCard
+from deckui.runtime.events import (
     EncoderPressEvent,
     EncoderTurnEvent,
     EventType,
@@ -595,7 +595,7 @@ class TestDeckCapabilities:
 
 class TestDeckStart:
     async def test_no_devices_found(self, deck):
-        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = []
             with pytest.raises(DeckError, match="No Stream Deck devices found"):
                 await deck.start()
@@ -603,14 +603,14 @@ class TestDeckStart:
     async def test_no_visual_devices(self, deck):
         mock_dev = MagicMock()
         mock_dev.DECK_VISUAL = False
-        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_dev]
             with pytest.raises(DeckError, match="No visual Stream Deck devices found"):
                 await deck.start()
 
     async def test_successful_start(self, mock_streamdeck_device):
         d = Deck(serial_number="TEST123")
-        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
             await d.start()
             assert d._running is True
@@ -623,7 +623,7 @@ class TestDeckStart:
 
     async def test_already_running_noop(self, mock_streamdeck_device):
         d = Deck(serial_number="TEST123")
-        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
             await d.start()
             # Second call should be no-op
@@ -635,7 +635,7 @@ class TestDeckStart:
     async def test_start_serial_not_found(self, mock_streamdeck_device):
         d = Deck(serial_number="NOMATCH")
         mock_streamdeck_device.get_serial_number.return_value = "OTHER"
-        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
             with pytest.raises(DeckError, match="No device with serial"):
                 await d.start()
@@ -651,7 +651,7 @@ class TestDeckStop:
 
     async def test_stop_closes_device(self, mock_streamdeck_device):
         d = Deck(serial_number="TEST123")
-        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
             await d.start()
             await d.stop()
@@ -662,7 +662,7 @@ class TestDeckStop:
 
     async def test_stop_sets_closed_event(self, mock_streamdeck_device):
         d = Deck(serial_number="TEST123")
-        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
             await d.start()
             await d.stop()
@@ -672,7 +672,7 @@ class TestDeckStop:
         """stop() handles errors during device close gracefully."""
         mock_streamdeck_device.close.side_effect = OSError("HID error")
         d = Deck(serial_number="TEST123")
-        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
             await d.start()
             await d.stop()  # Should not raise
@@ -684,7 +684,7 @@ class TestDeckStop:
 class TestDeckWaitClosed:
     async def test_wait_closed_resolves_after_stop(self, mock_streamdeck_device):
         d = Deck(serial_number="TEST123")
-        with patch("deckboard.runtime.deck.DeviceManager") as mock_dm:
+        with patch("deckui.runtime.deck.DeviceManager") as mock_dm:
             mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
             await d.start()
 
@@ -810,7 +810,7 @@ class TestDeckEventLoop:
             deck._running = False
 
         asyncio.create_task(stop_after_delay())
-        with patch("deckboard.runtime.deck.logger") as mock_logger:
+        with patch("deckui.runtime.deck.logger") as mock_logger:
             await deck._event_loop()
             mock_logger.exception.assert_called_with("Error in event handler")
         assert deck._closed_event.is_set()
@@ -828,7 +828,7 @@ class TestDeckEventLoop:
         transport.queue = MagicMock()
         transport.queue.get = exploding_get
 
-        with patch("deckboard.runtime.deck.logger") as mock_logger:
+        with patch("deckui.runtime.deck.logger") as mock_logger:
             await deck._event_loop()
             mock_logger.exception.assert_called_with("Event loop crashed")
         assert deck._closed_event.is_set()

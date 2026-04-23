@@ -1,4 +1,4 @@
-"""Runtime package for deckboard device sessions and events."""
+"""Runtime package for deckui device sessions and events."""
 
 from __future__ import annotations
 

@@ -1,13 +1,13 @@
-"""Declarative UI packages for deckboard (.dsui).
+"""Declarative UI packages for deckui (.dui).
 
 Load SVG + YAML packages and use them as touchscreen cards or physical keys
 without writing any Python rendering code.
 
 Example::
 
-    from deckboard.dsui import DsuiCard, load_package
+    from deckui.dsui import DsuiCard, load_package
 
-    spec = load_package("./AudioCard.dsui")
+    spec = load_package("./AudioCard.dui")
     card = DsuiCard(spec)
     card.set("artist", "Ash Walker")
 

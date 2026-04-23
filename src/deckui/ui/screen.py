@@ -1,4 +1,4 @@
-"""Screen layout class for deckboard navigation."""
+"""Screen layout class for deckui navigation."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ class Screen:
     The number of available keys, encoders, and card zones is determined
     by the device capabilities.  For devices without encoders or a
     touchscreen, those features are unavailable and accessing them raises
-    :class:`~deckboard.runtime.deck.DeckError`.
+    :class:`~deckui.runtime.deck.DeckError`.
 
     Usage::
 

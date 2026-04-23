@@ -1,4 +1,4 @@
-"""Tests for deckboard.tools.preview — SVG preview CLI tool."""
+"""Tests for deckui.tools.preview — SVG preview CLI tool."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from PIL import Image
 
-from deckboard.render.metrics import (
+from deckui.render.metrics import (
     KEY_MARGIN_BOTTOM,
     KEY_MARGIN_LEFT,
     KEY_MARGIN_RIGHT,
@@ -29,8 +29,8 @@ from deckboard.render.metrics import (
     TOUCHSCREEN_HEIGHT,
     TOUCHSCREEN_WIDTH,
 )
-from deckboard.render.svg_rasterize import RasterizeError
-from deckboard.tools.preview import (
+from deckui.render.svg_rasterize import RasterizeError
+from deckui.tools.preview import (
     _KEY_COUNT,
     _svg_to_png_fit,
     build_parser,
@@ -493,7 +493,7 @@ class TestRenderPreview:
 
 
 class TestMain:
-    @patch("deckboard.tools.preview.push_to_device", new_callable=AsyncMock)
+    @patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock)
     def test_main_calls_push(self, mock_push: AsyncMock, square_svg: Path):
         main(["--key0", str(square_svg)])
         mock_push.assert_awaited_once()
@@ -502,24 +502,24 @@ class TestMain:
         assert isinstance(touchstrip, bytes)
         assert brightness == 80
 
-    @patch("deckboard.tools.preview.push_to_device", new_callable=AsyncMock)
+    @patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock)
     def test_main_default_brightness(self, mock_push: AsyncMock):
         main([])
         _, _, brightness = mock_push.call_args[0]
         assert brightness == 80
 
-    @patch("deckboard.tools.preview.push_to_device", new_callable=AsyncMock)
+    @patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock)
     def test_main_custom_brightness(self, mock_push: AsyncMock):
         main(["--brightness", "40"])
         _, _, brightness = mock_push.call_args[0]
         assert brightness == 40
 
-    @patch("deckboard.tools.preview.push_to_device", new_callable=AsyncMock)
+    @patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock)
     def test_main_verbose(self, mock_push: AsyncMock):
         main(["-v"])
         mock_push.assert_awaited_once()
 
-    @patch("deckboard.tools.preview.push_to_device", new_callable=AsyncMock)
+    @patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock)
     def test_main_with_background(self, mock_push: AsyncMock):
         main(["--background", "#aabbcc"])
         mock_push.assert_awaited_once()
@@ -535,7 +535,7 @@ class TestMain:
 
 class TestPushToDevice:
     async def test_push_opens_and_pushes(self, mock_streamdeck_device: MagicMock):
-        from deckboard.tools.preview import push_to_device
+        from deckui.tools.preview import push_to_device
 
         # Create minimal key image and touchstrip
         blank_key = Image.new("RGB", KEY_SIZE, "black")
@@ -550,11 +550,11 @@ class TestPushToDevice:
 
         with (
             patch(
-                "deckboard.tools.preview._find_and_open_device",
+                "deckui.tools.preview._find_and_open_device",
                 return_value=mock_streamdeck_device,
             ),
             patch(
-                "deckboard.tools.preview._wait_for_interrupt",
+                "deckui.tools.preview._wait_for_interrupt",
                 new_callable=AsyncMock,
             ),
         ):
@@ -574,7 +574,7 @@ class TestPushToDevice:
 
     async def test_brightness_clamped(self, mock_streamdeck_device: MagicMock):
         """Values outside 0-100 are clamped."""
-        from deckboard.tools.preview import push_to_device
+        from deckui.tools.preview import push_to_device
 
         blank_ts = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), "black")
         buf = io.BytesIO()
@@ -583,11 +583,11 @@ class TestPushToDevice:
 
         with (
             patch(
-                "deckboard.tools.preview._find_and_open_device",
+                "deckui.tools.preview._find_and_open_device",
                 return_value=mock_streamdeck_device,
             ),
             patch(
-                "deckboard.tools.preview._wait_for_interrupt",
+                "deckui.tools.preview._wait_for_interrupt",
                 new_callable=AsyncMock,
             ),
         ):
@@ -604,7 +604,7 @@ class TestWaitForInterrupt:
         """The coroutine completes when SIGINT is delivered."""
         import signal
 
-        from deckboard.tools.preview import _wait_for_interrupt
+        from deckui.tools.preview import _wait_for_interrupt
 
         loop = asyncio.get_running_loop()
 
@@ -616,7 +616,7 @@ class TestWaitForInterrupt:
         """The SIGINT handler is cleaned up after _wait_for_interrupt returns."""
         import signal
 
-        from deckboard.tools.preview import _wait_for_interrupt
+        from deckui.tools.preview import _wait_for_interrupt
 
         loop = asyncio.get_running_loop()
         loop.call_later(0.05, os.kill, os.getpid(), signal.SIGINT)
@@ -680,7 +680,7 @@ class TestSvgToPngFit:
 
 class TestFindAndOpenDevice:
     def test_no_devices_exits(self, capsys: pytest.CaptureFixture[str]):
-        from deckboard.tools.preview import _find_and_open_device
+        from deckui.tools.preview import _find_and_open_device
 
         mock_dm = MagicMock()
         mock_dm.return_value.enumerate.return_value = []
@@ -693,7 +693,7 @@ class TestFindAndOpenDevice:
         assert "No Stream Deck devices found" in capsys.readouterr().err
 
     def test_no_visual_devices_exits(self, capsys: pytest.CaptureFixture[str]):
-        from deckboard.tools.preview import _find_and_open_device
+        from deckui.tools.preview import _find_and_open_device
 
         device = MagicMock()
         device.DECK_VISUAL = False
@@ -708,7 +708,7 @@ class TestFindAndOpenDevice:
         assert "No visual Stream Deck devices found" in capsys.readouterr().err
 
     def test_opens_first_visual_device(self):
-        from deckboard.tools.preview import _find_and_open_device
+        from deckui.tools.preview import _find_and_open_device
 
         device = MagicMock()
         device.DECK_VISUAL = True
@@ -727,12 +727,12 @@ class TestFindAndOpenDevice:
 
 
 class TestMainModule:
-    @patch("deckboard.tools.preview.main")
+    @patch("deckui.tools.preview.main")
     def test_main_module(self, mock_main: MagicMock):
         """Importing __main__ should call main()."""
         import importlib
 
-        import deckboard.tools.__main__  # noqa: F811
+        import deckui.tools.__main__  # noqa: F811
 
-        importlib.reload(deckboard.tools.__main__)
+        importlib.reload(deckui.tools.__main__)
         mock_main.assert_called()

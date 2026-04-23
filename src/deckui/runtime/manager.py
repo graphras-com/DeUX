@@ -20,7 +20,7 @@ ConnectHandler = Callable[["Deck"], Any]
 
 
 class DeckManager:
-    """The main entry point for the deckboard library.
+    """The main entry point for the deckui library.
 
     Manages one or more Stream Deck devices with automatic discovery,
     hot-plug detection, and reconnection.  Register ``on_connect`` and
