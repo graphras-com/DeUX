@@ -4,17 +4,19 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from PIL import Image
 
 from ..render.metrics import KEY_SIZE
-from ..runtime.events import AsyncHandler
 from ..ui.controls.key_slot import KeySlot
 from .event_map import EventMap
 from .svg_renderer import SvgRenderer
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from ..runtime.events import AsyncHandler
     from .schema import PackageSpec
 
 logger = logging.getLogger(__name__)
@@ -236,7 +238,7 @@ class DsuiKey(KeySlot):
         size = key_size or KEY_SIZE
         img = self._renderer.render()
         if img.size != size:
-            img = img.resize(size, Image.LANCZOS)
+            img = img.resize(size, Image.Resampling.LANCZOS)
         return self._encode_image(img, image_format)
 
     @property
@@ -253,10 +255,11 @@ class DsuiKey(KeySlot):
         Falls back to the base KeySlot handlers if the event map
         returns no matches.
         """
-        if pressed:
-            handlers = self._events.handle_key_press()
-        else:
-            handlers = self._events.handle_key_release()
+        handlers = (
+            self._events.handle_key_press()
+            if pressed
+            else self._events.handle_key_release()
+        )
 
         if handlers:
             for handler in handlers:

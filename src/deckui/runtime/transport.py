@@ -18,11 +18,23 @@ from .events import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from StreamDeck.Devices.StreamDeck import StreamDeck
 
     from .capabilities import DeviceCapabilities
 
 logger = logging.getLogger(__name__)
+
+
+def _coerce_int(value: object, default: int = 0) -> int:
+    """Convert callback payload values to ints without tripping strict mypy."""
+    return value if isinstance(value, int) else default
+
+
+def _optional_int(value: object) -> int | None:
+    """Convert callback payload values to optional ints."""
+    return value if isinstance(value, int) else None
 
 
 class AsyncTransport:
@@ -93,12 +105,16 @@ class AsyncTransport:
             if event == DialEventType.PUSH:
                 self._enqueue(EncoderPressEvent(encoder=encoder, pressed=bool(value)))
             elif event == DialEventType.TURN:
-                self._enqueue(EncoderTurnEvent(encoder=encoder, direction=int(value)))
+                direction = value if isinstance(value, int) else 0
+                self._enqueue(EncoderTurnEvent(encoder=encoder, direction=direction))
         except Exception:
             logger.exception("Error in encoder callback (encoder=%d)", encoder)
 
     def _on_touch(
-        self, deck: StreamDeck, evt_type: TouchscreenEventType, value: dict
+        self,
+        deck: StreamDeck,
+        evt_type: TouchscreenEventType,
+        value: Mapping[str, object],
     ) -> None:
         try:
             if evt_type == TouchscreenEventType.SHORT:
@@ -113,10 +129,10 @@ class AsyncTransport:
             self._enqueue(
                 TouchEvent(
                     event_type=event_type,
-                    x=value.get("x", 0),
-                    y=value.get("y", 0),
-                    x_out=value.get("x_out"),
-                    y_out=value.get("y_out"),
+                    x=_coerce_int(value.get("x", 0)),
+                    y=_coerce_int(value.get("y", 0)),
+                    x_out=_optional_int(value.get("x_out")),
+                    y_out=_optional_int(value.get("y_out")),
                 )
             )
         except Exception:

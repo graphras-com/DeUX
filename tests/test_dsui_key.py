@@ -19,7 +19,6 @@ from deckui.dsui.schema import (
 from deckui.ui.controls.key_slot import KeySlot
 from deckui.ui.screen import Screen
 
-
 # -- Helpers ---------------------------------------------------------------
 
 _KEY_SVG = (

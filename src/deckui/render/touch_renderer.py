@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from PIL import Image
 
-from .key_renderer import _encode_image, _encode_jpeg
+from .key_renderer import _encode_image
 from .metrics import (
     MARGIN_LEFT,
     MARGIN_TOP,
     PANEL_COUNT,
     PANEL_GAP,
-    PANEL_HEIGHT,
     PANEL_WIDTH,
     TOUCHSCREEN_HEIGHT,
     TOUCHSCREEN_WIDTH,

@@ -31,7 +31,7 @@ def render_info_screen(
 
     if image is not None:
         if image.size != (width, height):
-            image = image.resize((width, height), Image.LANCZOS)
+            image = image.resize((width, height), Image.Resampling.LANCZOS)
         if image.mode == "RGBA":
             canvas.paste(image, (0, 0), image)
         else:

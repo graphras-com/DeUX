@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
-from PIL import Image
-
-from ...render.metrics import PANEL_HEIGHT, PANEL_WIDTH
 from ...runtime.events import AsyncHandler, EventType, TouchEvent
+
+if TYPE_CHECKING:
+    from PIL import Image
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +209,7 @@ class Card(ABC):
 
     async def prepare_assets(self) -> None:
         """Prepare external assets needed for rendering this card."""
+        return None
 
     async def dispatch_encoder_turn(self, direction: int) -> None:
         """Dispatch an encoder-turn event to the card."""
@@ -261,18 +263,22 @@ class Card(ABC):
 
         Override to handle encoder rotation.  The default is a no-op.
         """
+        _ = direction
+        return None
 
     def handle_encoder_press(self) -> None:
         """Called when the encoder above this widget is pressed.
 
         Override to handle encoder presses.  The default is a no-op.
         """
+        return None
 
     def handle_encoder_release(self) -> None:
         """Called when the encoder above this widget is released.
 
         Override to handle encoder releases.  The default is a no-op.
         """
+        return None
 
     def check_selection_timeout(self) -> bool:
         """Check whether an internal selection timeout has elapsed.

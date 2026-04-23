@@ -62,7 +62,7 @@ class InfoScreen:
             image: A PIL Image to display.
         """
         if image.size != (self._width, self._height):
-            image = image.resize((self._width, self._height), Image.LANCZOS)
+            image = image.resize((self._width, self._height), Image.Resampling.LANCZOS)
         self._image = image
         self._dirty = True
 

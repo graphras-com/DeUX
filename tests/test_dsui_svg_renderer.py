@@ -32,7 +32,6 @@ from deckui.dsui.svg_renderer import (
     _wrap_text,
 )
 
-
 # -- Helper SVGs -----------------------------------------------------------
 
 _BASIC_SVG = (
@@ -785,7 +784,6 @@ class TestSvgRendererSlider:
         # Check the calculated position via internal rendering
         # midpoint = 10.0 + 0.5 * (190.0 - 10.0) = 100.0
         import copy
-        import xml.etree.ElementTree as ET
 
         root = copy.deepcopy(renderer._base_root)
         from deckui.dsui.svg_renderer import _find_element_by_id
@@ -806,7 +804,6 @@ class TestSvgRendererSlider:
         )
         renderer = SvgRenderer(spec)
         import copy
-        import xml.etree.ElementTree as ET
 
         root = copy.deepcopy(renderer._base_root)
         from deckui.dsui.svg_renderer import _find_element_by_id
@@ -827,7 +824,6 @@ class TestSvgRendererSlider:
         )
         renderer = SvgRenderer(spec)
         import copy
-        import xml.etree.ElementTree as ET
 
         root = copy.deepcopy(renderer._base_root)
         from deckui.dsui.svg_renderer import _find_element_by_id
@@ -956,7 +952,6 @@ class TestSvgRendererToggleRender:
     def test_toggle_true_shows_on_hides_off(self):
         """Verify SVG DOM manipulation: True → node_on visible, node_off hidden."""
         import copy
-        import xml.etree.ElementTree as ET
 
         spec = _make_spec(
             _TOGGLE_SVG,
@@ -968,7 +963,6 @@ class TestSvgRendererToggleRender:
         )
         renderer = SvgRenderer(spec)
         root = copy.deepcopy(renderer._base_root)
-        binding = spec.bindings["lights"]
         from deckui.dsui.svg_renderer import _find_element_by_id
 
         elem_on = _find_element_by_id(root, "icon_on")
@@ -1319,7 +1313,6 @@ class TestSvgRendererWrappedText:
     def test_wrap_produces_tspan_elements(self):
         """Wrapped text creates <tspan> children in the <text> element."""
         import copy
-        import xml.etree.ElementTree as ET
 
         spec = _make_spec(
             _WRAP_SVG,
@@ -1726,8 +1719,8 @@ class TestIconifyBindingRendering:
         """A failed icon fetch is logged and renders an empty <g>."""
         import logging
 
-        from deckui.dsui.iconify import IconifyError
         import deckui.dsui.svg_renderer as svg_renderer_mod
+        from deckui.dsui.iconify import IconifyError
 
         def boom(name: str) -> str:
             raise IconifyError("no network")

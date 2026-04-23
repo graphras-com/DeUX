@@ -2,25 +2,24 @@
 
 from __future__ import annotations
 
-import asyncio
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, PropertyMock
+from typing import TYPE_CHECKING
+from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
 
+from deckui.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
 from deckui.runtime.capabilities import (
-    DeviceCapabilities,
     STREAM_DECK_PLUS,
+    DeviceCapabilities,
 )
-from deckui.ui.controls.key_slot import KeySlot
 from deckui.ui.controls.encoder_slot import EncoderSlot
+from deckui.ui.controls.key_slot import KeySlot
 from deckui.ui.screen import Screen
-from deckui.render.metrics import PANEL_HEIGHT, PANEL_WIDTH, RenderMetrics
 from deckui.ui.touch_strip import TouchStrip
-from deckui.ui.cards.base import Card
-from deckui.ui.cards.blank import BlankCard
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # -- Device capability presets ------------------------------------------------
 

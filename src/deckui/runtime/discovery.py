@@ -4,14 +4,11 @@ from __future__ import annotations
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING
+from typing import Any
 
 from StreamDeck.DeviceManager import DeviceManager
 
 from .device_info import DeviceInfo
-
-if TYPE_CHECKING:
-    pass
 
 
 async def list_devices(
@@ -38,7 +35,7 @@ async def list_devices(
     executor = ThreadPoolExecutor(max_workers=2)
 
     try:
-        devices = await loop.run_in_executor(executor, DeviceManager().enumerate)
+        devices: list[Any] = await loop.run_in_executor(executor, DeviceManager().enumerate)
 
         if visual_only:
             devices = [d for d in devices if d.DECK_VISUAL]

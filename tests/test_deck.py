@@ -8,12 +8,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from PIL import Image
 
-from deckui.runtime.deck import Deck, DeckError
-from deckui.runtime.capabilities import STREAM_DECK_PLUS
 from deckui.render.metrics import PANEL_HEIGHT, PANEL_WIDTH, RenderMetrics
-from deckui.ui.screen import Screen
-from deckui.ui.cards.base import Card
-from deckui.ui.cards.blank import BlankCard
+from deckui.runtime.capabilities import STREAM_DECK_PLUS
+from deckui.runtime.deck import Deck, DeckError
 from deckui.runtime.events import (
     EncoderPressEvent,
     EncoderTurnEvent,
@@ -21,6 +18,8 @@ from deckui.runtime.events import (
     KeyEvent,
     TouchEvent,
 )
+from deckui.ui.cards.base import Card
+from deckui.ui.screen import Screen
 
 
 class _TestCard(Card):
@@ -818,7 +817,6 @@ class TestDeckEventLoop:
     async def test_event_loop_unexpected_crash_logged(self, deck):
         """Unexpected exception crashes the event loop, logged."""
         transport = MagicMock()
-        q = asyncio.Queue()
         deck._transport = transport
         deck._running = True
 

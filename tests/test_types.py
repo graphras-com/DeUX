@@ -6,16 +6,14 @@ import dataclasses
 
 import pytest
 
+from deckui.runtime.device_info import DeviceInfo
 from deckui.runtime.events import (
-    DeckEvent,
     EncoderPressEvent,
     EncoderTurnEvent,
     EventType,
     KeyEvent,
     TouchEvent,
 )
-from deckui.runtime.device_info import DeviceInfo
-
 
 # ── EventType enum ──────────────────────────────────────────────────────
 

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from deckui.ui.controls.key_slot import KeySlot
 
 

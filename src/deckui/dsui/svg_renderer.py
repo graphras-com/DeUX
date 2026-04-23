@@ -9,6 +9,7 @@ import io
 import logging
 import math
 import xml.etree.ElementTree as ET
+from contextlib import suppress
 from typing import Any
 
 from PIL import Image, ImageFont
@@ -68,13 +69,13 @@ def _fit_image(
     src_w, src_h = img.size
 
     if fit == ImageFit.FILL:
-        return img.resize((target_w, target_h), Image.LANCZOS)
+        return img.resize((target_w, target_h), Image.Resampling.LANCZOS)
 
     if fit == ImageFit.CONTAIN:
         ratio = min(target_w / src_w, target_h / src_h)
         new_w = max(1, int(src_w * ratio))
         new_h = max(1, int(src_h * ratio))
-        resized = img.resize((new_w, new_h), Image.LANCZOS)
+        resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
         canvas = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
         paste_x = (target_w - new_w) // 2
         paste_y = (target_h - new_h) // 2
@@ -85,7 +86,7 @@ def _fit_image(
     ratio = max(target_w / src_w, target_h / src_h)
     new_w = max(1, int(src_w * ratio))
     new_h = max(1, int(src_h * ratio))
-    resized = img.resize((new_w, new_h), Image.LANCZOS)
+    resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
     left = (new_w - target_w) // 2
     top = (new_h - target_h) // 2
     return resized.crop((left, top, left + target_w, top + target_h))
@@ -154,10 +155,8 @@ def _resolve_font_attrs(root: ET.Element, elem: ET.Element) -> tuple[str, float]
         if size is None:
             raw_size = current.get("font-size")
             if raw_size:
-                try:
+                with suppress(ValueError):
                     size = float(raw_size.rstrip("px"))
-                except ValueError:
-                    pass
         if family is not None and size is not None:
             break
         current = parent_map.get(current)
@@ -196,7 +195,7 @@ def _load_font(family: str, size: int) -> ImageFont.FreeTypeFont | ImageFont.Ima
     for name in unique:
         try:
             return ImageFont.truetype(name, size)
-        except (OSError, IOError):
+        except OSError:
             continue
 
     logger.warning(
@@ -299,11 +298,7 @@ class SvgRenderer:
 
         # Initialise defaults from bindings
         for name, binding in spec.bindings.items():
-            if isinstance(binding, TextBinding):
-                self._values[name] = binding.default
-            elif isinstance(binding, VisibilityBinding):
-                self._values[name] = binding.default
-            elif isinstance(binding, ColorBinding):
+            if isinstance(binding, (TextBinding, VisibilityBinding, ColorBinding)):
                 self._values[name] = binding.default
             elif isinstance(binding, RangeBinding):
                 self._values[name] = binding.default
@@ -316,11 +311,7 @@ class SvgRenderer:
                         else "height"
                     )
                     self._range_extents[name] = float(elem.get(attr, "0"))
-            elif isinstance(binding, SliderBinding):
-                self._values[name] = binding.default
-            elif isinstance(binding, ToggleBinding):
-                self._values[name] = binding.default
-            elif isinstance(binding, IconifyBinding):
+            elif isinstance(binding, (SliderBinding, ToggleBinding, IconifyBinding)):
                 self._values[name] = binding.default
             # ImageBinding defaults to None (no image)
 

@@ -12,7 +12,6 @@ from deckui.dsui.event_map import EventMap
 from deckui.dsui.schema import EventMapping, Region
 from deckui.runtime.events import EventType
 
-
 # -- Fixtures --------------------------------------------------------------
 
 

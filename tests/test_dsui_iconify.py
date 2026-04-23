@@ -16,7 +16,6 @@ from deckui.dsui.iconify import (
     fetch_icon,
 )
 
-
 _SAMPLE_SVG = (
     '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" '
     'viewBox="0 0 24 24"><path fill="currentColor" d="M0 0"/></svg>'
@@ -113,9 +112,11 @@ class TestFetchIcon:
         assert mock.call_count == 1
 
     def test_non_svg_body_treated_as_missing(self):
-        with patch.object(iconify_mod, "_http_get", return_value="random junk"):
-            with pytest.raises(IconifyError, match="not found"):
-                fetch_icon("fake:weird")
+        with (
+            patch.object(iconify_mod, "_http_get", return_value="random junk"),
+            pytest.raises(IconifyError, match="not found"),
+        ):
+            fetch_icon("fake:weird")
 
     def test_network_error_raises_and_caches(self):
         err = urllib.error.URLError("unreachable")
@@ -129,9 +130,11 @@ class TestFetchIcon:
 
     def test_os_error_also_caught(self):
         """A plain OSError from the socket layer is wrapped as IconifyError."""
-        with patch.object(iconify_mod, "_http_get", side_effect=OSError("boom")):
-            with pytest.raises(IconifyError, match="Failed to fetch"):
-                fetch_icon("line-md:boom")
+        with (
+            patch.object(iconify_mod, "_http_get", side_effect=OSError("boom")),
+            pytest.raises(IconifyError, match="Failed to fetch"),
+        ):
+            fetch_icon("line-md:boom")
 
     def test_clear_cache_forces_refetch(self):
         with patch.object(iconify_mod, "_http_get", return_value=_SAMPLE_SVG) as mock:
@@ -176,7 +179,7 @@ class TestHttpGet:
             def read(self) -> bytes:
                 return _SAMPLE_SVG.encode("utf-8")
 
-            def __enter__(self) -> "_FakeResp":
+            def __enter__(self) -> _FakeResp:
                 return self
 
             def __exit__(self, *exc: object) -> None:

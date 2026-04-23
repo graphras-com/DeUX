@@ -20,7 +20,8 @@ from __future__ import annotations
 
 from .card import DsuiCard
 from .event_map import EventMap
-from .iconify import IconifyError, clear_cache as clear_iconify_cache, fetch_icon
+from .iconify import IconifyError, fetch_icon
+from .iconify import clear_cache as clear_iconify_cache
 from .key import DsuiKey
 from .loader import PackageError, load_all_packages, load_package
 from .schema import (

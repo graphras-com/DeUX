@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
-from PIL import Image
-
-from ..runtime.events import AsyncHandler, EventType, TouchEvent
 from ..ui.cards.base import Card
 from .event_map import EventMap
 from .svg_renderer import SvgRenderer
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from PIL import Image
+
+    from ..runtime.events import AsyncHandler, TouchEvent
     from .schema import PackageSpec
 
 logger = logging.getLogger(__name__)

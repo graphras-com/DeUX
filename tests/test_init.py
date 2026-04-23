@@ -56,7 +56,6 @@ class TestPublicAPI:
 
     def test_event_types_importable(self):
         from deckui import (
-            DeckEvent,
             EncoderPressEvent,
             EncoderTurnEvent,
             EventType,

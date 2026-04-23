@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 from PIL import Image
@@ -10,7 +10,6 @@ from PIL import Image
 from deckui.dsui import (
     DsuiCard,
     DsuiKey,
-    PackageError,
     PackageSpec,
     load_all_packages,
     load_package,
@@ -22,7 +21,6 @@ from deckui.dsui.schema import (
 )
 from deckui.ui.controls.key_slot import KeySlot
 from deckui.ui.screen import Screen
-
 
 # -- Helpers ---------------------------------------------------------------
 
