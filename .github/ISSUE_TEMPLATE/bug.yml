@@ -1,0 +1,82 @@
+name: Bug Report
+description: Report a reproducible defect in DeckUI.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for verified defects. If you have not reproduced the problem on current `main`, do that first.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: State the problem in one or two sentences.
+      placeholder: Calling `await deck.set_screen("main")` fails after reconnect on Stream Deck+.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: DeckUI Version
+      description: Package version, commit SHA, or branch name.
+      placeholder: 0.4.1 / 93d657a / docs/add-github-templates
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python Version
+      placeholder: 3.11.11
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include OS, device model, and any relevant system libraries.
+      placeholder: |
+        macOS 15.4
+        Stream Deck+
+        hidapi 0.14
+        cairo 1.18
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps To Reproduce
+      description: Provide exact steps or a minimal script.
+      placeholder: |
+        1. Connect a Stream Deck+
+        2. Start the sample app
+        3. Disconnect and reconnect the device
+        4. Observe the failure
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      placeholder: The screen should be restored after reconnect.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      placeholder: The reconnect handler runs, but rendering fails with an exception.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs Or Traceback
+      description: Paste the relevant output. Trim noise.
+      render: text
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Anything else that narrows the problem.
