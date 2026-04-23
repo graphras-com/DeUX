@@ -1,0 +1,53 @@
+name: Feature Request
+description: Propose a new capability or API change for DeckUI.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for concrete feature work. Explain the problem first, then the proposed change.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What limitation are you hitting today?
+      placeholder: There is no high-level way to update only one touchscreen card without rebuilding the whole screen.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: Describe the API or behavior you want.
+      placeholder: Add a `Deck.refresh_card(index)` API that re-renders a single touchscreen region.
+    validations:
+      required: true
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use Case
+      description: Show why this matters in a real application.
+      placeholder: A media UI needs to update elapsed time every second without repainting keys or other cards.
+    validations:
+      required: true
+  - type: textarea
+    id: api
+    attributes:
+      label: API Sketch
+      description: Optional. Show a proposed call pattern or `.dui` shape.
+      render: python
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What workarounds or alternate designs did you consider?
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: I expect this change to require tests.
+        - label: I expect this change to require documentation updates.
+        - label: I am willing to help validate the proposed API.
