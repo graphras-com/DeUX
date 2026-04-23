@@ -12,35 +12,76 @@ permissions:
   contents: read
 
 jobs:
+  detect-stack:
+    name: Detect stack
+    runs-on: ubuntu-latest
+    outputs:
+      has-python: ${{ steps.detect.outputs.has-python }}
+      has-docker: ${{ steps.detect.outputs.has-docker }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Detect components
+        id: detect
+        run: |
+          has_python=false
+          has_docker=false
+
+          if [ -f pyproject.toml ] || [ -f setup.py ] || [ -f requirements.txt ]; then
+            has_python=true
+          fi
+
+          if [ -f Dockerfile ]; then
+            has_docker=true
+          fi
+
+          echo "has-python=${has_python}" >> "$GITHUB_OUTPUT"
+          echo "has-docker=${has_docker}" >> "$GITHUB_OUTPUT"
+
   py-lint:
     name: Python Lint
+    if: needs.detect-stack.outputs.has-python == 'true'
+    needs: [detect-stack]
     uses: ./.github/workflows/python-lint.yml
     with:
-      python-version: "3.11"
+      python-version: ${{ vars.CI_PYTHON_VERSION || '3.11' }}
+      install-spec: ${{ vars.CI_PYTHON_INSTALL_SPEC || '.[test]' }}
 
   py-build:
     name: Python Build
+    if: needs.detect-stack.outputs.has-python == 'true'
+    needs: [detect-stack]
     uses: ./.github/workflows/python-ci.yml
     with:
-      python-version: "3.11"
+      python-version: ${{ vars.CI_PYTHON_VERSION || '3.11' }}
+      install-spec: ${{ vars.CI_PYTHON_INSTALL_SPEC || '.[test]' }}
 
   py-typecheck:
     name: Python Type Check
+    if: needs.detect-stack.outputs.has-python == 'true'
+    needs: [detect-stack]
     uses: ./.github/workflows/python-typecheck.yml
     with:
-      python-version: "3.11"
+      python-version: ${{ vars.CI_PYTHON_VERSION || '3.11' }}
+      install-spec: ${{ vars.CI_PYTHON_INSTALL_SPEC || '.[test]' }}
 
   py-test:
-    name: Test Suite
+    name: Python Test
+    if: needs.detect-stack.outputs.has-python == 'true'
+    needs: [detect-stack]
     uses: ./.github/workflows/python-tests.yml
     with:
-      python-versions: '["3.11","3.12","3.13"]'
-      coverage-target: "deckui"
-      coverage-threshold: 95
-      pytest-args: "tests/"
+      python-versions: ${{ vars.CI_PYTHON_TEST_VERSIONS || '["3.11","3.12","3.13"]' }}
+      install-spec: ${{ vars.CI_PYTHON_INSTALL_SPEC || '.[test]' }}
+      coverage-target: ${{ vars.CI_PYTHON_COVERAGE_TARGET || 'deckui' }}
+      coverage-threshold: ${{ fromJSON(vars.CI_PYTHON_COVERAGE_THRESHOLD || '95') }}
+      pytest-args: ${{ vars.CI_PYTHON_TEST_ARGS || 'tests/' }}
+      system-packages: ${{ vars.CI_PYTHON_SYSTEM_PACKAGES || 'libcairo2-dev libhidapi-dev' }}
 
   secrets-scan:
     name: Secrets
+    needs: [detect-stack]
     uses: ./.github/workflows/python-gitleaks.yml
     secrets:
       GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
@@ -48,7 +89,7 @@ jobs:
   quality-gate:
     name: Quality gate
     if: always()
-    needs: [py-lint, py-build, py-typecheck, py-test, secrets-scan]
+    needs: [detect-stack, py-lint, py-build, py-typecheck, py-test, secrets-scan]
     runs-on: ubuntu-latest
     steps:
       - name: Check required job results
@@ -69,7 +110,7 @@ jobs:
   release:
     name: Release
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    needs: [quality-gate]
+    needs: [detect-stack, quality-gate]
     uses: ./.github/workflows/python-release.yml
     permissions:
       contents: write
