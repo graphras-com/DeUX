@@ -1,6 +1,8 @@
 """deckui - A high-level, asyncio-native library for Elgato Stream Deck devices.
 
-Example::
+Examples
+--------
+::
 
     import asyncio
     from deckui import DeckManager

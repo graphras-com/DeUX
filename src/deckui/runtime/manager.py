@@ -29,7 +29,9 @@ class DeckManager:
     hot-plug detection, and reconnection.  Register ``on_connect`` and
     ``on_disconnect`` handlers, then start the manager.
 
-    Usage::
+    Examples
+    --------
+    ::
 
         manager = DeckManager()
 
@@ -50,12 +52,16 @@ class DeckManager:
         async with manager:
             await manager.wait_closed()
 
-    Args:
-        poll_interval: Seconds between device scans (default 2.0).
-        brightness: Default brightness for new Deck instances (0-100).
-        auto_reconnect: If ``True`` (default), automatically reconnect
-            devices that disconnect.  The ``on_connect`` handler is
-            called again on reconnection.
+    Parameters
+    ----------
+    poll_interval
+        Seconds between device scans (default 2.0).
+    brightness
+        Default brightness for new Deck instances (0-100).
+    auto_reconnect
+        If ``True`` (default), automatically reconnect
+        devices that disconnect.  The ``on_connect`` handler is
+        called again on reconnection.
     """
 
     def __init__(
@@ -129,20 +135,27 @@ class DeckManager:
     ) -> Callable[[AsyncHandler], AsyncHandler]:
         """Register a callback for when a matching device connects.
 
-        Use as a decorator::
+        The handler is also called on reconnection when
+        ``auto_reconnect`` is enabled.
+
+        Examples
+        --------
+        ::
 
             @manager.on_connect(deck_type="Stream Deck +")
             async def handle(deck: Deck):
                 ...
 
-        The handler is also called on reconnection when
-        ``auto_reconnect`` is enabled.
+        Parameters
+        ----------
+        serial
+            Only match this serial number.
+        deck_type
+            Only match this device type.
 
-        Args:
-            serial: Only match this serial number.
-            deck_type: Only match this device type.
-
-        Returns:
+        Returns
+        -------
+        Callable
             Decorator that registers the handler.
         """
         filters = {"serial": serial, "deck_type": deck_type}
@@ -157,7 +170,9 @@ class DeckManager:
     def on_disconnect(self) -> Callable[[AsyncHandler], AsyncHandler]:
         """Register a callback for when a device disconnects.
 
-        Use as a decorator::
+        Examples
+        --------
+        ::
 
             @manager.on_disconnect
             async def handle(info: DeviceInfo):

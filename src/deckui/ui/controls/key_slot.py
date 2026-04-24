@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 class KeySlot:
     """Represents a single physical key on the Stream Deck.
 
+    Examples
+    --------
     Use decorators to register event handlers::
 
         @key.on_press
@@ -35,7 +37,9 @@ class KeySlot:
     def on_press(self, handler: AsyncHandler) -> AsyncHandler:
         """Decorator to register a handler for key press events.
 
-        Usage::
+        Examples
+        --------
+        ::
 
             @key.on_press
             async def handle():
@@ -47,7 +51,9 @@ class KeySlot:
     def on_release(self, handler: AsyncHandler) -> AsyncHandler:
         """Decorator to register a handler for key release events.
 
-        Usage::
+        Examples
+        --------
+        ::
 
             @key.on_release
             async def handle():

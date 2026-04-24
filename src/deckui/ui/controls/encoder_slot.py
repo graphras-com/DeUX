@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 class EncoderSlot:
     """Represents a single physical rotary encoder on the Stream Deck+.
 
+    Examples
+    --------
     Use decorators to register event handlers::
 
         @encoder.on_turn
@@ -37,7 +39,9 @@ class EncoderSlot:
         The handler receives a single ``direction`` argument:
         positive = clockwise, negative = counter-clockwise.
 
-        Usage::
+        Examples
+        --------
+        ::
 
             @encoder.on_turn
             async def handle(direction: int):
@@ -49,7 +53,9 @@ class EncoderSlot:
     def on_press(self, handler: AsyncHandler) -> AsyncHandler:
         """Decorator to register a handler for encoder press events.
 
-        Usage::
+        Examples
+        --------
+        ::
 
             @encoder.on_press
             async def handle():
@@ -61,7 +67,9 @@ class EncoderSlot:
     def on_release(self, handler: AsyncHandler) -> AsyncHandler:
         """Decorator to register a handler for encoder release events.
 
-        Usage::
+        Examples
+        --------
+        ::
 
             @encoder.on_release
             async def handle():

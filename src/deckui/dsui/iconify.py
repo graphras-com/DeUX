@@ -33,8 +33,10 @@ class IconifyError(Exception):
 def _parse_name(name: str) -> tuple[str, str]:
     """Split a ``"prefix:icon"`` name into its parts.
 
-    Raises:
-        IconifyError: If *name* is empty or not in ``prefix:icon`` form.
+    Raises
+    ------
+    IconifyError
+        If *name* is empty or not in ``prefix:icon`` form.
     """
     if not isinstance(name, str) or not name.strip():
         raise IconifyError(f"Iconify name must be a non-empty string, got {name!r}")
@@ -71,16 +73,22 @@ def fetch_icon(name: str) -> str:
     failure) are also cached so we do not retry broken references on
     every render.
 
-    Args:
-        name: Icon identifier in ``"prefix:icon"`` form, e.g.
-            ``"line-md:home"``.
+    Parameters
+    ----------
+    name
+        Icon identifier in ``"prefix:icon"`` form, e.g.
+        ``"line-md:home"``.
 
-    Returns:
+    Returns
+    -------
+    str
         The raw SVG source string as served by the Iconify API.
 
-    Raises:
-        IconifyError: If the name is malformed, the icon does not
-            exist, or the network request fails.
+    Raises
+    ------
+    IconifyError
+        If the name is malformed, the icon does not
+        exist, or the network request fails.
     """
     prefix, icon = _parse_name(name)
     key = f"{prefix}:{icon}"

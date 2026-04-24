@@ -21,8 +21,10 @@ class RenderMetrics:
     info-screen dimensions) are derived from the device's
     :class:`~deckui.runtime.capabilities.DeviceCapabilities`.
 
-    Args:
-        caps: Device capabilities to derive metrics from.
+    Parameters
+    ----------
+    caps
+        Device capabilities to derive metrics from.
     """
 
     def __init__(self, caps: DeviceCapabilities) -> None:

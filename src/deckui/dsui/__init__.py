@@ -3,7 +3,9 @@
 Load SVG + YAML packages and use them as touchscreen cards or physical keys
 without writing any Python rendering code.
 
-Example::
+Examples
+--------
+::
 
     from deckui.dsui import DsuiCard, load_package
 

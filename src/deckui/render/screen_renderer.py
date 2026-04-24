@@ -16,15 +16,23 @@ def render_info_screen(
 ) -> bytes:
     """Render an info screen image.
 
-    Args:
-        image: Optional PIL Image to display. If ``None``, a blank
-            black screen is rendered.
-        width: Screen width in pixels.
-        height: Screen height in pixels.
-        background: Background colour.
-        image_format: Encoding format (``"JPEG"`` or ``"BMP"``).
+    Parameters
+    ----------
+    image
+        Optional PIL Image to display. If ``None``, a blank
+        black screen is rendered.
+    width
+        Screen width in pixels.
+    height
+        Screen height in pixels.
+    background
+        Background colour.
+    image_format
+        Encoding format (``"JPEG"`` or ``"BMP"``).
 
-    Returns:
+    Returns
+    -------
+    bytes
         Encoded image bytes.
     """
     canvas = Image.new("RGB", (width, height), background)

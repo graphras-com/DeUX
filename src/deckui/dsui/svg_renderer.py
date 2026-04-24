@@ -121,7 +121,9 @@ def _resolve_font_attrs(root: ET.Element, elem: ET.Element) -> tuple[str, float]
     and ``font-size`` attributes.  Falls back to sensible defaults if
     neither the element nor any ancestor declares them.
 
-    Returns:
+    Returns
+    -------
+    tuple[str, float]
         A ``(font_family, font_size)`` tuple.
     """
     family: str | None = None
@@ -160,9 +162,12 @@ def _load_font(family: str, size: int) -> ImageFont.FreeTypeFont | ImageFont.Ima
     Tries several name variations.  If all fail, logs a warning and
     returns Pillow's built-in default font.  Results are cached.
 
-    Args:
-        family: Font family name (e.g. ``"ArialMT"``).
-        size: Font size in pixels (integer for cache-key hashability).
+    Parameters
+    ----------
+    family
+        Font family name (e.g. ``"ArialMT"``).
+    size
+        Font size in pixels (integer for cache-key hashability).
     """
     candidates: list[str] = [family]
     for suffix in ("MT", "Bold", "Italic", "-Regular", "-Bold"):
@@ -209,15 +214,24 @@ def _wrap_text(
     than fit, the last visible line is truncated with an ellipsis
     character (if *overflow* is :attr:`~OverflowMode.ELLIPSIS`).
 
-    Args:
-        text: The text string to wrap.
-        max_width: Maximum line width in pixels.
-        font: A Pillow font object for measurement.
-        overflow: How to handle text that doesn't fit.
-        max_height: Optional vertical pixel budget.
-        line_height: Vertical spacing between lines in pixels.
+    Parameters
+    ----------
+    text
+        The text string to wrap.
+    max_width
+        Maximum line width in pixels.
+    font
+        A Pillow font object for measurement.
+    overflow
+        How to handle text that doesn't fit.
+    max_height
+        Optional vertical pixel budget.
+    line_height
+        Vertical spacing between lines in pixels.
 
-    Returns:
+    Returns
+    -------
+    list[str]
         A list of line strings, one per wrapped line.
     """
     if not text or not text.strip():
@@ -265,8 +279,10 @@ class SvgRenderer:
     values, inlines image assets, and rasterises to a PIL Image via
     CairoSVG.
 
-    Args:
-        spec: The validated package specification.
+    Parameters
+    ----------
+    spec
+        The validated package specification.
     """
 
     def __init__(self, spec: PackageSpec) -> None:
@@ -294,17 +310,24 @@ class SvgRenderer:
     def set(self, name: str, value: Any) -> bool:
         """Set a binding value.
 
-        Args:
-            name: Binding name as defined in the manifest.
-            value: The new value.  Type depends on the binding:
-                   text → ``str``, image → ``PIL.Image.Image`` or ``bytes``,
-                   visibility → ``bool``, color → ``str``.
+        Parameters
+        ----------
+        name
+            Binding name as defined in the manifest.
+        value
+            The new value.  Type depends on the binding:
+            text → ``str``, image → ``PIL.Image.Image`` or ``bytes``,
+            visibility → ``bool``, color → ``str``.
 
-        Returns:
+        Returns
+        -------
+        bool
             ``True`` if the value actually changed (triggers dirty flag).
 
-        Raises:
-            KeyError: If *name* is not a known binding.
+        Raises
+        ------
+        KeyError
+            If *name* is not a known binding.
         """
         if name not in self._spec.bindings:
             raise KeyError(
@@ -326,7 +349,9 @@ class SvgRenderer:
     def set_many(self, **kwargs: Any) -> bool:
         """Set multiple binding values at once.
 
-        Returns:
+        Returns
+        -------
+        bool
             ``True`` if any value changed.
         """
         changed = False
@@ -338,8 +363,10 @@ class SvgRenderer:
     def get(self, name: str) -> Any:
         """Get the current value of a binding.
 
-        Raises:
-            KeyError: If *name* is not a known binding.
+        Raises
+        ------
+        KeyError
+            If *name* is not a known binding.
         """
         if name not in self._spec.bindings:
             raise KeyError(
@@ -350,7 +377,9 @@ class SvgRenderer:
     def render(self) -> Image.Image:
         """Rasterise the SVG with current binding values to a PIL Image.
 
-        Returns:
+        Returns
+        -------
+        Image.Image
             An RGB :class:`~PIL.Image.Image` at the SVG's native dimensions.
         """
         root = copy.deepcopy(self._base_root)

@@ -29,7 +29,9 @@ class Screen:
     touchscreen, those features are unavailable and accessing them raises
     :class:`~deckui.runtime.deck.DeckError`.
 
-    Usage::
+    Examples
+    --------
+    ::
 
         main = deck.screen("main")
 
@@ -77,10 +79,14 @@ class Screen:
     def key(self, index: int) -> KeySlot:
         """Get or create a key slot by index.
 
-        Args:
-            index: Key index (0 to key_count-1).
+        Parameters
+        ----------
+        index
+            Key index (0 to key_count-1).
 
-        Returns:
+        Returns
+        -------
+        KeySlot
             The KeySlot instance for this key on this screen.
         """
         key_count = self._caps.key_count
@@ -96,9 +102,12 @@ class Screen:
     def set_key(self, index: int, key: KeySlot) -> None:
         """Replace the key slot at *index* with a custom key.
 
-        Args:
-            index: Key index.
-            key: The key slot to install.
+        Parameters
+        ----------
+        index
+            Key index.
+        key
+            The key slot to install.
         """
         key_count = self._caps.key_count
         if not 0 <= index < key_count:
@@ -113,14 +122,20 @@ class Screen:
     def encoder(self, index: int) -> EncoderSlot:
         """Get or create an encoder slot by index.
 
-        Args:
-            index: Encoder index (0 to dial_count-1).
+        Parameters
+        ----------
+        index
+            Encoder index (0 to dial_count-1).
 
-        Returns:
+        Returns
+        -------
+        EncoderSlot
             The EncoderSlot instance for this encoder on this screen.
 
-        Raises:
-            IndexError: If index is out of range or device has no encoders.
+        Raises
+        ------
+        IndexError
+            If index is out of range or device has no encoders.
         """
         dial_count = self._caps.dial_count
         if dial_count == 0:

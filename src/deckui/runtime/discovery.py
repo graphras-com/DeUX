@@ -22,13 +22,18 @@ async def list_devices(
     firmware information, then closes them.  Returns a list of
     :class:`DeviceInfo` snapshots.
 
-    Args:
-        deck_type: If set, only return devices matching this type
-            (e.g. ``"Stream Deck +"``).
-        visual_only: If ``True`` (default), exclude non-visual devices
-            such as the Stream Deck Pedal.
+    Parameters
+    ----------
+    deck_type
+        If set, only return devices matching this type
+        (e.g. ``"Stream Deck +"``).
+    visual_only
+        If ``True`` (default), exclude non-visual devices
+        such as the Stream Deck Pedal.
 
-    Returns:
+    Returns
+    -------
+    list[DeviceInfo]
         A list of :class:`DeviceInfo` for each discovered device.
     """
     loop = asyncio.get_running_loop()

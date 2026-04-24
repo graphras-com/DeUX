@@ -20,12 +20,17 @@ def render_key_image(
 ) -> bytes:
     """Render an image for a Stream Deck key.
 
-    Args:
-        icon: Optional icon image to render on the key.
-        background: Background colour name.
-        key_size: Key dimensions ``(width, height)``.  Defaults to
-            the Stream Deck+ size ``(120, 120)``.
-        image_format: Image encoding format (``"JPEG"`` or ``"BMP"``).
+    Parameters
+    ----------
+    icon
+        Optional icon image to render on the key.
+    background
+        Background colour name.
+    key_size
+        Key dimensions ``(width, height)``.  Defaults to
+        the Stream Deck+ size ``(120, 120)``.
+    image_format
+        Image encoding format (``"JPEG"`` or ``"BMP"``).
     """
     size = key_size or KEY_SIZE
     icon_px = min(size[0], size[1]) * ICON_SIZE // KEY_SIZE[0]

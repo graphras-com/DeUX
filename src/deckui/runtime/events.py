@@ -59,10 +59,14 @@ class TouchEvent:
     def compute_zone(self, metrics: RenderMetrics) -> int:
         """Compute which touch-strip zone this touch falls in.
 
-        Args:
-            metrics: The render metrics for the connected device.
+        Parameters
+        ----------
+        metrics
+            The render metrics for the connected device.
 
-        Returns:
+        Returns
+        -------
+        int
             Zone index (0 to panel_count-1).
         """
         if metrics.panel_count == 0:

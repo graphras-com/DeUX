@@ -43,10 +43,14 @@ class AsyncTransport:
     Conditionally registers dial and touchscreen callbacks only when
     the device supports those features.
 
-    Args:
-        device: An open Stream Deck device.
-        loop: The running asyncio event loop.
-        caps: Device capabilities (used to determine which callbacks to register).
+    Parameters
+    ----------
+    device
+        An open Stream Deck device.
+    loop
+        The running asyncio event loop.
+    caps
+        Device capabilities (used to determine which callbacks to register).
     """
 
     def __init__(

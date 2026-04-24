@@ -54,9 +54,12 @@ class Deck:
         brightness: int = 80,
     ) -> None:
         """
-        Args:
-            serial_number: The serial number of the target device.
-            brightness: Initial brightness (0-100).
+        Parameters
+        ----------
+        serial_number
+            The serial number of the target device.
+        brightness
+            Initial brightness (0-100).
         """
         self._serial_number = serial_number
         self._brightness = brightness
@@ -180,8 +183,10 @@ class Deck:
     def capabilities(self) -> DeviceCapabilities:
         """The device capabilities for the connected device.
 
-        Raises:
-            DeckError: If the device is not opened.
+        Raises
+        ------
+        DeckError
+            If the device is not opened.
         """
         if self._caps is None:
             raise DeckError("Device not opened")
@@ -191,8 +196,10 @@ class Deck:
     def metrics(self) -> RenderMetrics:
         """Rendering metrics for the connected device.
 
-        Raises:
-            DeckError: If the device is not opened.
+        Raises
+        ------
+        DeckError
+            If the device is not opened.
         """
         if self._metrics is None:
             raise DeckError("Device not opened")
@@ -222,7 +229,13 @@ class Deck:
         return self._brightness
 
     async def set_brightness(self, percent: int) -> None:
-        """Set screen brightness (0-100)."""
+        """Set screen brightness.
+
+        Parameters
+        ----------
+        percent
+            Brightness level (0-100).
+        """
         self._brightness = max(0, min(100, percent))
         if self._device:
             loop = asyncio.get_running_loop()
@@ -234,10 +247,14 @@ class Deck:
     def screen(self, name: str) -> Screen:
         """Get or create a screen by name.
 
-        Args:
-            name: Screen name.
+        Parameters
+        ----------
+        name
+            Screen name.
 
-        Returns:
+        Returns
+        -------
+        Screen
             The Screen instance.
         """
         from ..ui.screen import Screen
@@ -249,8 +266,10 @@ class Deck:
     async def set_screen(self, name: str) -> None:
         """Switch to a named screen, rendering all keys and cards.
 
-        Args:
-            name: Screen name (must already exist via ``deck.screen(name)``).
+        Parameters
+        ----------
+        name
+            Screen name (must already exist via ``deck.screen(name)``).
         """
         if name not in self._screens:
             raise DeckError(f"Screen '{name}' does not exist")

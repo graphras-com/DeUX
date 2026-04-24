@@ -33,17 +33,28 @@ def compose_touchstrip(
     All dimension parameters default to Stream Deck+ values when
     not specified.
 
-    Args:
-        cards: Card images (or ``None`` for blank slots).
-        background: Fill colour for the canvas (margins and gaps).
-        touchscreen_width: Total touchscreen width in pixels.
-        touchscreen_height: Total touchscreen height in pixels.
-        panel_count: Number of card zones.
-        panel_width: Width of each card panel in pixels.
-        margin_left: Left margin in pixels.
-        margin_top: Top margin in pixels.
-        panel_gap: Gap between panels in pixels.
-        image_format: Image encoding format (``"JPEG"`` or ``"BMP"``).
+    Parameters
+    ----------
+    cards
+        Card images (or ``None`` for blank slots).
+    background
+        Fill colour for the canvas (margins and gaps).
+    touchscreen_width
+        Total touchscreen width in pixels.
+    touchscreen_height
+        Total touchscreen height in pixels.
+    panel_count
+        Number of card zones.
+    panel_width
+        Width of each card panel in pixels.
+    margin_left
+        Left margin in pixels.
+    margin_top
+        Top margin in pixels.
+    panel_gap
+        Gap between panels in pixels.
+    image_format
+        Image encoding format (``"JPEG"`` or ``"BMP"``).
     """
     ts_w = touchscreen_width if touchscreen_width is not None else TOUCHSCREEN_WIDTH
     ts_h = touchscreen_height if touchscreen_height is not None else TOUCHSCREEN_HEIGHT

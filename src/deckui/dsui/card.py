@@ -28,7 +28,9 @@ class DsuiCard(Card):
     loads the package, lets you set binding values, and renders the SVG
     into a PIL Image for the Stream Deck touchscreen.
 
-    Usage::
+    Examples
+    --------
+    ::
 
         from deckui.dsui import load_package, DsuiCard
 
@@ -43,8 +45,10 @@ class DsuiCard(Card):
     The card index is assigned automatically when you install the card
     on a screen with :meth:`~deckui.ui.screen.Screen.set_card`.
 
-    Args:
-        spec: A validated :class:`~deckui.dsui.schema.PackageSpec`.
+    Parameters
+    ----------
+    spec
+        A validated :class:`~deckui.dsui.schema.PackageSpec`.
     """
 
     def __init__(self, spec: PackageSpec) -> None:
@@ -61,15 +65,22 @@ class DsuiCard(Card):
     def set(self, name: str, value: Any) -> DsuiCard:
         """Set a binding value.  Marks the card dirty if changed.
 
-        Args:
-            name: Binding name as defined in the manifest.
-            value: New value (type depends on binding kind).
+        Parameters
+        ----------
+        name
+            Binding name as defined in the manifest.
+        value
+            New value (type depends on binding kind).
 
-        Returns:
+        Returns
+        -------
+        DsuiCard
             self, for method chaining.
 
-        Raises:
-            KeyError: If *name* is not a known binding.
+        Raises
+        ------
+        KeyError
+            If *name* is not a known binding.
         """
         if self._renderer.set(name, value):
             self.mark_dirty()
@@ -78,7 +89,9 @@ class DsuiCard(Card):
     def set_many(self, **kwargs: Any) -> DsuiCard:
         """Set multiple binding values at once.
 
-        Returns:
+        Returns
+        -------
+        DsuiCard
             self, for method chaining.
         """
         if self._renderer.set_many(**kwargs):
@@ -88,8 +101,10 @@ class DsuiCard(Card):
     def get(self, name: str) -> Any:
         """Get the current value of a binding.
 
-        Raises:
-            KeyError: If *name* is not a known binding.
+        Raises
+        ------
+        KeyError
+            If *name* is not a known binding.
         """
         return self._renderer.get(name)
 
@@ -101,18 +116,28 @@ class DsuiCard(Card):
         Normalises *value* from ``[min_val, max_val]`` to ``[0.0, 1.0]``
         and delegates to :meth:`set`.
 
-        Args:
-            name: Binding name (must be a ``range`` or ``slider`` binding).
-            value: Value in domain units (e.g. 0–100 for a percentage).
-            min_val: Lower bound of the domain range.
-            max_val: Upper bound of the domain range.
+        Parameters
+        ----------
+        name
+            Binding name (must be a ``range`` or ``slider`` binding).
+        value
+            Value in domain units (e.g. 0–100 for a percentage).
+        min_val
+            Lower bound of the domain range.
+        max_val
+            Upper bound of the domain range.
 
-        Returns:
+        Returns
+        -------
+        DsuiCard
             self, for method chaining.
 
-        Raises:
-            KeyError: If *name* is not a known binding.
-            ValueError: If *min_val* equals *max_val*.
+        Raises
+        ------
+        KeyError
+            If *name* is not a known binding.
+        ValueError
+            If *min_val* equals *max_val*.
         """
         if min_val == max_val:
             raise ValueError("min_val and max_val must not be equal")
@@ -128,20 +153,30 @@ class DsuiCard(Card):
         Reads the current normalised value, denormalises it, adds *delta*,
         clamps, re-normalises, and calls :meth:`set`.
 
-        Args:
-            name: Binding name (must be a ``range`` or ``slider`` binding).
-            delta: Amount to add in domain units (negative to decrease).
-            min_val: Lower bound of the domain range.
-            max_val: Upper bound of the domain range.
+        Parameters
+        ----------
+        name
+            Binding name (must be a ``range`` or ``slider`` binding).
+        delta
+            Amount to add in domain units (negative to decrease).
+        min_val
+            Lower bound of the domain range.
+        max_val
+            Upper bound of the domain range.
 
-        Returns:
+        Returns
+        -------
+        float
             The new value in domain units (clamped to
             ``[min_val, max_val]``), so callers can use it for display
             without back-computing.
 
-        Raises:
-            KeyError: If *name* is not a known binding.
-            ValueError: If *min_val* equals *max_val*.
+        Raises
+        ------
+        KeyError
+            If *name* is not a known binding.
+        ValueError
+            If *min_val* equals *max_val*.
         """
         if min_val == max_val:
             raise ValueError("min_val and max_val must not be equal")
@@ -157,17 +192,26 @@ class DsuiCard(Card):
     ) -> float:
         """Get a range/slider binding denormalised to domain units.
 
-        Args:
-            name: Binding name.
-            min_val: Lower bound of the domain range.
-            max_val: Upper bound of the domain range.
+        Parameters
+        ----------
+        name
+            Binding name.
+        min_val
+            Lower bound of the domain range.
+        max_val
+            Upper bound of the domain range.
 
-        Returns:
+        Returns
+        -------
+        float
             The current value in domain units.
 
-        Raises:
-            KeyError: If *name* is not a known binding.
-            ValueError: If *min_val* equals *max_val*.
+        Raises
+        ------
+        KeyError
+            If *name* is not a known binding.
+        ValueError
+            If *min_val* equals *max_val*.
         """
         if min_val == max_val:
             raise ValueError("min_val and max_val must not be equal")
@@ -177,16 +221,22 @@ class DsuiCard(Card):
     def on(self, event_name: str) -> Callable[[AsyncHandler], AsyncHandler]:
         """Decorator to register a handler for a named semantic event.
 
-        Usage::
+        Examples
+        --------
+        ::
 
             @card.on("toggle_play_pause")
             async def handle():
                 ...
 
-        Args:
-            event_name: Semantic event name from the manifest.
+        Parameters
+        ----------
+        event_name
+            Semantic event name from the manifest.
 
-        Returns:
+        Returns
+        -------
+        Callable
             A decorator that registers the handler and returns it unchanged.
         """
 
@@ -199,16 +249,21 @@ class DsuiCard(Card):
     def bind_event(self, event_name: str, handler: AsyncHandler) -> None:
         """Imperatively register a handler for a named semantic event.
 
-        Args:
-            event_name: Semantic event name from the manifest.
-            handler: The async callable to invoke.
+        Parameters
+        ----------
+        event_name
+            Semantic event name from the manifest.
+        handler
+            The async callable to invoke.
         """
         self._events.on(event_name, handler)
 
     def render(self) -> Image.Image:
         """Render the SVG layout with current bindings to a PIL Image.
 
-        Returns:
+        Returns
+        -------
+        Image.Image
             A PANEL_WIDTH x PANEL_HEIGHT RGB :class:`~PIL.Image.Image`.
         """
         return self._renderer.render()
