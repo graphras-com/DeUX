@@ -71,6 +71,11 @@ test = [
     "types-PyYAML>=6.0",
 ]
 
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.25",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
