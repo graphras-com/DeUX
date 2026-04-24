@@ -128,7 +128,7 @@ MINIMAL_KEY_SVG = (
 )
 
 
-def _write_card_dsui_package(base_dir: Path) -> Path:
+def _write_card_dui_package(base_dir: Path) -> Path:
     """Create a valid TouchStripCard .dui package on disk."""
     pkg_dir = base_dir / "TestCard.dui"
     pkg_dir.mkdir(parents=True, exist_ok=True)
@@ -207,7 +207,7 @@ regions:
     return pkg_dir
 
 
-def _write_key_dsui_package(base_dir: Path) -> Path:
+def _write_key_dui_package(base_dir: Path) -> Path:
     """Create a valid Key .dui package on disk."""
     pkg_dir = base_dir / "TestKey.dui"
     pkg_dir.mkdir(parents=True, exist_ok=True)
@@ -244,38 +244,38 @@ events:
 
 
 @pytest.fixture
-def card_dsui_path(tmp_path):
+def card_dui_path(tmp_path):
     """Path to a valid TouchStripCard .dui package."""
-    return _write_card_dsui_package(tmp_path)
+    return _write_card_dui_package(tmp_path)
 
 
 @pytest.fixture
-def key_dsui_path(tmp_path):
+def key_dui_path(tmp_path):
     """Path to a valid Key .dui package."""
-    return _write_key_dsui_package(tmp_path)
+    return _write_key_dui_package(tmp_path)
 
 
 @pytest.fixture
-def card_package_spec(card_dsui_path):
+def card_package_spec(card_dui_path):
     """A loaded PackageSpec for a TouchStripCard."""
-    from deckui.dsui.loader import load_package
+    from deckui.dui.loader import load_package
 
-    return load_package(card_dsui_path)
+    return load_package(card_dui_path)
 
 
 @pytest.fixture
-def key_package_spec(key_dsui_path):
+def key_package_spec(key_dui_path):
     """A loaded PackageSpec for a Key."""
-    from deckui.dsui.loader import load_package
+    from deckui.dui.loader import load_package
 
-    return load_package(key_dsui_path)
+    return load_package(key_dui_path)
 
 
 @pytest.fixture
-def dsui_packages_dir(tmp_path):
+def dui_packages_dir(tmp_path):
     """A directory containing multiple .dui packages."""
-    _write_card_dsui_package(tmp_path)
-    _write_key_dsui_package(tmp_path)
+    _write_card_dui_package(tmp_path)
+    _write_key_dui_package(tmp_path)
     return tmp_path
 
 

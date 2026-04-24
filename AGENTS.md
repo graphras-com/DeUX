@@ -52,7 +52,7 @@ CI runs: lint, build, typecheck, tests (3.11/3.12/3.13), gitleaks. All must pass
 
 - `src/deckui/runtime/` — device discovery, capabilities, transport
 - `src/deckui/ui/` — Screen, KeySlot, EncoderSlot, TouchStrip controls
-- `src/deckui/dsui/` — `.dui` package format (SVG layout + YAML manifest, data bindings, event maps)
+- `src/deckui/dui/` — `.dui` package format (SVG layout + YAML manifest, data bindings, event maps)
 - `src/deckui/render/` — image rendering, metrics
 - `src/deckui/tools/` — CLI utilities
 
@@ -60,7 +60,7 @@ CI runs: lint, build, typecheck, tests (3.11/3.12/3.13), gitleaks. All must pass
 
 - `asyncio_mode = "auto"` — async tests need no `@pytest.mark.asyncio`
 - All hardware is mocked via `conftest.py` fixtures (`mock_streamdeck_device`, etc.) — no real device needed
-- `.dui` test packages are built in `tmp_path` by `conftest.py` helpers (`card_dsui_path`, `key_dsui_path`)
+- `.dui` test packages are built in `tmp_path` by `conftest.py` helpers (`card_dui_path`, `key_dui_path`)
 - Coverage threshold: **95%**
 
 ## Style

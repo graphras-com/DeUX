@@ -1,4 +1,4 @@
-"""Tests for deckui.dsui.event_map — event routing and gesture detection."""
+"""Tests for deckui.dui.event_map — event routing and gesture detection."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from deckui.dsui.event_map import EventMap
-from deckui.dsui.schema import EventMapping, Region
+from deckui.dui.event_map import EventMap
+from deckui.dui.schema import EventMapping, Region
 from deckui.runtime.events import EventType
 
 

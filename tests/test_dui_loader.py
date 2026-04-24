@@ -1,11 +1,11 @@
-"""Tests for deckui.dsui.loader — package loading and validation."""
+"""Tests for deckui.dui.loader — package loading and validation."""
 
 from __future__ import annotations
 
 import pytest
 
-from deckui.dsui.loader import PackageError, load_all_packages, load_package
-from deckui.dsui.schema import (
+from deckui.dui.loader import PackageError, load_all_packages, load_package
+from deckui.dui.schema import (
     ColorBinding,
     IconifyBinding,
     ImageBinding,
@@ -24,21 +24,21 @@ from deckui.dsui.schema import (
 class TestLoadPackageValid:
     """Test loading valid .dui packages."""
 
-    def test_loads_card_package(self, card_dsui_path):
-        spec = load_package(card_dsui_path)
+    def test_loads_card_package(self, card_dui_path):
+        spec = load_package(card_dui_path)
         assert spec.name == "TestCard"
         assert spec.type == PackageType.TOUCH_STRIP_CARD
         assert spec.version == 1
         assert "<svg" in spec.svg_source
 
-    def test_loads_key_package(self, key_dsui_path):
-        spec = load_package(key_dsui_path)
+    def test_loads_key_package(self, key_dui_path):
+        spec = load_package(key_dui_path)
         assert spec.name == "TestKey"
         assert spec.type == PackageType.KEY
         assert spec.version == 1
 
-    def test_text_binding_parsed(self, card_dsui_path):
-        spec = load_package(card_dsui_path)
+    def test_text_binding_parsed(self, card_dui_path):
+        spec = load_package(card_dui_path)
         b = spec.bindings["title"]
         assert isinstance(b, TextBinding)
         assert b.node == "title"
@@ -46,14 +46,14 @@ class TestLoadPackageValid:
         assert b.max_width == 90
         assert b.overflow == OverflowMode.ELLIPSIS
 
-    def test_text_binding_no_max_width(self, card_dsui_path):
-        spec = load_package(card_dsui_path)
+    def test_text_binding_no_max_width(self, card_dui_path):
+        spec = load_package(card_dui_path)
         b = spec.bindings["artist"]
         assert isinstance(b, TextBinding)
         assert b.max_width is None
 
-    def test_text_binding_wrap_default_false(self, card_dsui_path):
-        spec = load_package(card_dsui_path)
+    def test_text_binding_wrap_default_false(self, card_dui_path):
+        spec = load_package(card_dui_path)
         b = spec.bindings["title"]
         assert isinstance(b, TextBinding)
         assert b.wrap is False
@@ -99,29 +99,29 @@ class TestLoadPackageValid:
         assert b.max_height is None
         assert b.line_height is None
 
-    def test_image_binding_parsed(self, card_dsui_path):
-        spec = load_package(card_dsui_path)
+    def test_image_binding_parsed(self, card_dui_path):
+        spec = load_package(card_dui_path)
         b = spec.bindings["cover"]
         assert isinstance(b, ImageBinding)
         assert b.node == "cover"
         assert b.fit == ImageFit.COVER
         assert b.placeholder_node == "cover_placeholder"
 
-    def test_visibility_binding_parsed(self, card_dsui_path):
-        spec = load_package(card_dsui_path)
+    def test_visibility_binding_parsed(self, card_dui_path):
+        spec = load_package(card_dui_path)
         b = spec.bindings["overlay_visible"]
         assert isinstance(b, VisibilityBinding)
         assert b.default is True
 
-    def test_color_binding_parsed(self, card_dsui_path):
-        spec = load_package(card_dsui_path)
+    def test_color_binding_parsed(self, card_dui_path):
+        spec = load_package(card_dui_path)
         b = spec.bindings["accent_color"]
         assert isinstance(b, ColorBinding)
         assert b.attribute == "fill"
         assert b.default == "#ff0000"
 
-    def test_range_binding_parsed(self, card_dsui_path):
-        spec = load_package(card_dsui_path)
+    def test_range_binding_parsed(self, card_dui_path):
+        spec = load_package(card_dui_path)
         b = spec.bindings["progress"]
         assert isinstance(b, RangeBinding)
         assert b.node == "accent"
@@ -284,8 +284,8 @@ class TestLoadPackageValid:
         assert isinstance(b, SliderBinding)
         assert b.min_pos == b.max_pos == 50.0
 
-    def test_events_parsed(self, card_dsui_path):
-        spec = load_package(card_dsui_path)
+    def test_events_parsed(self, card_dui_path):
+        spec = load_package(card_dui_path)
         names = [e.name for e in spec.events]
         assert "toggle_play" in names
         assert "next" in names
@@ -293,13 +293,13 @@ class TestLoadPackageValid:
         assert "seek_forward" in names
         assert "seek_backward" in names
 
-    def test_event_direction(self, card_dsui_path):
-        spec = load_package(card_dsui_path)
+    def test_event_direction(self, card_dui_path):
+        spec = load_package(card_dui_path)
         next_evt = next(e for e in spec.events if e.name == "next")
         assert next_evt.direction == "right"
 
-    def test_event_press_turn_direction(self, card_dsui_path):
-        spec = load_package(card_dsui_path)
+    def test_event_press_turn_direction(self, card_dui_path):
+        spec = load_package(card_dui_path)
         seek_fwd = next(e for e in spec.events if e.name == "seek_forward")
         seek_bwd = next(e for e in spec.events if e.name == "seek_backward")
         assert seek_fwd.source == "encoder_press_turn"
@@ -307,13 +307,13 @@ class TestLoadPackageValid:
         assert seek_bwd.source == "encoder_press_turn"
         assert seek_bwd.direction == "left"
 
-    def test_event_duration(self, card_dsui_path):
-        spec = load_package(card_dsui_path)
+    def test_event_duration(self, card_dui_path):
+        spec = load_package(card_dui_path)
         toggle = next(e for e in spec.events if e.name == "toggle_play")
         assert toggle.max_duration_ms == 250
 
-    def test_regions_parsed(self, card_dsui_path):
-        spec = load_package(card_dsui_path)
+    def test_regions_parsed(self, card_dui_path):
+        spec = load_package(card_dui_path)
         assert len(spec.regions) == 1
         r = spec.regions[0]
         assert r.name == "card"
@@ -321,17 +321,17 @@ class TestLoadPackageValid:
         assert r.width == 197
         assert "tap" in r.events
 
-    def test_assets_loaded(self, card_dsui_path):
-        spec = load_package(card_dsui_path)
+    def test_assets_loaded(self, card_dui_path):
+        spec = load_package(card_dui_path)
         assert "test_icon.png" in spec.assets
         assert len(spec.assets["test_icon.png"]) > 0
 
-    def test_accepts_string_path(self, card_dsui_path):
-        spec = load_package(str(card_dsui_path))
+    def test_accepts_string_path(self, card_dui_path):
+        spec = load_package(str(card_dui_path))
         assert spec.name == "TestCard"
 
-    def test_key_events_parsed(self, key_dsui_path):
-        spec = load_package(key_dsui_path)
+    def test_key_events_parsed(self, key_dui_path):
+        spec = load_package(key_dui_path)
         names = [e.name for e in spec.events]
         assert "activate" in names
         assert "hold" in names
@@ -1244,8 +1244,8 @@ class TestLoadPackageInvalid:
 
 
 class TestLoadAllPackages:
-    def test_loads_multiple(self, dsui_packages_dir):
-        packages = load_all_packages(dsui_packages_dir)
+    def test_loads_multiple(self, dui_packages_dir):
+        packages = load_all_packages(dui_packages_dir)
         assert "TestCard" in packages
         assert "TestKey" in packages
         assert len(packages) == 2
@@ -1259,7 +1259,7 @@ class TestLoadAllPackages:
         packages = load_all_packages(tmp_path)
         assert packages == {}
 
-    def test_skips_non_dsui(self, tmp_path):
+    def test_skips_non_dui(self, tmp_path):
         (tmp_path / "regular_dir").mkdir()
         (tmp_path / "file.txt").write_text("hello")
         packages = load_all_packages(tmp_path)

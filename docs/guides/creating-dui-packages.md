@@ -375,7 +375,7 @@ events:
 ### Loading a Package
 
 ```python
-from deckui.dsui import load_package, load_all_packages
+from deckui.dui import load_package, load_all_packages
 
 # Load a single package
 spec = load_package("path/to/AudioPlayer.dui")
@@ -387,9 +387,9 @@ packages = load_all_packages("path/to/packages/")
 ### Touchscreen Card
 
 ```python
-from deckui.dsui import DsuiCard
+from deckui.dui import DuiCard
 
-card = DsuiCard(spec, screen)
+card = DuiCard(spec, screen)
 
 # Set binding values
 card.set("title", "Bohemian Rhapsody")
@@ -420,9 +420,9 @@ image = card.render()
 ### Physical Key
 
 ```python
-from deckui.dsui import DsuiKey
+from deckui.dui import DuiKey
 
-key = DsuiKey(spec, slot)
+key = DuiKey(spec, slot)
 
 key.set("label", "Deploy")
 key.set("indicator_color", "#00ff00")

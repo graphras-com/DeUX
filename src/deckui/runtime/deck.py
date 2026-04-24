@@ -25,7 +25,7 @@ from .events import (
 from .transport import AsyncTransport
 
 if TYPE_CHECKING:
-    from ..dsui.key import DsuiKey
+    from ..dui.key import DuiKey
     from ..ui.cards.base import Card
     from ..ui.controls.key_slot import KeySlot
     from ..ui.screen import Screen
@@ -305,8 +305,8 @@ class Deck:
 
         for key_index in range(caps.key_count):
             key_slot = screen.keys.get(key_index)
-            if key_slot and self._is_dsui_key(key_slot):
-                await self._render_dsui_key(key_slot)
+            if key_slot and self._is_dui_key(key_slot):
+                await self._render_dui_key(key_slot)
             else:
                 image_bytes = render_blank_key(
                     key_size=metrics.key_size if metrics else (120, 120),
@@ -321,29 +321,29 @@ class Deck:
                     )
 
     @staticmethod
-    def _is_dsui_key(key_slot: KeySlot) -> bool:
-        """Check whether a key slot is a DsuiKey."""
-        return getattr(key_slot, "has_dsui_content", False)
+    def _is_dui_key(key_slot: KeySlot) -> bool:
+        """Check whether a key slot is a DuiKey."""
+        return getattr(key_slot, "has_dui_content", False)
 
-    async def _render_dsui_key(self, key_slot: KeySlot) -> None:
-        """Render a DsuiKey and push to the device."""
+    async def _render_dui_key(self, key_slot: KeySlot) -> None:
+        """Render a DuiKey and push to the device."""
         if not self._device:
             return
 
 
-        dsui_key = cast("DsuiKey", key_slot)
-        image_bytes = dsui_key.render_image(
+        dui_key = cast("DuiKey", key_slot)
+        image_bytes = dui_key.render_image(
             key_size=self._caps.key_size if self._caps else (120, 120),
             image_format=self._caps.key_image_format if self._caps else "JPEG",
         )
-        dsui_key.set_rendered_image(image_bytes)
+        dui_key.set_rendered_image(image_bytes)
 
         loop = asyncio.get_running_loop()
         async with self._device_lock:
             await loop.run_in_executor(
                 self._executor,
                 self._device.set_key_image,
-                dsui_key.index,
+                dui_key.index,
                 image_bytes,
             )
 
@@ -430,8 +430,8 @@ class Deck:
             await self._drain_card_callbacks(card)
 
         for key_slot in screen.keys.values():
-            if key_slot.is_dirty and self._is_dsui_key(key_slot):
-                await self._render_dsui_key(key_slot)
+            if key_slot.is_dirty and self._is_dui_key(key_slot):
+                await self._render_dui_key(key_slot)
 
         if screen.touch_strip is not None and screen.touch_strip.any_dirty:
             await self._render_touchscreen()

@@ -342,8 +342,8 @@ def load_package(path: str | Path) -> PackageSpec:
     -------
     PackageSpec
         A frozen :class:`PackageSpec` ready to be used by
-        :class:`~deckui.dsui.card.DsuiCard` or
-        :class:`~deckui.dsui.key.DsuiKey`.
+        :class:`~deckui.dui.card.DuiCard` or
+        :class:`~deckui.dui.key.DuiKey`.
 
     Raises
     ------

@@ -23,7 +23,7 @@ nav:
   - API Reference:
       - Runtime: reference/runtime.md
       - UI: reference/ui.md
-      - DSUI: reference/dsui.md
+      - DUI: reference/dui.md
       - Render: reference/render.md
       - Tools: reference/tools.md
 

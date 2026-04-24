@@ -1,4 +1,4 @@
-"""DsuiCard: a touchscreen card backed by a .dui package."""
+"""DuiCard: a touchscreen card backed by a .dui package."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class DsuiCard(Card):
+class DuiCard(Card):
     """A touchscreen card whose layout and events are defined by a .dui package.
 
     Instead of writing a Python class with imperative Pillow rendering,
@@ -32,10 +32,10 @@ class DsuiCard(Card):
     --------
     ::
 
-        from deckui.dsui import load_package, DsuiCard
+        from deckui.dui import load_package, DuiCard
 
         spec = load_package("./AudioCard.dui")
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         card.set("artist", "Ash Walker")
 
         @card.on("toggle_play_pause")
@@ -48,7 +48,7 @@ class DsuiCard(Card):
     Parameters
     ----------
     spec
-        A validated :class:`~deckui.dsui.schema.PackageSpec`.
+        A validated :class:`~deckui.dui.schema.PackageSpec`.
     """
 
     def __init__(self, spec: PackageSpec) -> None:
@@ -62,7 +62,7 @@ class DsuiCard(Card):
         """The package specification backing this card."""
         return self._spec
 
-    def set(self, name: str, value: Any) -> DsuiCard:
+    def set(self, name: str, value: Any) -> DuiCard:
         """Set a binding value.  Marks the card dirty if changed.
 
         Parameters
@@ -74,7 +74,7 @@ class DsuiCard(Card):
 
         Returns
         -------
-        DsuiCard
+        DuiCard
             self, for method chaining.
 
         Raises
@@ -86,12 +86,12 @@ class DsuiCard(Card):
             self.mark_dirty()
         return self
 
-    def set_many(self, **kwargs: Any) -> DsuiCard:
+    def set_many(self, **kwargs: Any) -> DuiCard:
         """Set multiple binding values at once.
 
         Returns
         -------
-        DsuiCard
+        DuiCard
             self, for method chaining.
         """
         if self._renderer.set_many(**kwargs):
@@ -110,7 +110,7 @@ class DsuiCard(Card):
 
     def set_range(
         self, name: str, value: float, *, min_val: float = 0, max_val: float = 1
-    ) -> DsuiCard:
+    ) -> DuiCard:
         """Set a range/slider binding using a domain-scale value.
 
         Normalises *value* from ``[min_val, max_val]`` to ``[0.0, 1.0]``
@@ -129,7 +129,7 @@ class DsuiCard(Card):
 
         Returns
         -------
-        DsuiCard
+        DuiCard
             self, for method chaining.
 
         Raises

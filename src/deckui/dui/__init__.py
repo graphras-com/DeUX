@@ -7,10 +7,10 @@ Examples
 --------
 ::
 
-    from deckui.dsui import DsuiCard, load_package
+    from deckui.dui import DuiCard, load_package
 
     spec = load_package("./AudioCard.dui")
-    card = DsuiCard(spec)
+    card = DuiCard(spec)
     card.set("artist", "Ash Walker")
 
     @card.on("toggle_play_pause")
@@ -20,11 +20,11 @@ Examples
 
 from __future__ import annotations
 
-from .card import DsuiCard
+from .card import DuiCard
 from .event_map import EventMap
 from .iconify import IconifyError, fetch_icon
 from .iconify import clear_cache as clear_iconify_cache
-from .key import DsuiKey
+from .key import DuiKey
 from .loader import PackageError, load_all_packages, load_package
 from .schema import (
     Binding,
@@ -51,8 +51,8 @@ __all__ = [
     "Binding",
     "BindingType",
     "ColorBinding",
-    "DsuiCard",
-    "DsuiKey",
+    "DuiCard",
+    "DuiKey",
     "EventMap",
     "EventMapping",
     "IconifyBinding",
