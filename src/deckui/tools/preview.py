@@ -1,6 +1,8 @@
 """Preview SVG designs on a physical Stream Deck device.
 
-Run with::
+Examples
+--------
+::
 
     python -m deckui.tools.preview \\
         --card0 my_card.svg --key0 my_key.svg \\

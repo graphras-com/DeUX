@@ -14,10 +14,14 @@ class InfoScreen:
     It does not support touch events or interactive cards — it is a
     simple image buffer with dirty tracking.
 
-    Args:
-        width: Screen width in pixels.
-        height: Screen height in pixels.
-        image_format: Image format for encoding (``"JPEG"`` or ``"BMP"``).
+    Parameters
+    ----------
+    width
+        Screen width in pixels.
+    height
+        Screen height in pixels.
+    image_format
+        Image format for encoding (``"JPEG"`` or ``"BMP"``).
     """
 
     def __init__(
@@ -58,8 +62,10 @@ class InfoScreen:
 
         The image is resized to fit the screen dimensions if needed.
 
-        Args:
-            image: A PIL Image to display.
+        Parameters
+        ----------
+        image
+            A PIL Image to display.
         """
         if image.size != (self._width, self._height):
             image = image.resize((self._width, self._height), Image.Resampling.LANCZOS)
@@ -84,7 +90,9 @@ class InfoScreen:
     def render_bytes(self) -> bytes:
         """Encode the current image to bytes in the device's format.
 
-        Returns:
+        Returns
+        -------
+        bytes
             Encoded image bytes. If no image has been set, returns
             a blank black image.
         """

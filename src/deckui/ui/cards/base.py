@@ -26,7 +26,9 @@ class Card(ABC):
     :meth:`render`.  Override the ``handle_encoder_*`` and
     ``check_selection_timeout`` hooks to react to encoder events.
 
-    Usage::
+    Examples
+    --------
+    ::
 
         class MyCard(Card):
             def render(self) -> Image.Image:
@@ -61,7 +63,9 @@ class Card(ABC):
     def on_tap(self, handler: AsyncHandler) -> AsyncHandler:
         """Decorator to register a handler for short tap events in this zone.
 
-        Usage::
+        Examples
+        --------
+        ::
 
             @widget.on_tap
             async def handle():
@@ -73,7 +77,9 @@ class Card(ABC):
     def on_long_press(self, handler: AsyncHandler) -> AsyncHandler:
         """Decorator to register a handler for long press events in this zone.
 
-        Usage::
+        Examples
+        --------
+        ::
 
             @widget.on_long_press
             async def handle():
@@ -88,7 +94,9 @@ class Card(ABC):
         The handler receives ``x``, ``y``, ``x_out``, ``y_out`` arguments
         describing the start and end coordinates of the drag gesture.
 
-        Usage::
+        Examples
+        --------
+        ::
 
             @widget.on_drag
             async def handle(x: int, y: int, x_out: int, y_out: int):
@@ -103,7 +111,9 @@ class Card(ABC):
         The handler receives a single ``direction`` argument:
         positive = clockwise, negative = counter-clockwise.
 
-        Usage::
+        Examples
+        --------
+        ::
 
             @widget.on_encoder_turn
             async def handle(direction: int):
@@ -115,7 +125,9 @@ class Card(ABC):
     def on_encoder_press(self, handler: AsyncHandler) -> AsyncHandler:
         """Decorator to register a handler for encoder press events on this widget.
 
-        Usage::
+        Examples
+        --------
+        ::
 
             @widget.on_encoder_press
             async def handle():
@@ -127,7 +139,9 @@ class Card(ABC):
     def on_encoder_release(self, handler: AsyncHandler) -> AsyncHandler:
         """Decorator to register a handler for encoder release events on this widget.
 
-        Usage::
+        Examples
+        --------
+        ::
 
             @widget.on_encoder_release
             async def handle():
@@ -163,16 +177,21 @@ class Card(ABC):
         synchronously.  The queued callbacks are drained and awaited by
         :class:`~deckui.runtime.deck.Deck` during event dispatch or refresh.
 
-        Args:
-            handler: The async callback to invoke.
-            args: Positional arguments to pass to the callback.
+        Parameters
+        ----------
+        handler
+            The async callback to invoke.
+        args
+            Positional arguments to pass to the callback.
         """
         self._pending_callbacks.append((handler, args))
 
     def drain_pending_callbacks(self) -> list[tuple[AsyncHandler, tuple[object, ...]]]:
         """Remove and return all pending callbacks.
 
-        Returns:
+        Returns
+        -------
+        list[tuple[AsyncHandler, tuple[object, ...]]]
             A list of ``(handler, args)`` tuples.  The list is empty if
             no callbacks are pending.
         """
@@ -241,7 +260,9 @@ class Card(ABC):
         Return ``None`` to let the touchstrip background colour show
         through (used by :class:`~deckui.ui.cards.blank.BlankCard`).
 
-        Returns:
+        Returns
+        -------
+        Image.Image or None
             A PANEL_WIDTH x PANEL_HEIGHT RGB :class:`~PIL.Image.Image`,
             or ``None`` for a transparent/empty slot.
         """
@@ -274,7 +295,9 @@ class Card(ABC):
         Override to implement timeout logic (e.g. for slider cycling).
         The default always returns ``False``.
 
-        Returns:
+        Returns
+        -------
+        bool
             ``True`` if the widget state changed and needs re-rendering.
         """
         return False

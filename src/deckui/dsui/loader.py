@@ -333,16 +333,22 @@ def _parse_region(name: str, raw: dict[str, Any]) -> Region:
 def load_package(path: str | Path) -> PackageSpec:
     """Load a .dui package directory into a validated PackageSpec.
 
-    Args:
-        path: Path to the ``.dui`` directory.
+    Parameters
+    ----------
+    path
+        Path to the ``.dui`` directory.
 
-    Returns:
+    Returns
+    -------
+    PackageSpec
         A frozen :class:`PackageSpec` ready to be used by
         :class:`~deckui.dsui.card.DsuiCard` or
         :class:`~deckui.dsui.key.DsuiKey`.
 
-    Raises:
-        PackageError: If the package is invalid or incomplete.
+    Raises
+    ------
+    PackageError
+        If the package is invalid or incomplete.
     """
     pkg_dir = Path(path)
     if not pkg_dir.is_dir():
@@ -486,14 +492,20 @@ def load_package(path: str | Path) -> PackageSpec:
 def load_all_packages(directory: str | Path) -> dict[str, PackageSpec]:
     """Load all .dui packages from a directory.
 
-    Args:
-        directory: Path to scan for ``.dui`` subdirectories.
+    Parameters
+    ----------
+    directory
+        Path to scan for ``.dui`` subdirectories.
 
-    Returns:
+    Returns
+    -------
+    dict[str, PackageSpec]
         A dict mapping package names to their specs.
 
-    Raises:
-        PackageError: If any package fails validation.
+    Raises
+    ------
+    PackageError
+        If any package fails validation.
     """
     base = Path(directory)
     if not base.is_dir():

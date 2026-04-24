@@ -17,9 +17,12 @@ class TouchStrip:
     owns its own ``TouchStrip``, so different screens can use different
     background colours.
 
-    Args:
-        panel_count: Number of card zones.
-        background_color: Initial background colour.
+    Parameters
+    ----------
+    panel_count
+        Number of card zones.
+    background_color
+        Initial background colour.
     """
 
     def __init__(
@@ -59,13 +62,19 @@ class TouchStrip:
     def set_card(self, index: int, card: Card) -> None:
         """Replace the card at *index* with a custom card.
 
-        Args:
-            index: Card zone index.
-            card: A :class:`Card` subclass instance.
+        Parameters
+        ----------
+        index
+            Card zone index.
+        card
+            A :class:`Card` subclass instance.
 
-        Raises:
-            IndexError: If *index* is out of range.
-            TypeError: If *card* is not a :class:`Card` instance.
+        Raises
+        ------
+        IndexError
+            If *index* is out of range.
+        TypeError
+            If *card* is not a :class:`Card` instance.
         """
         if not 0 <= index < self._panel_count:
             raise IndexError(

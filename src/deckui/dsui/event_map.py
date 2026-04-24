@@ -31,9 +31,12 @@ class EventMap:
     - Direction filtering: ``encoder_turn`` with ``direction: left``
       only fires for counter-clockwise turns.
 
-    Args:
-        events: Event mappings from the package manifest.
-        regions: Touch regions from the package manifest.
+    Parameters
+    ----------
+    events
+        Event mappings from the package manifest.
+    regions
+        Touch regions from the package manifest.
     """
 
     def __init__(
@@ -58,12 +61,17 @@ class EventMap:
     def on(self, event_name: str, handler: AsyncHandler) -> None:
         """Register a handler for a named semantic event.
 
-        Args:
-            event_name: The semantic event name (as defined in the manifest).
-            handler: An async callable to invoke when the event fires.
+        Parameters
+        ----------
+        event_name
+            The semantic event name (as defined in the manifest).
+        handler
+            An async callable to invoke when the event fires.
 
-        Raises:
-            KeyError: If *event_name* is not defined in the manifest.
+        Raises
+        ------
+        KeyError
+            If *event_name* is not defined in the manifest.
         """
         known = {m.name for m in self._mappings}
         if event_name not in known:
@@ -80,8 +88,10 @@ class EventMap:
     def _start_hold_timer(self, source: str) -> None:
         """Start a hold timer for the first matching hold mapping.
 
-        Args:
-            source: ``"key_hold"`` or ``"encoder_hold"``.
+        Parameters
+        ----------
+        source
+            ``"key_hold"`` or ``"encoder_hold"``.
         """
         for mapping in self._by_source.get(source, []):
             handler = self._handlers.get(mapping.name)
@@ -111,10 +121,14 @@ class EventMap:
     def handle_encoder_turn(self, direction: int) -> AsyncHandler | None:
         """Match an encoder turn to a semantic event.
 
-        Args:
-            direction: Positive for clockwise, negative for counter-clockwise.
+        Parameters
+        ----------
+        direction
+            Positive for clockwise, negative for counter-clockwise.
 
-        Returns:
+        Returns
+        -------
+        AsyncHandler or None
             The handler to call, or ``None`` if no mapping matched.
         """
         if self._pressed:
@@ -136,7 +150,9 @@ class EventMap:
         Records the press timestamp for gesture detection and starts
         a hold timer if an ``encoder_hold`` mapping exists.
 
-        Returns:
+        Returns
+        -------
+        list[AsyncHandler]
             A list of handlers to call (may be empty).
         """
         self._press_time = time.monotonic()
@@ -161,7 +177,9 @@ class EventMap:
         fired for this press–release cycle (since the interaction was
         a hold, not a press-release gesture).
 
-        Returns:
+        Returns
+        -------
+        list[AsyncHandler]
             A list of handlers to call (may be empty).
         """
         self._pressed = False
@@ -199,7 +217,9 @@ class EventMap:
         Records the press timestamp and starts a hold timer if a
         ``key_hold`` mapping exists.
 
-        Returns:
+        Returns
+        -------
+        list[AsyncHandler]
             A list of handlers to call (may be empty).
         """
         self._press_time = time.monotonic()
@@ -224,7 +244,9 @@ class EventMap:
         fired for this press–release cycle (since the interaction was
         a hold, not a press-release gesture).
 
-        Returns:
+        Returns
+        -------
+        list[AsyncHandler]
             A list of handlers to call (may be empty).
         """
         self._pressed = False
@@ -259,12 +281,18 @@ class EventMap:
     ) -> AsyncHandler | None:
         """Match a touch event to a semantic event via regions.
 
-        Args:
-            event_type: The touch event type (TOUCH_SHORT or TOUCH_LONG).
-            x: Touch x coordinate (relative to card origin).
-            y: Touch y coordinate (relative to card origin).
+        Parameters
+        ----------
+        event_type
+            The touch event type (TOUCH_SHORT or TOUCH_LONG).
+        x
+            Touch x coordinate (relative to card origin).
+        y
+            Touch y coordinate (relative to card origin).
 
-        Returns:
+        Returns
+        -------
+        AsyncHandler or None
             The handler to call, or ``None`` if no region/mapping matched.
         """
         from ..runtime.events import EventType as ET_Enum

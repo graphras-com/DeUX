@@ -54,10 +54,14 @@ class DeviceCapabilities:
     def from_device(cls, device: StreamDeck) -> DeviceCapabilities:
         """Build capabilities from a connected (opened) device.
 
-        Args:
-            device: An open ``StreamDeck`` device object.
+        Parameters
+        ----------
+        device
+            An open ``StreamDeck`` device object.
 
-        Returns:
+        Returns
+        -------
+        DeviceCapabilities
             A frozen :class:`DeviceCapabilities` instance.
         """
         key_layout = device.key_layout()

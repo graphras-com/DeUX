@@ -30,7 +30,9 @@ class DsuiKey(KeySlot):
     replaces the icon + label rendering with SVG-based rendering from
     a ``.dui`` package.
 
-    Usage::
+    Examples
+    --------
+    ::
 
         from deckui.dsui import load_package, DsuiKey
 
@@ -45,8 +47,10 @@ class DsuiKey(KeySlot):
     The key index is assigned automatically when you install the key
     on a screen with :meth:`~deckui.ui.screen.Screen.set_key`.
 
-    Args:
-        spec: A validated :class:`~deckui.dsui.schema.PackageSpec`.
+    Parameters
+    ----------
+    spec
+        A validated :class:`~deckui.dsui.schema.PackageSpec`.
     """
 
     def __init__(self, spec: PackageSpec) -> None:
@@ -64,15 +68,22 @@ class DsuiKey(KeySlot):
     def set(self, name: str, value: Any) -> DsuiKey:
         """Set a binding value.  Marks the key dirty if changed.
 
-        Args:
-            name: Binding name as defined in the manifest.
-            value: New value (type depends on binding kind).
+        Parameters
+        ----------
+        name
+            Binding name as defined in the manifest.
+        value
+            New value (type depends on binding kind).
 
-        Returns:
+        Returns
+        -------
+        DsuiKey
             self, for method chaining.
 
-        Raises:
-            KeyError: If *name* is not a known binding.
+        Raises
+        ------
+        KeyError
+            If *name* is not a known binding.
         """
         if self._renderer.set(name, value):
             self._dirty = True
@@ -81,7 +92,9 @@ class DsuiKey(KeySlot):
     def set_many(self, **kwargs: Any) -> DsuiKey:
         """Set multiple binding values at once.
 
-        Returns:
+        Returns
+        -------
+        DsuiKey
             self, for method chaining.
         """
         if self._renderer.set_many(**kwargs):
@@ -91,8 +104,10 @@ class DsuiKey(KeySlot):
     def get(self, name: str) -> Any:
         """Get the current value of a binding.
 
-        Raises:
-            KeyError: If *name* is not a known binding.
+        Raises
+        ------
+        KeyError
+            If *name* is not a known binding.
         """
         return self._renderer.get(name)
 
@@ -104,18 +119,28 @@ class DsuiKey(KeySlot):
         Normalises *value* from ``[min_val, max_val]`` to ``[0.0, 1.0]``
         and delegates to :meth:`set`.
 
-        Args:
-            name: Binding name (must be a ``range`` or ``slider`` binding).
-            value: Value in domain units (e.g. 0–100 for a percentage).
-            min_val: Lower bound of the domain range.
-            max_val: Upper bound of the domain range.
+        Parameters
+        ----------
+        name
+            Binding name (must be a ``range`` or ``slider`` binding).
+        value
+            Value in domain units (e.g. 0–100 for a percentage).
+        min_val
+            Lower bound of the domain range.
+        max_val
+            Upper bound of the domain range.
 
-        Returns:
+        Returns
+        -------
+        DsuiKey
             self, for method chaining.
 
-        Raises:
-            KeyError: If *name* is not a known binding.
-            ValueError: If *min_val* equals *max_val*.
+        Raises
+        ------
+        KeyError
+            If *name* is not a known binding.
+        ValueError
+            If *min_val* equals *max_val*.
         """
         if min_val == max_val:
             raise ValueError("min_val and max_val must not be equal")
@@ -131,20 +156,30 @@ class DsuiKey(KeySlot):
         Reads the current normalised value, denormalises it, adds *delta*,
         clamps, re-normalises, and calls :meth:`set`.
 
-        Args:
-            name: Binding name (must be a ``range`` or ``slider`` binding).
-            delta: Amount to add in domain units (negative to decrease).
-            min_val: Lower bound of the domain range.
-            max_val: Upper bound of the domain range.
+        Parameters
+        ----------
+        name
+            Binding name (must be a ``range`` or ``slider`` binding).
+        delta
+            Amount to add in domain units (negative to decrease).
+        min_val
+            Lower bound of the domain range.
+        max_val
+            Upper bound of the domain range.
 
-        Returns:
+        Returns
+        -------
+        float
             The new value in domain units (clamped to
             ``[min_val, max_val]``), so callers can use it for display
             without back-computing.
 
-        Raises:
-            KeyError: If *name* is not a known binding.
-            ValueError: If *min_val* equals *max_val*.
+        Raises
+        ------
+        KeyError
+            If *name* is not a known binding.
+        ValueError
+            If *min_val* equals *max_val*.
         """
         if min_val == max_val:
             raise ValueError("min_val and max_val must not be equal")
@@ -160,17 +195,26 @@ class DsuiKey(KeySlot):
     ) -> float:
         """Get a range/slider binding denormalised to domain units.
 
-        Args:
-            name: Binding name.
-            min_val: Lower bound of the domain range.
-            max_val: Upper bound of the domain range.
+        Parameters
+        ----------
+        name
+            Binding name.
+        min_val
+            Lower bound of the domain range.
+        max_val
+            Upper bound of the domain range.
 
-        Returns:
+        Returns
+        -------
+        float
             The current value in domain units.
 
-        Raises:
-            KeyError: If *name* is not a known binding.
-            ValueError: If *min_val* equals *max_val*.
+        Raises
+        ------
+        KeyError
+            If *name* is not a known binding.
+        ValueError
+            If *min_val* equals *max_val*.
         """
         if min_val == max_val:
             raise ValueError("min_val and max_val must not be equal")
@@ -180,16 +224,22 @@ class DsuiKey(KeySlot):
     def on_event(self, event_name: str) -> Callable[[AsyncHandler], AsyncHandler]:
         """Decorator to register a handler for a named semantic event.
 
-        Usage::
+        Examples
+        --------
+        ::
 
             @key.on_event("activate")
             async def handle():
                 ...
 
-        Args:
-            event_name: Semantic event name from the manifest.
+        Parameters
+        ----------
+        event_name
+            Semantic event name from the manifest.
 
-        Returns:
+        Returns
+        -------
+        Callable
             A decorator that registers the handler and returns it unchanged.
         """
 
@@ -202,9 +252,12 @@ class DsuiKey(KeySlot):
     def bind_event(self, event_name: str, handler: AsyncHandler) -> None:
         """Imperatively register a handler for a named semantic event.
 
-        Args:
-            event_name: Semantic event name from the manifest.
-            handler: The async callable to invoke.
+        Parameters
+        ----------
+        event_name
+            Semantic event name from the manifest.
+        handler
+            The async callable to invoke.
         """
         self._events.on(event_name, handler)
 
@@ -218,12 +271,17 @@ class DsuiKey(KeySlot):
         The SVG is rasterised and scaled to the device's key size,
         then encoded in the device's image format.
 
-        Args:
-            key_size: Target key dimensions ``(width, height)``.
-                Defaults to ``KEY_SIZE`` (120x120 for Stream Deck+).
-            image_format: Image encoding format (``"JPEG"`` or ``"BMP"``).
+        Parameters
+        ----------
+        key_size
+            Target key dimensions ``(width, height)``.
+            Defaults to ``KEY_SIZE`` (120x120 for Stream Deck+).
+        image_format
+            Image encoding format (``"JPEG"`` or ``"BMP"``).
 
-        Returns:
+        Returns
+        -------
+        bytes
             Encoded image bytes.
         """
         size = key_size or KEY_SIZE
