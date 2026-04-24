@@ -1,4 +1,4 @@
-"""Tests for deckui.dsui.card — DsuiCard class."""
+"""Tests for deckui.dui.card — DuiCard class."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock
 import pytest
 from PIL import Image
 
-from deckui.dsui.card import DsuiCard
-from deckui.dsui.schema import (
+from deckui.dui.card import DuiCard
+from deckui.dui.schema import (
     EventMapping,
     PackageSpec,
     PackageType,
@@ -46,28 +46,28 @@ def _make_card_spec(
     )
 
 
-class TestDsuiCardIsCard:
+class TestDuiCardIsCard:
     def test_is_card_subclass(self, card_package_spec):
-        card = DsuiCard(card_package_spec)
+        card = DuiCard(card_package_spec)
         assert isinstance(card, Card)
 
     def test_has_index_after_set_card(self, card_package_spec):
-        card = DsuiCard(card_package_spec)
+        card = DuiCard(card_package_spec)
         screen = Screen("test")
         screen.set_card(2, card)
         assert card.index == 2
 
     def test_has_spec(self, card_package_spec):
-        card = DsuiCard(card_package_spec)
+        card = DuiCard(card_package_spec)
         assert card.spec is card_package_spec
 
 
-class TestDsuiCardDataBinding:
+class TestDuiCardDataBinding:
     def test_set_marks_dirty(self):
         spec = _make_card_spec(
             bindings={"title": TextBinding(node="title", default="")}
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         card.mark_clean()
         assert card.is_dirty is False
 
@@ -78,7 +78,7 @@ class TestDsuiCardDataBinding:
         spec = _make_card_spec(
             bindings={"title": TextBinding(node="title", default="Same")}
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         card.mark_clean()
         card.set("title", "Same")
         assert card.is_dirty is False
@@ -87,7 +87,7 @@ class TestDsuiCardDataBinding:
         spec = _make_card_spec(
             bindings={"title": TextBinding(node="title", default="")}
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         result = card.set("title", "Test")
         assert result is card
 
@@ -95,7 +95,7 @@ class TestDsuiCardDataBinding:
         spec = _make_card_spec(
             bindings={"title": TextBinding(node="title", default="")}
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         card.mark_clean()
         result = card.set_many(title="New")
         assert result is card
@@ -105,7 +105,7 @@ class TestDsuiCardDataBinding:
         spec = _make_card_spec(
             bindings={"title": TextBinding(node="title", default="Same")}
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         card.mark_clean()
         card.set_many(title="Same")
         assert card.is_dirty is False
@@ -114,20 +114,20 @@ class TestDsuiCardDataBinding:
         spec = _make_card_spec(
             bindings={"title": TextBinding(node="title", default="Init")}
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         assert card.get("title") == "Init"
         card.set("title", "Changed")
         assert card.get("title") == "Changed"
 
     def test_set_unknown_raises(self):
         spec = _make_card_spec()
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         with pytest.raises(KeyError):
             card.set("nonexistent", "val")
 
     def test_get_unknown_raises(self):
         spec = _make_card_spec()
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         with pytest.raises(KeyError):
             card.get("nonexistent")
 
@@ -135,7 +135,7 @@ class TestDsuiCardDataBinding:
         spec = _make_card_spec(
             bindings={"level": RangeBinding(node="bar", default=0.0)}
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         card.mark_clean()
         card.set("level", 0.5)
         assert card.is_dirty is True
@@ -144,7 +144,7 @@ class TestDsuiCardDataBinding:
         spec = _make_card_spec(
             bindings={"level": RangeBinding(node="bar", default=0.5)}
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         card.mark_clean()
         card.set("level", 0.5)
         assert card.is_dirty is False
@@ -153,20 +153,20 @@ class TestDsuiCardDataBinding:
         spec = _make_card_spec(
             bindings={"level": RangeBinding(node="bar", default=0.3)}
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         assert card.get("level") == 0.3
         card.set("level", 0.8)
         assert card.get("level") == 0.8
 
 
-class TestDsuiCardRangeHelpers:
+class TestDuiCardRangeHelpers:
     """Tests for set_range, adjust_range, and get_range helpers."""
 
-    def _make_range_card(self, default: float = 0.0) -> DsuiCard:
+    def _make_range_card(self, default: float = 0.0) -> DuiCard:
         spec = _make_card_spec(
             bindings={"level": RangeBinding(node="bar", default=default)}
         )
-        return DsuiCard(spec)
+        return DuiCard(spec)
 
 
     def test_set_range_normalises(self):
@@ -268,7 +268,7 @@ class TestDsuiCardRangeHelpers:
             card.get_range("nonexistent", min_val=0, max_val=100)
 
 
-class TestDsuiCardToggleBinding:
+class TestDuiCardToggleBinding:
     _TOGGLE_CARD_SVG = (
         '<svg id="TC" xmlns="http://www.w3.org/2000/svg" width="197" height="98">'
         '<rect id="bg" width="197" height="98" fill="#1c1c1c"/>'
@@ -292,28 +292,28 @@ class TestDsuiCardToggleBinding:
 
     def test_set_toggle_marks_dirty(self):
         spec = self._make_toggle_spec()
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         card.mark_clean()
         card.set("lights", True)
         assert card.is_dirty is True
 
     def test_set_toggle_same_value_not_dirty(self):
         spec = self._make_toggle_spec()
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         card.mark_clean()
         card.set("lights", False)
         assert card.is_dirty is False
 
     def test_get_toggle_value(self):
         spec = self._make_toggle_spec()
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         assert card.get("lights") is False
         card.set("lights", True)
         assert card.get("lights") is True
 
     def test_toggle_renders_differently(self):
         spec = self._make_toggle_spec()
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         img_off = card.render()
 
         card.set("lights", True)
@@ -322,12 +322,12 @@ class TestDsuiCardToggleBinding:
         assert img_off.tobytes() != img_on.tobytes()
 
 
-class TestDsuiCardRender:
+class TestDuiCardRender:
     def test_render_returns_image(self):
         spec = _make_card_spec(
             bindings={"title": TextBinding(node="title", default="Hello")}
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         img = card.render()
         assert isinstance(img, Image.Image)
         assert img.mode == "RGB"
@@ -337,26 +337,26 @@ class TestDsuiCardRender:
         spec = _make_card_spec(
             bindings={"title": TextBinding(node="title", default="Hello")}
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         img1 = card.render()
         card.set("title", "World")
         img2 = card.render()
         assert img1.tobytes() != img2.tobytes()
 
 
-class TestDsuiCardPrepareAssets:
+class TestDuiCardPrepareAssets:
     async def test_prepare_assets_is_noop(self):
         spec = _make_card_spec()
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         await card.prepare_assets()
 
 
-class TestDsuiCardEvents:
+class TestDuiCardEvents:
     def test_on_decorator(self):
         spec = _make_card_spec(
             events=(EventMapping(name="play", source="encoder_press"),),
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
 
         @card.on("play")
         async def handler():
@@ -368,7 +368,7 @@ class TestDsuiCardEvents:
         spec = _make_card_spec(
             events=(EventMapping(name="play", source="encoder_press"),),
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         handler = AsyncMock()
         card.bind_event("play", handler)
         card.handle_encoder_press()
@@ -382,7 +382,7 @@ class TestDsuiCardEvents:
                 EventMapping(name="next", source="encoder_turn", direction="right"),
             ),
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         handler = AsyncMock()
         card.bind_event("next", handler)
 
@@ -396,7 +396,7 @@ class TestDsuiCardEvents:
                 EventMapping(name="next", source="encoder_turn", direction="right"),
             ),
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         handler = AsyncMock()
         card.bind_event("next", handler)
 
@@ -408,7 +408,7 @@ class TestDsuiCardEvents:
         spec = _make_card_spec(
             events=(EventMapping(name="press", source="encoder_press"),),
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         handler = AsyncMock()
         card.bind_event("press", handler)
 
@@ -420,7 +420,7 @@ class TestDsuiCardEvents:
         spec = _make_card_spec(
             events=(EventMapping(name="release", source="encoder_release"),),
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         handler = AsyncMock()
         card.bind_event("release", handler)
 
@@ -436,7 +436,7 @@ class TestDsuiCardEvents:
                 Region(name="card", x=0, y=0, width=197, height=98, events=("tap",)),
             ),
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         handler = AsyncMock()
         card.bind_event("card_tap", handler)
 
@@ -446,7 +446,7 @@ class TestDsuiCardEvents:
 
     async def test_dispatch_touch_falls_back_to_base(self):
         spec = _make_card_spec()
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         base_handler = AsyncMock()
         card.on_tap(base_handler)
 
@@ -461,7 +461,7 @@ class TestDsuiCardEvents:
                 EventMapping(name="next", source="encoder_turn", direction="right"),
             ),
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         handler = AsyncMock()
         card.bind_event("next", handler)
 
@@ -475,7 +475,7 @@ class TestDsuiCardEvents:
         spec = _make_card_spec(
             events=(EventMapping(name="press", source="encoder_press"),),
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         handler = AsyncMock()
         card.bind_event("press", handler)
 
@@ -487,7 +487,7 @@ class TestDsuiCardEvents:
         spec = _make_card_spec(
             events=(EventMapping(name="release", source="encoder_release"),),
         )
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         handler = AsyncMock()
         card.bind_event("release", handler)
 
@@ -498,15 +498,15 @@ class TestDsuiCardEvents:
         assert len(callbacks) == 1
 
 
-class TestDsuiCardDirtyTracking:
+class TestDuiCardDirtyTracking:
     def test_starts_dirty(self):
         spec = _make_card_spec()
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         assert card.is_dirty is True
 
     def test_mark_clean_and_dirty(self):
         spec = _make_card_spec()
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         card.mark_clean()
         assert card.is_dirty is False
         card.mark_dirty()
@@ -514,7 +514,7 @@ class TestDsuiCardDirtyTracking:
 
     def test_set_rendered_clears_dirty(self):
         spec = _make_card_spec()
-        card = DsuiCard(spec)
+        card = DuiCard(spec)
         img = Image.new("RGB", (197, 98))
         card.set_rendered(img)
         assert card.is_dirty is False

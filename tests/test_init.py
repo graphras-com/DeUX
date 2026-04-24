@@ -18,8 +18,8 @@ class TestPublicAPI:
             "DeckManager",
             "DeviceCapabilities",
             "DeviceInfo",
-            "DsuiCard",
-            "DsuiKey",
+            "DuiCard",
+            "DuiKey",
             "EncoderPressEvent",
             "EncoderSlot",
             "EncoderTurnEvent",
@@ -85,18 +85,18 @@ class TestPublicAPI:
 
         assert DeviceInfo is not None
 
-    def test_dsui_importable(self):
+    def test_dui_importable(self):
         from deckui import (
-            DsuiCard,
-            DsuiKey,
+            DuiCard,
+            DuiKey,
             PackageError,
             PackageSpec,
             load_all_packages,
             load_package,
         )
 
-        assert DsuiCard is not None
-        assert DsuiKey is not None
+        assert DuiCard is not None
+        assert DuiKey is not None
         assert PackageError is not None
         assert PackageSpec is not None
         assert load_all_packages is not None

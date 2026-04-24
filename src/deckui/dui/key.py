@@ -1,4 +1,4 @@
-"""DsuiKey: a physical key backed by a .dui package."""
+"""DuiKey: a physical key backed by a .dui package."""
 
 from __future__ import annotations
 
@@ -22,10 +22,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class DsuiKey(KeySlot):
+class DuiKey(KeySlot):
     """A physical key whose layout and events are defined by a .dui package.
 
-    ``DsuiKey`` extends :class:`~deckui.ui.controls.key_slot.KeySlot`
+    ``DuiKey`` extends :class:`~deckui.ui.controls.key_slot.KeySlot`
     so that it is accepted wherever a ``KeySlot`` is expected.  It
     replaces the icon + label rendering with SVG-based rendering from
     a ``.dui`` package.
@@ -34,10 +34,10 @@ class DsuiKey(KeySlot):
     --------
     ::
 
-        from deckui.dsui import load_package, DsuiKey
+        from deckui.dui import load_package, DuiKey
 
         spec = load_package("./PowerKey.dui")
-        key = DsuiKey(spec)
+        key = DuiKey(spec)
         key.set("label", "Shutdown")
 
         @key.on_event("activate")
@@ -50,7 +50,7 @@ class DsuiKey(KeySlot):
     Parameters
     ----------
     spec
-        A validated :class:`~deckui.dsui.schema.PackageSpec`.
+        A validated :class:`~deckui.dui.schema.PackageSpec`.
     """
 
     def __init__(self, spec: PackageSpec) -> None:
@@ -65,7 +65,7 @@ class DsuiKey(KeySlot):
         """The package specification backing this key."""
         return self._spec
 
-    def set(self, name: str, value: Any) -> DsuiKey:
+    def set(self, name: str, value: Any) -> DuiKey:
         """Set a binding value.  Marks the key dirty if changed.
 
         Parameters
@@ -77,7 +77,7 @@ class DsuiKey(KeySlot):
 
         Returns
         -------
-        DsuiKey
+        DuiKey
             self, for method chaining.
 
         Raises
@@ -89,12 +89,12 @@ class DsuiKey(KeySlot):
             self._dirty = True
         return self
 
-    def set_many(self, **kwargs: Any) -> DsuiKey:
+    def set_many(self, **kwargs: Any) -> DuiKey:
         """Set multiple binding values at once.
 
         Returns
         -------
-        DsuiKey
+        DuiKey
             self, for method chaining.
         """
         if self._renderer.set_many(**kwargs):
@@ -113,7 +113,7 @@ class DsuiKey(KeySlot):
 
     def set_range(
         self, name: str, value: float, *, min_val: float = 0, max_val: float = 1
-    ) -> DsuiKey:
+    ) -> DuiKey:
         """Set a range/slider binding using a domain-scale value.
 
         Normalises *value* from ``[min_val, max_val]`` to ``[0.0, 1.0]``
@@ -132,7 +132,7 @@ class DsuiKey(KeySlot):
 
         Returns
         -------
-        DsuiKey
+        DuiKey
             self, for method chaining.
 
         Raises
@@ -293,7 +293,7 @@ class DsuiKey(KeySlot):
         return _encode_image(img, image_format)
 
     @property
-    def has_dsui_content(self) -> bool:
+    def has_dui_content(self) -> bool:
         """Always ``True`` — this key is backed by a .dui package."""
         return True
 

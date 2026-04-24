@@ -37,6 +37,6 @@ pip install deckui
 
 - **[Runtime](reference/runtime.md)** — Device discovery, capabilities, transport, and event handling
 - **[UI](reference/ui.md)** — Screen, KeySlot, EncoderSlot, TouchStrip controls
-- **[DSUI](reference/dsui.md)** — `.dui` package format (SVG layout + YAML manifest)
+- **[DUI](reference/dui.md)** — `.dui` package format (SVG layout + YAML manifest)
 - **[Render](reference/render.md)** — Image rendering and metrics
 - **[Tools](reference/tools.md)** — CLI utilities

@@ -28,9 +28,9 @@ Examples
 
 from __future__ import annotations
 
-from .dsui import (
-    DsuiCard,
-    DsuiKey,
+from .dui import (
+    DuiCard,
+    DuiKey,
     PackageError,
     PackageSpec,
     load_all_packages,
@@ -68,8 +68,8 @@ __all__ = [
     "DeckManager",
     "DeviceCapabilities",
     "DeviceInfo",
-    "DsuiCard",
-    "DsuiKey",
+    "DuiCard",
+    "DuiKey",
     "EncoderPressEvent",
     "EncoderSlot",
     "EncoderTurnEvent",

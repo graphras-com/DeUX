@@ -1,10 +1,10 @@
-"""Tests for deckui.dsui.schema — data model classes."""
+"""Tests for deckui.dui.schema — data model classes."""
 
 from __future__ import annotations
 
 import pytest
 
-from deckui.dsui.schema import (
+from deckui.dui.schema import (
     HOLD_SOURCES,
     VALID_DIRECTIONS,
     VALID_REGION_EVENTS,

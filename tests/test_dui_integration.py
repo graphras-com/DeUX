@@ -1,4 +1,4 @@
-"""Tests for deckui.dsui integration — Screen.set_key, Deck rendering, public API."""
+"""Tests for deckui.dui integration — Screen.set_key, Deck rendering, public API."""
 
 from __future__ import annotations
 
@@ -7,14 +7,14 @@ from unittest.mock import AsyncMock
 import pytest
 from PIL import Image
 
-from deckui.dsui import (
-    DsuiCard,
-    DsuiKey,
+from deckui.dui import (
+    DuiCard,
+    DuiKey,
     PackageSpec,
     load_all_packages,
     load_package,
 )
-from deckui.dsui.schema import (
+from deckui.dui.schema import (
     EventMapping,
     PackageType,
     TextBinding,
@@ -59,15 +59,15 @@ def _card_spec() -> PackageSpec:
 
 
 class TestScreenSetKey:
-    def test_set_key_installs_dsui_key(self):
+    def test_set_key_installs_dui_key(self):
         screen = Screen("test")
-        key = DsuiKey(_key_spec())
+        key = DuiKey(_key_spec())
         screen.set_key(0, key)
         assert screen.keys[0] is key
 
     def test_set_key_validates_index(self):
         screen = Screen("test")
-        key = DsuiKey(_key_spec())
+        key = DuiKey(_key_spec())
         with pytest.raises(IndexError):
             screen.set_key(8, key)
         with pytest.raises(IndexError):
@@ -81,7 +81,7 @@ class TestScreenSetKey:
     def test_set_key_replaces_existing(self):
         screen = Screen("test")
         old = screen.key(0)
-        new = DsuiKey(_key_spec())
+        new = DuiKey(_key_spec())
         screen.set_key(0, new)
         assert screen.keys[0] is new
         assert screen.keys[0] is not old
@@ -94,41 +94,41 @@ class TestScreenSetKey:
 
 
 class TestScreenSetCard:
-    def test_set_card_with_dsui_card(self):
+    def test_set_card_with_dui_card(self):
         screen = Screen("test")
-        card = DsuiCard(_card_spec())
+        card = DuiCard(_card_spec())
         screen.set_card(0, card)
         assert screen.card(0) is card
 
 
-class TestDeckDsuiKeyRendering:
-    """Test that Deck._is_dsui_key correctly identifies DsuiKeys."""
+class TestDeckDuiKeyRendering:
+    """Test that Deck._is_dui_key correctly identifies DuiKeys."""
 
-    def test_is_dsui_key_true(self):
+    def test_is_dui_key_true(self):
         from deckui.runtime.deck import Deck
 
-        key = DsuiKey(_key_spec())
-        assert Deck._is_dsui_key(key) is True
+        key = DuiKey(_key_spec())
+        assert Deck._is_dui_key(key) is True
 
-    def test_is_dsui_key_false_for_regular(self):
+    def test_is_dui_key_false_for_regular(self):
         from deckui.runtime.deck import Deck
 
         key = KeySlot(0)
-        assert Deck._is_dsui_key(key) is False
+        assert Deck._is_dui_key(key) is False
 
 
 class TestPublicApiImports:
-    """Verify that all dsui types are importable from the top-level package."""
+    """Verify that all dui types are importable from the top-level package."""
 
-    def test_dsui_card_importable(self):
-        from deckui import DsuiCard
+    def test_dui_card_importable(self):
+        from deckui import DuiCard
 
-        assert DsuiCard is not None
+        assert DuiCard is not None
 
-    def test_dsui_key_importable(self):
-        from deckui import DsuiKey
+    def test_dui_key_importable(self):
+        from deckui import DuiKey
 
-        assert DsuiKey is not None
+        assert DuiKey is not None
 
     def test_load_package_importable(self):
         from deckui import load_package
@@ -154,8 +154,8 @@ class TestPublicApiImports:
         import deckui
 
         for name in [
-            "DsuiCard",
-            "DsuiKey",
+            "DuiCard",
+            "DuiKey",
             "PackageError",
             "PackageSpec",
             "load_package",
@@ -164,15 +164,15 @@ class TestPublicApiImports:
             assert name in deckui.__all__
 
 
-class TestDsuiInitExports:
-    """Verify that all types are exported from deckui.dsui."""
+class TestDuiInitExports:
+    """Verify that all types are exported from deckui.dui."""
 
     def test_all_exports(self):
-        from deckui import dsui
+        from deckui import dui
 
         expected = [
-            "DsuiCard",
-            "DsuiKey",
+            "DuiCard",
+            "DuiKey",
             "EventMap",
             "SvgRenderer",
             "PackageError",
@@ -194,32 +194,32 @@ class TestDsuiInitExports:
             "OverflowMode",
         ]
         for name in expected:
-            assert name in dsui.__all__, f"{name} not in dsui.__all__"
-            assert hasattr(dsui, name), f"{name} not accessible on dsui module"
+            assert name in dui.__all__, f"{name} not in dui.__all__"
+            assert hasattr(dui, name), f"{name} not accessible on dui module"
 
 
 class TestEndToEnd:
     """Integration test: load from disk, set bindings, render, dispatch."""
 
-    def test_load_and_render_card(self, card_dsui_path):
-        spec = load_package(card_dsui_path)
-        card = DsuiCard(spec)
+    def test_load_and_render_card(self, card_dui_path):
+        spec = load_package(card_dui_path)
+        card = DuiCard(spec)
         card.set("title", "Integration Test")
         img = card.render()
         assert isinstance(img, Image.Image)
         assert img.size == (197, 98)
 
-    def test_load_and_render_key(self, key_dsui_path):
-        spec = load_package(key_dsui_path)
-        key = DsuiKey(spec)
+    def test_load_and_render_key(self, key_dui_path):
+        spec = load_package(key_dui_path)
+        key = DuiKey(spec)
         key.set("label", "Power")
         data = key.render_image()
         assert isinstance(data, bytes)
         assert data[:2] == b"\xff\xd8"
 
-    async def test_card_event_roundtrip(self, card_dsui_path):
-        spec = load_package(card_dsui_path)
-        card = DsuiCard(spec)
+    async def test_card_event_roundtrip(self, card_dui_path):
+        spec = load_package(card_dui_path)
+        card = DuiCard(spec)
         handler = AsyncMock()
         card.bind_event("toggle_play", handler)
 
@@ -232,9 +232,9 @@ class TestEndToEnd:
 
         handler.assert_awaited_once()
 
-    async def test_key_event_roundtrip(self, key_dsui_path):
-        spec = load_package(key_dsui_path)
-        key = DsuiKey(spec)
+    async def test_key_event_roundtrip(self, key_dui_path):
+        spec = load_package(key_dui_path)
+        key = DuiKey(spec)
         handler = AsyncMock()
         key.bind_event("activate", handler)
 
@@ -242,15 +242,15 @@ class TestEndToEnd:
         await key.dispatch(False)
         handler.assert_awaited_once()
 
-    def test_load_all_and_use(self, dsui_packages_dir):
-        packages = load_all_packages(dsui_packages_dir)
+    def test_load_all_and_use(self, dui_packages_dir):
+        packages = load_all_packages(dui_packages_dir)
         assert len(packages) == 2
 
         screen = Screen("test")
-        card = DsuiCard(packages["TestCard"])
+        card = DuiCard(packages["TestCard"])
         screen.set_card(0, card)
 
-        key = DsuiKey(packages["TestKey"])
+        key = DuiKey(packages["TestKey"])
         screen.set_key(0, key)
 
         assert screen.card(0) is card

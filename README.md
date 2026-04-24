@@ -67,10 +67,10 @@ asyncio.run(main())
 ### Using `.dui` packages
 
 ```python
-from deckui.dsui import load_package, DsuiCard
+from deckui.dui import load_package, DuiCard
 
 spec = load_package("./AudioCard.dui")
-card = DsuiCard(spec)
+card = DuiCard(spec)
 card.set("artist", "Ash Walker")
 
 @card.on("toggle_play_pause")
