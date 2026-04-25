@@ -45,6 +45,7 @@ class SpinnerFrames:
         width: int,
         height: int,
         image_format: str = "JPEG",
+        rendered_svg: str | None = None,
     ) -> None:
         if spec.spinner is None:
             raise ValueError("PackageSpec has no spinner configuration")
@@ -53,6 +54,7 @@ class SpinnerFrames:
         self._width = width
         self._height = height
         self._image_format = image_format
+        self._rendered_svg = rendered_svg
         self._cached_frames: list[bytes] | None = None
 
     @property
@@ -84,7 +86,8 @@ class SpinnerFrames:
 
     def _generate_rotation(self) -> list[bytes]:
         """Generate frames by rotating the spinner node."""
-        base_root = ET.fromstring(self._spec.svg_source)  # noqa: S314
+        svg_source = self._rendered_svg or self._spec.svg_source
+        base_root = ET.fromstring(svg_source)  # noqa: S314
         node = self._spinner.node
         assert node is not None
 
@@ -114,7 +117,8 @@ class SpinnerFrames:
 
     def _generate_pulse(self) -> list[bytes]:
         """Generate frames by pulsing opacity on the spinner node."""
-        base_root = ET.fromstring(self._spec.svg_source)  # noqa: S314
+        svg_source = self._rendered_svg or self._spec.svg_source
+        base_root = ET.fromstring(svg_source)  # noqa: S314
         node = self._spinner.node
         assert node is not None
 

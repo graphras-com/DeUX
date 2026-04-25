@@ -346,7 +346,12 @@ class DuiKey(KeySlot):
             await super().dispatch(pressed)
 
     def _busy_wrap(self, handler: AsyncHandler) -> AsyncHandler:
-        """Wrap a handler with busy-guard and spinner animation."""
+        """Wrap a handler with busy-guard and spinner animation.
+
+        The spinner keeps running after the handler returns.  Call
+        :meth:`finish_busy` to stop the spinner and restore the
+        normal render cycle.
+        """
 
         async def wrapped() -> None:
             if self._busy:
@@ -355,24 +360,42 @@ class DuiKey(KeySlot):
             try:
                 await self._start_spinner()
                 await handler()
-            finally:
+            except BaseException:
+                # On error, auto-clear so the UI doesn't stay stuck
                 await self._stop_spinner()
                 self._busy = False
                 self._dirty = True
+                raise
 
         return wrapped
+
+    async def finish_busy(self) -> None:
+        """Stop the spinner and exit the busy state.
+
+        Call this from your application code when the asynchronous
+        work is truly complete (e.g. after receiving a state update
+        from an external system).
+
+        If the key is not currently busy this is a no-op.
+        """
+        if not self._busy:
+            return
+        await self._stop_spinner()
+        self._busy = False
+        self._dirty = True
 
     async def _start_spinner(self) -> None:
         """Start the spinner animation if configured."""
         if self._spec.spinner is None or self._push_fn is None:
             return
 
-        if self._spinner_frames is None:
-            self._spinner_frames = SpinnerFrames(
-                self._spec,
-                width=KEY_SIZE[0],
-                height=KEY_SIZE[1],
-            )
+        rendered_svg = self._renderer.render_svg()
+        self._spinner_frames = SpinnerFrames(
+            self._spec,
+            width=KEY_SIZE[0],
+            height=KEY_SIZE[1],
+            rendered_svg=rendered_svg,
+        )
 
         self._animator = SpinnerAnimator(
             frames=self._spinner_frames.frames,
