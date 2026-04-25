@@ -20,15 +20,15 @@ nav:
   - Home: index.md
   - Guides:
       - Creating DUI Packages: guides/creating-dui-packages.md
-  - API Reference:
-      - Runtime: reference/runtime.md
-      - UI: reference/ui.md
-      - DUI: reference/dui.md
-      - Render: reference/render.md
-      - Tools: reference/tools.md
+  - API Reference: reference/
 
 plugins:
   - search
+  - gen-files:
+      scripts:
+        - docs/gen_ref_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
   - mkdocstrings:
       handlers:
         python:
