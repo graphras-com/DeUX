@@ -320,15 +320,11 @@ All coordinates are non-negative integers. The `events` list is optional and res
 
 ## Spinner & Busy State
 
-When an event handler takes time to complete (e.g. making an API call), users get no immediate visual feedback and may press the button again. The **spinner** system solves this by:
-
-1. Showing an animation immediately when the event fires
-2. Suppressing duplicate events while the handler is running
-3. Restoring the normal UI when the handler completes
+When an event handler takes time to complete (e.g. making an API call), users get no immediate visual feedback and may press the button again. The **spinner** system solves this by letting your application explicitly enter and exit a busy state with a visual animation.
 
 ### Defining a Spinner
 
-Add a `spinner` section to your manifest and mark events with `busy: true`:
+Add a `spinner` section to your manifest:
 
 ```yaml
 spinner:
@@ -336,11 +332,6 @@ spinner:
   node: spinner_icon    # SVG element ID to animate (required for rotation/pulse)
   frames: 12            # frames per cycle (default 12, minimum 2)
   interval_ms: 80       # ms between frames (default 80, minimum 10)
-
-events:
-  - name: toggle_play
-    source: encoder_press_release
-    busy: true           # enable spinner + event guard for this event
 ```
 
 Your SVG must include an element with the spinner node ID. It's typically hidden by default and made visible during animation:
@@ -410,29 +401,33 @@ spinner:
 
 ### How It Works
 
-When an event marked `busy: true` fires:
+The busy state is **entirely controlled by your application** via two methods:
 
-1. The library sets the card/key to **busy** state — further events for that slot are suppressed
-2. The spinner animation starts, pushing pre-rendered frames directly to the device at `interval_ms` intervals
-3. Spinner frames are rendered **on top of the current UI state** — all bindings (text, colors, images, etc.) are preserved. Only the spinner node is animated; the rest of the key/card looks exactly as it did before the event fired.
-4. For touchscreen cards, only the affected panel region is updated (not the entire strip)
-5. The normal refresh cycle skips animating slots to avoid overwriting frames
-6. **The application decides when the busy state ends** by calling `finish_busy()`. The spinner keeps running until then. If the handler raises an exception, the busy state is auto-cleared so the UI doesn't stay stuck.
+- `await card.start_busy()` / `await key.start_busy()` — enters the busy state and starts the spinner animation
+- `await card.finish_busy()` / `await key.finish_busy()` — stops the spinner and exits the busy state
 
-Frames are re-generated each time the spinner starts so they always reflect the latest binding values.
+When busy:
+
+1. Spinner frames are rendered **on top of the current UI state** — all bindings (text, colors, images, etc.) are preserved. Only the spinner node is animated; the rest of the key/card looks exactly as it did before.
+2. For touchscreen cards, only the affected panel region is updated (not the entire strip)
+3. The normal refresh cycle skips animating slots to avoid overwriting frames
+4. Frames are re-generated each time the spinner starts so they always reflect the latest binding values
+
+Duplicate `start_busy()` calls while already busy are no-ops.
+`finish_busy()` when not busy is also a no-op.
 
 ### Controlling the Busy Lifecycle
 
-The spinner does **not** stop automatically when the event handler returns.
-Your application must call ``finish_busy()`` to signal that work is
-complete. This lets you decouple the handler from the actual completion
-of the task — for example, when waiting for an external system to push a
-state update.
+Your application decides when to start and stop the spinner. This
+decouples the spinner from the event handler — the handler can return
+immediately while the spinner keeps running until an external signal
+arrives.
 
 ```python
 @key.on_event("toggle")
 async def handle():
-    # Fire-and-forget an API call. The spinner keeps running
+    await key.start_busy()
+    # Fire the API call. The spinner keeps running
     # after this handler returns.
     await smart_home_api.toggle_light()
 
@@ -442,34 +437,22 @@ async def on_state_update(new_state):
     await key.finish_busy()   # stops the spinner and re-renders
 ```
 
-If you don't need external lifecycle control and just want the spinner
-to last for the duration of the handler, call ``finish_busy()`` at the
-end:
+If the work completes within the handler, call both in the same handler:
 
 ```python
 @key.on_event("toggle")
 async def handle():
+    await key.start_busy()
     new_state = await smart_home_api.toggle_light()
     key.set("status_color", "#00ff00" if new_state else "#333333")
     await key.finish_busy()
 ```
 
-### Busy Events
-
-The `busy` field is opt-in per event. Only events you mark with `busy: true` get the spinner and event suppression. Non-busy events on the same card/key still fire normally.
-
-```yaml
-events:
-  - name: toggle_play
-    source: encoder_press_release
-    busy: true           # gets spinner + suppression
-  - name: next_track
-    source: encoder_turn
-    direction: right     # no busy — fires immediately, no spinner
-```
+Sometimes you don't need a spinner at all — the task resolves instantly.
+Since the application controls the busy state, you simply don't call
+`start_busy()` for fast operations.
 
 **Validation rules:**
-- If any event has `busy: true`, the manifest must define a `spinner` section
 - For `rotation` and `pulse` types, the `node` must exist in the SVG
 - For `custom` type, either `assets/spinner.gif` or `assets/spinner/frame_*.png` files must exist
 
@@ -502,7 +485,6 @@ events:
   - name: toggle
     source: key_press_release
     max_duration_ms: 300
-    busy: true
 ```
 
 ```python
@@ -513,7 +495,8 @@ key = DuiKey(spec)
 
 @key.on_event("toggle")
 async def handle():
-    # Spinner starts automatically — the key still shows the current
+    await key.start_busy()
+    # Spinner starts — the key still shows the current
     # label and status_color while the spinner animates in the corner.
     await smart_home_api.toggle_light()
     # Don't call finish_busy() here — wait for the state update callback.

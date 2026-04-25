@@ -296,17 +296,12 @@ def _parse_event(raw: dict[str, Any], index: int) -> EventMapping:
     if source in _PRESS_RELEASE_SOURCES and max_duration_ms is None:
         max_duration_ms = DEFAULT_MAX_DURATION_MS
 
-    busy = raw.get("busy", False)
-    if not isinstance(busy, bool):
-        raise PackageError(f"Event '{name}': busy must be a boolean")
-
     return EventMapping(
         name=name,
         source=source,
         direction=direction,
         max_duration_ms=max_duration_ms,
         hold_ms=hold_ms,
-        busy=busy,
     )
 
 
@@ -589,13 +584,6 @@ def load_package(path: str | Path) -> PackageSpec:
                 f"which does not exist in the SVG. "
                 f"Available ids: {sorted(svg_ids)}"
             )
-
-    # Validate busy events require a spinner
-    has_busy_event = any(e.busy for e in events)
-    if has_busy_event and spinner is None:
-        raise PackageError(
-            "Events with 'busy: true' require a 'spinner' section in the manifest"
-        )
 
     assets: dict[str, bytes] = {}
     assets_dir = pkg_dir / "assets"

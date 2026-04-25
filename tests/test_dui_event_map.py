@@ -26,16 +26,14 @@ def _make_events(*specs: tuple) -> tuple[EventMapping, ...]:
     return tuple(result)
 
 
-def _handlers(results: list[tuple]) -> list:
-    """Extract just the handler from (handler, is_busy) tuples."""
-    return [h for h, _ in results]
+def _handlers(results: list) -> list:
+    """Return the list of handlers as-is (identity helper for readability)."""
+    return results
 
 
-def _handler(result: tuple | None):
-    """Extract handler from a single (handler, is_busy) or None."""
-    if result is None:
-        return None
-    return result[0]
+def _handler(result):
+    """Return the handler as-is (identity helper for readability)."""
+    return result
 
 
 class TestEncoderTurn:
@@ -90,7 +88,7 @@ class TestEncoderPressRelease:
         em = EventMap(events)
         handler = AsyncMock()
         em.on("press", handler)
-        assert em.handle_encoder_press() == [(handler, False)]
+        assert em.handle_encoder_press() == [handler]
 
     def test_simple_release(self):
         events = _make_events(("release", "encoder_release"))

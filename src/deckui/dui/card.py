@@ -81,8 +81,8 @@ class DuiCard(Card):
     def set_push_fn(self, push_fn: PushFn) -> None:
         """Set the async function used to push animation frames to the device.
 
-        This must be called before busy events can trigger spinner
-        animations.  Typically set by :class:`~deckui.runtime.deck.Deck`.
+        This must be called before spinner animations can play.
+        Typically set by :class:`~deckui.runtime.deck.Deck`.
 
         Parameters
         ----------
@@ -302,29 +302,19 @@ class DuiCard(Card):
 
     def handle_encoder_turn(self, direction: int) -> None:
         """Route encoder turn through the event map."""
-        result = self._events.handle_encoder_turn(direction)
-        if result is not None:
-            handler, is_busy = result
-            if is_busy:
-                self.queue_pending_callback(self._busy_wrap(handler), ())
-            else:
-                self.queue_pending_callback(handler, ())
+        handler = self._events.handle_encoder_turn(direction)
+        if handler is not None:
+            self.queue_pending_callback(handler, ())
 
     def handle_encoder_press(self) -> None:
         """Route encoder press through the event map."""
-        for handler, is_busy in self._events.handle_encoder_press():
-            if is_busy:
-                self.queue_pending_callback(self._busy_wrap(handler), ())
-            else:
-                self.queue_pending_callback(handler, ())
+        for handler in self._events.handle_encoder_press():
+            self.queue_pending_callback(handler, ())
 
     def handle_encoder_release(self) -> None:
         """Route encoder release through the event map."""
-        for handler, is_busy in self._events.handle_encoder_release():
-            if is_busy:
-                self.queue_pending_callback(self._busy_wrap(handler), ())
-            else:
-                self.queue_pending_callback(handler, ())
+        for handler in self._events.handle_encoder_release():
+            self.queue_pending_callback(handler, ())
 
     async def dispatch_touch(self, event: TouchEvent) -> None:
         """Dispatch touch events through regions and the event map.
@@ -332,39 +322,25 @@ class DuiCard(Card):
         Falls back to the base Card touch handlers (on_tap, etc.)
         if the event map doesn't handle the event.
         """
-        result = self._events.handle_touch(event.event_type, event.x, event.y)
-        if result is not None:
-            handler, is_busy = result
-            if is_busy:
-                await self._busy_wrap(handler)()
-            else:
-                await handler()
+        handler = self._events.handle_touch(event.event_type, event.x, event.y)
+        if handler is not None:
+            await handler()
         else:
             await super().dispatch_touch(event)
 
-    def _busy_wrap(self, handler: AsyncHandler) -> AsyncHandler:
-        """Wrap a handler with busy-guard and spinner animation.
+    async def start_busy(self) -> None:
+        """Enter the busy state and start the spinner animation.
 
-        The spinner keeps running after the handler returns.  Call
-        :meth:`finish_busy` to stop the spinner and restore the
-        normal render cycle.
+        While busy, the card suppresses further ``start_busy()`` calls.
+        The spinner keeps running until :meth:`finish_busy` is called.
+
+        If no spinner is configured in the manifest the busy flag is
+        still set (suppressing duplicate calls) but no animation plays.
         """
-
-        async def wrapped() -> None:
-            if self._busy:
-                return  # suppress duplicate events while busy
-            self._busy = True
-            try:
-                await self._start_spinner()
-                await handler()
-            except BaseException:
-                # On error, auto-clear so the UI doesn't stay stuck
-                await self._stop_spinner()
-                self._busy = False
-                self.mark_dirty()
-                raise
-
-        return wrapped
+        if self._busy:
+            return
+        self._busy = True
+        await self._start_spinner()
 
     async def finish_busy(self) -> None:
         """Stop the spinner and exit the busy state.

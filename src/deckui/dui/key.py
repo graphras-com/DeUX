@@ -337,37 +337,24 @@ class DuiKey(KeySlot):
         )
 
         if handlers:
-            for handler, is_busy in handlers:
-                if is_busy:
-                    await self._busy_wrap(handler)()
-                else:
-                    await handler()
+            for handler in handlers:
+                await handler()
         else:
             await super().dispatch(pressed)
 
-    def _busy_wrap(self, handler: AsyncHandler) -> AsyncHandler:
-        """Wrap a handler with busy-guard and spinner animation.
+    async def start_busy(self) -> None:
+        """Enter the busy state and start the spinner animation.
 
-        The spinner keeps running after the handler returns.  Call
-        :meth:`finish_busy` to stop the spinner and restore the
-        normal render cycle.
+        While busy, the key suppresses further ``start_busy()`` calls.
+        The spinner keeps running until :meth:`finish_busy` is called.
+
+        If no spinner is configured in the manifest the busy flag is
+        still set (suppressing duplicate calls) but no animation plays.
         """
-
-        async def wrapped() -> None:
-            if self._busy:
-                return  # suppress duplicate events while busy
-            self._busy = True
-            try:
-                await self._start_spinner()
-                await handler()
-            except BaseException:
-                # On error, auto-clear so the UI doesn't stay stuck
-                await self._stop_spinner()
-                self._busy = False
-                self._dirty = True
-                raise
-
-        return wrapped
+        if self._busy:
+            return
+        self._busy = True
+        await self._start_spinner()
 
     async def finish_busy(self) -> None:
         """Stop the spinner and exit the busy state.
