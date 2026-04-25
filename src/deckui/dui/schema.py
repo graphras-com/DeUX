@@ -207,7 +207,6 @@ class EventMapping:
     direction: str | None = None
     max_duration_ms: int | None = None
     hold_ms: int | None = None
-    busy: bool = False
 
 
 HOLD_SOURCES = frozenset({"key_hold", "encoder_hold"})
@@ -240,11 +239,14 @@ DEFAULT_SPINNER_INTERVAL_MS: int = 80
 
 @dataclass(frozen=True, slots=True)
 class SpinnerSpec:
-    """Configuration for a busy-state spinner animation.
+    """Configuration for a spinner animation.
 
-    The spinner is shown when an event handler marked with ``busy: true``
-    is executing.  It provides immediate visual feedback by cycling
-    pre-rendered animation frames on the key or card panel.
+    The spinner is started and stopped explicitly by the application
+    via :meth:`~deckui.dui.card.DuiCard.start_busy` /
+    :meth:`~deckui.dui.card.DuiCard.finish_busy` (and the equivalent
+    methods on :class:`~deckui.dui.key.DuiKey`).  It provides visual
+    feedback by cycling pre-rendered animation frames on the key or
+    card panel.
 
     Parameters
     ----------

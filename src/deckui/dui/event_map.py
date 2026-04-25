@@ -47,9 +47,6 @@ class EventMap:
         self._mappings = events
         self._regions = regions
         self._handlers: dict[str, AsyncHandler] = {}
-        self._busy_events: frozenset[str] = frozenset(
-            m.name for m in events if m.busy
-        )
 
         self._press_time: float | None = None
         self._pressed = False
@@ -88,15 +85,6 @@ class EventMap:
         """All semantic event names defined in this map."""
         return [m.name for m in self._mappings]
 
-    def is_busy_event(self, event_name: str) -> bool:
-        """Return whether *event_name* is marked as ``busy``."""
-        return event_name in self._busy_events
-
-    @property
-    def has_busy_events(self) -> bool:
-        """Whether any events in this map are marked ``busy``."""
-        return bool(self._busy_events)
-
     def _start_hold_timer(self, source: str) -> None:
         """Start a hold timer for the first matching hold mapping.
 
@@ -130,7 +118,7 @@ class EventMap:
             self._hold_task.cancel()
             self._hold_task = None
 
-    def handle_encoder_turn(self, direction: int) -> tuple[AsyncHandler, bool] | None:
+    def handle_encoder_turn(self, direction: int) -> AsyncHandler | None:
         """Match an encoder turn to a semantic event.
 
         Parameters
@@ -140,8 +128,8 @@ class EventMap:
 
         Returns
         -------
-        tuple[AsyncHandler, bool] or None
-            ``(handler, is_busy)`` or ``None`` if no mapping matched.
+        AsyncHandler or None
+            The matched handler, or ``None`` if no mapping matched.
         """
         if self._pressed:
             self._cancel_hold_timer()
@@ -150,17 +138,17 @@ class EventMap:
                 if self._direction_matches(mapping, direction):
                     h = self._handlers.get(mapping.name)
                     if h is not None:
-                        return (h, mapping.name in self._busy_events)
+                        return h
 
         for mapping in self._by_source.get("encoder_turn", []):
             if self._direction_matches(mapping, direction):
                 h = self._handlers.get(mapping.name)
                 if h is not None:
-                    return (h, mapping.name in self._busy_events)
+                    return h
 
         return None
 
-    def handle_encoder_press(self) -> list[tuple[AsyncHandler, bool]]:
+    def handle_encoder_press(self) -> list[AsyncHandler]:
         """Match an encoder press to semantic events.
 
         Records the press timestamp for gesture detection and starts
@@ -168,8 +156,8 @@ class EventMap:
 
         Returns
         -------
-        list[tuple[AsyncHandler, bool]]
-            A list of ``(handler, is_busy)`` tuples (may be empty).
+        list[AsyncHandler]
+            A list of matched handlers (may be empty).
         """
         self._press_time = time.monotonic()
         self._pressed = True
@@ -177,14 +165,14 @@ class EventMap:
 
         self._start_hold_timer("encoder_hold")
 
-        handlers: list[tuple[AsyncHandler, bool]] = []
+        handlers: list[AsyncHandler] = []
         for mapping in self._by_source.get("encoder_press", []):
             handler = self._handlers.get(mapping.name)
             if handler is not None:
-                handlers.append((handler, mapping.name in self._busy_events))
+                handlers.append(handler)
         return handlers
 
-    def handle_encoder_release(self) -> list[tuple[AsyncHandler, bool]]:
+    def handle_encoder_release(self) -> list[AsyncHandler]:
         """Match an encoder release to semantic events.
 
         Cancels any running hold timer.  The simple ``encoder_release``
@@ -195,8 +183,8 @@ class EventMap:
 
         Returns
         -------
-        list[tuple[AsyncHandler, bool]]
-            A list of ``(handler, is_busy)`` tuples (may be empty).
+        list[AsyncHandler]
+            A list of matched handlers (may be empty).
         """
         self._pressed = False
         self._cancel_hold_timer()
@@ -204,32 +192,28 @@ class EventMap:
         hold_fired = self._hold_fired
         self._hold_fired = False
 
-        handlers: list[tuple[AsyncHandler, bool]] = []
+        handlers: list[AsyncHandler] = []
 
         if not hold_fired and self._press_time is not None:
             elapsed_ms = (time.monotonic() - self._press_time) * 1000
 
             for mapping in self._by_source.get("encoder_press_release", []):
-
-
                 max_ms = mapping.max_duration_ms
                 if max_ms is None or elapsed_ms <= max_ms:
                     handler = self._handlers.get(mapping.name)
                     if handler is not None:
-                        handlers.append(
-                            (handler, mapping.name in self._busy_events)
-                        )
+                        handlers.append(handler)
 
         self._press_time = None
 
         for mapping in self._by_source.get("encoder_release", []):
             handler = self._handlers.get(mapping.name)
             if handler is not None:
-                handlers.append((handler, mapping.name in self._busy_events))
+                handlers.append(handler)
 
         return handlers
 
-    def handle_key_press(self) -> list[tuple[AsyncHandler, bool]]:
+    def handle_key_press(self) -> list[AsyncHandler]:
         """Match a key press to semantic events.
 
         Records the press timestamp and starts a hold timer if a
@@ -237,8 +221,8 @@ class EventMap:
 
         Returns
         -------
-        list[tuple[AsyncHandler, bool]]
-            A list of ``(handler, is_busy)`` tuples (may be empty).
+        list[AsyncHandler]
+            A list of matched handlers (may be empty).
         """
         self._press_time = time.monotonic()
         self._pressed = True
@@ -246,14 +230,14 @@ class EventMap:
 
         self._start_hold_timer("key_hold")
 
-        handlers: list[tuple[AsyncHandler, bool]] = []
+        handlers: list[AsyncHandler] = []
         for mapping in self._by_source.get("key_press", []):
             handler = self._handlers.get(mapping.name)
             if handler is not None:
-                handlers.append((handler, mapping.name in self._busy_events))
+                handlers.append(handler)
         return handlers
 
-    def handle_key_release(self) -> list[tuple[AsyncHandler, bool]]:
+    def handle_key_release(self) -> list[AsyncHandler]:
         """Match a key release to semantic events.
 
         Cancels any running hold timer.  The simple ``key_release``
@@ -264,8 +248,8 @@ class EventMap:
 
         Returns
         -------
-        list[tuple[AsyncHandler, bool]]
-            A list of ``(handler, is_busy)`` tuples (may be empty).
+        list[AsyncHandler]
+            A list of matched handlers (may be empty).
         """
         self._pressed = False
         self._cancel_hold_timer()
@@ -273,7 +257,7 @@ class EventMap:
         hold_fired = self._hold_fired
         self._hold_fired = False
 
-        handlers: list[tuple[AsyncHandler, bool]] = []
+        handlers: list[AsyncHandler] = []
 
         if not hold_fired and self._press_time is not None:
             elapsed_ms = (time.monotonic() - self._press_time) * 1000
@@ -283,22 +267,20 @@ class EventMap:
                 if max_ms is None or elapsed_ms <= max_ms:
                     handler = self._handlers.get(mapping.name)
                     if handler is not None:
-                        handlers.append(
-                            (handler, mapping.name in self._busy_events)
-                        )
+                        handlers.append(handler)
 
         self._press_time = None
 
         for mapping in self._by_source.get("key_release", []):
             handler = self._handlers.get(mapping.name)
             if handler is not None:
-                handlers.append((handler, mapping.name in self._busy_events))
+                handlers.append(handler)
 
         return handlers
 
     def handle_touch(
         self, event_type: EventType, x: int, y: int
-    ) -> tuple[AsyncHandler, bool] | None:
+    ) -> AsyncHandler | None:
         """Match a touch event to a semantic event via regions.
 
         Parameters
@@ -312,8 +294,8 @@ class EventMap:
 
         Returns
         -------
-        tuple[AsyncHandler, bool] or None
-            ``(handler, is_busy)`` or ``None`` if no region/mapping matched.
+        AsyncHandler or None
+            The matched handler, or ``None`` if no region/mapping matched.
         """
         from ..runtime.events import EventType as ET_Enum
 
@@ -334,12 +316,12 @@ class EventMap:
                 for mapping in self._by_source.get(touch_name, []):
                     h = self._handlers.get(mapping.name)
                     if h is not None:
-                        return (h, mapping.name in self._busy_events)
+                        return h
 
         for mapping in self._by_source.get(touch_name, []):
             h = self._handlers.get(mapping.name)
             if h is not None:
-                return (h, mapping.name in self._busy_events)
+                return h
 
         return None
 
