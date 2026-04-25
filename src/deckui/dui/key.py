@@ -10,7 +10,9 @@ from PIL import Image
 from ..render.key_renderer import _encode_image
 from ..render.metrics import KEY_SIZE
 from ..ui.controls.key_slot import KeySlot
+from .animator import PushFn, SpinnerAnimator
 from .event_map import EventMap
+from .spinner import SpinnerFrames
 from .svg_renderer import SvgRenderer
 
 if TYPE_CHECKING:
@@ -59,11 +61,35 @@ class DuiKey(KeySlot):
         self._renderer = SvgRenderer(spec)
         self._events = EventMap(spec.events)
         self._dirty = True
+        self._busy = False
+        self._animator: SpinnerAnimator | None = None
+        self._spinner_frames: SpinnerFrames | None = None
+        self._push_fn: PushFn | None = None
 
     @property
     def spec(self) -> PackageSpec:
         """The package specification backing this key."""
         return self._spec
+
+    @property
+    def is_busy(self) -> bool:
+        """Whether a busy-guarded handler is currently executing."""
+        return self._busy
+
+    @property
+    def is_animating(self) -> bool:
+        """Whether a spinner animation is currently running."""
+        return self._animator is not None and self._animator.is_running
+
+    def set_push_fn(self, push_fn: PushFn) -> None:
+        """Set the async function used to push animation frames to the device.
+
+        Parameters
+        ----------
+        push_fn
+            Async callable ``(frame_bytes) -> None``.
+        """
+        self._push_fn = push_fn
 
     def set(self, name: str, value: Any) -> DuiKey:
         """Set a binding value.  Marks the key dirty if changed.
@@ -311,7 +337,52 @@ class DuiKey(KeySlot):
         )
 
         if handlers:
-            for handler in handlers:
-                await handler()
+            for handler, is_busy in handlers:
+                if is_busy:
+                    await self._busy_wrap(handler)()
+                else:
+                    await handler()
         else:
             await super().dispatch(pressed)
+
+    def _busy_wrap(self, handler: AsyncHandler) -> AsyncHandler:
+        """Wrap a handler with busy-guard and spinner animation."""
+
+        async def wrapped() -> None:
+            if self._busy:
+                return  # suppress duplicate events while busy
+            self._busy = True
+            try:
+                await self._start_spinner()
+                await handler()
+            finally:
+                await self._stop_spinner()
+                self._busy = False
+                self._dirty = True
+
+        return wrapped
+
+    async def _start_spinner(self) -> None:
+        """Start the spinner animation if configured."""
+        if self._spec.spinner is None or self._push_fn is None:
+            return
+
+        if self._spinner_frames is None:
+            self._spinner_frames = SpinnerFrames(
+                self._spec,
+                width=KEY_SIZE[0],
+                height=KEY_SIZE[1],
+            )
+
+        self._animator = SpinnerAnimator(
+            frames=self._spinner_frames.frames,
+            interval_ms=self._spinner_frames.interval_ms,
+            push_fn=self._push_fn,
+        )
+        await self._animator.start()
+
+    async def _stop_spinner(self) -> None:
+        """Stop the spinner animation."""
+        if self._animator is not None:
+            await self._animator.stop()
+            self._animator = None

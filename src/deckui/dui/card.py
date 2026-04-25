@@ -6,7 +6,9 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from ..ui.cards.base import Card
+from .animator import PushFn, SpinnerAnimator
 from .event_map import EventMap
+from .spinner import SpinnerFrames
 from .svg_renderer import SvgRenderer
 
 if TYPE_CHECKING:
@@ -56,11 +58,38 @@ class DuiCard(Card):
         self._spec = spec
         self._renderer = SvgRenderer(spec)
         self._events = EventMap(spec.events, spec.regions)
+        self._busy = False
+        self._animator: SpinnerAnimator | None = None
+        self._spinner_frames: SpinnerFrames | None = None
+        self._push_fn: PushFn | None = None
 
     @property
     def spec(self) -> PackageSpec:
         """The package specification backing this card."""
         return self._spec
+
+    @property
+    def is_busy(self) -> bool:
+        """Whether a busy-guarded handler is currently executing."""
+        return self._busy
+
+    @property
+    def is_animating(self) -> bool:
+        """Whether a spinner animation is currently running."""
+        return self._animator is not None and self._animator.is_running
+
+    def set_push_fn(self, push_fn: PushFn) -> None:
+        """Set the async function used to push animation frames to the device.
+
+        This must be called before busy events can trigger spinner
+        animations.  Typically set by :class:`~deckui.runtime.deck.Deck`.
+
+        Parameters
+        ----------
+        push_fn
+            Async callable ``(frame_bytes) -> None``.
+        """
+        self._push_fn = push_fn
 
     def set(self, name: str, value: Any) -> DuiCard:
         """Set a binding value.  Marks the card dirty if changed.
@@ -273,19 +302,29 @@ class DuiCard(Card):
 
     def handle_encoder_turn(self, direction: int) -> None:
         """Route encoder turn through the event map."""
-        handler = self._events.handle_encoder_turn(direction)
-        if handler is not None:
-            self.queue_pending_callback(handler, ())
+        result = self._events.handle_encoder_turn(direction)
+        if result is not None:
+            handler, is_busy = result
+            if is_busy:
+                self.queue_pending_callback(self._busy_wrap(handler), ())
+            else:
+                self.queue_pending_callback(handler, ())
 
     def handle_encoder_press(self) -> None:
         """Route encoder press through the event map."""
-        for handler in self._events.handle_encoder_press():
-            self.queue_pending_callback(handler, ())
+        for handler, is_busy in self._events.handle_encoder_press():
+            if is_busy:
+                self.queue_pending_callback(self._busy_wrap(handler), ())
+            else:
+                self.queue_pending_callback(handler, ())
 
     def handle_encoder_release(self) -> None:
         """Route encoder release through the event map."""
-        for handler in self._events.handle_encoder_release():
-            self.queue_pending_callback(handler, ())
+        for handler, is_busy in self._events.handle_encoder_release():
+            if is_busy:
+                self.queue_pending_callback(self._busy_wrap(handler), ())
+            else:
+                self.queue_pending_callback(handler, ())
 
     async def dispatch_touch(self, event: TouchEvent) -> None:
         """Dispatch touch events through regions and the event map.
@@ -293,8 +332,56 @@ class DuiCard(Card):
         Falls back to the base Card touch handlers (on_tap, etc.)
         if the event map doesn't handle the event.
         """
-        handler = self._events.handle_touch(event.event_type, event.x, event.y)
-        if handler is not None:
-            await handler()
+        result = self._events.handle_touch(event.event_type, event.x, event.y)
+        if result is not None:
+            handler, is_busy = result
+            if is_busy:
+                await self._busy_wrap(handler)()
+            else:
+                await handler()
         else:
             await super().dispatch_touch(event)
+
+    def _busy_wrap(self, handler: AsyncHandler) -> AsyncHandler:
+        """Wrap a handler with busy-guard and spinner animation."""
+
+        async def wrapped() -> None:
+            if self._busy:
+                return  # suppress duplicate events while busy
+            self._busy = True
+            try:
+                await self._start_spinner()
+                await handler()
+            finally:
+                await self._stop_spinner()
+                self._busy = False
+                self.mark_dirty()
+
+        return wrapped
+
+    async def _start_spinner(self) -> None:
+        """Start the spinner animation if configured."""
+        if self._spec.spinner is None or self._push_fn is None:
+            return
+
+        if self._spinner_frames is None:
+            from ..render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+
+            self._spinner_frames = SpinnerFrames(
+                self._spec,
+                width=PANEL_WIDTH,
+                height=PANEL_HEIGHT,
+            )
+
+        self._animator = SpinnerAnimator(
+            frames=self._spinner_frames.frames,
+            interval_ms=self._spinner_frames.interval_ms,
+            push_fn=self._push_fn,
+        )
+        await self._animator.start()
+
+    async def _stop_spinner(self) -> None:
+        """Stop the spinner animation."""
+        if self._animator is not None:
+            await self._animator.stop()
+            self._animator = None

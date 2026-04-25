@@ -20,6 +20,7 @@ Examples
 
 from __future__ import annotations
 
+from .animator import SpinnerAnimator
 from .card import DuiCard
 from .event_map import EventMap
 from .iconify import IconifyError, fetch_icon
@@ -42,10 +43,13 @@ from .schema import (
     RangeDirection,
     Region,
     SliderBinding,
+    SpinnerSpec,
+    SpinnerType,
     TextBinding,
     ToggleBinding,
     VisibilityBinding,
 )
+from .spinner import SpinnerFrames
 from .svg_renderer import SvgRenderer
 
 __all__ = [
@@ -68,6 +72,10 @@ __all__ = [
     "RangeDirection",
     "Region",
     "SliderBinding",
+    "SpinnerAnimator",
+    "SpinnerFrames",
+    "SpinnerSpec",
+    "SpinnerType",
     "SvgRenderer",
     "TextBinding",
     "ToggleBinding",

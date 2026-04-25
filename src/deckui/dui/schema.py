@@ -13,6 +13,14 @@ class PackageType(Enum):
     KEY = "Key"
 
 
+class SpinnerType(Enum):
+    """Animation strategy for the busy spinner."""
+
+    ROTATION = "rotation"
+    PULSE = "pulse"
+    CUSTOM = "custom"
+
+
 class BindingType(Enum):
     """Supported binding types for SVG node manipulation."""
 
@@ -199,6 +207,7 @@ class EventMapping:
     direction: str | None = None
     max_duration_ms: int | None = None
     hold_ms: int | None = None
+    busy: bool = False
 
 
 HOLD_SOURCES = frozenset({"key_hold", "encoder_hold"})
@@ -220,6 +229,41 @@ class Region:
     width: int
     height: int
     events: tuple[str, ...] = ()
+
+
+DEFAULT_SPINNER_FRAMES: int = 12
+"""Default number of frames in a spinner animation cycle."""
+
+DEFAULT_SPINNER_INTERVAL_MS: int = 80
+"""Default interval (ms) between spinner animation frames."""
+
+
+@dataclass(frozen=True, slots=True)
+class SpinnerSpec:
+    """Configuration for a busy-state spinner animation.
+
+    The spinner is shown when an event handler marked with ``busy: true``
+    is executing.  It provides immediate visual feedback by cycling
+    pre-rendered animation frames on the key or card panel.
+
+    Parameters
+    ----------
+    type
+        Animation strategy: ``rotation`` (rotate an SVG node),
+        ``pulse`` (fade opacity), or ``custom`` (user-provided frames).
+    node
+        SVG element ID to animate (required for ``rotation`` and
+        ``pulse``; ignored for ``custom``).
+    frames
+        Number of frames per animation cycle.
+    interval_ms
+        Milliseconds between frames.
+    """
+
+    type: SpinnerType
+    node: str | None = None
+    frames: int = DEFAULT_SPINNER_FRAMES
+    interval_ms: int = DEFAULT_SPINNER_INTERVAL_MS
 
 
 VALID_CATEGORIES = frozenset(
@@ -256,6 +300,7 @@ KNOWN_MANIFEST_KEYS = frozenset(
         "bindings",
         "events",
         "regions",
+        "spinner",
     }
 )
 """All recognised top-level keys in a manifest.yaml file."""
@@ -273,6 +318,7 @@ class PackageSpec:
     events: tuple[EventMapping, ...] = ()
     regions: tuple[Region, ...] = ()
     assets: dict[str, bytes] = field(default_factory=dict)
+    spinner: SpinnerSpec | None = None
     description: str | None = None
     author: str | None = None
     license: str | None = None
