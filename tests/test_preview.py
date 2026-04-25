@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import io
 import os
+import signal
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -34,10 +35,13 @@ if TYPE_CHECKING:
 from deckui.tools.preview import (
     _KEY_COUNT,
     _svg_to_png_fit,
+    _watch_and_reload,
     build_parser,
+    collect_svg_paths,
     compose_card_image,
     compose_key_image,
     compose_touchstrip,
+    get_mtimes,
     load_svg,
     main,
     parse_args,
@@ -459,10 +463,12 @@ class TestMain:
     def test_main_calls_push(self, mock_push: AsyncMock, square_svg: Path):
         main(["--key0", str(square_svg)])
         mock_push.assert_awaited_once()
-        key_images, touchstrip, brightness = mock_push.call_args[0]
+        kwargs = mock_push.call_args
+        key_images, touchstrip, brightness = kwargs[0]
         assert 0 in key_images
         assert isinstance(touchstrip, bytes)
         assert brightness == 80
+        assert kwargs[1]["watch_args"] is None
 
     @patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock)
     def test_main_default_brightness(self, mock_push: AsyncMock):
@@ -491,6 +497,19 @@ class TestMain:
         assert px[0] > 150
         assert px[1] > 160
         assert px[2] > 180
+
+    @patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock)
+    def test_main_watch_passes_args(self, mock_push: AsyncMock, square_svg: Path):
+        main(["--key0", str(square_svg), "--watch"])
+        kwargs = mock_push.call_args
+        assert kwargs[1]["watch_args"] is not None
+        assert kwargs[1]["watch_args"].watch is True
+
+    @patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock)
+    def test_main_poll_interval(self, mock_push: AsyncMock):
+        main(["--watch", "--poll-interval", "1.5"])
+        kwargs = mock_push.call_args
+        assert kwargs[1]["poll_interval"] == 1.5
 
 
 class TestPushToDevice:
@@ -677,3 +696,150 @@ class TestMainModule:
 
         importlib.reload(deckui.tools.__main__)
         mock_main.assert_called()
+
+
+class TestCollectSvgPaths:
+    def test_empty_args(self):
+        args = parse_args([])
+        assert collect_svg_paths(args) == []
+
+    def test_collects_keys_and_cards(self, tmp_path: Path):
+        k = tmp_path / "k.svg"
+        c = tmp_path / "c.svg"
+        args = parse_args(["--key0", str(k), "--card2", str(c)])
+        paths = collect_svg_paths(args)
+        assert k in paths
+        assert c in paths
+        assert len(paths) == 2
+
+    def test_order_keys_before_cards(self, tmp_path: Path):
+        k = tmp_path / "k.svg"
+        c = tmp_path / "c.svg"
+        args = parse_args(["--card0", str(c), "--key0", str(k)])
+        paths = collect_svg_paths(args)
+        assert paths[0] == k
+        assert paths[1] == c
+
+
+class TestGetMtimes:
+    def test_existing_file(self, tiny_svg: Path):
+        mtimes = get_mtimes([tiny_svg])
+        assert tiny_svg in mtimes
+        assert mtimes[tiny_svg] > 0
+
+    def test_missing_file(self, tmp_path: Path):
+        missing = tmp_path / "gone.svg"
+        mtimes = get_mtimes([missing])
+        assert mtimes[missing] == 0.0
+
+    def test_empty_list(self):
+        assert get_mtimes([]) == {}
+
+
+class TestParserWatch:
+    def test_watch_default_false(self):
+        args = parse_args([])
+        assert args.watch is False
+
+    def test_watch_flag(self):
+        args = parse_args(["--watch"])
+        assert args.watch is True
+
+    def test_watch_short(self):
+        args = parse_args(["-w"])
+        assert args.watch is True
+
+    def test_poll_interval_default(self):
+        args = parse_args([])
+        assert args.poll_interval == 0.5
+
+    def test_poll_interval_custom(self):
+        args = parse_args(["--poll-interval", "2.0"])
+        assert args.poll_interval == 2.0
+
+
+class TestWatchAndReload:
+    async def test_detects_change_and_reloads(
+        self, square_svg: Path, mock_streamdeck_device: MagicMock
+    ):
+        """When an SVG file mtime changes, _watch_and_reload re-pushes."""
+        args = parse_args(["--key0", str(square_svg), "--watch"])
+
+        call_count = 0
+
+        def counting_set_key(key: int, image: bytes) -> None:
+            nonlocal call_count
+            call_count += 1
+
+        mock_streamdeck_device.set_key_image.side_effect = counting_set_key
+
+        loop = asyncio.get_running_loop()
+        # Schedule: touch file after 0.1s, then SIGINT after 0.8s
+        loop.call_later(0.1, square_svg.write_bytes, square_svg.read_bytes())
+        loop.call_later(1.0, os.kill, os.getpid(), signal.SIGINT)
+
+        await asyncio.wait_for(
+            _watch_and_reload(args, mock_streamdeck_device, poll_interval=0.2),
+            timeout=3.0,
+        )
+        assert call_count >= 1
+
+    async def test_exits_on_sigint(self, mock_streamdeck_device: MagicMock):
+        """_watch_and_reload exits cleanly on SIGINT."""
+        args = parse_args(["--watch"])
+
+        loop = asyncio.get_running_loop()
+        loop.call_later(0.1, os.kill, os.getpid(), signal.SIGINT)
+
+        await asyncio.wait_for(
+            _watch_and_reload(args, mock_streamdeck_device, poll_interval=0.2),
+            timeout=2.0,
+        )
+
+    async def test_render_error_continues(
+        self, square_svg: Path, mock_streamdeck_device: MagicMock
+    ):
+        """A render error during watch should not crash the watcher."""
+        args = parse_args(["--key0", str(square_svg), "--watch"])
+
+        loop = asyncio.get_running_loop()
+        # Write invalid SVG to trigger render error, then SIGINT
+        loop.call_later(0.1, square_svg.write_bytes, b"not valid svg")
+        loop.call_later(1.0, os.kill, os.getpid(), signal.SIGINT)
+
+        # Should not raise
+        await asyncio.wait_for(
+            _watch_and_reload(args, mock_streamdeck_device, poll_interval=0.2),
+            timeout=3.0,
+        )
+
+
+class TestPushToDeviceWatch:
+    async def test_push_with_watch_calls_watch_and_reload(
+        self, mock_streamdeck_device: MagicMock, square_svg: Path
+    ):
+        """When watch_args is provided, push_to_device enters watch mode."""
+        from deckui.tools.preview import push_to_device
+
+        blank_ts = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), "black")
+        buf = io.BytesIO()
+        blank_ts.save(buf, format="JPEG")
+        ts_jpeg = buf.getvalue()
+
+        args = parse_args(["--key0", str(square_svg), "--watch"])
+
+        with (
+            patch(
+                "deckui.tools.preview._find_and_open_device",
+                return_value=mock_streamdeck_device,
+            ),
+            patch(
+                "deckui.tools.preview._watch_and_reload",
+                new_callable=AsyncMock,
+            ) as mock_watch,
+        ):
+            await push_to_device(
+                {}, ts_jpeg, brightness=80, watch_args=args, poll_interval=0.5
+            )
+
+        mock_watch.assert_awaited_once_with(args, mock_streamdeck_device, 0.5)

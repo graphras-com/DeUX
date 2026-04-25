@@ -8,6 +8,10 @@ Examples
         --card0 my_card.svg --key0 my_key.svg \\
         --background "#1a2b3c"
 
+    # Auto-reload when SVG files change:
+    python -m deckui.tools.preview \\
+        --card0 my_card.svg --key0 my_key.svg --watch
+
 Only the specified slots are updated; unspecified keys and cards are
 left blank (black unless ``--background`` is given).  SVGs are scaled to
 fit the target area while preserving aspect ratio and centred on the
@@ -15,6 +19,10 @@ background colour.
 
 The tool auto-detects the first connected visual Stream Deck device
 and adapts key/card counts and dimensions to the hardware.
+
+With ``--watch``, the tool monitors all specified SVG files and
+automatically re-renders and re-pushes images when any file changes.
+The poll interval can be tuned with ``--poll-interval`` (default 0.5s).
 """
 
 from __future__ import annotations
@@ -275,6 +283,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Background colour for the touchstrip in hex (e.g. '#1a2b3c' or '1a2b3c')",
     )
     parser.add_argument(
+        "-w",
+        "--watch",
+        action="store_true",
+        help="Watch SVG files for changes and auto-reload",
+    )
+    parser.add_argument(
+        "--poll-interval",
+        type=float,
+        default=0.5,
+        metavar="SECS",
+        help="File poll interval in seconds when --watch is active (default: 0.5)",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -317,12 +338,20 @@ async def push_to_device(
     key_images: dict[int, bytes],
     touchstrip_bytes: bytes,
     brightness: int = 80,
+    *,
+    watch_args: argparse.Namespace | None = None,
+    poll_interval: float = 0.5,
 ) -> None:
     """Push rendered images to the physical Stream Deck+.
 
     *key_images* maps key indices to JPEG bytes.  *touchstrip_bytes* is
     the full 800x100 touchscreen JPEG.  *brightness* sets the screen
     brightness (0-100).
+
+    When *watch_args* is provided, the tool watches the SVG files
+    specified in those args and automatically re-renders and re-pushes
+    when changes are detected.  *poll_interval* controls how often files
+    are polled (in seconds).
     """
     loop = asyncio.get_running_loop()
     deck = await loop.run_in_executor(None, _find_and_open_device)
@@ -355,8 +384,15 @@ async def push_to_device(
             TOUCHSCREEN_HEIGHT,
         )
 
-        print("Preview pushed — press Ctrl+C to exit", file=sys.stderr)  # noqa: T201
-        await _wait_for_interrupt()
+        if watch_args is not None:
+            print(  # noqa: T201
+                "Preview pushed — watching for changes (Ctrl+C to exit)",
+                file=sys.stderr,
+            )
+            await _watch_and_reload(watch_args, deck, poll_interval)
+        else:
+            print("Preview pushed — press Ctrl+C to exit", file=sys.stderr)  # noqa: T201
+            await _wait_for_interrupt()
     finally:
         await loop.run_in_executor(None, deck.reset)
         await loop.run_in_executor(None, deck.close)
@@ -373,6 +409,99 @@ async def _wait_for_interrupt() -> None:
     loop.add_signal_handler(signal.SIGINT, stop.set)
     try:
         await stop.wait()
+    finally:
+        loop.remove_signal_handler(signal.SIGINT)
+
+
+def collect_svg_paths(args: argparse.Namespace) -> list[Path]:
+    """Return the list of SVG file paths specified in *args*."""
+    paths: list[Path] = []
+    for i in range(_KEY_COUNT):
+        p: Path | None = getattr(args, f"key{i}", None)
+        if p is not None:
+            paths.append(p)
+    for i in range(PANEL_COUNT):
+        p = getattr(args, f"card{i}", None)
+        if p is not None:
+            paths.append(p)
+    return paths
+
+
+def get_mtimes(paths: list[Path]) -> dict[Path, float]:
+    """Return a mapping of *paths* to their modification times.
+
+    Missing files are silently assigned mtime ``0.0``.
+    """
+    mtimes: dict[Path, float] = {}
+    for p in paths:
+        try:
+            mtimes[p] = p.stat().st_mtime
+        except OSError:
+            mtimes[p] = 0.0
+    return mtimes
+
+
+async def _watch_and_reload(
+    args: argparse.Namespace,
+    deck: PreviewDeckDevice,
+    poll_interval: float,
+) -> None:
+    """Poll SVG files for changes and re-push to *deck* on modification.
+
+    Runs until SIGINT (Ctrl+C) is received.
+    """
+    loop = asyncio.get_running_loop()
+    stop = asyncio.Event()
+    loop.add_signal_handler(signal.SIGINT, stop.set)
+
+    svg_paths = collect_svg_paths(args)
+    last_mtimes = get_mtimes(svg_paths)
+
+    try:
+        while not stop.is_set():
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=poll_interval)
+                break  # stop was set
+            except TimeoutError:
+                pass  # poll interval elapsed, check files
+
+            current_mtimes = get_mtimes(svg_paths)
+            if current_mtimes != last_mtimes:
+                changed = [
+                    p for p in svg_paths if current_mtimes[p] != last_mtimes.get(p, 0.0)
+                ]
+                logger.info("Detected changes: %s", [str(p) for p in changed])
+                print(  # noqa: T201
+                    f"Reloading {len(changed)} changed file(s)...",
+                    file=sys.stderr,
+                )
+                last_mtimes = current_mtimes
+                try:
+                    key_images, touchstrip_bytes = render_preview(args)
+                except Exception as exc:
+                    print(f"Render error: {exc}", file=sys.stderr)  # noqa: T201
+                    continue
+
+                for key_index in range(_KEY_COUNT):
+                    jpeg = key_images.get(key_index)
+                    if jpeg is not None:
+                        await loop.run_in_executor(
+                            None,
+                            deck.set_key_image,
+                            key_index,
+                            jpeg,
+                        )
+
+                await loop.run_in_executor(
+                    None,
+                    deck.set_touchscreen_image,
+                    touchstrip_bytes,
+                    0,
+                    0,
+                    TOUCHSCREEN_WIDTH,
+                    TOUCHSCREEN_HEIGHT,
+                )
+                print("Preview updated", file=sys.stderr)  # noqa: T201
     finally:
         loop.remove_signal_handler(signal.SIGINT)
 
@@ -426,7 +555,17 @@ def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
 
     key_images, touchstrip_bytes = render_preview(args)
-    asyncio.run(push_to_device(key_images, touchstrip_bytes, args.brightness))
+    watch_args = args if args.watch else None
+    poll_interval: float = args.poll_interval
+    asyncio.run(
+        push_to_device(
+            key_images,
+            touchstrip_bytes,
+            args.brightness,
+            watch_args=watch_args,
+            poll_interval=poll_interval,
+        )
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover
