@@ -222,6 +222,45 @@ class Region:
     events: tuple[str, ...] = ()
 
 
+VALID_CATEGORIES = frozenset(
+    {
+        "media",
+        "productivity",
+        "system",
+        "gaming",
+        "social",
+        "development",
+        "utilities",
+        "streaming",
+        "home-automation",
+        "communication",
+    }
+)
+"""Controlled vocabulary for the ``category`` manifest field."""
+
+KNOWN_MANIFEST_KEYS = frozenset(
+    {
+        "name",
+        "type",
+        "version",
+        "layout",
+        "description",
+        "author",
+        "license",
+        "tags",
+        "category",
+        "url",
+        "icon",
+        "min_deckui",
+        "device",
+        "bindings",
+        "events",
+        "regions",
+    }
+)
+"""All recognised top-level keys in a manifest.yaml file."""
+
+
 @dataclass(frozen=True, slots=True)
 class PackageSpec:
     """Fully validated, immutable representation of a loaded .dui package."""
@@ -234,3 +273,12 @@ class PackageSpec:
     events: tuple[EventMapping, ...] = ()
     regions: tuple[Region, ...] = ()
     assets: dict[str, bytes] = field(default_factory=dict)
+    description: str | None = None
+    author: str | None = None
+    license: str | None = None
+    tags: tuple[str, ...] = ()
+    category: str | None = None
+    url: str | None = None
+    icon: str | None = None
+    min_deckui: str | None = None
+    device: tuple[str, ...] = ()

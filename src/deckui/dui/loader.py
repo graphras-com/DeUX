@@ -13,6 +13,8 @@ from .schema import (
     DEFAULT_HOLD_MS,
     DEFAULT_MAX_DURATION_MS,
     HOLD_SOURCES,
+    KNOWN_MANIFEST_KEYS,
+    VALID_CATEGORIES,
     VALID_DIRECTIONS,
     VALID_REGION_EVENTS,
     VALID_SOURCES,
@@ -399,6 +401,69 @@ def load_package(path: str | Path) -> PackageSpec:
     svg_source = layout_path.read_text(encoding="utf-8")
     svg_ids = _find_svg_ids(svg_source)
 
+    # ── Optional metadata fields ──────────────────────────────────────
+    unknown_keys = set(manifest.keys()) - KNOWN_MANIFEST_KEYS
+    if unknown_keys:
+        logger.warning(
+            "Package '%s': unknown manifest keys: %s", name, sorted(unknown_keys)
+        )
+
+    description = manifest.get("description")
+    if description is not None and not isinstance(description, str):
+        raise PackageError("'description' must be a string")
+
+    author = manifest.get("author")
+    if author is not None and not isinstance(author, str):
+        raise PackageError("'author' must be a string")
+
+    pkg_license = manifest.get("license")
+    if pkg_license is not None and not isinstance(pkg_license, str):
+        raise PackageError("'license' must be a string")
+
+    tags: tuple[str, ...] = ()
+    raw_tags = manifest.get("tags")
+    if raw_tags is not None:
+        if not isinstance(raw_tags, list):
+            raise PackageError("'tags' must be a list")
+        for tag in raw_tags:
+            if not isinstance(tag, str) or not tag.strip():
+                raise PackageError(f"Each tag must be a non-empty string, got {tag!r}")
+        tags = tuple(raw_tags)
+
+    category = manifest.get("category")
+    if category is not None:
+        if not isinstance(category, str):
+            raise PackageError("'category' must be a string")
+        if category not in VALID_CATEGORIES:
+            raise PackageError(
+                f"Invalid category '{category}'. "
+                f"Valid categories: {sorted(VALID_CATEGORIES)}"
+            )
+
+    url = manifest.get("url")
+    if url is not None and not isinstance(url, str):
+        raise PackageError("'url' must be a string")
+
+    icon = manifest.get("icon")
+    if icon is not None and not isinstance(icon, str):
+        raise PackageError("'icon' must be a string")
+
+    min_deckui = manifest.get("min_deckui")
+    if min_deckui is not None and not isinstance(min_deckui, str):
+        raise PackageError("'min_deckui' must be a string")
+
+    device: tuple[str, ...] = ()
+    raw_device = manifest.get("device")
+    if raw_device is not None:
+        if not isinstance(raw_device, list):
+            raise PackageError("'device' must be a list")
+        for d in raw_device:
+            if not isinstance(d, str) or not d.strip():
+                raise PackageError(
+                    f"Each device must be a non-empty string, got {d!r}"
+                )
+        device = tuple(raw_device)
+
     bindings: dict[str, Binding] = {}
     raw_bindings = manifest.get("bindings", {})
     if raw_bindings and not isinstance(raw_bindings, dict):
@@ -486,6 +551,15 @@ def load_package(path: str | Path) -> PackageSpec:
         events=tuple(events),
         regions=tuple(regions),
         assets=assets,
+        description=description,
+        author=author,
+        license=pkg_license,
+        tags=tags,
+        category=category,
+        url=url,
+        icon=icon,
+        min_deckui=min_deckui,
+        device=device,
     )
 
 

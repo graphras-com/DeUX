@@ -140,6 +140,10 @@ name: TestCard
 type: TouchStripCard
 version: 1
 layout: layout.svg
+description: "A test card for audio playback"
+author: "Test Author <test@example.com>"
+category: media
+tags: [music, test]
 
 bindings:
   title:
@@ -219,6 +223,8 @@ name: TestKey
 type: Key
 version: 1
 layout: layout.svg
+description: "A test key for status indication"
+author: "Test Author <test@example.com>"
 
 bindings:
   label:
