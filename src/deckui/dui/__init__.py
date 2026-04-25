@@ -27,6 +27,7 @@ from .iconify import clear_cache as clear_iconify_cache
 from .key import DuiKey
 from .loader import PackageError, load_all_packages, load_package
 from .schema import (
+    VALID_CATEGORIES,
     Binding,
     BindingType,
     ColorBinding,
@@ -70,6 +71,7 @@ __all__ = [
     "SvgRenderer",
     "TextBinding",
     "ToggleBinding",
+    "VALID_CATEGORIES",
     "VisibilityBinding",
     "clear_iconify_cache",
     "fetch_icon",

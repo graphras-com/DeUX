@@ -14,7 +14,7 @@ MyPackage.dui/
 
 ## The Manifest
 
-`manifest.yaml` is the heart of every package. It has four required top-level fields and three optional sections.
+`manifest.yaml` is the heart of every package. It has four required top-level fields, optional metadata for repository publishing, and three optional sections for bindings, events, and regions.
 
 ### Required Fields
 
@@ -24,6 +24,26 @@ MyPackage.dui/
 | `type` | `str` | `"TouchStripCard"` (touchscreen panel) or `"Key"` (physical key) |
 | `version` | `int` | Positive integer (>= 1) |
 | `layout` | `str` | Relative path to the SVG file (e.g. `layout.svg`) |
+
+### Metadata Fields
+
+These fields are optional for local use but required when publishing to a DUI package repository. The `verify --strict` tool enforces `description` and `author`.
+
+| Field | Type | Required for repo | Description |
+|-------|------|:-----------------:|-------------|
+| `description` | `str` | yes | One-line summary for search and display |
+| `author` | `str` | yes | Author name and optional email (`"Jane Doe <jane@example.com>"`) |
+| `license` | `str` | no | SPDX license identifier (`MIT`, `Apache-2.0`, `CC-BY-4.0`) |
+| `tags` | `list[str]` | no | Free-form lowercase labels for search (`[music, media, spotify]`) |
+| `category` | `str` | no | Primary category from a controlled vocabulary (see below) |
+| `url` | `str` | no | Project or source URL |
+| `icon` | `str` | no | Path to a thumbnail in `assets/` for repository listings |
+| `min_deckui` | `str` | no | Minimum DeckUI version required (e.g. `"0.5.0"`) |
+| `device` | `list[str]` | no | Explicit device compatibility (`[StreamDeckPlus, StreamDeckXL]`) |
+
+#### Valid Categories
+
+`media` · `productivity` · `system` · `gaming` · `social` · `development` · `utilities` · `streaming` · `home-automation` · `communication`
 
 ### Optional Sections
 
@@ -46,6 +66,31 @@ bindings:
     type: text
     node: label
     default: "Hello"
+```
+
+### Repository-Ready Example
+
+```yaml
+name: NowPlaying
+type: TouchStripCard
+version: 2
+layout: layout.svg
+description: "Media player card with album art, progress bar, and transport controls"
+author: "Jane Doe <jane@example.com>"
+license: MIT
+category: media
+tags: [music, spotify, media-player]
+url: https://github.com/jane/nowplaying-dui
+icon: assets/icon.png
+min_deckui: "0.5.0"
+
+bindings:
+  title:
+    type: text
+    node: title
+    default: "No Track"
+    max_width: 90
+    overflow: ellipsis
 ```
 
 ---
@@ -449,5 +494,51 @@ Packages are validated on load. Common errors:
 - Duplicate event names
 - `hold_ms` used on a non-hold source
 - Invalid region coordinates (negative values)
+- Invalid `category` value (must be from the controlled vocabulary)
+- Invalid `tags` entries (must be non-empty strings)
 
 All validation errors raise `PackageError` with a descriptive message.
+
+---
+
+## Package Verification Tool
+
+Use the verify tool to check packages before publishing to a repository.
+
+### Basic verification
+
+```bash
+python -m deckui.tools.verify path/to/MyPackage.dui
+```
+
+Checks that the package loads correctly and reports warnings for missing metadata, oversized assets, uppercase tags, and unknown manifest keys.
+
+### Strict mode (for repository submission)
+
+```bash
+python -m deckui.tools.verify --strict path/to/MyPackage.dui
+```
+
+Promotes all warnings to errors. Use this as a gate for repository submissions — packages must have `description` and `author` to pass.
+
+### Build a repository index
+
+```bash
+python -m deckui.tools.verify --index path/to/packages/
+```
+
+Verifies all `.dui` packages in a directory and emits a `repository.json` to stdout containing metadata from every valid package. This JSON index is all a repository needs — no external database required.
+
+### Verification checks
+
+| Check | Severity | Description |
+|-------|----------|-------------|
+| Package loads | error | All `load_package` validation passes |
+| `description` present | warning | Non-empty string |
+| `author` present | warning | Non-empty string |
+| `category` valid | error | Must be from the controlled vocabulary (if set) |
+| Tags are lowercase | warning | Each tag should be lowercase |
+| `icon` exists | warning | If declared, file must exist in `assets/` |
+| Unknown manifest keys | warning | Catches typos like `desciption` |
+| Package size | warning | Total assets + SVG under 2 MB |
+| `license` is SPDX | warning | No spaces in the license identifier |

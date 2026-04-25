@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 
 from deckui.dui.loader import PackageError, load_all_packages, load_package
@@ -30,6 +32,10 @@ class TestLoadPackageValid:
         assert spec.type == PackageType.TOUCH_STRIP_CARD
         assert spec.version == 1
         assert "<svg" in spec.svg_source
+        assert spec.description == "A test card for audio playback"
+        assert spec.author == "Test Author <test@example.com>"
+        assert spec.category == "media"
+        assert spec.tags == ("music", "test")
 
     def test_loads_key_package(self, key_dui_path):
         spec = load_package(key_dui_path)
@@ -1284,3 +1290,112 @@ class TestLoadPackageNoBindingsOrEvents:
         assert spec.events == ()
         assert spec.regions == ()
         assert spec.assets == {}
+
+
+class TestLoadPackageMetadata:
+    """Test parsing of optional metadata fields."""
+
+    _SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"/>'
+    _BASE = "name: M\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+
+    def _make_pkg(self, tmp_path, extra_yaml: str) -> str:
+        pkg = tmp_path / "M.dui"
+        pkg.mkdir()
+        (pkg / "layout.svg").write_text(self._SVG, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(self._BASE + extra_yaml, encoding="utf-8")
+        return str(pkg)
+
+    def test_metadata_defaults_to_none(self, tmp_path):
+        spec = load_package(self._make_pkg(tmp_path, ""))
+        assert spec.description is None
+        assert spec.author is None
+        assert spec.license is None
+        assert spec.tags == ()
+        assert spec.category is None
+        assert spec.url is None
+        assert spec.icon is None
+        assert spec.min_deckui is None
+        assert spec.device == ()
+
+    def test_all_metadata_parsed(self, tmp_path):
+        extra = (
+            'description: "A great package"\n'
+            'author: "Jane Doe"\n'
+            'license: MIT\n'
+            "tags: [media, music]\n"
+            "category: media\n"
+            'url: "https://example.com"\n'
+            'icon: "assets/icon.png"\n'
+            'min_deckui: "0.5.0"\n'
+            "device: [StreamDeckPlus]\n"
+        )
+        pkg = tmp_path / "M.dui"
+        pkg.mkdir()
+        (pkg / "layout.svg").write_text(self._SVG, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(self._BASE + extra, encoding="utf-8")
+        assets = pkg / "assets"
+        assets.mkdir()
+        (assets / "icon.png").write_bytes(b"PNG")
+        spec = load_package(pkg)
+        assert spec.description == "A great package"
+        assert spec.author == "Jane Doe"
+        assert spec.license == "MIT"
+        assert spec.tags == ("media", "music")
+        assert spec.category == "media"
+        assert spec.url == "https://example.com"
+        assert spec.icon == "assets/icon.png"
+        assert spec.min_deckui == "0.5.0"
+        assert spec.device == ("StreamDeckPlus",)
+
+    def test_invalid_category(self, tmp_path):
+        with pytest.raises(PackageError, match="Invalid category"):
+            load_package(self._make_pkg(tmp_path, "category: invalid_cat"))
+
+    def test_description_not_string(self, tmp_path):
+        with pytest.raises(PackageError, match="'description' must be a string"):
+            load_package(self._make_pkg(tmp_path, "description: 123"))
+
+    def test_author_not_string(self, tmp_path):
+        with pytest.raises(PackageError, match="'author' must be a string"):
+            load_package(self._make_pkg(tmp_path, "author: 123"))
+
+    def test_tags_not_list(self, tmp_path):
+        with pytest.raises(PackageError, match="'tags' must be a list"):
+            load_package(self._make_pkg(tmp_path, "tags: bad"))
+
+    def test_tags_empty_string(self, tmp_path):
+        with pytest.raises(PackageError, match="non-empty string"):
+            load_package(self._make_pkg(tmp_path, 'tags: [""]'))
+
+    def test_device_not_list(self, tmp_path):
+        with pytest.raises(PackageError, match="'device' must be a list"):
+            load_package(self._make_pkg(tmp_path, "device: StreamDeckPlus"))
+
+    def test_device_empty_string(self, tmp_path):
+        with pytest.raises(PackageError, match="non-empty string"):
+            load_package(self._make_pkg(tmp_path, 'device: [""]'))
+
+    def test_license_not_string(self, tmp_path):
+        with pytest.raises(PackageError, match="'license' must be a string"):
+            load_package(self._make_pkg(tmp_path, "license: 123"))
+
+    def test_url_not_string(self, tmp_path):
+        with pytest.raises(PackageError, match="'url' must be a string"):
+            load_package(self._make_pkg(tmp_path, "url: 123"))
+
+    def test_icon_not_string(self, tmp_path):
+        with pytest.raises(PackageError, match="'icon' must be a string"):
+            load_package(self._make_pkg(tmp_path, "icon: 123"))
+
+    def test_min_deckui_not_string(self, tmp_path):
+        with pytest.raises(PackageError, match="'min_deckui' must be a string"):
+            load_package(self._make_pkg(tmp_path, "min_deckui: 1"))
+
+    def test_category_not_string(self, tmp_path):
+        with pytest.raises(PackageError, match="'category' must be a string"):
+            load_package(self._make_pkg(tmp_path, "category: 123"))
+
+    def test_unknown_keys_logged(self, tmp_path, caplog):
+        with caplog.at_level(logging.WARNING):
+            load_package(self._make_pkg(tmp_path, "desciption: typo"))
+        assert "unknown manifest keys" in caplog.text
