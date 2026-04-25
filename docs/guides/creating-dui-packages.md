@@ -414,11 +414,45 @@ When an event marked `busy: true` fires:
 
 1. The library sets the card/key to **busy** state — further events for that slot are suppressed
 2. The spinner animation starts, pushing pre-rendered frames directly to the device at `interval_ms` intervals
-3. For touchscreen cards, only the affected panel region is updated (not the entire strip)
-4. The normal refresh cycle skips animating slots to avoid overwriting frames
-5. When the handler returns, the animation stops, the slot is marked dirty, and a normal re-render occurs
+3. Spinner frames are rendered **on top of the current UI state** — all bindings (text, colors, images, etc.) are preserved. Only the spinner node is animated; the rest of the key/card looks exactly as it did before the event fired.
+4. For touchscreen cards, only the affected panel region is updated (not the entire strip)
+5. The normal refresh cycle skips animating slots to avoid overwriting frames
+6. **The application decides when the busy state ends** by calling `finish_busy()`. The spinner keeps running until then. If the handler raises an exception, the busy state is auto-cleared so the UI doesn't stay stuck.
 
-Frames are generated **lazily on first use** and cached for the lifetime of the card/key.
+Frames are re-generated each time the spinner starts so they always reflect the latest binding values.
+
+### Controlling the Busy Lifecycle
+
+The spinner does **not** stop automatically when the event handler returns.
+Your application must call ``finish_busy()`` to signal that work is
+complete. This lets you decouple the handler from the actual completion
+of the task — for example, when waiting for an external system to push a
+state update.
+
+```python
+@key.on_event("toggle")
+async def handle():
+    # Fire-and-forget an API call. The spinner keeps running
+    # after this handler returns.
+    await smart_home_api.toggle_light()
+
+# Later, when the external system confirms the new state:
+async def on_state_update(new_state):
+    key.set("status_color", "#00ff00" if new_state else "#333333")
+    await key.finish_busy()   # stops the spinner and re-renders
+```
+
+If you don't need external lifecycle control and just want the spinner
+to last for the duration of the handler, call ``finish_busy()`` at the
+end:
+
+```python
+@key.on_event("toggle")
+async def handle():
+    new_state = await smart_home_api.toggle_light()
+    key.set("status_color", "#00ff00" if new_state else "#333333")
+    await key.finish_busy()
+```
 
 ### Busy Events
 
@@ -479,10 +513,15 @@ key = DuiKey(spec)
 
 @key.on_event("toggle")
 async def handle():
-    # This takes 2 seconds — spinner plays during this time,
-    # and duplicate presses are ignored
-    new_state = await smart_home_api.toggle_light()
+    # Spinner starts automatically — the key still shows the current
+    # label and status_color while the spinner animates in the corner.
+    await smart_home_api.toggle_light()
+    # Don't call finish_busy() here — wait for the state update callback.
+
+async def on_light_state_changed(new_state):
+    """Called by your integration when the light confirms its new state."""
     key.set("status_color", "#00ff00" if new_state else "#333333")
+    await key.finish_busy()   # stops spinner, re-renders the key
 ```
 
 ---

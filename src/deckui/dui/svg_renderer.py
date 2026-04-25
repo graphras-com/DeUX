@@ -393,6 +393,27 @@ class SvgRenderer:
         svg_bytes = ET.tostring(root, encoding="unicode", xml_declaration=True)
         return self._rasterise(svg_bytes.encode("utf-8"))
 
+    def render_svg(self) -> str:
+        """Return the SVG source with current bindings applied (not rasterised).
+
+        This is used by the spinner system to generate frames that
+        reflect the current binding state rather than the raw template.
+
+        Returns
+        -------
+        str
+            SVG markup as a Unicode string.
+        """
+        root = copy.deepcopy(self._base_root)
+
+        for name, binding in self._spec.bindings.items():
+            value = self._values.get(name)
+            self._apply_binding(root, name, binding, value)
+
+        self._inline_assets(root)
+
+        return ET.tostring(root, encoding="unicode", xml_declaration=True)
+
     def _apply_binding(
         self,
         root: ET.Element,

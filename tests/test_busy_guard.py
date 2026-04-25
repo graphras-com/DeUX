@@ -13,11 +13,13 @@ from deckui.dui.card import DuiCard
 from deckui.dui.key import DuiKey
 from deckui.dui.loader import PackageError, _parse_spinner, load_package
 from deckui.dui.schema import (
+    Binding,
     EventMapping,
     PackageSpec,
     PackageType,
     SpinnerSpec,
     SpinnerType,
+    TextBinding,
 )
 
 _CARD_SVG = (
@@ -47,6 +49,7 @@ def _fake_png(width: int = 120, height: int = 120) -> bytes:
 def _make_card_spec(
     busy: bool = False,
     spinner: SpinnerSpec | None = None,
+    bindings: dict[str, Binding] | None = None,
 ) -> PackageSpec:
     events = (
         EventMapping(name="action", source="encoder_press", busy=busy),
@@ -56,7 +59,7 @@ def _make_card_spec(
         type=PackageType.TOUCH_STRIP_CARD,
         version=1,
         svg_source=_CARD_SVG,
-        bindings={},
+        bindings=bindings or {},
         events=events,
         spinner=spinner,
     )
@@ -65,6 +68,7 @@ def _make_card_spec(
 def _make_key_spec(
     busy: bool = False,
     spinner: SpinnerSpec | None = None,
+    bindings: dict[str, Binding] | None = None,
 ) -> PackageSpec:
     events = (
         EventMapping(name="activate", source="key_press", busy=busy),
@@ -74,7 +78,7 @@ def _make_key_spec(
         type=PackageType.KEY,
         version=1,
         svg_source=_KEY_SVG,
-        bindings={},
+        bindings=bindings or {},
         events=events,
         spinner=spinner,
     )
@@ -124,9 +128,15 @@ class TestCardBusyGuard:
         event.set()
         await task
 
+        # Still busy until finish_busy() is called
+        assert card.is_busy is True
         assert call_count == 1
 
-    async def test_card_busy_clears_after_handler(self):
+        await card.finish_busy()
+        assert card.is_busy is False
+
+    async def test_card_busy_stays_after_handler(self):
+        """Busy state persists after handler returns — app must call finish_busy()."""
         spec = _make_card_spec(busy=True)
         card = DuiCard(spec)
         handler = AsyncMock()
@@ -136,9 +146,11 @@ class TestCardBusyGuard:
         callbacks = card.drain_pending_callbacks()
         await callbacks[0][0](*callbacks[0][1])
 
+        assert card.is_busy is True
+        await card.finish_busy()
         assert card.is_busy is False
 
-    async def test_card_marks_dirty_after_busy_handler(self):
+    async def test_card_finish_busy_marks_dirty(self):
         spec = _make_card_spec(busy=True)
         card = DuiCard(spec)
         handler = AsyncMock()
@@ -149,6 +161,33 @@ class TestCardBusyGuard:
         callbacks = card.drain_pending_callbacks()
         await callbacks[0][0](*callbacks[0][1])
 
+        card.mark_clean()
+        await card.finish_busy()
+        assert card.is_dirty is True
+
+    async def test_card_finish_busy_noop_when_not_busy(self):
+        spec = _make_card_spec(busy=True)
+        card = DuiCard(spec)
+        card.mark_clean()
+        await card.finish_busy()
+        assert card.is_dirty is False
+
+    async def test_card_busy_clears_on_handler_error(self):
+        """If the handler raises, busy state is auto-cleared."""
+        spec = _make_card_spec(busy=True)
+        card = DuiCard(spec)
+
+        async def failing_handler():
+            raise RuntimeError("boom")
+
+        card.bind_event("action", failing_handler)
+
+        card.handle_encoder_press()
+        callbacks = card.drain_pending_callbacks()
+        with pytest.raises(RuntimeError, match="boom"):
+            await callbacks[0][0](*callbacks[0][1])
+
+        assert card.is_busy is False
         assert card.is_dirty is True
 
     @patch(
@@ -170,9 +209,12 @@ class TestCardBusyGuard:
         callbacks = card.drain_pending_callbacks()
         await callbacks[0][0](*callbacks[0][1])
 
-        # After completion, animator should be stopped and cleared
+        # Spinner still running after handler returns
+        assert card.is_animating is True
+
+        await card.finish_busy()
         assert card.is_animating is False
-        assert push_fn.await_count >= 0  # may or may not have pushed in fast test
+        assert push_fn.await_count >= 0
 
     @patch(
         "deckui.render.svg_rasterize._svg_to_png",
@@ -203,7 +245,41 @@ class TestCardBusyGuard:
         event.set()
         await task
 
+        # Still animating until finish_busy
+        assert card.is_animating is True
+
+        await card.finish_busy()
         assert card.is_animating is False
+
+    @patch(
+        "deckui.render.svg_rasterize._svg_to_png",
+        side_effect=lambda b, w, h: _fake_png(w, h),
+    )
+    async def test_card_spinner_uses_rendered_svg(self, mock_raster):
+        """Spinner frames should include current binding values."""
+        bindings: dict[str, Binding] = {
+            "title": TextBinding(node="title", default="Default"),
+        }
+        spinner = SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=2)
+        spec = _make_card_spec(busy=True, spinner=spinner, bindings=bindings)
+        card = DuiCard(spec)
+        card.set("title", "Updated")
+
+        push_fn = AsyncMock()
+        card.set_push_fn(push_fn)
+        handler = AsyncMock()
+        card.bind_event("action", handler)
+
+        card.handle_encoder_press()
+        callbacks = card.drain_pending_callbacks()
+        await callbacks[0][0](*callbacks[0][1])
+
+        # Inspect what was rasterised — SVG bytes should contain "Updated"
+        assert mock_raster.call_count >= 2
+        first_svg_bytes: bytes = mock_raster.call_args_list[0][0][0]
+        assert b"Updated" in first_svg_bytes
+
+        await card.finish_busy()
 
 
 # ── Key busy guard ────────────────────────────────────────────────────
@@ -241,15 +317,71 @@ class TestKeyBusyGuard:
         await task
 
         assert call_count == 1
+        # Still busy until finish_busy
+        assert key.is_busy is True
+        await key.finish_busy()
+        assert key.is_busy is False
 
-    async def test_key_busy_clears_after_handler(self):
+    async def test_key_busy_stays_after_handler(self):
+        """Busy state persists after handler returns — app must call finish_busy()."""
         spec = _make_key_spec(busy=True)
         key = DuiKey(spec)
         handler = AsyncMock()
         key.bind_event("activate", handler)
 
         await key.dispatch(True)
+        assert key.is_busy is True
+        await key.finish_busy()
         assert key.is_busy is False
+
+    async def test_key_finish_busy_noop_when_not_busy(self):
+        spec = _make_key_spec(busy=True)
+        key = DuiKey(spec)
+        key._dirty = False
+        await key.finish_busy()
+        assert key._dirty is False
+
+    async def test_key_busy_clears_on_handler_error(self):
+        """If the handler raises, busy state is auto-cleared."""
+        spec = _make_key_spec(busy=True)
+        key = DuiKey(spec)
+
+        async def failing_handler():
+            raise RuntimeError("boom")
+
+        key.bind_event("activate", failing_handler)
+
+        with pytest.raises(RuntimeError, match="boom"):
+            await key.dispatch(True)
+
+        assert key.is_busy is False
+
+    @patch(
+        "deckui.render.svg_rasterize._svg_to_png",
+        side_effect=lambda b, w, h: _fake_png(w, h),
+    )
+    async def test_key_spinner_uses_rendered_svg(self, mock_raster):
+        """Spinner frames should include current binding values."""
+        bindings: dict[str, Binding] = {
+            "label": TextBinding(node="label", default="Key"),
+        }
+        spinner = SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=2)
+        spec = _make_key_spec(busy=True, spinner=spinner, bindings=bindings)
+        key = DuiKey(spec)
+        key.set("label", "Playing")
+
+        push_fn = AsyncMock()
+        key.set_push_fn(push_fn)
+        handler = AsyncMock()
+        key.bind_event("activate", handler)
+
+        await key.dispatch(True)
+
+        assert mock_raster.call_count >= 2
+        first_svg_bytes: bytes = mock_raster.call_args_list[0][0][0]
+        assert b"Playing" in first_svg_bytes
+
+        await key.finish_busy()
 
 
 # ── Spinner manifest validation ───────────────────────────────────────

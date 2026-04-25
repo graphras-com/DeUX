@@ -140,6 +140,62 @@ class TestCaching:
         assert mock_raster.call_count == 4  # once per frame, not 8
 
 
+class TestRenderedSvg:
+    @patch("deckui.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    def test_rotation_uses_rendered_svg_when_provided(self, mock_raster):
+        """When rendered_svg is passed, spinner frames use it instead of raw svg_source."""
+        rendered = (
+            '<svg id="TestCard" xmlns="http://www.w3.org/2000/svg" '
+            'width="120" height="120">'
+            '<rect id="bg" width="120" height="120" fill="#1c1c1c"/>'
+            '<text id="title">Updated Title</text>'
+            '<rect id="spinner" x="80" y="30" width="30" height="30" '
+            'display="none" fill="#fff"/>'
+            "</svg>"
+        )
+        spec = _make_spec(
+            spinner=SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=2)
+        )
+        sf = SpinnerFrames(spec, width=120, height=120, rendered_svg=rendered)
+        assert len(sf.frames) == 2
+
+        # Verify the rendered SVG was used — it should contain "Updated Title"
+        first_call_svg: bytes = mock_raster.call_args_list[0][0][0]
+        assert b"Updated Title" in first_call_svg
+
+    @patch("deckui.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    def test_pulse_uses_rendered_svg_when_provided(self, mock_raster):
+        rendered = (
+            '<svg id="TestCard" xmlns="http://www.w3.org/2000/svg" '
+            'width="120" height="120">'
+            '<rect id="bg" width="120" height="120" fill="#1c1c1c"/>'
+            '<text id="title">Rendered Content</text>'
+            '<rect id="spinner" x="80" y="30" width="30" height="30" '
+            'display="none" fill="#fff"/>'
+            "</svg>"
+        )
+        spec = _make_spec(
+            spinner=SpinnerSpec(type=SpinnerType.PULSE, node="spinner", frames=2)
+        )
+        sf = SpinnerFrames(spec, width=120, height=120, rendered_svg=rendered)
+        assert len(sf.frames) == 2
+
+        first_call_svg: bytes = mock_raster.call_args_list[0][0][0]
+        assert b"Rendered Content" in first_call_svg
+
+    @patch("deckui.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    def test_falls_back_to_svg_source_without_rendered(self, mock_raster):
+        """Without rendered_svg, spinner uses the raw svg_source."""
+        spec = _make_spec(
+            spinner=SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=2)
+        )
+        sf = SpinnerFrames(spec, width=120, height=120)
+        assert len(sf.frames) == 2
+        # Raw SVG should NOT contain "Updated Title"
+        first_call_svg: bytes = mock_raster.call_args_list[0][0][0]
+        assert b"Updated Title" not in first_call_svg
+
+
 class TestErrors:
     def test_no_spinner_spec_raises(self):
         spec = _make_spec(spinner=None)
