@@ -12,6 +12,8 @@ import yaml
 from .schema import (
     DEFAULT_HOLD_MS,
     DEFAULT_MAX_DURATION_MS,
+    DEFAULT_SPINNER_FRAMES,
+    DEFAULT_SPINNER_INTERVAL_MS,
     HOLD_SOURCES,
     KNOWN_MANIFEST_KEYS,
     VALID_CATEGORIES,
@@ -32,6 +34,8 @@ from .schema import (
     RangeDirection,
     Region,
     SliderBinding,
+    SpinnerSpec,
+    SpinnerType,
     TextBinding,
     ToggleBinding,
     VisibilityBinding,
@@ -292,12 +296,55 @@ def _parse_event(raw: dict[str, Any], index: int) -> EventMapping:
     if source in _PRESS_RELEASE_SOURCES and max_duration_ms is None:
         max_duration_ms = DEFAULT_MAX_DURATION_MS
 
+    busy = raw.get("busy", False)
+    if not isinstance(busy, bool):
+        raise PackageError(f"Event '{name}': busy must be a boolean")
+
     return EventMapping(
         name=name,
         source=source,
         direction=direction,
         max_duration_ms=max_duration_ms,
         hold_ms=hold_ms,
+        busy=busy,
+    )
+
+
+def _parse_spinner(raw: dict[str, Any]) -> SpinnerSpec:
+    """Parse a spinner configuration from the manifest."""
+    raw_type = raw.get("type")
+    if raw_type is None:
+        raise PackageError("Spinner missing 'type'")
+    try:
+        spinner_type = SpinnerType(raw_type)
+    except ValueError:
+        valid = [t.value for t in SpinnerType]
+        raise PackageError(
+            f"Invalid spinner type '{raw_type}'. Valid types: {valid}"
+        ) from None
+
+    node = raw.get("node")
+    if spinner_type in (SpinnerType.ROTATION, SpinnerType.PULSE):
+        if not node or not isinstance(node, str):
+            raise PackageError(
+                f"Spinner type '{raw_type}' requires a 'node' (SVG element ID)"
+            )
+    elif node is not None and not isinstance(node, str):
+        raise PackageError("Spinner 'node' must be a string if provided")
+
+    frames = raw.get("frames", DEFAULT_SPINNER_FRAMES)
+    if not isinstance(frames, int) or isinstance(frames, bool) or frames < 2:
+        raise PackageError("Spinner 'frames' must be an integer >= 2")
+
+    interval_ms = raw.get("interval_ms", DEFAULT_SPINNER_INTERVAL_MS)
+    if not isinstance(interval_ms, int) or isinstance(interval_ms, bool) or interval_ms < 10:
+        raise PackageError("Spinner 'interval_ms' must be an integer >= 10")
+
+    return SpinnerSpec(
+        type=spinner_type,
+        node=node,
+        frames=frames,
+        interval_ms=interval_ms,
     )
 
 
@@ -527,12 +574,47 @@ def load_package(path: str | Path) -> PackageSpec:
         region = _parse_region(region_name, region_raw)
         regions.append(region)
 
+    # ── Spinner ───────────────────────────────────────────────────────
+    spinner: SpinnerSpec | None = None
+    raw_spinner = manifest.get("spinner")
+    if raw_spinner is not None:
+        if not isinstance(raw_spinner, dict):
+            raise PackageError("'spinner' must be a mapping")
+        spinner = _parse_spinner(raw_spinner)
+
+        # Validate spinner node exists in SVG (for rotation/pulse)
+        if spinner.node is not None and spinner.node not in svg_ids:
+            raise PackageError(
+                f"Spinner references node '{spinner.node}' "
+                f"which does not exist in the SVG. "
+                f"Available ids: {sorted(svg_ids)}"
+            )
+
+    # Validate busy events require a spinner
+    has_busy_event = any(e.busy for e in events)
+    if has_busy_event and spinner is None:
+        raise PackageError(
+            "Events with 'busy: true' require a 'spinner' section in the manifest"
+        )
+
     assets: dict[str, bytes] = {}
     assets_dir = pkg_dir / "assets"
     if assets_dir.is_dir():
-        for asset_file in assets_dir.iterdir():
+        for asset_file in sorted(assets_dir.rglob("*")):
             if asset_file.is_file():
-                assets[asset_file.name] = asset_file.read_bytes()
+                rel = str(asset_file.relative_to(assets_dir))
+                assets[rel] = asset_file.read_bytes()
+
+    # Validate custom spinner frames exist in assets
+    if spinner is not None and spinner.type == SpinnerType.CUSTOM:
+        has_gif = "spinner.gif" in assets
+        frame_keys = sorted(k for k in assets if k.startswith("spinner/frame_"))
+        if not has_gif and not frame_keys:
+            raise PackageError(
+                "Spinner type 'custom' requires either 'assets/spinner.gif' "
+                "or frame images in 'assets/spinner/' "
+                "(e.g. 'spinner/frame_00.png', 'spinner/frame_01.png', ...)"
+            )
 
     logger.info(
         "Loaded .dui package '%s' (%s, %d bindings, %d events)",
@@ -551,6 +633,7 @@ def load_package(path: str | Path) -> PackageSpec:
         events=tuple(events),
         regions=tuple(regions),
         assets=assets,
+        spinner=spinner,
         description=description,
         author=author,
         license=pkg_license,

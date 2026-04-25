@@ -26,6 +26,18 @@ def _make_events(*specs: tuple) -> tuple[EventMapping, ...]:
     return tuple(result)
 
 
+def _handlers(results: list[tuple]) -> list:
+    """Extract just the handler from (handler, is_busy) tuples."""
+    return [h for h, _ in results]
+
+
+def _handler(result: tuple | None):
+    """Extract handler from a single (handler, is_busy) or None."""
+    if result is None:
+        return None
+    return result[0]
+
+
 class TestEncoderTurn:
     def test_turn_right(self):
         events = _make_events(
@@ -36,7 +48,7 @@ class TestEncoderTurn:
         handler = AsyncMock()
         em.on("next", handler)
         result = em.handle_encoder_turn(1)
-        assert result is handler
+        assert _handler(result) is handler
 
     def test_turn_left(self):
         events = _make_events(
@@ -47,15 +59,15 @@ class TestEncoderTurn:
         handler = AsyncMock()
         em.on("prev", handler)
         result = em.handle_encoder_turn(-1)
-        assert result is handler
+        assert _handler(result) is handler
 
     def test_turn_no_direction_filter(self):
         events = _make_events(("scroll", "encoder_turn"))
         em = EventMap(events)
         handler = AsyncMock()
         em.on("scroll", handler)
-        assert em.handle_encoder_turn(1) is handler
-        assert em.handle_encoder_turn(-1) is handler
+        assert _handler(em.handle_encoder_turn(1)) is handler
+        assert _handler(em.handle_encoder_turn(-1)) is handler
 
     def test_turn_no_match(self):
         events = _make_events(("next", "encoder_turn", {"direction": "right"}))
@@ -78,7 +90,7 @@ class TestEncoderPressRelease:
         em = EventMap(events)
         handler = AsyncMock()
         em.on("press", handler)
-        assert em.handle_encoder_press() == [handler]
+        assert em.handle_encoder_press() == [(handler, False)]
 
     def test_simple_release(self):
         events = _make_events(("release", "encoder_release"))
@@ -86,7 +98,7 @@ class TestEncoderPressRelease:
         handler = AsyncMock()
         em.on("release", handler)
         em.handle_encoder_press()
-        assert em.handle_encoder_release() == [handler]
+        assert _handlers(em.handle_encoder_release()) == [handler]
 
     def test_press_release_gesture_within_duration(self):
         events = _make_events(
@@ -98,7 +110,7 @@ class TestEncoderPressRelease:
 
         em.handle_encoder_press()
         result = em.handle_encoder_release()
-        assert handler in result
+        assert handler in _handlers(result)
 
     def test_press_release_gesture_exceeded_duration(self):
         events = _make_events(
@@ -111,7 +123,7 @@ class TestEncoderPressRelease:
         em.handle_encoder_press()
         time.sleep(0.01)
         result = em.handle_encoder_release()
-        assert handler not in result
+        assert handler not in _handlers(result)
 
     def test_press_release_no_max_duration(self):
         events = _make_events(("toggle", "encoder_press_release"))
@@ -122,7 +134,7 @@ class TestEncoderPressRelease:
         em.handle_encoder_press()
         time.sleep(0.01)
         result = em.handle_encoder_release()
-        assert handler in result
+        assert handler in _handlers(result)
 
     def test_release_without_press(self):
         events = _make_events(("release", "encoder_release"))
@@ -130,7 +142,7 @@ class TestEncoderPressRelease:
         handler = AsyncMock()
         em.on("release", handler)
         result = em.handle_encoder_release()
-        assert result == [handler]
+        assert _handlers(result) == [handler]
 
     def test_release_always_fires_alongside_press_release(self):
         """encoder_release fires even when encoder_press_release also fires."""
@@ -146,8 +158,8 @@ class TestEncoderPressRelease:
 
         em.handle_encoder_press()
         result = em.handle_encoder_release()
-        assert toggle_handler in result
-        assert release_handler in result
+        assert toggle_handler in _handlers(result)
+        assert release_handler in _handlers(result)
 
 
 class TestEncoderPressTurn:
@@ -159,7 +171,7 @@ class TestEncoderPressTurn:
 
         em.handle_encoder_press()
         result = em.handle_encoder_turn(1)
-        assert result is handler
+        assert _handler(result) is handler
 
     def test_press_turn_not_pressed(self):
         events = _make_events(("seek", "encoder_press_turn"))
@@ -194,7 +206,7 @@ class TestEncoderPressTurn:
 
         em.handle_encoder_press()
         result = em.handle_encoder_turn(1)
-        assert result is fwd_handler
+        assert _handler(result) is fwd_handler
 
     def test_press_turn_direction_left(self):
         events = _make_events(
@@ -209,7 +221,7 @@ class TestEncoderPressTurn:
 
         em.handle_encoder_press()
         result = em.handle_encoder_turn(-1)
-        assert result is bwd_handler
+        assert _handler(result) is bwd_handler
 
     def test_press_turn_direction_no_match(self):
         events = _make_events(
@@ -237,7 +249,7 @@ class TestEncoderPressTurn:
 
         em.handle_encoder_press()
         result = em.handle_encoder_turn(1)
-        assert result is seek_handler
+        assert _handler(result) is seek_handler
 
     def test_regular_turn_fires_when_press_turn_direction_mismatches(self):
         """Falls back to encoder_turn when press_turn direction doesn't match."""
@@ -253,7 +265,7 @@ class TestEncoderPressTurn:
 
         em.handle_encoder_press()
         result = em.handle_encoder_turn(-1)
-        assert result is scroll_handler
+        assert _handler(result) is scroll_handler
 
 
 class TestKeyEvents:
@@ -262,7 +274,7 @@ class TestKeyEvents:
         em = EventMap(events)
         handler = AsyncMock()
         em.on("hold", handler)
-        assert em.handle_key_press() == [handler]
+        assert _handlers(em.handle_key_press()) == [handler]
 
     def test_key_release(self):
         events = _make_events(("up", "key_release"))
@@ -270,7 +282,7 @@ class TestKeyEvents:
         handler = AsyncMock()
         em.on("up", handler)
         em.handle_key_press()
-        assert em.handle_key_release() == [handler]
+        assert _handlers(em.handle_key_release()) == [handler]
 
     def test_key_press_release_within_duration(self):
         events = _make_events(
@@ -282,7 +294,7 @@ class TestKeyEvents:
 
         em.handle_key_press()
         result = em.handle_key_release()
-        assert handler in result
+        assert handler in _handlers(result)
 
     def test_key_press_release_exceeded(self):
         events = _make_events(
@@ -295,7 +307,7 @@ class TestKeyEvents:
         em.handle_key_press()
         time.sleep(0.01)
         result = em.handle_key_release()
-        assert handler not in result
+        assert handler not in _handlers(result)
 
     def test_key_release_without_press(self):
         events = _make_events(("up", "key_release"))
@@ -303,7 +315,7 @@ class TestKeyEvents:
         handler = AsyncMock()
         em.on("up", handler)
         result = em.handle_key_release()
-        assert result == [handler]
+        assert _handlers(result) == [handler]
 
     def test_key_press_release_no_max(self):
         events = _make_events(("tap", "key_press_release"))
@@ -312,7 +324,7 @@ class TestKeyEvents:
         em.on("tap", handler)
         em.handle_key_press()
         time.sleep(0.01)
-        assert handler in em.handle_key_release()
+        assert handler in _handlers(em.handle_key_release())
 
     def test_release_always_fires_alongside_press_release(self):
         """key_release fires even when key_press_release also fires."""
@@ -328,8 +340,8 @@ class TestKeyEvents:
 
         em.handle_key_press()
         result = em.handle_key_release()
-        assert tap_handler in result
-        assert release_handler in result
+        assert tap_handler in _handlers(result)
+        assert release_handler in _handlers(result)
 
     def test_press_always_fires_with_hold_configured(self):
         """key_press fires even when key_hold is also configured."""
@@ -344,7 +356,7 @@ class TestKeyEvents:
         em.on("long_hold", hold_handler)
 
         result = em.handle_key_press()
-        assert press_handler in result
+        assert press_handler in _handlers(result)
 
     def test_no_key_press_mapping_returns_empty(self):
         """handle_key_press returns empty list when no key_press mapping."""
@@ -409,7 +421,7 @@ class TestKeyHold:
         hold_handler.assert_awaited_once()
 
         result = em.handle_key_release()
-        assert tap_handler not in result
+        assert tap_handler not in _handlers(result)
         tap_handler.assert_not_awaited()
 
     async def test_hold_does_not_suppress_key_release(self):
@@ -429,7 +441,7 @@ class TestKeyHold:
         hold_handler.assert_awaited_once()
 
         result = em.handle_key_release()
-        assert release_handler in result
+        assert release_handler in _handlers(result)
 
     async def test_short_tap_still_works_with_hold(self):
         """Quick release fires press_release, not the hold."""
@@ -445,7 +457,7 @@ class TestKeyHold:
 
         em.handle_key_press()
         result = em.handle_key_release()
-        assert tap_handler in result
+        assert tap_handler in _handlers(result)
         hold_handler.assert_not_awaited()
 
     async def test_hold_no_handler_registered(self):
@@ -478,7 +490,7 @@ class TestKeyHold:
 
         em.handle_key_press()
         result = em.handle_key_release()
-        assert tap_handler in result
+        assert tap_handler in _handlers(result)
 
     async def test_hold_suppresses_press_release_but_not_release(self):
         """After key_hold fires, key_press_release is suppressed but key_release still fires."""
@@ -500,8 +512,8 @@ class TestKeyHold:
         hold_handler.assert_awaited_once()
 
         result = em.handle_key_release()
-        assert tap_handler not in result
-        assert release_handler in result
+        assert tap_handler not in _handlers(result)
+        assert release_handler in _handlers(result)
 
 
 class TestEncoderHold:
@@ -546,7 +558,7 @@ class TestEncoderHold:
         hold_handler.assert_awaited_once()
 
         result = em.handle_encoder_release()
-        assert toggle_handler not in result
+        assert toggle_handler not in _handlers(result)
         toggle_handler.assert_not_awaited()
 
     async def test_encoder_short_tap_still_works_with_hold(self):
@@ -562,7 +574,7 @@ class TestEncoderHold:
 
         em.handle_encoder_press()
         result = em.handle_encoder_release()
-        assert toggle_handler in result
+        assert toggle_handler in _handlers(result)
         hold_handler.assert_not_awaited()
 
     async def test_encoder_release_fires_alongside_press_release(self):
@@ -582,8 +594,8 @@ class TestEncoderHold:
 
         em.handle_encoder_press()
         result = em.handle_encoder_release()
-        assert toggle_handler in result
-        assert release_handler in result
+        assert toggle_handler in _handlers(result)
+        assert release_handler in _handlers(result)
 
     async def test_encoder_hold_cancelled_by_turn_before_hold_ms(self):
         """encoder_hold does NOT fire if a turn occurs before hold_ms expires."""
@@ -599,7 +611,7 @@ class TestEncoderHold:
 
         em.handle_encoder_press()
         result = em.handle_encoder_turn(1)
-        assert result is seek_handler
+        assert _handler(result) is seek_handler
 
         await asyncio.sleep(0.1)
         hold_handler.assert_not_awaited()
@@ -639,7 +651,7 @@ class TestEncoderHold:
         hold_handler.assert_awaited_once()
 
         result = em.handle_encoder_release()
-        assert release_handler in result
+        assert release_handler in _handlers(result)
 
 
 class TestTouchEvents:
@@ -653,7 +665,7 @@ class TestTouchEvents:
         em.on("card_tap", handler)
 
         result = em.handle_touch(EventType.TOUCH_SHORT, 50, 50)
-        assert result is handler
+        assert _handler(result) is handler
 
     def test_tap_outside_region(self):
         events = _make_events(("card_tap", "tap"))
@@ -663,7 +675,7 @@ class TestTouchEvents:
         em.on("card_tap", handler)
 
         result = em.handle_touch(EventType.TOUCH_SHORT, 100, 50)
-        assert result is handler
+        assert _handler(result) is handler
 
     def test_long_press_in_region(self):
         events = _make_events(("menu", "long_press"))
@@ -675,7 +687,7 @@ class TestTouchEvents:
         em.on("menu", handler)
 
         result = em.handle_touch(EventType.TOUCH_LONG, 50, 50)
-        assert result is handler
+        assert _handler(result) is handler
 
     def test_drag_not_handled(self):
         events = _make_events(("card_tap", "tap"))
@@ -691,7 +703,7 @@ class TestTouchEvents:
         handler = AsyncMock()
         em.on("card_tap", handler)
         result = em.handle_touch(EventType.TOUCH_SHORT, 50, 50)
-        assert result is handler
+        assert _handler(result) is handler
 
     def test_region_event_mismatch(self):
         """Region only accepts 'tap' but we send long_press."""
@@ -703,7 +715,7 @@ class TestTouchEvents:
         handler = AsyncMock()
         em.on("menu", handler)
         result = em.handle_touch(EventType.TOUCH_LONG, 50, 50)
-        assert result is handler
+        assert _handler(result) is handler
 
 
 class TestEventMapRegistration:

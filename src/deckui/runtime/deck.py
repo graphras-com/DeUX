@@ -25,6 +25,7 @@ from .events import (
 from .transport import AsyncTransport
 
 if TYPE_CHECKING:
+    from ..dui.animator import PushFn
     from ..dui.key import DuiKey
     from ..ui.cards.base import Card
     from ..ui.controls.key_slot import KeySlot
@@ -325,13 +326,38 @@ class Deck:
         """Check whether a key slot is a DuiKey."""
         return getattr(key_slot, "has_dui_content", False)
 
+    @staticmethod
+    def _is_animating(obj: Any) -> bool:
+        """Check whether a card or key has an active spinner animation."""
+        return getattr(obj, "is_animating", False)
+
     async def _render_dui_key(self, key_slot: KeySlot) -> None:
         """Render a DuiKey and push to the device."""
         if not self._device:
             return
 
-
         dui_key = cast("DuiKey", key_slot)
+
+        # Skip rendering if a spinner animation is active
+        if self._is_animating(dui_key):
+            return
+
+        # Wire up push_fn for spinner animation support
+        if not dui_key._push_fn:  # noqa: SLF001
+            key_index = dui_key.index
+
+            async def _push_key_frame(frame_bytes: bytes) -> None:
+                loop = asyncio.get_running_loop()
+                async with self._device_lock:
+                    await loop.run_in_executor(
+                        self._executor,
+                        self._device.set_key_image,
+                        key_index,
+                        frame_bytes,
+                    )
+
+            dui_key.set_push_fn(_push_key_frame)
+
         image_bytes = dui_key.render_image(
             key_size=self._caps.key_size if self._caps else (120, 120),
             image_format=self._caps.key_image_format if self._caps else "JPEG",
@@ -356,8 +382,48 @@ class Deck:
         if screen.touch_strip is None:
             return
 
+        metrics = self._metrics
+
+        # Wire up push_fn for each DuiCard that needs spinner support
+        for card_idx, card in enumerate(screen.cards):
+            from ..dui.card import DuiCard
+
+            if isinstance(card, DuiCard) and card._push_fn is None:  # noqa: SLF001
+                x_pos = metrics.margin_left + card_idx * (
+                    metrics.panel_width + metrics.panel_gap
+                )
+                y_pos = metrics.margin_top
+
+                async def _make_push(x: int, y: int, w: int, h: int) -> PushFn:
+                    async def _push_card_frame(frame_bytes: bytes) -> None:
+                        loop = asyncio.get_running_loop()
+                        async with self._device_lock:
+                            await loop.run_in_executor(
+                                self._executor,
+                                self._device.set_touchscreen_image,
+                                frame_bytes,
+                                x,
+                                y,
+                                w,
+                                h,
+                            )
+
+                    return _push_card_frame
+
+                push_fn = await _make_push(
+                    x_pos,
+                    y_pos,
+                    metrics.panel_width,
+                    metrics.panel_height,
+                )
+                card.set_push_fn(push_fn)
+
         card_images = []
         for card in screen.cards:
+            # Skip re-rendering cards with active spinner animations
+            if self._is_animating(card):
+                card_images.append(card.rendered)
+                continue
             await card.prepare_assets()
             img = card.render()
             card.set_rendered(img)

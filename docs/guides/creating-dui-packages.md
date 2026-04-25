@@ -260,6 +260,7 @@ events:
 | `direction` | `str` | no | `"left"` or `"right"` (turn events only) |
 | `max_duration_ms` | `int` | no | Max press duration for `*_press_release` (default 500) |
 | `hold_ms` | `int` | no | Hold threshold for `*_hold` (default 500) |
+| `busy` | `bool` | no | Enable spinner animation and event suppression (default `false`) |
 
 ### Sources
 
@@ -314,6 +315,175 @@ regions:
 ```
 
 All coordinates are non-negative integers. The `events` list is optional and restricts which touch gestures the region responds to.
+
+---
+
+## Spinner & Busy State
+
+When an event handler takes time to complete (e.g. making an API call), users get no immediate visual feedback and may press the button again. The **spinner** system solves this by:
+
+1. Showing an animation immediately when the event fires
+2. Suppressing duplicate events while the handler is running
+3. Restoring the normal UI when the handler completes
+
+### Defining a Spinner
+
+Add a `spinner` section to your manifest and mark events with `busy: true`:
+
+```yaml
+spinner:
+  type: rotation        # "rotation", "pulse", or "custom"
+  node: spinner_icon    # SVG element ID to animate (required for rotation/pulse)
+  frames: 12            # frames per cycle (default 12, minimum 2)
+  interval_ms: 80       # ms between frames (default 80, minimum 10)
+
+events:
+  - name: toggle_play
+    source: encoder_press_release
+    busy: true           # enable spinner + event guard for this event
+```
+
+Your SVG must include an element with the spinner node ID. It's typically hidden by default and made visible during animation:
+
+```xml
+<rect id="spinner_icon" x="80" y="30" width="30" height="30"
+      display="none" fill="#ffffff"/>
+```
+
+### Spinner Types
+
+#### `rotation`
+
+Rotates the SVG node by `360/frames` degrees each frame around its centre. Good for loading spinners.
+
+```yaml
+spinner:
+  type: rotation
+  node: spinner_icon
+  frames: 12
+  interval_ms: 80
+```
+
+#### `pulse`
+
+Cycles the node's opacity between 0.2 and 1.0 in a triangle wave. Good for subtle "working" indicators.
+
+```yaml
+spinner:
+  type: pulse
+  node: spinner_glow
+  frames: 8
+  interval_ms: 100
+```
+
+#### `custom`
+
+Use your own pre-rendered frames. Place them in one of two formats:
+
+**Numbered PNGs** in `assets/spinner/`:
+
+```
+MyPackage.dui/
+  assets/
+    spinner/
+      frame_00.png
+      frame_01.png
+      frame_02.png
+      ...
+```
+
+**Animated GIF** at `assets/spinner.gif`:
+
+```
+MyPackage.dui/
+  assets/
+    spinner.gif
+```
+
+For custom spinners, the `node` field is optional (ignored).
+
+```yaml
+spinner:
+  type: custom
+  interval_ms: 60
+```
+
+### How It Works
+
+When an event marked `busy: true` fires:
+
+1. The library sets the card/key to **busy** state — further events for that slot are suppressed
+2. The spinner animation starts, pushing pre-rendered frames directly to the device at `interval_ms` intervals
+3. For touchscreen cards, only the affected panel region is updated (not the entire strip)
+4. The normal refresh cycle skips animating slots to avoid overwriting frames
+5. When the handler returns, the animation stops, the slot is marked dirty, and a normal re-render occurs
+
+Frames are generated **lazily on first use** and cached for the lifetime of the card/key.
+
+### Busy Events
+
+The `busy` field is opt-in per event. Only events you mark with `busy: true` get the spinner and event suppression. Non-busy events on the same card/key still fire normally.
+
+```yaml
+events:
+  - name: toggle_play
+    source: encoder_press_release
+    busy: true           # gets spinner + suppression
+  - name: next_track
+    source: encoder_turn
+    direction: right     # no busy — fires immediately, no spinner
+```
+
+**Validation rules:**
+- If any event has `busy: true`, the manifest must define a `spinner` section
+- For `rotation` and `pulse` types, the `node` must exist in the SVG
+- For `custom` type, either `assets/spinner.gif` or `assets/spinner/frame_*.png` files must exist
+
+### Complete Example
+
+```yaml
+name: SmartLight
+type: Key
+version: 1
+layout: layout.svg
+
+spinner:
+  type: rotation
+  node: loading_ring
+  frames: 8
+  interval_ms: 100
+
+bindings:
+  label:
+    type: text
+    node: label
+    default: "Light"
+  status_color:
+    type: color
+    node: indicator
+    attribute: fill
+    default: "#333333"
+
+events:
+  - name: toggle
+    source: key_press_release
+    max_duration_ms: 300
+    busy: true
+```
+
+```python
+from deckui.dui import DuiKey, load_package
+
+spec = load_package("./SmartLight.dui")
+key = DuiKey(spec)
+
+@key.on_event("toggle")
+async def handle():
+    # This takes 2 seconds — spinner plays during this time,
+    # and duplicate presses are ignored
+    new_state = await smart_home_api.toggle_light()
+    key.set("status_color", "#00ff00" if new_state else "#333333")
+```
 
 ---
 
