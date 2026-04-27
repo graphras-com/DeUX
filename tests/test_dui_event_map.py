@@ -732,3 +732,139 @@ class TestEventMapRegistration:
         events = _make_events(("play", "encoder_press"))
         em = EventMap(events)
         assert em.handle_encoder_press() == []
+
+
+class TestAccumulatedTurns:
+    async def test_accumulated_turn_debounces(self):
+        """Multiple ticks flush as a single call with net steps."""
+        events = _make_events(
+            ("vol_up", "encoder_turn", {
+                "direction": "right", "accumulate": True, "accumulate_delay": 0.05,
+            }),
+        )
+        em = EventMap(events)
+        handler = AsyncMock()
+        em.on("vol_up", handler)
+
+        assert em.handle_encoder_turn(1) is None
+        assert em.handle_encoder_turn(1) is None
+        assert em.handle_encoder_turn(1) is None
+
+        await asyncio.sleep(0.1)
+        handler.assert_awaited_once_with(3)
+
+    async def test_accumulated_turn_respects_max_steps(self):
+        events = _make_events(
+            ("vol_up", "encoder_turn", {
+                "direction": "right", "accumulate": True,
+                "accumulate_delay": 0.05, "accumulate_max_steps": 2,
+            }),
+        )
+        em = EventMap(events)
+        handler = AsyncMock()
+        em.on("vol_up", handler)
+
+        for _ in range(5):
+            em.handle_encoder_turn(1)
+
+        await asyncio.sleep(0.1)
+        handler.assert_awaited_once_with(2)
+
+    async def test_accumulated_turn_custom_delay(self):
+        events = _make_events(
+            ("vol", "encoder_turn", {
+                "accumulate": True, "accumulate_delay": 0.05,
+            }),
+        )
+        em = EventMap(events)
+        handler = AsyncMock()
+        em.on("vol", handler)
+
+        em.handle_encoder_turn(1)
+        await asyncio.sleep(0.02)
+        handler.assert_not_awaited()
+
+        await asyncio.sleep(0.05)
+        handler.assert_awaited_once_with(1)
+
+    async def test_accumulated_press_turn(self):
+        events = _make_events(
+            ("kelvin", "encoder_press_turn", {
+                "direction": "right", "accumulate": True, "accumulate_delay": 0.05,
+            }),
+        )
+        em = EventMap(events)
+        handler = AsyncMock()
+        em.on("kelvin", handler)
+
+        em.handle_encoder_press()
+        assert em.handle_encoder_turn(1) is None
+        assert em.handle_encoder_turn(1) is None
+
+        await asyncio.sleep(0.1)
+        handler.assert_awaited_once_with(2)
+
+    async def test_accumulated_press_turn_not_pressed(self):
+        """Accumulated press_turn doesn't fire when not pressed."""
+        events = _make_events(
+            ("kelvin", "encoder_press_turn", {
+                "accumulate": True, "accumulate_delay": 0.05,
+            }),
+        )
+        em = EventMap(events)
+        handler = AsyncMock()
+        em.on("kelvin", handler)
+
+        assert em.handle_encoder_turn(1) is None
+
+        await asyncio.sleep(0.1)
+        handler.assert_not_awaited()
+
+    async def test_cancel_accumulators(self):
+        events = _make_events(
+            ("vol_up", "encoder_turn", {
+                "direction": "right", "accumulate": True, "accumulate_delay": 0.05,
+            }),
+        )
+        em = EventMap(events)
+        handler = AsyncMock()
+        em.on("vol_up", handler)
+
+        em.handle_encoder_turn(1)
+        em.cancel_accumulators()
+
+        await asyncio.sleep(0.1)
+        handler.assert_not_awaited()
+
+    async def test_non_accumulated_turn_unchanged(self):
+        """Non-accumulated turns still return handler directly."""
+        events = _make_events(
+            ("vol_up", "encoder_turn", {"direction": "right"}),
+        )
+        em = EventMap(events)
+        handler = AsyncMock()
+        em.on("vol_up", handler)
+
+        result = em.handle_encoder_turn(1)
+        assert result is handler
+
+    async def test_accumulated_direction_filtering(self):
+        """Accumulated left turn only captures left ticks."""
+        events = _make_events(
+            ("vol_down", "encoder_turn", {
+                "direction": "left", "accumulate": True, "accumulate_delay": 0.05,
+            }),
+        )
+        em = EventMap(events)
+        handler = AsyncMock()
+        em.on("vol_down", handler)
+
+        # Right tick should not match
+        assert em.handle_encoder_turn(1) is None
+        await asyncio.sleep(0.1)
+        handler.assert_not_awaited()
+
+        # Left tick should match
+        em.handle_encoder_turn(-1)
+        await asyncio.sleep(0.1)
+        handler.assert_awaited_once_with(-1)

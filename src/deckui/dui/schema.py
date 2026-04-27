@@ -198,6 +198,10 @@ VALID_DIRECTIONS = frozenset({"left", "right"})
 VALID_REGION_EVENTS = frozenset({"tap", "long_press"})
 
 
+TURN_SOURCES = frozenset({"encoder_turn", "encoder_press_turn"})
+"""Sources that support the ``accumulate`` option."""
+
+
 @dataclass(frozen=True, slots=True)
 class EventMapping:
     """Map a physical input to a named semantic event."""
@@ -207,6 +211,9 @@ class EventMapping:
     direction: str | None = None
     max_duration_ms: int | None = None
     hold_ms: int | None = None
+    accumulate: bool = False
+    accumulate_delay: float | None = None
+    accumulate_max_steps: int | None = None
 
 
 HOLD_SOURCES = frozenset({"key_hold", "encoder_hold"})

@@ -697,6 +697,139 @@ class TestLoadPackageInvalid:
         with pytest.raises(PackageError, match="Duplicate event name"):
             load_package(pkg)
 
+    def test_event_accumulate_encoder_turn(self, tmp_path):
+        pkg = tmp_path / "Good.dui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Good\ntype: TouchStripCard\nversion: 1\nlayout: layout.svg\n"
+            "events:\n  - name: vol_up\n    source: encoder_turn\n"
+            "    direction: right\n    accumulate: true",
+            encoding="utf-8",
+        )
+        spec = load_package(pkg)
+        ev = next(e for e in spec.events if e.name == "vol_up")
+        assert ev.accumulate is True
+        assert ev.accumulate_delay is None
+        assert ev.accumulate_max_steps is None
+
+    def test_event_accumulate_encoder_press_turn(self, tmp_path):
+        pkg = tmp_path / "Good.dui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Good\ntype: TouchStripCard\nversion: 1\nlayout: layout.svg\n"
+            "events:\n  - name: seek\n    source: encoder_press_turn\n"
+            "    accumulate: true",
+            encoding="utf-8",
+        )
+        spec = load_package(pkg)
+        ev = next(e for e in spec.events if e.name == "seek")
+        assert ev.accumulate is True
+
+    def test_event_accumulate_with_delay_and_max_steps(self, tmp_path):
+        pkg = tmp_path / "Good.dui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Good\ntype: TouchStripCard\nversion: 1\nlayout: layout.svg\n"
+            "events:\n  - name: vol\n    source: encoder_turn\n"
+            "    accumulate: true\n    accumulate_delay: 0.1\n"
+            "    accumulate_max_steps: 5",
+            encoding="utf-8",
+        )
+        spec = load_package(pkg)
+        ev = next(e for e in spec.events if e.name == "vol")
+        assert ev.accumulate is True
+        assert ev.accumulate_delay == 0.1
+        assert ev.accumulate_max_steps == 5
+
+    def test_event_accumulate_invalid_source(self, tmp_path):
+        pkg = tmp_path / "Bad.dui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "events:\n  - name: x\n    source: key_press\n    accumulate: true",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="accumulate is only valid for"):
+            load_package(pkg)
+
+    def test_event_accumulate_delay_without_accumulate(self, tmp_path):
+        pkg = tmp_path / "Bad.dui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: TouchStripCard\nversion: 1\nlayout: layout.svg\n"
+            "events:\n  - name: x\n    source: encoder_turn\n"
+            "    accumulate_delay: 0.1",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="accumulate_delay requires accumulate"):
+            load_package(pkg)
+
+    def test_event_accumulate_max_steps_without_accumulate(self, tmp_path):
+        pkg = tmp_path / "Bad.dui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: TouchStripCard\nversion: 1\nlayout: layout.svg\n"
+            "events:\n  - name: x\n    source: encoder_turn\n"
+            "    accumulate_max_steps: 5",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="accumulate_max_steps requires accumulate"):
+            load_package(pkg)
+
+    def test_event_accumulate_delay_not_positive(self, tmp_path):
+        pkg = tmp_path / "Bad.dui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: TouchStripCard\nversion: 1\nlayout: layout.svg\n"
+            "events:\n  - name: x\n    source: encoder_turn\n"
+            "    accumulate: true\n    accumulate_delay: -1",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="accumulate_delay must be a positive number"):
+            load_package(pkg)
+
+    def test_event_accumulate_max_steps_not_positive(self, tmp_path):
+        pkg = tmp_path / "Bad.dui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: TouchStripCard\nversion: 1\nlayout: layout.svg\n"
+            "events:\n  - name: x\n    source: encoder_turn\n"
+            "    accumulate: true\n    accumulate_max_steps: 0",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="accumulate_max_steps must be a positive integer"):
+            load_package(pkg)
+
+    def test_event_accumulate_max_steps_boolean_rejected(self, tmp_path):
+        pkg = tmp_path / "Bad.dui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"/>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: TouchStripCard\nversion: 1\nlayout: layout.svg\n"
+            "events:\n  - name: x\n    source: encoder_turn\n"
+            "    accumulate: true\n    accumulate_max_steps: true",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="accumulate_max_steps must be a positive integer"):
+            load_package(pkg)
+
     def test_region_missing_field(self, tmp_path):
         pkg = tmp_path / "Bad.dui"
         pkg.mkdir()
