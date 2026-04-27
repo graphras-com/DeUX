@@ -5,7 +5,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+from ..ui.controls.dial_accumulator import DialAccumulator
 
 if TYPE_CHECKING:
     from ..runtime.events import AsyncHandler, EventType
@@ -58,6 +60,8 @@ class EventMap:
         for mapping in events:
             self._by_source.setdefault(mapping.source, []).append(mapping)
 
+        self._accumulators: dict[str, DialAccumulator] = {}
+
     def on(self, event_name: str, handler: AsyncHandler) -> None:
         """Register a handler for a named semantic event.
 
@@ -67,6 +71,8 @@ class EventMap:
             The semantic event name (as defined in the manifest).
         handler
             An async callable to invoke when the event fires.
+            For accumulated events the handler signature must accept
+            a single ``int`` argument (the net accumulated steps).
 
         Raises
         ------
@@ -78,6 +84,16 @@ class EventMap:
             raise KeyError(
                 f"Unknown event '{event_name}'. Defined events: {sorted(known)}"
             )
+
+        mapping = next(m for m in self._mappings if m.name == event_name)
+        if mapping.accumulate:
+            kwargs: dict[str, Any] = {}
+            if mapping.accumulate_delay is not None:
+                kwargs["delay"] = mapping.accumulate_delay
+            if mapping.accumulate_max_steps is not None:
+                kwargs["max_steps"] = mapping.accumulate_max_steps
+            self._accumulators[event_name] = DialAccumulator(handler, **kwargs)
+
         self._handlers[event_name] = handler
 
     @property
@@ -118,6 +134,11 @@ class EventMap:
             self._hold_task.cancel()
             self._hold_task = None
 
+    def cancel_accumulators(self) -> None:
+        """Cancel all active dial accumulators and discard pending ticks."""
+        for acc in self._accumulators.values():
+            acc.cancel()
+
     def handle_encoder_turn(self, direction: int) -> AsyncHandler | None:
         """Match an encoder turn to a semantic event.
 
@@ -130,18 +151,29 @@ class EventMap:
         -------
         AsyncHandler or None
             The matched handler, or ``None`` if no mapping matched.
+            For accumulated events this returns ``None`` because the
+            tick is forwarded to the :class:`DialAccumulator` which
+            schedules its own async flush.
         """
         if self._pressed:
             self._cancel_hold_timer()
 
             for mapping in self._by_source.get("encoder_press_turn", []):
                 if self._direction_matches(mapping, direction):
+                    acc = self._accumulators.get(mapping.name)
+                    if acc is not None:
+                        acc.tick(direction)
+                        return None
                     h = self._handlers.get(mapping.name)
                     if h is not None:
                         return h
 
         for mapping in self._by_source.get("encoder_turn", []):
             if self._direction_matches(mapping, direction):
+                acc = self._accumulators.get(mapping.name)
+                if acc is not None:
+                    acc.tick(direction)
+                    return None
                 h = self._handlers.get(mapping.name)
                 if h is not None:
                     return h

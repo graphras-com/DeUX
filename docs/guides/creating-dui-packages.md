@@ -260,6 +260,9 @@ events:
 | `direction` | `str` | no | `"left"` or `"right"` (turn events only) |
 | `max_duration_ms` | `int` | no | Max press duration for `*_press_release` (default 500) |
 | `hold_ms` | `int` | no | Hold threshold for `*_hold` (default 500) |
+| `accumulate` | `bool` | no | Debounce rapid ticks via `DialAccumulator` (turn events only, default `false`) |
+| `accumulate_delay` | `float` | no | Seconds to wait after last tick before flushing (default 0.25, requires `accumulate: true`) |
+| `accumulate_max_steps` | `int` | no | Cap on accumulated ticks (default 10, requires `accumulate: true`) |
 | `busy` | `bool` | no | Enable spinner animation and event suppression (default `false`) |
 
 ### Sources
@@ -290,6 +293,48 @@ events:
 |--------|------------|
 | `tap` | Touch tap on a region |
 | `long_press` | Long press on a region |
+
+### Accumulated Turns
+
+By default, each encoder tick fires the handler once. For continuous controls like volume or brightness, rapid ticks produce many individual calls. The `accumulate` option debounces rapid ticks and flushes them as a single callback with the net step count.
+
+```yaml
+events:
+  - name: brightness_up
+    source: encoder_turn
+    direction: right
+    accumulate: true
+    accumulate_delay: 0.2       # optional – seconds before flush (default 0.25)
+    accumulate_max_steps: 5     # optional – cap on net ticks (default 10)
+
+  - name: brightness_down
+    source: encoder_turn
+    direction: left
+    accumulate: true
+
+  - name: kelvin_up
+    source: encoder_press_turn
+    direction: right
+    accumulate: true
+    accumulate_delay: 0.1
+    accumulate_max_steps: 5
+```
+
+The handler receives a single `int` argument — the net accumulated steps (positive for right, negative for left):
+
+```python
+@card.on("brightness_up")
+async def handle(steps: int):
+    # steps is e.g. 3 if the user turned right 3 ticks quickly
+    new_val = card.adjust_range("brightness", steps * 5, min_val=0, max_val=100)
+```
+
+**Validation rules:**
+
+- `accumulate` is only valid on `encoder_turn` and `encoder_press_turn` sources
+- `accumulate_delay` and `accumulate_max_steps` require `accumulate: true`
+- `accumulate_delay` must be a positive number
+- `accumulate_max_steps` must be a positive integer
 
 ---
 
@@ -559,9 +604,13 @@ events:
   - name: seek_forward
     source: encoder_press_turn
     direction: right
+    accumulate: true
+    accumulate_delay: 0.15
   - name: seek_backward
     source: encoder_press_turn
     direction: left
+    accumulate: true
+    accumulate_delay: 0.15
 
 regions:
   card:

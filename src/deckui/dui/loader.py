@@ -16,6 +16,7 @@ from .schema import (
     DEFAULT_SPINNER_INTERVAL_MS,
     HOLD_SOURCES,
     KNOWN_MANIFEST_KEYS,
+    TURN_SOURCES,
     VALID_CATEGORIES,
     VALID_DIRECTIONS,
     VALID_REGION_EVENTS,
@@ -296,12 +297,53 @@ def _parse_event(raw: dict[str, Any], index: int) -> EventMapping:
     if source in _PRESS_RELEASE_SOURCES and max_duration_ms is None:
         max_duration_ms = DEFAULT_MAX_DURATION_MS
 
+    accumulate = bool(raw.get("accumulate", False))
+    accumulate_delay: float | None = None
+    accumulate_max_steps: int | None = None
+
+    if accumulate and source not in TURN_SOURCES:
+        raise PackageError(
+            f"Event '{name}': accumulate is only valid for "
+            f"encoder_turn/encoder_press_turn sources"
+        )
+
+    raw_delay = raw.get("accumulate_delay")
+    if raw_delay is not None:
+        if not accumulate:
+            raise PackageError(
+                f"Event '{name}': accumulate_delay requires accumulate: true"
+            )
+        if not isinstance(raw_delay, (int, float)) or raw_delay <= 0:
+            raise PackageError(
+                f"Event '{name}': accumulate_delay must be a positive number"
+            )
+        accumulate_delay = float(raw_delay)
+
+    raw_max_steps = raw.get("accumulate_max_steps")
+    if raw_max_steps is not None:
+        if not accumulate:
+            raise PackageError(
+                f"Event '{name}': accumulate_max_steps requires accumulate: true"
+            )
+        if (
+            not isinstance(raw_max_steps, int)
+            or isinstance(raw_max_steps, bool)
+            or raw_max_steps < 1
+        ):
+            raise PackageError(
+                f"Event '{name}': accumulate_max_steps must be a positive integer"
+            )
+        accumulate_max_steps = raw_max_steps
+
     return EventMapping(
         name=name,
         source=source,
         direction=direction,
         max_duration_ms=max_duration_ms,
         hold_ms=hold_ms,
+        accumulate=accumulate,
+        accumulate_delay=accumulate_delay,
+        accumulate_max_steps=accumulate_max_steps,
     )
 
 

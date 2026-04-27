@@ -384,3 +384,7 @@ class DuiCard(Card):
         if self._animator is not None:
             await self._animator.stop()
             self._animator = None
+
+    def cleanup(self) -> None:
+        """Cancel pending accumulators and release resources."""
+        self._events.cancel_accumulators()
