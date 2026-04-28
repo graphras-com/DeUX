@@ -69,6 +69,7 @@ class Screen:
 
     @property
     def name(self) -> str:
+        """The screen name."""
         return self._name
 
     @property
@@ -163,10 +164,12 @@ class Screen:
 
     @property
     def keys(self) -> dict[int, KeySlot]:
+        """Mapping of key index to :class:`KeySlot` for all configured keys."""
         return self._keys
 
     @property
     def encoders(self) -> dict[int, EncoderSlot]:
+        """Mapping of encoder index to :class:`EncoderSlot` for all configured encoders."""
         return self._encoders
 
     @property
@@ -193,6 +196,7 @@ class Screen:
 
     @property
     def cards(self) -> list[Card]:
+        """All touch-strip cards, or an empty list if the device has no touchscreen."""
         if self._touch_strip is None:
             return []
         return self._touch_strip.cards

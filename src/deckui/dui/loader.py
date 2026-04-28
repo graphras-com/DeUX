@@ -54,7 +54,23 @@ class PackageError(Exception):
 
 
 def _find_svg_ids(svg_source: str) -> set[str]:
-    """Extract all id attributes from an SVG string."""
+    """Extract all ``id`` attributes from an SVG string.
+
+    Parameters
+    ----------
+    svg_source : str
+        Raw SVG markup to parse.
+
+    Returns
+    -------
+    set[str]
+        The set of ``id`` attribute values found in the SVG.
+
+    Raises
+    ------
+    PackageError
+        If *svg_source* is not valid XML.
+    """
     try:
         root = ET.fromstring(svg_source)  # noqa: S314 — trusted local files only
     except ET.ParseError as exc:
@@ -69,7 +85,25 @@ def _find_svg_ids(svg_source: str) -> set[str]:
 
 
 def _parse_binding(name: str, raw: dict[str, Any]) -> Binding:
-    """Parse a single binding entry from the manifest."""
+    """Parse a single binding entry from the manifest.
+
+    Parameters
+    ----------
+    name : str
+        Binding name as it appears in the manifest ``bindings`` mapping.
+    raw : dict[str, Any]
+        Raw YAML mapping for this binding entry.
+
+    Returns
+    -------
+    Binding
+        A concrete binding dataclass (e.g. ``TextBinding``, ``ToggleBinding``).
+
+    Raises
+    ------
+    PackageError
+        If required keys are missing or values are invalid.
+    """
     raw_type = raw.get("type")
     if raw_type is None:
         raise PackageError(f"Binding '{name}' missing 'type'")
@@ -256,7 +290,26 @@ def _parse_binding(name: str, raw: dict[str, Any]) -> Binding:
 
 
 def _parse_event(raw: dict[str, Any], index: int) -> EventMapping:
-    """Parse a single event mapping from the manifest."""
+    """Parse a single event mapping from the manifest.
+
+    Parameters
+    ----------
+    raw : dict[str, Any]
+        Raw YAML mapping for this event entry.
+    index : int
+        Positional index of the event in the manifest list, used for
+        error messages.
+
+    Returns
+    -------
+    EventMapping
+        A validated event mapping dataclass.
+
+    Raises
+    ------
+    PackageError
+        If required keys are missing or values are invalid.
+    """
     name = raw.get("name")
     if name is None:
         raise PackageError(f"Event at index {index} missing 'name'")
@@ -348,7 +401,23 @@ def _parse_event(raw: dict[str, Any], index: int) -> EventMapping:
 
 
 def _parse_spinner(raw: dict[str, Any]) -> SpinnerSpec:
-    """Parse a spinner configuration from the manifest."""
+    """Parse a spinner configuration from the manifest.
+
+    Parameters
+    ----------
+    raw : dict[str, Any]
+        Raw YAML mapping for the ``spinner`` section.
+
+    Returns
+    -------
+    SpinnerSpec
+        A validated spinner specification dataclass.
+
+    Raises
+    ------
+    PackageError
+        If the spinner type is missing/invalid or constraints are violated.
+    """
     raw_type = raw.get("type")
     if raw_type is None:
         raise PackageError("Spinner missing 'type'")
@@ -386,7 +455,26 @@ def _parse_spinner(raw: dict[str, Any]) -> SpinnerSpec:
 
 
 def _parse_region(name: str, raw: dict[str, Any]) -> Region:
-    """Parse a single region from the manifest."""
+    """Parse a single region from the manifest.
+
+    Parameters
+    ----------
+    name : str
+        Region name as it appears in the manifest ``regions`` mapping.
+    raw : dict[str, Any]
+        Raw YAML mapping containing ``x``, ``y``, ``width``, ``height``,
+        and optionally ``events``.
+
+    Returns
+    -------
+    Region
+        A validated region dataclass.
+
+    Raises
+    ------
+    PackageError
+        If required geometry keys are missing or event names are invalid.
+    """
     for field_name in ("x", "y", "width", "height"):
         if field_name not in raw:
             raise PackageError(f"Region '{name}' missing '{field_name}'")

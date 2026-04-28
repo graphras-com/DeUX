@@ -55,14 +55,17 @@ class VerifyResult:
 
     @property
     def errors(self) -> list[Diagnostic]:
+        """Diagnostics with :attr:`Severity.ERROR` severity."""
         return [d for d in self.diagnostics if d.severity == Severity.ERROR]
 
     @property
     def warnings(self) -> list[Diagnostic]:
+        """Diagnostics with :attr:`Severity.WARNING` severity."""
         return [d for d in self.diagnostics if d.severity == Severity.WARNING]
 
     @property
     def ok(self) -> bool:
+        """``True`` if there are no error-level diagnostics."""
         return len(self.errors) == 0
 
 
@@ -152,7 +155,18 @@ def verify_package(path: str | Path, *, strict: bool = False) -> VerifyResult:
 
 
 def _spec_to_index_entry(spec: PackageSpec) -> dict[str, object]:
-    """Convert a PackageSpec to a JSON-serializable index entry."""
+    """Convert a PackageSpec to a JSON-serializable index entry.
+
+    Parameters
+    ----------
+    spec : PackageSpec
+        Loaded and validated package specification.
+
+    Returns
+    -------
+    dict[str, object]
+        Dictionary suitable for inclusion in a repository index JSON file.
+    """
     return {
         "name": spec.name,
         "type": spec.type.value,
@@ -258,7 +272,13 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _print_result(result: VerifyResult) -> None:
-    """Print verification diagnostics to stderr."""
+    """Print verification diagnostics to stderr.
+
+    Parameters
+    ----------
+    result : VerifyResult
+        Verification result for a single package.
+    """
     label = result.package_name or str(result.path)
     if not result.diagnostics:
         print(f"  {label}: OK", file=sys.stderr)

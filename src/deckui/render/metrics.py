@@ -79,7 +79,13 @@ class RenderMetrics:
 
 
 def _default_metrics() -> RenderMetrics:
-    """Create metrics for the default Stream Deck+ profile."""
+    """Create metrics for the default Stream Deck+ profile.
+
+    Returns
+    -------
+    RenderMetrics
+        Metrics derived from the built-in Stream Deck+ capabilities.
+    """
     from ..runtime.capabilities import STREAM_DECK_PLUS
 
     return RenderMetrics(STREAM_DECK_PLUS)

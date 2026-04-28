@@ -194,6 +194,16 @@ def compose_key_image(svg_img: Image.Image) -> bytes:
     The SVG is centred within the margin-bounded usable area
     (``KEY_USABLE_WIDTH`` x ``KEY_USABLE_HEIGHT``) so the design
     respects the key margins defined in ``render.metrics``.
+
+    Parameters
+    ----------
+    svg_img : Image.Image
+        Pre-rasterised SVG image to composite onto the key canvas.
+
+    Returns
+    -------
+    bytes
+        JPEG-encoded image bytes ready for ``set_key_image``.
     """
     canvas = Image.new("RGB", KEY_SIZE, "black")
     x = KEY_MARGIN_LEFT + (KEY_USABLE_WIDTH - svg_img.width) // 2
@@ -211,8 +221,18 @@ def compose_card_image(
 ) -> Image.Image:
     """Place *svg_img* centred on a panel-sized card canvas.
 
-    *background* sets the canvas fill colour (any PIL-compatible colour
-    string, e.g. ``"black"`` or ``"#1a2b3c"``).
+    Parameters
+    ----------
+    svg_img : Image.Image
+        Pre-rasterised SVG image to composite onto the card canvas.
+    background : str, default="black"
+        Canvas fill colour (any PIL-compatible colour string,
+        e.g. ``"black"`` or ``"#1a2b3c"``).
+
+    Returns
+    -------
+    Image.Image
+        Composited card image at ``PANEL_WIDTH`` x ``PANEL_HEIGHT``.
     """
     canvas = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), background)
     x = (PANEL_WIDTH - svg_img.width) // 2
@@ -230,8 +250,18 @@ def compose_touchstrip(
 ) -> bytes:
     """Compose up to 4 card images into a single 800x100 touchscreen JPEG.
 
-    *background* fills the entire 800x100 canvas — including the margin
-    and gap areas outside card panels.
+    Parameters
+    ----------
+    card_images : list[Image.Image | None]
+        Up to 4 card images (or ``None`` for empty slots).
+    background : str, default="black"
+        Fill colour for the entire 800x100 canvas, including margin
+        and gap areas outside card panels.
+
+    Returns
+    -------
+    bytes
+        JPEG-encoded 800x100 touchscreen image bytes.
     """
     img = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), background)
     for index, card_image in enumerate(card_images):
@@ -305,7 +335,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Parse CLI arguments."""
+    """Parse CLI arguments.
+
+    Parameters
+    ----------
+    argv : list[str] | None, optional
+        Argument list to parse.  Defaults to ``sys.argv[1:]``.
+
+    Returns
+    -------
+    argparse.Namespace
+        Parsed arguments with key/card paths, brightness, background, etc.
+    """
     return build_parser().parse_args(argv)
 
 
@@ -414,7 +455,19 @@ async def _wait_for_interrupt() -> None:
 
 
 def collect_svg_paths(args: argparse.Namespace) -> list[Path]:
-    """Return the list of SVG file paths specified in *args*."""
+    """Return the list of SVG file paths specified in *args*.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed CLI arguments containing ``key0``–``keyN`` and
+        ``card0``–``cardN`` attributes.
+
+    Returns
+    -------
+    list[Path]
+        Ordered list of SVG paths (keys first, then cards).
+    """
     paths: list[Path] = []
     for i in range(_KEY_COUNT):
         p: Path | None = getattr(args, f"key{i}", None)
@@ -513,7 +566,17 @@ def render_preview(
 ) -> tuple[dict[int, bytes], bytes]:
     """Render all specified SVGs and return key images + touchstrip JPEG.
 
-    Returns a ``(key_images, touchstrip_bytes)`` tuple.
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed CLI arguments with ``key0``–``keyN``, ``card0``–``cardN``,
+        and ``background`` attributes.
+
+    Returns
+    -------
+    tuple[dict[int, bytes], bytes]
+        A ``(key_images, touchstrip_bytes)`` tuple where *key_images*
+        maps key indices to JPEG bytes.
     """
     background: str = getattr(args, "background", None) or "black"
     key_images: dict[int, bytes] = {}
@@ -548,7 +611,13 @@ def render_preview(
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Entry point for the preview tool."""
+    """Entry point for the preview tool.
+
+    Parameters
+    ----------
+    argv : list[str] | None, optional
+        Argument list to parse.  Defaults to ``sys.argv[1:]``.
+    """
     args = parse_args(argv)
 
     level = logging.DEBUG if args.verbose else logging.INFO

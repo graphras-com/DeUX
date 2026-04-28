@@ -85,7 +85,13 @@ class SpinnerFrames:
         return self._generate_custom()
 
     def _generate_rotation(self) -> list[bytes]:
-        """Generate frames by rotating the spinner node."""
+        """Generate frames by rotating the spinner node.
+
+        Returns
+        -------
+        list[bytes]
+            Encoded image frames, one per rotation step.
+        """
         svg_source = self._rendered_svg or self._spec.svg_source
         base_root = ET.fromstring(svg_source)  # noqa: S314
         node = self._spinner.node
@@ -116,7 +122,13 @@ class SpinnerFrames:
         return frames
 
     def _generate_pulse(self) -> list[bytes]:
-        """Generate frames by pulsing opacity on the spinner node."""
+        """Generate frames by pulsing opacity on the spinner node.
+
+        Returns
+        -------
+        list[bytes]
+            Encoded image frames with a triangle-wave opacity cycle.
+        """
         svg_source = self._rendered_svg or self._spec.svg_source
         base_root = ET.fromstring(svg_source)  # noqa: S314
         node = self._spinner.node
@@ -139,7 +151,16 @@ class SpinnerFrames:
         return frames
 
     def _generate_custom(self) -> list[bytes]:
-        """Load custom frames from package assets."""
+        """Load custom frames from package assets.
+
+        Looks for ``assets/spinner.gif`` first, then numbered PNGs in
+        ``assets/spinner/``. Falls back to blank frames if neither is found.
+
+        Returns
+        -------
+        list[bytes]
+            Encoded image frames loaded from the package assets.
+        """
         assets = self._spec.assets
 
         # Try animated GIF first
@@ -165,7 +186,19 @@ class SpinnerFrames:
         return frames
 
     def _load_gif_frames(self, data: bytes) -> list[bytes]:
-        """Extract and encode frames from an animated GIF."""
+        """Extract and encode frames from an animated GIF.
+
+        Parameters
+        ----------
+        data : bytes
+            Raw GIF file bytes.
+
+        Returns
+        -------
+        list[bytes]
+            Encoded image frames; falls back to blank frames if the GIF
+            contains no frames.
+        """
         gif = Image.open(io.BytesIO(data))
         frames: list[bytes] = []
         try:
@@ -188,13 +221,30 @@ class SpinnerFrames:
         return frames
 
     def _blank_frames(self) -> list[bytes]:
-        """Return a list of blank encoded frames as fallback."""
+        """Return a list of blank encoded frames as fallback.
+
+        Returns
+        -------
+        list[bytes]
+            Black frames, one per configured spinner frame count.
+        """
         blank = Image.new("RGB", (self._width, self._height), "black")
         data = _encode_image(blank, self._image_format)
         return [data] * self._spinner.frames
 
     def _rasterise(self, root: ET.Element) -> bytes:
-        """Rasterise an SVG element tree to encoded image bytes."""
+        """Rasterise an SVG element tree to encoded image bytes.
+
+        Parameters
+        ----------
+        root : ET.Element
+            The SVG document root to render.
+
+        Returns
+        -------
+        bytes
+            Image data encoded in the instance's configured format.
+        """
         from ..render.svg_rasterize import _svg_to_png
 
         svg_bytes = ET.tostring(root, encoding="unicode", xml_declaration=True)
@@ -204,7 +254,21 @@ class SpinnerFrames:
 
     @staticmethod
     def _element_centre(elem: ET.Element) -> tuple[float, float]:
-        """Compute the centre of an SVG element from its geometry attributes."""
+        """Compute the centre of an SVG element from its geometry attributes.
+
+        Handles both rectangular elements (``x``, ``y``, ``width``, ``height``)
+        and circle/ellipse elements (``cx``, ``cy``).
+
+        Parameters
+        ----------
+        elem : ET.Element
+            The SVG element to measure.
+
+        Returns
+        -------
+        tuple[float, float]
+            ``(cx, cy)`` centre coordinates.
+        """
         x = float(elem.get("x", "0"))
         y = float(elem.get("y", "0"))
         w = float(elem.get("width", "0"))

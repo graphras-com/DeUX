@@ -38,18 +38,22 @@ class InfoScreen:
 
     @property
     def width(self) -> int:
+        """Screen width in pixels."""
         return self._width
 
     @property
     def height(self) -> int:
+        """Screen height in pixels."""
         return self._height
 
     @property
     def size(self) -> tuple[int, int]:
+        """Screen dimensions as ``(width, height)``."""
         return (self._width, self._height)
 
     @property
     def image_format(self) -> str:
+        """Image encoding format (``"JPEG"`` or ``"BMP"``)."""
         return self._image_format
 
     @property
@@ -79,12 +83,15 @@ class InfoScreen:
 
     @property
     def is_dirty(self) -> bool:
+        """Whether the screen content has changed since the last flush."""
         return self._dirty
 
     def mark_clean(self) -> None:
+        """Clear the dirty flag after the screen has been flushed to the device."""
         self._dirty = False
 
     def mark_dirty(self) -> None:
+        """Flag the screen for re-rendering on the next refresh."""
         self._dirty = True
 
     def render_bytes(self) -> bytes:

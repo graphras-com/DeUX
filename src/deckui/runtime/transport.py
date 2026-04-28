@@ -28,12 +28,36 @@ logger = logging.getLogger(__name__)
 
 
 def _coerce_int(value: object, default: int = 0) -> int:
-    """Convert callback payload values to ints without tripping strict mypy."""
+    """Convert a callback payload value to ``int``.
+
+    Parameters
+    ----------
+    value : object
+        The raw value from the device callback payload.
+    default : int, default=0
+        Fallback returned when *value* is not an ``int``.
+
+    Returns
+    -------
+    int
+        *value* if it is an ``int``, otherwise *default*.
+    """
     return value if isinstance(value, int) else default
 
 
 def _optional_int(value: object) -> int | None:
-    """Convert callback payload values to optional ints."""
+    """Convert a callback payload value to an optional ``int``.
+
+    Parameters
+    ----------
+    value : object
+        The raw value from the device callback payload.
+
+    Returns
+    -------
+    int or None
+        *value* if it is an ``int``, otherwise ``None``.
+    """
     return value if isinstance(value, int) else None
 
 
@@ -67,6 +91,7 @@ class AsyncTransport:
 
     @property
     def queue(self) -> asyncio.Queue[DeckEvent]:
+        """The asyncio queue that receives decoded device events."""
         return self._queue
 
     def start(self) -> None:
@@ -96,6 +121,17 @@ class AsyncTransport:
         self._loop.call_soon_threadsafe(self._queue.put_nowait, event)
 
     def _on_key(self, deck: StreamDeck, key: int, pressed: bool) -> None:
+        """Handle a physical key press/release callback.
+
+        Parameters
+        ----------
+        deck : StreamDeck
+            The device that generated the event.
+        key : int
+            Zero-based key index.
+        pressed : bool
+            ``True`` on key-down, ``False`` on key-up.
+        """
         try:
             self._enqueue(KeyEvent(key=key, pressed=pressed))
         except Exception:
@@ -104,6 +140,19 @@ class AsyncTransport:
     def _on_encoder(
         self, deck: StreamDeck, encoder: int, event: DialEventType, value: object
     ) -> None:
+        """Handle an encoder push or turn callback.
+
+        Parameters
+        ----------
+        deck : StreamDeck
+            The device that generated the event.
+        encoder : int
+            Zero-based encoder index.
+        event : DialEventType
+            Whether the dial was pushed or turned.
+        value : object
+            ``bool`` for push events, ``int`` direction for turn events.
+        """
         try:
             if event == DialEventType.PUSH:
                 self._enqueue(EncoderPressEvent(encoder=encoder, pressed=bool(value)))
@@ -119,6 +168,17 @@ class AsyncTransport:
         evt_type: TouchscreenEventType,
         value: Mapping[str, object],
     ) -> None:
+        """Handle a touchscreen interaction callback.
+
+        Parameters
+        ----------
+        deck : StreamDeck
+            The device that generated the event.
+        evt_type : TouchscreenEventType
+            The kind of touch (short, long, or drag).
+        value : Mapping[str, object]
+            Touch coordinates (``x``, ``y``, and optionally ``x_out``, ``y_out``).
+        """
         try:
             if evt_type == TouchscreenEventType.SHORT:
                 event_type = EventType.TOUCH_SHORT
