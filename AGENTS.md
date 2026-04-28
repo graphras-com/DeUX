@@ -4,6 +4,17 @@
 
 DeckUI — asyncio-native Python library for Elgato Stream Deck devices. Single package at `src/deckui`, built with Hatchling.
 
+## Core Mission
+
+Build a robust, asyncio-native foundation for Stream Deck development centered on a declarative UI model (DUI) that separates interface definition from runtime logic.
+The project’s mission is to standardize how keys, encoders, and touchscreen interfaces are described, shared, and executed—enabling reusable, composable UI packages across devices.
+
+Prioritize reliability (auto-discovery, hot-plugging, multi-deck orchestration), consistency (event-driven APIs with predictable behavior), and portability (device-agnostic DUI packages).
+Every design decision should move toward a platform-independent ecosystem where developers can create, distribute, and reuse high-quality DUI components through a centralized repository.
+
+Avoid feature sprawl that ties implementations to specific hardware quirks. Instead, abstract capabilities into clean, declarative primitives that scale across current and future devices.
+
+
 ## Setup
 
 ```bash
@@ -34,6 +45,53 @@ You MUST follow this sequence for every task. Do not write any code before step 
    ```
 
 **Never commit directly to `main`.** No exceptions.
+
+## Docstring convention
+
+All AI agents modifying this repository must write NumPy-style docstrings for all relevant Python code.
+
+Use NumPy-style docstrings for:
+
+- Public modules
+- Public classes
+- Public methods
+- Public functions
+- Non-obvious private helpers
+- Complex test fixtures or utilities
+
+Docstrings must describe:
+
+- Purpose and behavior
+- Parameters
+- Return values
+- Raised exceptions, where relevant
+- Side effects, where relevant
+- Examples, when useful
+
+Use this format:
+
+```python
+def example_function(name: str, retries: int = 3) -> bool:
+    """Validate a named operation.
+
+    Parameters
+    ----------
+    name : str
+        Name of the operation to validate.
+    retries : int, default=3
+        Number of retry attempts before failing.
+
+    Returns
+    -------
+    bool
+        True if the operation is valid, otherwise False.
+
+    Raises
+    ------
+    ValueError
+        If ``name`` is empty.
+    """
+```
 
 ## Commands
 
