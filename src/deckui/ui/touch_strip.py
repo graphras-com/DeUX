@@ -88,8 +88,10 @@ class TouchStrip:
 
     @property
     def cards(self) -> list[Card]:
+        """All card zones on this touch strip."""
         return self._cards
 
     @property
     def any_dirty(self) -> bool:
+        """Whether any card zone needs re-rendering."""
         return any(card.is_dirty for card in self._cards)

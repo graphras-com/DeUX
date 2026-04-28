@@ -32,6 +32,7 @@ class KeySlot:
 
     @property
     def index(self) -> int:
+        """The key index on the device."""
         return self._index
 
     def on_press(self, handler: AsyncHandler) -> AsyncHandler:
@@ -70,9 +71,11 @@ class KeySlot:
 
     @property
     def is_dirty(self) -> bool:
+        """Whether the key image needs re-rendering."""
         return self._dirty
 
     def mark_clean(self) -> None:
+        """Clear the dirty flag after the key image has been flushed."""
         self._dirty = False
 
     def set_rendered_image(self, image_bytes: bytes) -> None:
@@ -82,4 +85,5 @@ class KeySlot:
 
     @property
     def image_bytes(self) -> bytes | None:
+        """The pre-rendered image bytes, or ``None`` if not yet rendered."""
         return self._image_bytes

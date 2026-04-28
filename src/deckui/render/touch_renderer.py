@@ -55,6 +55,11 @@ def compose_touchstrip(
         Gap between panels in pixels.
     image_format
         Image encoding format (``"JPEG"`` or ``"BMP"``).
+
+    Returns
+    -------
+    bytes
+        Encoded touchscreen image bytes.
     """
     ts_w = touchscreen_width if touchscreen_width is not None else TOUCHSCREEN_WIDTH
     ts_h = touchscreen_height if touchscreen_height is not None else TOUCHSCREEN_HEIGHT
@@ -83,7 +88,26 @@ def render_blank_touchscreen(
     panel_count: int | None = None,
     image_format: str = "JPEG",
 ) -> bytes:
-    """Render a blank touch-strip image."""
+    """Render a blank touch-strip image.
+
+    Parameters
+    ----------
+    background : str, default="black"
+        Fill colour for the canvas.
+    touchscreen_width : int, optional
+        Total touchscreen width in pixels.
+    touchscreen_height : int, optional
+        Total touchscreen height in pixels.
+    panel_count : int, optional
+        Number of card zones.
+    image_format : str, default="JPEG"
+        Image encoding format (``"JPEG"`` or ``"BMP"``).
+
+    Returns
+    -------
+    bytes
+        Encoded blank touchscreen image bytes.
+    """
     p_count = panel_count if panel_count is not None else PANEL_COUNT
     return compose_touchstrip(
         [None] * p_count,

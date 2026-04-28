@@ -84,10 +84,12 @@ class DeckManager:
         self._disconnect_handler: AsyncHandler | None = None
 
     async def __aenter__(self) -> DeckManager:
+        """Start the manager and return it for use as an async context manager."""
         await self.start()
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Stop the manager when exiting the async context."""
         await self.stop()
 
     async def start(self) -> None:
@@ -191,7 +193,12 @@ class DeckManager:
         return dict(self._decks)
 
     async def _scan_loop(self) -> None:
-        """Periodically enumerate devices and manage connections."""
+        """Periodically enumerate devices and manage connections.
+
+        Runs an initial scan immediately, then polls at the configured
+        ``poll_interval`` until the manager is stopped or cancelled.
+        Sets the closed event on exit so that ``wait_closed()`` unblocks.
+        """
         await self._scan_once()
 
         try:
@@ -208,7 +215,13 @@ class DeckManager:
             self._closed_event.set()
 
     async def _scan_once(self) -> None:
-        """Single scan: discover devices, handle connects/disconnects."""
+        """Execute a single device scan cycle.
+
+        Enumerates all connected Stream Deck devices, detects new
+        connections and disconnections, and invokes the appropriate
+        registered handlers.  Devices that fail to open are silently
+        skipped.
+        """
         loop = asyncio.get_running_loop()
 
         try:

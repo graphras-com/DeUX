@@ -38,6 +38,7 @@ class EncoderSlot:
 
     @property
     def index(self) -> int:
+        """The encoder index on the device."""
         return self._index
 
     # -- Turn handlers -------------------------------------------------------

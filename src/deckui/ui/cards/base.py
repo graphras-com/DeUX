@@ -58,6 +58,7 @@ class Card(ABC):
 
     @property
     def index(self) -> int:
+        """The card zone index on the touch strip."""
         return self._index
 
     def on_tap(self, handler: AsyncHandler) -> AsyncHandler:
@@ -201,9 +202,11 @@ class Card(ABC):
 
     @property
     def is_dirty(self) -> bool:
+        """Whether the card needs re-rendering."""
         return self._dirty
 
     def mark_clean(self) -> None:
+        """Clear the dirty flag after the card has been rendered."""
         self._dirty = False
 
     def mark_dirty(self) -> None:
@@ -212,9 +215,17 @@ class Card(ABC):
 
     @property
     def rendered(self) -> Image.Image | None:
+        """The last rendered image, or ``None`` if not yet rendered."""
         return self._rendered
 
     def set_rendered(self, img: Image.Image | None) -> None:
+        """Store the rendered image and clear the dirty flag.
+
+        Parameters
+        ----------
+        img
+            The rendered PIL image, or ``None`` to clear.
+        """
         self._rendered = img
         self._dirty = False
 

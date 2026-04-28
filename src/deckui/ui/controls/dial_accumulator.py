@@ -59,6 +59,7 @@ class DialAccumulator:
         self._flush_task = asyncio.create_task(self._schedule_flush())
 
     async def _schedule_flush(self) -> None:
+        """Wait for the debounce delay, then flush accumulated ticks."""
         try:
             logger.debug("DialAccumulator._schedule_flush: waiting %.2fs", self._delay)
             await asyncio.sleep(self._delay)
@@ -67,6 +68,7 @@ class DialAccumulator:
             pass
 
     async def _flush(self) -> None:
+        """Invoke the callback with the net accumulated steps and reset."""
         steps = self._pending
         self._pending = 0
         self._flush_task = None

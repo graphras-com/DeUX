@@ -469,7 +469,19 @@ class SvgRenderer:
         binding: TextBinding,
         value: Any,
     ) -> None:
-        """Set text content, applying wrapping or truncation if configured."""
+        """Set text content, applying wrapping or truncation if configured.
+
+        Parameters
+        ----------
+        root : ET.Element
+            The SVG document root (needed for font resolution during wrapping).
+        elem : ET.Element
+            The ``<text>`` element whose content is being set.
+        binding : TextBinding
+            The text binding definition from the manifest.
+        value : Any
+            The text value to render; coerced to ``str``.
+        """
         text = str(value) if value is not None else binding.default
 
         if binding.wrap and binding.max_width is not None:
@@ -526,7 +538,19 @@ class SvgRenderer:
         binding: ImageBinding,
         value: Any,
     ) -> None:
-        """Set an image element's href to a data URI."""
+        """Set an image element's href to a data URI.
+
+        Parameters
+        ----------
+        root : ET.Element
+            The SVG document root (used to locate placeholder nodes).
+        elem : ET.Element
+            The ``<image>`` element to update.
+        binding : ImageBinding
+            The image binding definition from the manifest.
+        value : Any
+            A ``PIL.Image.Image``, ``bytes``, or ``None`` to clear the image.
+        """
         if value is None:
             elem.set("href", "")
             elem.set("display", "none")
@@ -564,7 +588,15 @@ class SvgRenderer:
         elem.set(f"{{{_XLINK_NS}}}href", data_uri)
 
     def _apply_visibility(self, elem: ET.Element, value: Any) -> None:
-        """Toggle element visibility via the display attribute."""
+        """Toggle element visibility via the ``display`` attribute.
+
+        Parameters
+        ----------
+        elem : ET.Element
+            The SVG element to show or hide.
+        value : Any
+            Truthy to show, falsy to hide (sets ``display="none"``).
+        """
         if value:
             elem.attrib.pop("display", None)
         else:
@@ -576,7 +608,17 @@ class SvgRenderer:
         elem_off: ET.Element | None,
         value: Any,
     ) -> None:
-        """Toggle visibility between two elements based on a boolean value."""
+        """Toggle visibility between two elements based on a boolean value.
+
+        Parameters
+        ----------
+        elem_on : ET.Element | None
+            The element shown when *value* is truthy.
+        elem_off : ET.Element | None
+            The element shown when *value* is falsy.
+        value : Any
+            Boolean-like value controlling which element is visible.
+        """
         if value:
             if elem_on is not None:
                 elem_on.attrib.pop("display", None)
@@ -589,7 +631,17 @@ class SvgRenderer:
                 elem_on.set("display", "none")
 
     def _apply_color(self, elem: ET.Element, binding: ColorBinding, value: Any) -> None:
-        """Set an element's fill, stroke, or color attribute."""
+        """Set an element's fill, stroke, or color attribute.
+
+        Parameters
+        ----------
+        elem : ET.Element
+            The SVG element to modify.
+        binding : ColorBinding
+            The color binding definition specifying the target attribute.
+        value : Any
+            CSS color string (e.g. ``"#ff0000"``); falls back to *binding.default*.
+        """
         color_val = str(value) if value is not None else binding.default
         elem.set(binding.attribute, color_val)
 
@@ -600,7 +652,19 @@ class SvgRenderer:
         binding: RangeBinding,
         value: Any,
     ) -> None:
-        """Scale an element's width or height proportional to a 0–1 value."""
+        """Scale an element's width or height proportional to a 0--1 value.
+
+        Parameters
+        ----------
+        elem : ET.Element
+            The SVG element whose dimension is being scaled.
+        name : str
+            Binding name, used to look up the cached original extent.
+        binding : RangeBinding
+            The range binding definition from the manifest.
+        value : Any
+            A float in ``[0.0, 1.0]``; clamped if out of range.
+        """
         ratio = max(
             0.0, min(1.0, float(value if value is not None else binding.default))
         )
@@ -614,7 +678,17 @@ class SvgRenderer:
         binding: SliderBinding,
         value: Any,
     ) -> None:
-        """Translate an element's x or y between min_pos and max_pos."""
+        """Translate an element's x or y between *min_pos* and *max_pos*.
+
+        Parameters
+        ----------
+        elem : ET.Element
+            The SVG element to reposition.
+        binding : SliderBinding
+            The slider binding definition containing position limits.
+        value : Any
+            A float in ``[0.0, 1.0]`` interpolated between *min_pos* and *max_pos*.
+        """
         ratio = max(
             0.0, min(1.0, float(value if value is not None else binding.default))
         )
@@ -665,7 +739,13 @@ class SvgRenderer:
         elem.append(icon_root)
 
     def _inline_assets(self, root: ET.Element) -> None:
-        """Replace relative asset href references with data URIs."""
+        """Replace relative asset ``href`` references with data URIs.
+
+        Parameters
+        ----------
+        root : ET.Element
+            The SVG document root to scan for asset references.
+        """
         if not self._spec.assets:
             return
 
@@ -687,7 +767,18 @@ class SvgRenderer:
                 elem.set(f"{{{_XLINK_NS}}}href", data_uri)
 
     def _rasterise(self, svg_data: bytes) -> Image.Image:
-        """Rasterise SVG bytes to a PIL Image via CairoSVG."""
+        """Rasterise SVG bytes to a PIL Image via CairoSVG.
+
+        Parameters
+        ----------
+        svg_data : bytes
+            UTF-8 encoded SVG markup.
+
+        Returns
+        -------
+        Image.Image
+            An RGB :class:`~PIL.Image.Image` at the SVG's native dimensions.
+        """
         from ..render.svg_rasterize import _svg_to_png
 
         width = int(float(self._base_root.get("width", "197")))

@@ -17,7 +17,29 @@ class RasterizeError(Exception):
 
 
 def _svg_to_png(svg_data: bytes, width: int, height: int) -> bytes:
-    """Convert SVG bytes to PNG bytes."""
+    """Convert SVG bytes to PNG bytes.
+
+    Attempts CairoSVG first, then falls back to ``rsvg-convert``.
+
+    Parameters
+    ----------
+    svg_data : bytes
+        Raw SVG content.
+    width : int
+        Desired output width in pixels.
+    height : int
+        Desired output height in pixels.
+
+    Returns
+    -------
+    bytes
+        Rasterised PNG image bytes.
+
+    Raises
+    ------
+    RasterizeError
+        If no SVG renderer backend is available.
+    """
     try:
         if platform.system() == "Darwin":
             brew_lib = Path("/opt/homebrew/lib")

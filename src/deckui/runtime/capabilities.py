@@ -10,7 +10,20 @@ if TYPE_CHECKING:
 
 
 def _coerce_flip(value: object) -> tuple[bool, bool]:
-    """Coerce a device flip tuple to a typed `(bool, bool)` pair."""
+    """Coerce a device flip value to a typed ``(bool, bool)`` pair.
+
+    Parameters
+    ----------
+    value : object
+        The raw flip attribute from the device, expected to be a
+        two-element tuple.
+
+    Returns
+    -------
+    tuple[bool, bool]
+        A ``(horizontal_flip, vertical_flip)`` pair.  Returns
+        ``(False, False)`` when *value* is not a two-element tuple.
+    """
     if isinstance(value, tuple) and len(value) == 2:
         return (bool(value[0]), bool(value[1]))
     return (False, False)

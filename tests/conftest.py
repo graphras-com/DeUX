@@ -129,7 +129,18 @@ MINIMAL_KEY_SVG = (
 
 
 def _write_card_dui_package(base_dir: Path) -> Path:
-    """Create a valid TouchStripCard .dui package on disk."""
+    """Create a valid TouchStripCard .dui package on disk.
+
+    Parameters
+    ----------
+    base_dir : Path
+        Parent directory in which the ``TestCard.dui`` directory is created.
+
+    Returns
+    -------
+    Path
+        Path to the created ``.dui`` package directory.
+    """
     pkg_dir = base_dir / "TestCard.dui"
     pkg_dir.mkdir(parents=True, exist_ok=True)
 
@@ -212,7 +223,18 @@ regions:
 
 
 def _write_key_dui_package(base_dir: Path) -> Path:
-    """Create a valid Key .dui package on disk."""
+    """Create a valid Key .dui package on disk.
+
+    Parameters
+    ----------
+    base_dir : Path
+        Parent directory in which the ``TestKey.dui`` directory is created.
+
+    Returns
+    -------
+    Path
+        Path to the created ``.dui`` package directory.
+    """
     pkg_dir = base_dir / "TestKey.dui"
     pkg_dir.mkdir(parents=True, exist_ok=True)
 
@@ -328,7 +350,19 @@ def sample_widget_image():
 
 
 def _make_mock_streamdeck(caps: DeviceCapabilities) -> MagicMock:
-    """Create a MagicMock mimicking a StreamDeck device from capabilities."""
+    """Create a MagicMock mimicking a StreamDeck device from capabilities.
+
+    Parameters
+    ----------
+    caps : DeviceCapabilities
+        The capability profile to replicate on the mock.
+
+    Returns
+    -------
+    MagicMock
+        A mock object with all device attributes and methods configured
+        to match *caps*.
+    """
     device = MagicMock()
     device.DECK_TYPE = caps.deck_type
     device.DECK_VISUAL = caps.has_visual

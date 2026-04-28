@@ -31,6 +31,11 @@ def render_key_image(
         the Stream Deck+ size ``(120, 120)``.
     image_format
         Image encoding format (``"JPEG"`` or ``"BMP"``).
+
+    Returns
+    -------
+    bytes
+        Encoded image bytes ready to send to the device.
     """
     size = key_size or KEY_SIZE
     icon_px = min(size[0], size[1]) * ICON_SIZE // KEY_SIZE[0]
@@ -56,14 +61,43 @@ def render_blank_key(
     key_size: tuple[int, int] | None = None,
     image_format: str = "JPEG",
 ) -> bytes:
-    """Render a blank key image."""
+    """Render a blank key image.
+
+    Parameters
+    ----------
+    key_size : tuple of int, optional
+        Key dimensions ``(width, height)``.  Defaults to the
+        Stream Deck+ size ``(120, 120)``.
+    image_format : str, default="JPEG"
+        Image encoding format (``"JPEG"`` or ``"BMP"``).
+
+    Returns
+    -------
+    bytes
+        Encoded blank-key image bytes.
+    """
     return render_key_image(key_size=key_size, image_format=image_format)
 
 
 def _encode_image(
     img: Image.Image, image_format: str = "JPEG", quality: int = 90
 ) -> bytes:
-    """Encode a PIL image in the specified format."""
+    """Encode a PIL image in the specified format.
+
+    Parameters
+    ----------
+    img : PIL.Image.Image
+        Image to encode.
+    image_format : str, default="JPEG"
+        Target format (``"JPEG"`` or ``"BMP"``).
+    quality : int, default=90
+        JPEG quality (ignored for BMP).
+
+    Returns
+    -------
+    bytes
+        Raw encoded image bytes.
+    """
     buf = io.BytesIO()
     fmt = image_format.upper()
     if fmt == "BMP":

@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from ..render.metrics import RenderMetrics
 
 AsyncHandler = Callable[..., Coroutine[Any, Any, None]]
+"""Type alias for an async callback that accepts any arguments and returns ``None``."""
 
 
 class EventType(Enum):
@@ -80,3 +81,4 @@ class TouchEvent:
         return max(0, min(zone, metrics.panel_count - 1))
 
 DeckEvent = KeyEvent | EncoderTurnEvent | EncoderPressEvent | TouchEvent
+"""Union type of all events that can be received from a Stream Deck device."""

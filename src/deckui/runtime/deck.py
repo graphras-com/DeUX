@@ -286,6 +286,7 @@ class Deck:
 
     @property
     def active_screen(self) -> Screen | None:
+        """The currently displayed screen, or ``None`` if no screen is set."""
         return self._active_screen
 
     def _current_screen(self) -> Screen | None:
