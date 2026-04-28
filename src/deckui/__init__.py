@@ -36,7 +36,7 @@ from .dui import (
     load_all_packages,
     load_package,
 )
-from .render import RenderMetrics
+from .render import ImageFetchError, RenderMetrics, clear_image_cache, fetch_image
 from .runtime import (
     DeckError,
     DeckEvent,
@@ -74,6 +74,7 @@ __all__ = [
     "EncoderSlot",
     "EncoderTurnEvent",
     "EventType",
+    "ImageFetchError",
     "InfoScreen",
     "KeyEvent",
     "KeySlot",
@@ -83,6 +84,8 @@ __all__ = [
     "Screen",
     "TouchEvent",
     "TouchStrip",
+    "clear_image_cache",
+    "fetch_image",
     "list_devices",
     "load_all_packages",
     "load_package",
