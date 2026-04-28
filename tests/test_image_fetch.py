@@ -1,0 +1,203 @@
+"""Tests for deckui.render.image_fetch — remote image fetch and cache."""
+
+from __future__ import annotations
+
+import io
+import urllib.error
+from unittest.mock import patch
+
+import pytest
+from PIL import Image
+
+from deckui.render import image_fetch as mod
+from deckui.render.image_fetch import (
+    ImageFetchError,
+    _validate_url,
+    clear_cache,
+    fetch_image,
+)
+
+
+def _png_bytes(size: tuple[int, int] = (4, 4), color: str = "red") -> bytes:
+    """Create minimal valid PNG bytes for testing."""
+    img = Image.new("RGB", size, color)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_cache():
+    """Reset the image cache around every test."""
+    clear_cache()
+    yield
+    clear_cache()
+
+
+class TestValidateUrl:
+    """Tests for :func:`_validate_url`."""
+
+    def test_valid_https(self):
+        _validate_url("https://example.com/img.png")
+
+    def test_valid_http(self):
+        _validate_url("http://example.com/img.png")
+
+    def test_empty_raises(self):
+        with pytest.raises(ImageFetchError, match="non-empty"):
+            _validate_url("")
+
+    def test_whitespace_only_raises(self):
+        with pytest.raises(ImageFetchError, match="non-empty"):
+            _validate_url("   ")
+
+    def test_non_string_raises(self):
+        with pytest.raises(ImageFetchError, match="non-empty"):
+            _validate_url(None)  # type: ignore[arg-type]
+
+    def test_ftp_scheme_raises(self):
+        with pytest.raises(ImageFetchError, match="http://"):
+            _validate_url("ftp://example.com/img.png")
+
+    def test_no_scheme_raises(self):
+        with pytest.raises(ImageFetchError, match="http://"):
+            _validate_url("example.com/img.png")
+
+
+class TestFetchImage:
+    """Tests for :func:`fetch_image`."""
+
+    def test_fetch_returns_pil_image(self):
+        data = _png_bytes()
+        with patch.object(mod, "_http_get_bytes", return_value=data) as mock:
+            result = fetch_image("https://example.com/icon.png")
+        assert isinstance(result, Image.Image)
+        assert result.size == (4, 4)
+        mock.assert_called_once_with("https://example.com/icon.png")
+
+    def test_cache_hit_skips_http(self):
+        data = _png_bytes()
+        with patch.object(mod, "_http_get_bytes", return_value=data) as mock:
+            fetch_image("https://example.com/icon.png")
+            fetch_image("https://example.com/icon.png")
+            fetch_image("https://example.com/icon.png")
+        assert mock.call_count == 1
+
+    def test_cached_image_is_copy(self):
+        """Mutating a returned image must not affect the cache."""
+        data = _png_bytes()
+        with patch.object(mod, "_http_get_bytes", return_value=data):
+            a = fetch_image("https://example.com/icon.png")
+            b = fetch_image("https://example.com/icon.png")
+        assert a is not b
+
+    def test_different_urls_cached_separately(self):
+        red = _png_bytes(color="red")
+        blue = _png_bytes(color="blue")
+
+        def side_effect(url: str) -> bytes:
+            return red if "red" in url else blue
+
+        with patch.object(mod, "_http_get_bytes", side_effect=side_effect) as mock:
+            a = fetch_image("https://example.com/red.png")
+            b = fetch_image("https://example.com/blue.png")
+            fetch_image("https://example.com/red.png")
+            fetch_image("https://example.com/blue.png")
+        assert mock.call_count == 2
+        # Both images differ in pixel content
+        assert list(a.tobytes()) != list(b.tobytes())
+
+    def test_invalid_url_raises(self):
+        with pytest.raises(ImageFetchError, match="non-empty"):
+            fetch_image("")
+
+    def test_network_error_raises_and_caches(self):
+        err = urllib.error.URLError("unreachable")
+        with patch.object(mod, "_http_get_bytes", side_effect=err) as mock:
+            with pytest.raises(ImageFetchError, match="Failed to fetch"):
+                fetch_image("https://example.com/gone.png")
+            with pytest.raises(ImageFetchError, match="previously failed"):
+                fetch_image("https://example.com/gone.png")
+        assert mock.call_count == 1
+
+    def test_os_error_also_caught(self):
+        with (
+            patch.object(mod, "_http_get_bytes", side_effect=OSError("boom")),
+            pytest.raises(ImageFetchError, match="Failed to fetch"),
+        ):
+            fetch_image("https://example.com/boom.png")
+
+    def test_invalid_image_data_raises_and_caches(self):
+        with patch.object(mod, "_http_get_bytes", return_value=b"not-an-image") as mock:
+            with pytest.raises(ImageFetchError, match="not a valid image"):
+                fetch_image("https://example.com/bad.png")
+            with pytest.raises(ImageFetchError, match="previously failed"):
+                fetch_image("https://example.com/bad.png")
+        assert mock.call_count == 1
+
+    def test_clear_cache_forces_refetch(self):
+        data = _png_bytes()
+        with patch.object(mod, "_http_get_bytes", return_value=data) as mock:
+            fetch_image("https://example.com/icon.png")
+            clear_cache()
+            fetch_image("https://example.com/icon.png")
+        assert mock.call_count == 2
+
+    def test_clear_cache_drops_negative_entries(self):
+        err = urllib.error.URLError("gone")
+        with patch.object(mod, "_http_get_bytes", side_effect=err) as mock:
+            with pytest.raises(ImageFetchError):
+                fetch_image("https://example.com/gone.png")
+            clear_cache()
+            with pytest.raises(ImageFetchError):
+                fetch_image("https://example.com/gone.png")
+        assert mock.call_count == 2
+
+
+class TestHttpGetBytes:
+    """Verify transport-level behaviour of :func:`_http_get_bytes`."""
+
+    def test_sends_user_agent_header(self):
+        captured: dict[str, object] = {}
+        sample = _png_bytes()
+
+        class _FakeResp:
+            def read(self) -> bytes:
+                return sample
+
+            def __enter__(self) -> _FakeResp:
+                return self
+
+            def __exit__(self, *exc: object) -> None:
+                return None
+
+        def fake_urlopen(req, timeout):
+            captured["request"] = req
+            return _FakeResp()
+
+        with patch.object(mod.urllib.request, "urlopen", fake_urlopen):
+            result = mod._http_get_bytes("https://example.test/img.png")
+
+        assert result == sample
+        req = captured["request"]
+        assert req.get_header("User-agent") == mod.USER_AGENT
+
+
+class TestPackageExports:
+    """Ensure fetch_image is accessible from the package root."""
+
+    def test_render_package_exports(self):
+        from deckui.render import ImageFetchError as IE
+        from deckui.render import clear_image_cache
+        from deckui.render import fetch_image as fi
+
+        assert IE is ImageFetchError
+        assert fi is fetch_image
+        assert callable(clear_image_cache)
+
+    def test_root_package_exports(self):
+        import deckui
+
+        assert hasattr(deckui, "fetch_image")
+        assert hasattr(deckui, "ImageFetchError")
+        assert hasattr(deckui, "clear_image_cache")

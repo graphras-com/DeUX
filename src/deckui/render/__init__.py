@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .image_fetch import ImageFetchError, fetch_image
+from .image_fetch import clear_cache as clear_image_cache
 from .key_renderer import render_blank_key, render_key_image
 from .metrics import (
     ICON_PADDING,
@@ -35,6 +37,7 @@ from .touch_renderer import (
 )
 
 __all__ = [
+    "ImageFetchError",
     "ICON_PADDING",
     "ICON_SIZE",
     "KEY_MARGIN_BOTTOM",
@@ -59,6 +62,8 @@ __all__ = [
     "USABLE_HEIGHT",
     "USABLE_WIDTH",
     "compose_touchstrip",
+    "clear_image_cache",
+    "fetch_image",
     "render_blank_key",
     "render_blank_touchscreen",
     "render_info_screen",
