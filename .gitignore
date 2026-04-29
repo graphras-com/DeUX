@@ -79,3 +79,4 @@ dmypy.json
 *.pem
 *.key
 site/
+docs/architecture/
