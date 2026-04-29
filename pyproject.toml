@@ -76,6 +76,7 @@ docs = [
     "mkdocstrings[python]>=0.25",
     "mkdocs-gen-files>=0.5",
     "mkdocs-literate-nav>=0.6",
+    "pylint>=3.0",
 ]
 
 [tool.pytest.ini_options]
