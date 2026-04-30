@@ -267,6 +267,11 @@ class Deck:
     async def set_screen(self, name: str) -> None:
         """Switch to a named screen, rendering all keys and cards.
 
+        Wires up refresh callbacks on every key and card so that any
+        handler or background task can call ``request_refresh()`` to
+        trigger a re-render without needing a direct reference to the
+        deck.
+
         Parameters
         ----------
         name
@@ -278,11 +283,30 @@ class Deck:
         self._active_screen = self._screens[name]
         logger.info("Switching to screen: %s", name)
 
+        self._wire_refresh_callbacks()
+
         await self._render_all_keys()
         if self._active_screen.touch_strip is not None:
             await self._render_touchscreen()
         if self._active_screen.info_screen is not None:
             await self._render_info_screen()
+
+    def _wire_refresh_callbacks(self) -> None:
+        """Register ``self.refresh`` on every key and card of the active screen.
+
+        Called by :meth:`set_screen`.  Allows handlers and background
+        tasks to call :meth:`KeySlot.request_refresh` /
+        :meth:`Card.request_refresh` to trigger re-renders without
+        needing a direct deck reference.
+        """
+        screen = self._active_screen
+        if screen is None:
+            return
+        for key_slot in screen.keys.values():
+            key_slot.set_refresh_callback(self.refresh)
+        if screen.touch_strip is not None:
+            for card in screen.touch_strip.cards:
+                card.set_refresh_callback(self.refresh)
 
     @property
     def active_screen(self) -> Screen | None:
@@ -583,7 +607,6 @@ class Deck:
                 await encoder.dispatch_press(event.pressed)
             if screen.touch_strip is not None:
                 card = screen.touch_strip.card(event.encoder)
-                card.set_refresh_callback(self.refresh)
                 if event.pressed:
                     await card.dispatch_encoder_press()
                 else:
