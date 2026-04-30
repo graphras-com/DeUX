@@ -337,6 +337,7 @@ class LightsController:
         self.brightness = max(0, min(100, value))
         log.info("Brightness: %d%%", self.brightness)
         self._card.set("brightness_value_text", f"{self.brightness}%")
+        self._card.set_range("brightness", self.brightness, min_val=0, max_val=100)
 
     async def set_kelvin(self, value: int) -> None:
         """Set colour temperature.
@@ -349,12 +350,15 @@ class LightsController:
         self.kelvin = max(2000, min(6500, value))
         log.info("Kelvin: %dK", self.kelvin)
         self._card.set("kelvin_value_text", f"{self.kelvin}K")
+        self._card.set_range("kelvin", self.kelvin, min_val=2000, max_val=6500)
 
     def _sync_card(self) -> None:
         """Push the full light state into card bindings."""
         self._card.set("lights", self.is_on)
         self._card.set("brightness_value_text", f"{self.brightness}%")
+        self._card.set_range("brightness", self.brightness, min_val=0, max_val=100)
         self._card.set("kelvin_value_text", f"{self.kelvin}K")
+        self._card.set_range("kelvin", self.kelvin, min_val=2000, max_val=6500)
 
     def _bind_events(self) -> None:
         """Register card event handlers."""

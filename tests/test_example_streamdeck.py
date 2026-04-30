@@ -441,6 +441,9 @@ class TestLightsController:
         assert ctrl.card.get("lights") is True
         assert ctrl.card.get("brightness_value_text") == "80%"
         assert ctrl.card.get("kelvin_value_text") == "4000K"
+        # Slider bindings should be normalised (80/100 and (4000-2000)/(6500-2000))
+        assert ctrl.card.get("brightness") == pytest.approx(0.8)
+        assert ctrl.card.get("kelvin") == pytest.approx((4000 - 2000) / (6500 - 2000))
 
     async def test_toggle(self, ctrl: LightsController) -> None:
         await ctrl.toggle()
@@ -453,15 +456,19 @@ class TestLightsController:
         await ctrl.set_brightness(150)
         assert ctrl.brightness == 100
         assert ctrl.card.get("brightness_value_text") == "100%"
+        assert ctrl.card.get("brightness") == pytest.approx(1.0)
         await ctrl.set_brightness(-10)
         assert ctrl.brightness == 0
+        assert ctrl.card.get("brightness") == pytest.approx(0.0)
 
     async def test_set_kelvin_clamps(self, ctrl: LightsController) -> None:
         await ctrl.set_kelvin(1000)
         assert ctrl.kelvin == 2000
         assert ctrl.card.get("kelvin_value_text") == "2000K"
+        assert ctrl.card.get("kelvin") == pytest.approx(0.0)
         await ctrl.set_kelvin(9000)
         assert ctrl.kelvin == 6500
+        assert ctrl.card.get("kelvin") == pytest.approx(1.0)
 
 
 # ===================================================================
