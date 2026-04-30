@@ -434,6 +434,10 @@ class TimerController:
 
     TICK_INTERVAL_S = 1.0
     ADJUST_STEP_S = 30
+    FLASH_COUNT = 6
+    FLASH_INTERVAL_S = 0.3
+    DEFAULT_BACKGROUND = "#dedede"
+    DEFAULT_FOREGROUND = "#1c1c1c"
 
     def __init__(
         self,
@@ -552,6 +556,37 @@ class TimerController:
         async def _decrease(steps: int) -> None:
             await self.adjust_duration(-abs(steps) * self.ADJUST_STEP_S)
 
+    async def _flash_notification(self) -> None:
+        """Flash foreground/background colors to signal timer completion.
+
+        Swaps the foreground and background colors three times with a
+        short interval, then restores the original colors.  This gives
+        a visible pulse on the touch-strip card so the user knows the
+        countdown has ended.
+        """
+        swapped = False
+        for _ in range(self.FLASH_COUNT):
+            swapped = not swapped
+            if swapped:
+                self._card.set_many(
+                    background=self.DEFAULT_FOREGROUND,
+                    foreground=self.DEFAULT_BACKGROUND,
+                )
+            else:
+                self._card.set_many(
+                    background=self.DEFAULT_BACKGROUND,
+                    foreground=self.DEFAULT_FOREGROUND,
+                )
+            await self._card.request_refresh()
+            await asyncio.sleep(self.FLASH_INTERVAL_S)
+
+        # Ensure colors are restored to their original values.
+        self._card.set_many(
+            background=self.DEFAULT_BACKGROUND,
+            foreground=self.DEFAULT_FOREGROUND,
+        )
+        await self._card.request_refresh()
+
     async def _tick_loop(self) -> None:
         """Decrement *remaining* once per second while running."""
         try:
@@ -568,6 +603,7 @@ class TimerController:
                     log.info("Timer finished")
                     self._sync_card()
                     await self._card.request_refresh()
+                    await self._flash_notification()
         except asyncio.CancelledError:
             pass
 
