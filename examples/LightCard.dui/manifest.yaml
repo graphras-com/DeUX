@@ -58,13 +58,15 @@ events:
     source: encoder_press_turn
     direction: right
     accumulate: true
-    accumulate_max_steps: 1
+    accumulate_delay: 0.1
+    accumulate_max_steps: 10
 
   - name: kelvin_down
     source: encoder_press_turn
     direction: left
     accumulate: true
-    accumulate_max_steps: 1
+    accumulate_delay: 0.1
+    accumulate_max_steps: 10
 
 regions:
   card:
