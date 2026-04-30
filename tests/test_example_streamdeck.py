@@ -34,6 +34,7 @@ from streamdeck import (
     FavoritesController,
     LightsController,
     SceneController,
+    ScreenCycler,
     TimerController,
 )
 
@@ -285,6 +286,11 @@ def _dash_spec() -> PackageSpec:
                 source="encoder_turn",
                 direction="left",
                 accumulate=True,
+            ),
+            EventMapping(
+                name="next_screen",
+                source="encoder_press_release",
+                max_duration_ms=250,
             ),
         ),
     )
@@ -730,3 +736,88 @@ class TestFavoritesController:
         screen = MagicMock()
         ctrl.install(screen, [0, 1])
         assert screen.set_key.call_count == 2
+
+
+# ===================================================================
+# ScreenCycler tests
+# ===================================================================
+
+
+class TestScreenCycler:
+    """Tests for the ScreenCycler controller."""
+
+    def test_rejects_empty_screen_list(self) -> None:
+        with pytest.raises(ValueError):
+            ScreenCycler([])
+
+    def test_starts_on_first_screen(self) -> None:
+        cycler = ScreenCycler(["main", "settings", "info"])
+        assert cycler.current == "main"
+
+    async def test_advance_wraps_around(self) -> None:
+        cycler = ScreenCycler(["a", "b", "c"])
+        deck = MagicMock()
+        deck.set_screen = AsyncMock()
+        cycler.bind_deck(deck)
+
+        await cycler.advance()
+        assert cycler.current == "b"
+        deck.set_screen.assert_awaited_with("b")
+
+        await cycler.advance()
+        assert cycler.current == "c"
+
+        await cycler.advance()
+        assert cycler.current == "a"
+        # Three calls in total, in order.
+        targets = [c.args[0] for c in deck.set_screen.await_args_list]
+        assert targets == ["b", "c", "a"]
+
+    async def test_advance_without_deck_is_noop(self) -> None:
+        cycler = ScreenCycler(["a", "b"])
+        # No bind_deck() -- must not raise and must not advance index.
+        await cycler.advance()
+        assert cycler.current == "a"
+
+    async def test_attach_binds_event_to_advance(self) -> None:
+        spec = _dash_spec()
+        card = DuiCard(spec)
+        cycler = ScreenCycler(["a", "b"])
+        deck = MagicMock()
+        deck.set_screen = AsyncMock()
+        cycler.bind_deck(deck)
+
+        cycler.attach(card)
+        # The cycler registers a handler against the manifest event;
+        # invoke it the same way the deck would.
+        handler = card._events._handlers["next_screen"]
+        await handler()
+        assert cycler.current == "b"
+        deck.set_screen.assert_awaited_with("b")
+
+    async def test_attach_custom_event_name(self) -> None:
+        # Build a dashboard-shaped spec but with a differently-named event.
+        spec = PackageSpec(
+            name="DashboardCard",
+            type=PackageType.TOUCH_STRIP_CARD,
+            version=1,
+            svg_source=_DASH_SVG,
+            bindings=_dash_spec().bindings,
+            events=(
+                EventMapping(
+                    name="rotate_screen",
+                    source="encoder_press_release",
+                    max_duration_ms=250,
+                ),
+            ),
+        )
+        card = DuiCard(spec)
+        cycler = ScreenCycler(["x", "y"])
+        deck = MagicMock()
+        deck.set_screen = AsyncMock()
+        cycler.bind_deck(deck)
+
+        cycler.attach(card, event="rotate_screen")
+        handler = card._events._handlers["rotate_screen"]
+        await handler()
+        assert cycler.current == "y"

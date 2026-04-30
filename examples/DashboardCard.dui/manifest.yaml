@@ -55,6 +55,10 @@ events:
     accumulate: true
     accumulate_delay: 0.05
 
+  - name: next_screen
+    source: encoder_press_release
+    max_duration_ms: 250
+    
 regions:
   card:
     x: 0

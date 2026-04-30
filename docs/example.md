@@ -26,7 +26,9 @@ action is logged to the console.
 - **A live dashboard clock** that updates only when the displayed value
   changes.
 - **Multi-screen navigation** — a `main` screen and a `settings` screen
-  swap atomically via `Deck.set_screen`.
+  swap atomically via `Deck.set_screen`. The dashboard encoder's
+  press-release cycles screens via the `next_screen` event declared in
+  `DashboardCard.dui` — no key needed.
 - **All three key event sources** — `press`, `release`, and the
   higher-level `click`. Scene keys flash their colours while held to
   prove that all three fire.
@@ -44,8 +46,9 @@ StreamDeckApp
 ├── TimerController        ── TimerCard.dui      (touch-strip card 2)
 ├── DashboardController    ── DashboardCard.dui  (touch-strip card 3)
 ├── FavoritesController    ── PictureKey.dui     (keys 0..N favourites)
-├── SceneController        ── IconKey.dui        (keys after favourites)
-└── NavigationController   ── IconKey.dui        (last key, screen switch)
+├── SceneController        ── IconKey.dui        (remaining keys)
+└── ScreenCycler           ── (no widget; bound to dashboard's
+                                 ``next_screen`` event)
 ```
 
 Controllers never talk to the deck directly. They mutate their card's
@@ -128,20 +131,42 @@ async def _click():
     log.info("Scene activated: %s", label)
 ```
 
-### Two screens, one set of controllers
+### Two screens, cycled by an encoder press
 
-`NavigationController` swaps between a busy `main` screen (favourites,
-scenes, all four cards) and a focused `settings` screen (just the
-dashboard and lights). The same controllers appear on both — DeckUI
-re-renders whatever is installed on the active screen.
+`ScreenCycler` swaps between a busy `main` screen (favourites, scenes,
+all four cards) and a focused `settings` screen (dashboard and lights
+only). The same controllers appear on both — DeckUI re-renders
+whatever is installed on the active screen.
+
+The cycler doesn't own any widget. Instead, `DashboardCard.dui`
+declares a `next_screen` event mapped to an encoder press-release, and
+the cycler binds a handler to that event:
 
 ```python
-async def _toggle(self) -> None:
-    target = self._primary if self._on_secondary else self._secondary
-    self._on_secondary = not self._on_secondary
-    self._render_label()
-    await self._deck.set_screen(target)
+class ScreenCycler:
+    def attach(self, card: DuiCard, event: str = "next_screen") -> None:
+        @card.on(event)
+        async def _trigger() -> None:
+            await self.advance()
+
+    async def advance(self) -> None:
+        if self._deck is None:
+            return
+        self._index = (self._index + 1) % len(self._screens)
+        await self._deck.set_screen(self._screens[self._index])
 ```
+
+The corresponding manifest fragment in `DashboardCard.dui`:
+
+```yaml
+events:
+  - name: next_screen
+    source: encoder_press_release
+    max_duration_ms: 250
+```
+
+This keeps every key slot available for favourites and scenes while
+still giving the user a one-press way to flip between layouts.
 
 ## Try it
 
@@ -158,7 +183,7 @@ Once running, here are some interactions to try:
 | Click the timer encoder | Start or pause the countdown |
 | Hold the timer encoder | Reset the timer |
 | Turn the timer encoder | Add/remove 30 seconds |
-| Press the Settings key | Switch to the settings screen |
+| Press the dashboard encoder | Cycle to the next screen |
 
 ## Full source
 
