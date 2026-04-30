@@ -657,13 +657,22 @@ class TestSceneController:
     async def test_press_release_requests_refresh(
         self, ctrl: SceneController
     ) -> None:
-        """Press and release each call request_refresh on the key."""
+        """Press and release each call request_refresh on the key.
+
+        The stub mimics ``Deck.refresh`` by clearing the dirty flag,
+        which is what makes the auto-refresh wrapper idempotent in
+        production: when a handler explicitly calls ``request_refresh``,
+        the card is rendered and marked clean, so the wrapper's
+        post-handler ``if is_dirty: refresh()`` check finds nothing to
+        do.
+        """
         key = ctrl.keys[0]
         refreshes = 0
 
         async def _refresh() -> None:
             nonlocal refreshes
             refreshes += 1
+            key.mark_clean()
 
         key.set_refresh_callback(_refresh)
         await key.dispatch(pressed=True)

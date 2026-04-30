@@ -270,7 +270,7 @@ class DuiKey(KeySlot):
         """
 
         def decorator(fn: AsyncHandler) -> AsyncHandler:
-            self._events.on(event_name, fn)
+            self._events.on(event_name, self._wrap_handler(fn))
             return fn
 
         return decorator
@@ -285,7 +285,25 @@ class DuiKey(KeySlot):
         handler
             The async callable to invoke.
         """
-        self._events.on(event_name, handler)
+        self._events.on(event_name, self._wrap_handler(handler))
+
+    def _wrap_handler(self, fn: AsyncHandler) -> AsyncHandler:
+        """Wrap *fn* so any state changes trigger a refresh after it runs.
+
+        Mirrors :meth:`DuiCard._wrap_handler`.  Without this, hold-timer
+        handlers (``key_hold``) -- which fire from a detached asyncio
+        task -- would mutate bindings without ever triggering a render.
+        Wrapping at the registration boundary makes every handler
+        self-refreshing regardless of how it's dispatched.
+        """
+
+        async def _wrapped(*args: Any, **kwargs: Any) -> None:
+            await fn(*args, **kwargs)
+            if self.is_dirty:
+                await self.request_refresh()
+
+        _wrapped.__wrapped__ = fn  # type: ignore[attr-defined]
+        return _wrapped
 
     def render_image(
         self,
