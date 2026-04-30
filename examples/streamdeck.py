@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Stream Deck+ demo — showcases DeckUI with mockup controllers.
+"""Stream Deck+ demo -- showcases DeckUI with mockup controllers.
 
 This example demonstrates how to build a complete Stream Deck+ application
 using DeckUI's declarative UI system.  It sets up four touchscreen cards
 (audio player, lights, timer, dashboard) and eight physical keys (four
 album-art favorites and four scene-activation buttons).
 
-No real hardware or external services are required — every controller uses
+No real hardware or external services are required -- every controller uses
 in-memory state and logs actions to the console.
 
 Layout
@@ -44,7 +44,7 @@ logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Media catalog — four classic albums used as favorites
+# Media catalog -- four classic albums used as favorites
 # ---------------------------------------------------------------------------
 
 MEDIA_CATALOG: list[dict[str, str]] = [
@@ -141,12 +141,12 @@ class AudioPlayer:
             self._index = self._catalog.index(track)
         self.is_playing = True
         t = self.current_track
-        log.info("▶ Playing: %s — %s", t["artist"], t["title"])
+        log.info("Playing: %s -- %s", t["artist"], t["title"])
 
     async def pause(self) -> None:
         """Pause playback."""
         self.is_playing = False
-        log.info("⏸ Paused")
+        log.info("Paused")
 
     async def play_pause(self) -> None:
         """Toggle between play and pause."""
@@ -165,7 +165,7 @@ class AudioPlayer:
         """
         self._index = (self._index + 1) % len(self._catalog)
         t = self.current_track
-        log.info("⏭ Next: %s — %s", t["artist"], t["title"])
+        log.info("Next: %s -- %s", t["artist"], t["title"])
         return t
 
     async def previous_track(self) -> dict[str, str]:
@@ -178,7 +178,7 @@ class AudioPlayer:
         """
         self._index = (self._index - 1) % len(self._catalog)
         t = self.current_track
-        log.info("⏮ Previous: %s — %s", t["artist"], t["title"])
+        log.info("Previous: %s -- %s", t["artist"], t["title"])
         return t
 
     async def set_volume(self, level: float) -> None:
@@ -190,12 +190,12 @@ class AudioPlayer:
             Volume between 0.0 and 1.0.
         """
         self.volume_level = max(0.0, min(1.0, level))
-        log.info("🔊 Volume: %.0f%%", self.volume_level * 100)
+        log.info("Volume: %.0f%%", self.volume_level * 100)
 
     async def toggle_mute(self) -> None:
         """Toggle mute state."""
         self.is_muted = not self.is_muted
-        log.info("🔇 Muted: %s", self.is_muted)
+        log.info("Muted: %s", self.is_muted)
 
 
 class LightsController:
@@ -217,7 +217,7 @@ class LightsController:
     async def toggle(self) -> None:
         """Toggle lights on/off."""
         self.is_on = not self.is_on
-        log.info("💡 Lights: %s", "ON" if self.is_on else "OFF")
+        log.info("Lights: %s", "ON" if self.is_on else "OFF")
 
     async def set_brightness(self, value: int) -> None:
         """Set brightness percentage.
@@ -228,7 +228,7 @@ class LightsController:
             Brightness between 0 and 100.
         """
         self.brightness = max(0, min(100, value))
-        log.info("💡 Brightness: %d%%", self.brightness)
+        log.info("Brightness: %d%%", self.brightness)
 
     async def set_kelvin(self, value: int) -> None:
         """Set colour temperature.
@@ -239,7 +239,7 @@ class LightsController:
             Colour temperature in Kelvin (clamped to 2000–6500).
         """
         self.kelvin = max(2000, min(6500, value))
-        log.info("💡 Kelvin: %dK", self.kelvin)
+        log.info("Kelvin: %dK", self.kelvin)
 
 
 class TimerController:
@@ -271,13 +271,13 @@ class TimerController:
     async def toggle(self) -> None:
         """Start or pause the timer."""
         self.is_running = not self.is_running
-        log.info("⏱ Timer %s — %s", "started" if self.is_running else "paused", self._format())
+        log.info("Timer %s -- %s", "started" if self.is_running else "paused", self._format())
 
     async def reset(self) -> None:
         """Reset the timer to its initial duration."""
         self.is_running = False
         self.remaining = self.duration
-        log.info("⏱ Timer reset — %s", self._format())
+        log.info("Timer reset -- %s", self._format())
 
     async def adjust_duration(self, delta_seconds: int) -> None:
         """Adjust the timer duration.
@@ -289,7 +289,7 @@ class TimerController:
         """
         self.duration = max(0, self.duration + delta_seconds)
         self.remaining = self.duration
-        log.info("⏱ Timer duration: %s", self._format())
+        log.info("Timer duration: %s", self._format())
 
 
 class DashboardController:
@@ -335,7 +335,7 @@ class DashboardController:
             Brightness percentage (0–100).
         """
         self.deck_brightness = max(0, min(100, value))
-        log.info("🖥 Deck brightness: %d%%", self.deck_brightness)
+        log.info("Deck brightness: %d%%", self.deck_brightness)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -556,7 +556,7 @@ def setup_favorites(
 
         @key.on_event("click")
         async def _click(m: dict[str, str] = media) -> None:
-            log.info("Favorite pressed: %s — %s", m["artist"], m["title"])
+            log.info("Favorite pressed: %s -- %s", m["artist"], m["title"])
             await player.play(m)
 
         screen.set_key(fav["position"], key)
@@ -615,7 +615,7 @@ async def run() -> None:
 
     @manager.on_connect()
     async def on_deck_connect(deck: Any) -> None:
-        """Handle a new deck connection — set up the full UI."""
+        """Handle a new deck connection -- set up the full UI."""
         log.info("Deck connected")
 
         screen = deck.screen("main")
@@ -650,7 +650,7 @@ async def run() -> None:
     @manager.on_disconnect
     async def on_deck_disconnect(info: DeviceInfo) -> None:
         """Log when a deck disconnects."""
-        log.warning("Deck disconnected: %s — waiting for reconnect...", info.serial)
+        log.warning("Deck disconnected: %s -- waiting for reconnect...", info.serial)
 
     async with manager:
         await manager.wait_closed()
