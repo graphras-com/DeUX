@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 from deckui.ui.controls.key_slot import KeySlot
 
 
@@ -48,6 +50,19 @@ class TestKeySlotEventHandlers:
             pass
 
         assert key_slot._release_handler is handler
+
+
+class TestKeySlotRefreshCallback:
+    async def test_request_refresh_no_callback(self, key_slot: KeySlot):
+        """request_refresh is a no-op when no callback is registered."""
+        await key_slot.request_refresh()
+
+    async def test_set_and_request_refresh(self, key_slot: KeySlot):
+        """request_refresh awaits the registered callback."""
+        cb = AsyncMock()
+        key_slot.set_refresh_callback(cb)
+        await key_slot.request_refresh()
+        cb.assert_awaited_once()
 
 
 class TestKeySlotRendering:

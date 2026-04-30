@@ -29,11 +29,35 @@ class KeySlot:
         self._release_handler: AsyncHandler | None = None
         self._image_bytes: bytes | None = None
         self._dirty = True
+        self._request_refresh: AsyncHandler | None = None
 
     @property
     def index(self) -> int:
         """The key index on the device."""
         return self._index
+
+    def set_refresh_callback(self, callback: AsyncHandler) -> None:
+        """Register an async callback the key can invoke to request a refresh.
+
+        This is set automatically by :class:`~deckui.runtime.deck.Deck`
+        when a screen is activated, so any code path (key handler,
+        background task, external state change) can call
+        :meth:`request_refresh` to trigger a re-render.
+
+        Parameters
+        ----------
+        callback
+            Async callable that triggers a deck refresh.
+        """
+        self._request_refresh = callback
+
+    async def request_refresh(self) -> None:
+        """Ask the deck to re-render the active screen.
+
+        No-op if no refresh callback has been registered.
+        """
+        if self._request_refresh is not None:
+            await self._request_refresh()
 
     def on_press(self, handler: AsyncHandler) -> AsyncHandler:
         """Decorator to register a handler for key press events.

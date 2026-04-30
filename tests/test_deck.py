@@ -126,6 +126,45 @@ class TestDeckActivePage:
         assert deck.active_screen is None
 
 
+class TestDeckWireRefreshCallbacks:
+    """Tests for the screen-wide refresh-callback wiring."""
+
+    async def test_wires_keys_and_cards_on_set_screen(self, deck):
+        """set_screen wires deck.refresh on every key and card."""
+        screen = deck.screen("main")
+        key = screen.key(0)
+        card = _TestCard(0)
+        screen.set_card(0, card)
+
+        deck._render_all_keys = AsyncMock()
+        deck._render_touchscreen = AsyncMock()
+
+        # Patch BEFORE set_screen so the bound method captured by the
+        # wiring is the mock.
+        with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
+            await deck.set_screen("main")
+            await key.request_refresh()
+            await card.request_refresh()
+            assert mock_refresh.await_count == 2
+
+    async def test_request_refresh_from_key_handler_triggers_refresh(self, deck):
+        """A key handler can call request_refresh after set_screen."""
+        screen = deck.screen("main")
+        key = screen.key(0)
+
+        deck._render_all_keys = AsyncMock()
+        deck._render_touchscreen = AsyncMock()
+
+        @key.on_press
+        async def _press() -> None:
+            await key.request_refresh()
+
+        with patch.object(deck, "refresh", new_callable=AsyncMock) as mock_refresh:
+            await deck.set_screen("main")
+            await deck._dispatch(KeyEvent(key=0, pressed=True))
+            mock_refresh.assert_awaited()
+
+
 class TestDeckRefresh:
     async def test_no_active_screen(self, deck):
         """refresh() is a no-op when no active page."""

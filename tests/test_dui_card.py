@@ -374,7 +374,10 @@ class TestDuiCardEvents:
         card.handle_encoder_press()
         callbacks = card.drain_pending_callbacks()
         assert len(callbacks) == 1
-        assert callbacks[0][0] is handler
+        # The registered callable wraps the user's handler so any
+        # state changes auto-trigger a refresh; the original handler
+        # is preserved on the wrapper for introspection.
+        assert callbacks[0][0].__wrapped__ is handler
 
     def test_encoder_turn_routes_to_handler(self):
         spec = _make_card_spec(
@@ -519,3 +522,137 @@ class TestDuiCardDirtyTracking:
         card.set_rendered(img)
         assert card.is_dirty is False
         assert card.rendered is img
+
+
+class TestDuiCardHandlerAutoRefresh:
+    """Registered handlers that mutate state must auto-trigger a refresh.
+
+    Regression tests for the bug where accumulator-driven and hold-timer
+    handlers fired from detached asyncio tasks, mutating bindings without
+    ever causing a render.
+    """
+
+    @pytest.fixture
+    def card(self):
+        spec = _make_card_spec(
+            bindings={"title": TextBinding(node="title", default="")},
+            events=(
+                EventMapping(
+                    name="bump",
+                    source="encoder_turn",
+                    direction="right",
+                    accumulate=True,
+                ),
+                EventMapping(name="press", source="encoder_press"),
+                EventMapping(name="hold", source="encoder_hold", hold_ms=50),
+            ),
+        )
+        return DuiCard(spec)
+
+    async def test_handler_dirties_card_triggers_refresh(self, card):
+        """Wrapper calls request_refresh when handler leaves card dirty."""
+        refreshed = 0
+
+        async def _refresh() -> None:
+            nonlocal refreshed
+            refreshed += 1
+            card.mark_clean()
+
+        card.set_refresh_callback(_refresh)
+        card.mark_clean()
+
+        @card.on("press")
+        async def _press():
+            card.set("title", "changed")
+
+        # Invoke the wrapped handler directly (mirrors what
+        # accumulator/hold tasks do once they fire).
+        card.handle_encoder_press()
+        for handler, args in card.drain_pending_callbacks():
+            await handler(*args)
+
+        assert refreshed == 1
+
+    async def test_clean_handler_no_extra_refresh(self, card):
+        """Wrapper is a no-op when the handler doesn't dirty the card."""
+        refreshed = 0
+
+        async def _refresh() -> None:
+            nonlocal refreshed
+            refreshed += 1
+            card.mark_clean()
+
+        card.set_refresh_callback(_refresh)
+        card.mark_clean()
+
+        @card.on("press")
+        async def _press():
+            pass  # no state change
+
+        card.handle_encoder_press()
+        for handler, args in card.drain_pending_callbacks():
+            await handler(*args)
+
+        assert refreshed == 0
+
+    async def test_explicit_request_refresh_not_doubled(self, card):
+        """A handler that calls request_refresh itself doesn't trigger a 2nd refresh.
+
+        After the handler's explicit refresh, the deck (here, the stub)
+        marks the card clean.  The wrapper's post-call dirty check then
+        finds nothing to do, so we get exactly one refresh -- not two.
+        """
+        refreshed = 0
+
+        async def _refresh() -> None:
+            nonlocal refreshed
+            refreshed += 1
+            card.mark_clean()
+
+        card.set_refresh_callback(_refresh)
+        card.mark_clean()
+
+        @card.on("press")
+        async def _press():
+            card.set("title", "changed")
+            await card.request_refresh()
+
+        card.handle_encoder_press()
+        for handler, args in card.drain_pending_callbacks():
+            await handler(*args)
+
+        assert refreshed == 1
+
+    async def test_accumulator_flush_triggers_refresh(self, card):
+        """The whole point: accumulated turns refresh after the debounce.
+
+        Before this fix, the flush task fired the user's callback in a
+        detached coroutine that never re-entered the dispatcher, so a
+        rapid encoder spin could leave the display stale.
+        """
+        import asyncio
+
+        refreshed = 0
+
+        async def _refresh() -> None:
+            nonlocal refreshed
+            refreshed += 1
+            card.mark_clean()
+
+        card.set_refresh_callback(_refresh)
+        card.mark_clean()
+
+        @card.on("bump")
+        async def _bump(_steps: int):
+            card.set("title", "changed")
+
+        # Simulate a burst of 5 ticks; the accumulator collapses them
+        # into one debounced call to the wrapped handler.
+        for _ in range(5):
+            card.handle_encoder_turn(1)
+        # Wait for the default 0.25s debounce window to elapse plus
+        # a tiny buffer for the flush task to run.
+        await asyncio.sleep(0.4)
+
+        assert refreshed == 1
+        assert card.get("title") == "changed"

@@ -270,7 +270,7 @@ class DuiCard(Card):
         """
 
         def decorator(fn: AsyncHandler) -> AsyncHandler:
-            self._events.on(event_name, fn)
+            self._events.on(event_name, self._wrap_handler(fn))
             return fn
 
         return decorator
@@ -285,7 +285,44 @@ class DuiCard(Card):
         handler
             The async callable to invoke.
         """
-        self._events.on(event_name, handler)
+        self._events.on(event_name, self._wrap_handler(handler))
+
+    def _wrap_handler(self, fn: AsyncHandler) -> AsyncHandler:
+        """Wrap *fn* so any state changes trigger a refresh after it runs.
+
+        For events dispatched synchronously from the deck's event loop
+        (key press, encoder press, non-accumulated turns) the deck
+        already calls ``refresh()`` when the card is dirty after the
+        handler runs.  But several event paths fire from detached
+        asyncio tasks where the dispatcher is no longer in scope:
+
+        * Accumulator flushes (``accumulate: true`` encoder turns).
+        * Hold timers (``encoder_hold`` / ``key_hold``).
+
+        Without this wrapper, those handlers can mutate bindings
+        without ever triggering a render -- the user's display goes
+        silently stale (e.g. brightness slider lagging behind rapid
+        encoder spins).  Wrapping at the registration boundary makes
+        every handler self-refreshing, regardless of how it's
+        dispatched.
+
+        The wrapper:
+
+        * Is a no-op when no refresh callback is wired (i.e. before the
+          card is installed on a screen).
+        * Is idempotent when the handler already calls
+          :meth:`request_refresh` itself -- the second call finds the
+          card clean and skips re-rendering.
+        """
+
+        async def _wrapped(*args: Any, **kwargs: Any) -> None:
+            await fn(*args, **kwargs)
+            if self.is_dirty:
+                await self.request_refresh()
+
+        # Preserve the original for testing / introspection.
+        _wrapped.__wrapped__ = fn  # type: ignore[attr-defined]
+        return _wrapped
 
     def render(self) -> Image.Image:
         """Render the SVG layout with current bindings to a PIL Image.
