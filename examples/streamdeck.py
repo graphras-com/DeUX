@@ -1,30 +1,16 @@
 #!/usr/bin/env python3
-"""Stream Deck+ demo -- showcases DeckUI with self-contained controllers.
+"""Stream Deck example -- showcases DeckUI across all supported devices.
 
-This example demonstrates how to build a complete Stream Deck+ application
-using DeckUI's declarative UI system.  Each controller owns its DUI card,
-loads the ``.dui`` package, manages internal state, and wires up all event
-handlers -- making every controller a single, readable unit.
+This example works with any Stream Deck model.  Physical keys (favourites
+and scenes) are laid out dynamically based on the connected device's key
+count.  Touchscreen cards (audio, lights, timer, dashboard) are only
+installed when the device has a touch strip and encoders.
 
-Four touchscreen cards (audio, lights, timer, dashboard) and eight physical
-keys (four album-art favourites, four scene buttons) are set up.
+Each controller owns its DUI card or keys, loads the ``.dui`` package,
+manages internal state, and wires up all event handlers.
 
-No real hardware or external services are required -- every controller uses
-in-memory state and logs actions to the console.
-
-Layout
-------
-Keys (8-key, 2x4 grid)::
-
-    +------+------+------+------+
-    | Fav0 | Fav1 |Scene0|Scene1|
-    +------+------+------+------+
-    | Fav2 | Fav3 |Scene2|Scene3|
-    +------+------+------+------+
-
-Touch-strip cards (left to right)::
-
-    [ Audio ] [ Lights ] [ Timer ] [ Dashboard ]
+No real hardware or external services are required -- every controller
+uses in-memory state and logs actions to the console.
 
 Running
 -------
@@ -82,19 +68,12 @@ MEDIA_CATALOG: list[dict[str, str]] = [
     },
 ]
 
-# Key layout definitions
-SCENE_KEYS: list[dict[str, Any]] = [
-    {"position": 2, "label": "Normal", "icon": "fa-regular:smile-beam"},
-    {"position": 3, "label": "Tired", "icon": "fa-regular:tired"},
-    {"position": 6, "label": "Cinema", "icon": "mdi:cinema"},
-    {"position": 7, "label": "Bedtime", "icon": "icon-park-outline:sleep-two"},
-]
-
-FAVORITE_KEYS: list[dict[str, Any]] = [
-    {"position": 0, "media": MEDIA_CATALOG[0]},
-    {"position": 1, "media": MEDIA_CATALOG[1]},
-    {"position": 4, "media": MEDIA_CATALOG[2]},
-    {"position": 5, "media": MEDIA_CATALOG[3]},
+# Scene definitions (installed on keys after favourites)
+SCENE_DEFS: list[dict[str, str]] = [
+    {"label": "Normal", "icon": "fa-regular:smile-beam"},
+    {"label": "Tired", "icon": "fa-regular:tired"},
+    {"label": "Cinema", "icon": "mdi:cinema"},
+    {"label": "Bedtime", "icon": "icon-park-outline:sleep-two"},
 ]
 
 
@@ -605,15 +584,15 @@ class SceneController:
 
     Parameters
     ----------
-    scenes : list[dict[str, Any]]
-        Scene definitions, each with ``position``, ``label``, and ``icon``.
+    scenes : list[dict[str, str]]
+        Scene definitions, each with ``label`` and ``icon``.
     packages_dir : Path | None
         Directory containing ``.dui`` packages.
     """
 
     def __init__(
         self,
-        scenes: list[dict[str, Any]],
+        scenes: list[dict[str, str]],
         packages_dir: Path | None = None,
     ) -> None:
         self._scenes = scenes
@@ -637,16 +616,21 @@ class SceneController:
         """The created scene keys (same order as *scenes*)."""
         return list(self._keys)
 
-    def install(self, screen: Any) -> None:
-        """Place all scene keys onto a screen at their configured positions.
+    def install(self, screen: Any, positions: list[int]) -> None:
+        """Place scene keys onto a screen at the given positions.
+
+        Only installs as many keys as there are positions (or keys),
+        whichever is fewer.
 
         Parameters
         ----------
         screen
             The :class:`~deckui.ui.screen.Screen` to install keys on.
+        positions : list[int]
+            Key indices to place the scene keys at.
         """
-        for scene, key in zip(self._scenes, self._keys, strict=True):
-            screen.set_key(scene["position"], key)
+        for pos, key in zip(positions, self._keys, strict=False):
+            screen.set_key(pos, key)
 
 
 class FavoritesController:
@@ -658,8 +642,8 @@ class FavoritesController:
 
     Parameters
     ----------
-    favorites : list[dict[str, Any]]
-        Favourite definitions, each with ``position`` and ``media``.
+    catalog : list[dict[str, str]]
+        Media entries used as favourites.
     audio : AudioController
         The audio controller that handles playback.
     packages_dir : Path | None
@@ -668,19 +652,18 @@ class FavoritesController:
 
     def __init__(
         self,
-        favorites: list[dict[str, Any]],
+        catalog: list[dict[str, str]],
         audio: AudioController,
         packages_dir: Path | None = None,
     ) -> None:
-        self._favorites = favorites
+        self._catalog = catalog
         self._audio = audio
         pkg_dir = packages_dir or EXAMPLES_DIR
         self._spec = load_package(pkg_dir / "PictureKey.dui")
         self._keys: list[DuiKey] = []
 
-        for fav in self._favorites:
+        for media in self._catalog:
             key = DuiKey(self._spec)
-            media = fav["media"]
 
             # Load the album cover and set it on the key
             cover_path = pkg_dir / media["cover"]
@@ -696,19 +679,91 @@ class FavoritesController:
 
     @property
     def keys(self) -> list[DuiKey]:
-        """The created favourite keys (same order as *favorites*)."""
+        """The created favourite keys (same order as *catalog*)."""
         return list(self._keys)
 
-    def install(self, screen: Any) -> None:
-        """Place all favourite keys onto a screen at their configured positions.
+    def install(self, screen: Any, positions: list[int]) -> None:
+        """Place favourite keys onto a screen at the given positions.
+
+        Only installs as many keys as there are positions (or keys),
+        whichever is fewer.
 
         Parameters
         ----------
         screen
             The :class:`~deckui.ui.screen.Screen` to install keys on.
+        positions : list[int]
+            Key indices to place the favourite keys at.
         """
-        for fav, key in zip(self._favorites, self._keys, strict=True):
-            screen.set_key(fav["position"], key)
+        for pos, key in zip(positions, self._keys, strict=False):
+            screen.set_key(pos, key)
+
+
+def compute_key_layout(
+    key_count: int,
+    key_cols: int,
+    num_favorites: int,
+    num_scenes: int,
+) -> tuple[list[int], list[int]]:
+    """Compute key positions for favourites and scenes based on device layout.
+
+    Favourites fill from the left of each row, scenes fill from the right.
+    On devices with fewer keys than items, the lists are truncated.
+
+    Parameters
+    ----------
+    key_count : int
+        Total number of physical keys.
+    key_cols : int
+        Number of key columns per row.
+    num_favorites : int
+        Number of favourite keys to place.
+    num_scenes : int
+        Number of scene keys to place.
+
+    Returns
+    -------
+    tuple[list[int], list[int]]
+        ``(favorite_positions, scene_positions)`` -- lists of key indices.
+
+    Examples
+    --------
+    Stream Deck+ (8 keys, 4 cols)::
+
+        >>> compute_key_layout(8, 4, 4, 4)
+        ([0, 1, 4, 5], [2, 3, 6, 7])
+
+    Stream Deck Mini (6 keys, 3 cols)::
+
+        >>> compute_key_layout(6, 3, 4, 4)
+        ([0, 3], [1, 2, 4, 5])
+
+    Stream Deck XL (32 keys, 8 cols)::
+
+        >>> compute_key_layout(32, 8, 4, 4)
+        ([0, 1, 8, 9], [2, 3, 10, 11])
+    """
+    key_rows = key_count // key_cols if key_cols > 0 else 1
+
+    # Determine how many columns each group gets.  Favourites get at most
+    # half the columns (rounded down), scenes get the rest.
+    fav_cols = min(key_cols // 2, num_favorites)
+    scene_cols = min(key_cols - fav_cols, num_scenes)
+
+    fav_positions: list[int] = []
+    scene_positions: list[int] = []
+    for row in range(key_rows):
+        row_start = row * key_cols
+        for col in range(fav_cols):
+            idx = row_start + col
+            if idx < key_count and len(fav_positions) < num_favorites:
+                fav_positions.append(idx)
+        for col in range(fav_cols, fav_cols + scene_cols):
+            idx = row_start + col
+            if idx < key_count and len(scene_positions) < num_scenes:
+                scene_positions.append(idx)
+
+    return fav_positions, scene_positions
 
 
 # ===================================================================
@@ -717,29 +772,36 @@ class FavoritesController:
 
 
 async def run() -> None:
-    """Start the Stream Deck+ demo application.
+    """Start the Stream Deck demo application.
 
     Creates controllers, registers connect/disconnect handlers, and runs
-    until interrupted.
+    until interrupted.  Works with any Stream Deck model -- touchscreen
+    cards are only installed when the device supports them.
     """
     audio = AudioController(MEDIA_CATALOG, initial_volume=0.3)
     lights = LightsController(brightness=80, kelvin=4000)
     timer = TimerController(initial_seconds=300)
     dashboard = DashboardController(deck_brightness=60)
-    scenes = SceneController(SCENE_KEYS)
-    favorites = FavoritesController(FAVORITE_KEYS, audio)
+    scenes = SceneController(SCENE_DEFS)
+    favorites = FavoritesController(MEDIA_CATALOG, audio)
 
     manager = DeckManager(brightness=60, auto_reconnect=True)
 
     @manager.on_connect()
     async def on_deck_connect(deck: Any) -> None:
         """Handle a new deck connection -- set up the full UI."""
-        log.info("Deck connected")
+        caps = deck.capabilities
+        log.info(
+            "Deck connected: %s (%d keys, %d encoders)",
+            caps.deck_type,
+            caps.key_count,
+            caps.dial_count,
+        )
 
         dashboard.bind_deck(deck)
         screen = deck.screen("main")
 
-        # Touch-strip cards
+        # Touch-strip cards -- only on devices with encoders + touchscreen
         if screen.touch_strip is not None:
             screen.touch_strip.background_color = "#1c1c1c"
             screen.set_card(0, audio.card)
@@ -747,9 +809,15 @@ async def run() -> None:
             screen.set_card(2, timer.card)
             screen.set_card(3, dashboard.card)
 
-        # Physical keys
-        favorites.install(screen)
-        scenes.install(screen)
+        # Physical keys -- layout adapts to device key count
+        fav_positions, scene_positions = compute_key_layout(
+            caps.key_count,
+            caps.key_cols,
+            len(MEDIA_CATALOG),
+            len(SCENE_DEFS),
+        )
+        favorites.install(screen, fav_positions)
+        scenes.install(screen, scene_positions)
 
         await deck.set_screen("main")
         log.info("Deck ready!")
@@ -764,7 +832,7 @@ async def run() -> None:
 
 
 def main() -> None:
-    """Entry point for the Stream Deck+ demo."""
+    """Entry point for the Stream Deck demo."""
     asyncio.run(run())
 
 

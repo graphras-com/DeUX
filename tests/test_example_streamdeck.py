@@ -1,4 +1,4 @@
-"""Tests for the Stream Deck+ demo example (examples/streamdeck.py)."""
+"""Tests for the Stream Deck example (examples/streamdeck.py)."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from deckui.dui.key import DuiKey
 from deckui.dui.schema import (
     EventMapping,
     IconifyBinding,
+    ImageBinding,
     PackageSpec,
     PackageType,
     RangeBinding,
@@ -25,15 +26,15 @@ from deckui.dui.schema import (
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "examples"))
 
 from streamdeck import (
-    FAVORITE_KEYS,
     MEDIA_CATALOG,
-    SCENE_KEYS,
+    SCENE_DEFS,
     AudioController,
     DashboardController,
     FavoritesController,
     LightsController,
     SceneController,
     TimerController,
+    compute_key_layout,
 )
 
 # ---------------------------------------------------------------------------
@@ -314,8 +315,6 @@ def _picturekey_spec() -> PackageSpec:
     PackageSpec
         Spec with picture binding and click event.
     """
-    from deckui.dui.schema import ImageBinding
-
     return PackageSpec(
         name="PictureKey",
         type=PackageType.KEY,
@@ -328,6 +327,58 @@ def _picturekey_spec() -> PackageSpec:
             EventMapping(name="click", source="key_press_release", max_duration_ms=300),
         ),
     )
+
+
+# ===================================================================
+# compute_key_layout tests
+# ===================================================================
+
+
+class TestComputeKeyLayout:
+    """Tests for dynamic key position computation."""
+
+    def test_stream_deck_plus_layout(self) -> None:
+        """8 keys, 4 cols: 4 favs + 4 scenes."""
+        favs, scenes = compute_key_layout(8, 4, 4, 4)
+        assert favs == [0, 1, 4, 5]
+        assert scenes == [2, 3, 6, 7]
+
+    def test_stream_deck_mini_layout(self) -> None:
+        """6 keys, 3 cols: only 1 fav col fits, rest are scenes."""
+        favs, scenes = compute_key_layout(6, 3, 4, 4)
+        assert favs == [0, 3]
+        assert scenes == [1, 2, 4, 5]
+
+    def test_stream_deck_xl_layout(self) -> None:
+        """32 keys, 8 cols: 4 fav_cols + 4 scene_cols, all fit in row 0."""
+        favs, scenes = compute_key_layout(32, 8, 4, 4)
+        assert favs == [0, 1, 2, 3]
+        assert scenes == [4, 5, 6, 7]
+
+    def test_fewer_keys_than_items(self) -> None:
+        """2 keys, 2 cols: only 1 fav + 1 scene fit."""
+        favs, scenes = compute_key_layout(2, 2, 4, 4)
+        assert favs == [0]
+        assert scenes == [1]
+
+    def test_single_column_device(self) -> None:
+        """Edge case: 1 column device gives no favs (0 cols for favs)."""
+        favs, scenes = compute_key_layout(4, 1, 4, 4)
+        assert favs == []
+        assert scenes == [0, 1, 2, 3]
+
+    def test_no_scenes(self) -> None:
+        """Fav_cols is still capped at half the columns when no scenes."""
+        favs, scenes = compute_key_layout(8, 4, 8, 0)
+        assert len(scenes) == 0
+        # fav_cols = min(4//2, 8) = 2, so 2 per row * 2 rows = 4
+        assert favs == [0, 1, 4, 5]
+
+    def test_no_favorites(self) -> None:
+        """All keys become scenes when no favourites requested."""
+        favs, scenes = compute_key_layout(8, 4, 0, 8)
+        assert len(favs) == 0
+        assert len(scenes) == 8
 
 
 # ===================================================================
@@ -588,20 +639,30 @@ class TestSceneController:
         monkeypatch.setattr(
             "streamdeck.load_package", lambda _path: _iconkey_spec()
         )
-        return SceneController(SCENE_KEYS)
+        return SceneController(SCENE_DEFS)
 
     def test_creates_correct_number_of_keys(self, ctrl: SceneController) -> None:
-        assert len(ctrl.keys) == len(SCENE_KEYS)
+        assert len(ctrl.keys) == len(SCENE_DEFS)
 
     def test_keys_are_dui_keys(self, ctrl: SceneController) -> None:
         for key in ctrl.keys:
             assert isinstance(key, DuiKey)
 
-    def test_install_places_keys(self, ctrl: SceneController) -> None:
+    def test_install_places_keys_at_given_positions(self, ctrl: SceneController) -> None:
         screen = MagicMock()
-        ctrl.install(screen)
+        ctrl.install(screen, [2, 3, 6, 7])
         positions = [call.args[0] for call in screen.set_key.call_args_list]
-        assert positions == [s["position"] for s in SCENE_KEYS]
+        assert positions == [2, 3, 6, 7]
+
+    def test_install_truncates_to_fewer_positions(self, ctrl: SceneController) -> None:
+        screen = MagicMock()
+        ctrl.install(screen, [0, 1])
+        assert screen.set_key.call_count == 2
+
+    def test_install_truncates_to_fewer_keys(self, ctrl: SceneController) -> None:
+        screen = MagicMock()
+        ctrl.install(screen, list(range(10)))
+        assert screen.set_key.call_count == len(SCENE_DEFS)
 
 
 # ===================================================================
@@ -621,17 +682,26 @@ class TestFavoritesController:
             lambda path: specs[Path(path).name],
         )
         audio = AudioController(MEDIA_CATALOG, initial_volume=0.3)
-        return FavoritesController(FAVORITE_KEYS, audio)
+        return FavoritesController(MEDIA_CATALOG, audio)
 
     def test_creates_correct_number_of_keys(self, ctrl: FavoritesController) -> None:
-        assert len(ctrl.keys) == len(FAVORITE_KEYS)
+        assert len(ctrl.keys) == len(MEDIA_CATALOG)
 
     def test_keys_are_dui_keys(self, ctrl: FavoritesController) -> None:
         for key in ctrl.keys:
             assert isinstance(key, DuiKey)
 
-    def test_install_places_keys(self, ctrl: FavoritesController) -> None:
+    def test_install_places_keys_at_given_positions(
+        self, ctrl: FavoritesController
+    ) -> None:
         screen = MagicMock()
-        ctrl.install(screen)
+        ctrl.install(screen, [0, 1, 4, 5])
         positions = [call.args[0] for call in screen.set_key.call_args_list]
-        assert positions == [f["position"] for f in FAVORITE_KEYS]
+        assert positions == [0, 1, 4, 5]
+
+    def test_install_truncates_to_fewer_positions(
+        self, ctrl: FavoritesController
+    ) -> None:
+        screen = MagicMock()
+        ctrl.install(screen, [0, 1])
+        assert screen.set_key.call_count == 2
