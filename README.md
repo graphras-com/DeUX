@@ -5,6 +5,7 @@
 [![gitleaks](https://img.shields.io/badge/protected%20by-gitleaks-blue)](https://github.com/gitleaks/gitleaks)
 [![Dependabot](https://img.shields.io/badge/dependabot-enabled-brightgreen?logo=dependabot)](https://github.com/graphras-com/DeckUI/network/updates)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-online-blue)](https://graphras-com.github.io/DeckUI/)
 
 A high-level, asyncio-native Python library for Elgato Stream Deck devices. Define screen layouts, key actions, encoder controls, and touchscreen card UIs using a declarative, event-driven API.
 
