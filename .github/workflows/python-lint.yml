@@ -1,5 +1,8 @@
 name: Reusable Python Lint
 
+permissions:
+  contents: read
+
 on:
   workflow_call:
     inputs:

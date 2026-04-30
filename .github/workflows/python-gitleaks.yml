@@ -1,5 +1,8 @@
 name: Reusable Gitleaks
 
+permissions:
+  contents: read
+
 on:
   workflow_call:
     secrets:
