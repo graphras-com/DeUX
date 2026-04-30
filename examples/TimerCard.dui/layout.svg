@@ -1,0 +1,8 @@
+<svg id="TimerCard" xmlns="http://www.w3.org/2000/svg" width="197" height="98" font-family="ArialMT,Arial,sans-serif">
+    <rect id="background" color="#1c1c1c" x="0" y="0" width="197" height="98" fill="currentColor"/>
+    <g id="foreground">
+        <g color="#dedede" transform="translate(98.5 49)">
+            <text id="timer" font-size="30" fill="currentColor" text-anchor="middle" dominant-baseline="middle">00:00:00</text>
+        </g>
+    </g>
+</svg>
