@@ -135,8 +135,10 @@ async def _click():
 
 `ScreenCycler` swaps between a busy `main` screen (favourites, scenes,
 all four cards) and a focused `settings` screen (dashboard and lights
-only). The same controllers appear on both — DeckUI re-renders
-whatever is installed on the active screen.
+only). The dashboard card stays in the same slot on every screen so
+the encoder used to cycle screens is always the rightmost one. The
+same controllers appear on both — DeckUI re-renders whatever is
+installed on the active screen.
 
 The cycler doesn't own any widget. Instead, `DashboardCard.dui`
 declares a `next_screen` event mapped to an encoder press-release, and

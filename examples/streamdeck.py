@@ -1088,8 +1088,10 @@ class StreamDeckApp:
         screen = deck.screen("settings")
         if screen.touch_strip is not None:
             screen.touch_strip.background_color = "#0a0a0a"
-            screen.set_card(0, self.dashboard.card)
-            screen.set_card(1, self.lights.card)
+            # Keep the dashboard in the same slot on every screen so the
+            # encoder used to cycle screens is always the rightmost one.
+            screen.set_card(0, self.lights.card)
+            screen.set_card(3, self.dashboard.card)
 
 
 # ===========================================================================
