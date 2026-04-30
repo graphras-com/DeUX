@@ -1122,11 +1122,21 @@ class StreamDeckApp:
             Open deck handle.
         """
         screen = deck.screen("settings")
+        caps = deck.capabilities
+
         if screen.touch_strip is not None:
-            screen.touch_strip.background_color = "#0a0a0a"
+            screen.touch_strip.background_color = "#1c1c1c"
+            pkg_dir = self._packages_dir or EXAMPLES_DIR
+            iconkey_spec = load_package(pkg_dir / "IconKey.dui")
+            for key_index in range(caps.key_count):
+                key = DuiKey(iconkey_spec)
+                key.set("label","Unassigned")
+                screen.set_key(key_index, key)
+                
+            #caps.key_count
             # Keep the dashboard in the same slot on every screen so the
             # encoder used to cycle screens is always the rightmost one.
-            screen.set_card(0, self.lights.card)
+            #screen.set_card(0, self.lights.card)
             screen.set_card(3, self.dashboard.card)
 
 
