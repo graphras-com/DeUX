@@ -5,7 +5,7 @@ from __future__ import annotations
 import io
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageFont
 
 from deckui.dui.schema import (
     ColorBinding,
@@ -114,6 +114,42 @@ class TestTextTruncation:
     def test_very_small_max_width(self):
         result = _truncate_text("Hello World", 7, OverflowMode.ELLIPSIS)
         assert len(result) <= 2
+
+    def test_font_based_short_text_unchanged(self):
+        """Short text that fits within max_width is returned unchanged with font."""
+        font = ImageFont.load_default()
+        short = "Hi"
+        result = _truncate_text(short, 500, OverflowMode.ELLIPSIS, font=font)
+        assert result == short
+
+    def test_font_based_long_text_truncated(self):
+        """Long text is truncated with ellipsis using pixel-accurate font measurement."""
+        font = ImageFont.load_default()
+        long_text = "A" * 200
+        result = _truncate_text(long_text, 80, OverflowMode.ELLIPSIS, font=font)
+        assert result.endswith("\u2026")
+        assert font.getlength(result) <= 80
+
+    def test_font_based_clip_unchanged(self):
+        """Clip mode returns original text even with font."""
+        font = ImageFont.load_default()
+        long_text = "A" * 200
+        assert _truncate_text(long_text, 80, OverflowMode.CLIP, font=font) == long_text
+
+    def test_font_based_large_font_truncates_sooner(self):
+        """Larger font size causes truncation at fewer characters."""
+        try:
+            small_font = ImageFont.truetype("sans-serif", 12)
+            large_font = ImageFont.truetype("sans-serif", 24)
+        except OSError:
+            small_font = ImageFont.load_default()
+            large_font = ImageFont.load_default()
+            pytest.skip("TrueType fonts not available for size comparison")
+        text = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        small_result = _truncate_text(text, 120, OverflowMode.ELLIPSIS, font=small_font)
+        large_result = _truncate_text(text, 120, OverflowMode.ELLIPSIS, font=large_font)
+        # Large font should truncate to fewer characters
+        assert len(large_result) <= len(small_result)
 
 
 class TestImageFit:

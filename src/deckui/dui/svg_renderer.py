@@ -89,24 +89,62 @@ def _fit_image(
     return resized.crop((left, top, left + target_w, top + target_h))
 
 
-def _truncate_text(text: str, max_width: int, overflow: OverflowMode) -> str:
-    """Truncate text to approximate a pixel max_width.
+def _truncate_text(
+    text: str,
+    max_width: int,
+    overflow: OverflowMode,
+    font: ImageFont.FreeTypeFont | ImageFont.ImageFont | None = None,
+) -> str:
+    """Truncate single-line text so it fits within *max_width* pixels.
 
-    Uses a simple character-width heuristic (0.6 * font-size per char)
-    since we cannot measure the exact rendered width before CairoSVG
-    rasterises.  The SVG font-size is not available here, so we use
-    the max_width as a rough character limit with an average ratio.
+    When a Pillow *font* is provided, pixel-accurate measurement via
+    :meth:`~PIL.ImageFont.ImageFont.getlength` is used.  Otherwise
+    falls back to a simple character-width heuristic (7 px per char).
+
+    Parameters
+    ----------
+    text : str
+        The text string to truncate.
+    max_width : int
+        Maximum allowed width in pixels.
+    overflow : OverflowMode
+        How to handle overflow (``ELLIPSIS`` appends ``…``, ``CLIP``
+        returns the original text unchanged).
+    font : ImageFont.FreeTypeFont | ImageFont.ImageFont | None, optional
+        Pillow font used for pixel-accurate measurement.  When *None*,
+        a character-width heuristic is used as a fallback.
+
+    Returns
+    -------
+    str
+        The (possibly truncated) text.
     """
     if overflow == OverflowMode.CLIP:
         return text
 
+    ellipsis = "\u2026"
+
+    if font is not None:
+        if font.getlength(text) <= max_width:
+            return text
+        # Binary-search for the longest prefix that fits with ellipsis.
+        lo, hi = 0, len(text)
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if font.getlength(text[:mid] + ellipsis) <= max_width:
+                lo = mid
+            else:
+                hi = mid - 1
+        return text[: max(1, lo)].rstrip() + ellipsis
+
+    # Fallback: character-width heuristic (no font available).
     avg_char_width = 7
     max_chars = max(1, max_width // avg_char_width)
 
     if len(text) <= max_chars:
         return text
 
-    return text[: max(1, max_chars - 1)] + "\u2026"
+    return text[: max(1, max_chars - 1)] + ellipsis
 
 
 _DEFAULT_FONT_FAMILY = "sans-serif"
@@ -489,7 +527,9 @@ class SvgRenderer:
             return
 
         if binding.max_width is not None:
-            text = _truncate_text(text, binding.max_width, binding.overflow)
+            family, size_f = _resolve_font_attrs(root, elem)
+            font = _load_font(family, int(size_f))
+            text = _truncate_text(text, binding.max_width, binding.overflow, font=font)
         elem.text = text
 
     def _apply_wrapped_text(
