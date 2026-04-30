@@ -17,7 +17,9 @@ What it demonstrates
   :meth:`~deckui.DuiCard.request_refresh`.
 * A live, asyncio-driven countdown ``TimerCard`` and a dashboard clock
   that ticks every second.
-* Multi-screen navigation -- a ``main`` screen and a ``settings`` screen.
+* Multi-screen navigation -- a ``main`` screen and a ``settings``
+  screen, cycled by an encoder press-release on the dashboard card
+  (see ``DashboardCard.dui``'s ``next_screen`` event).
 
 Running
 -------
@@ -873,76 +875,74 @@ class SceneController:
             screen.set_key(pos, key)
 
 
-class NavigationController:
-    """A single key that toggles the deck between two screens.
+class ScreenCycler:
+    """Cycles the deck through a list of screens.
 
-    Demonstrates :meth:`Deck.set_screen` -- screens are independent
-    layouts that swap atomically, so you can reuse the same physical
-    keys/encoders for completely different functionality.
+    Wires itself to a card event (the dashboard's ``next_screen`` event,
+    emitted by an encoder press-release) and advances to the next screen
+    on each trigger, wrapping around at the end.
+
+    Demonstrates two ideas at once:
+
+    * :meth:`Deck.set_screen` -- screens are independent layouts that
+      swap atomically, so the same encoders/keys can host completely
+      different functionality on each one.
+    * Card-level events -- a ``.dui`` package can declare arbitrary
+      events (here ``encoder_press_release`` named ``next_screen``) and
+      controllers bind handlers to them, with no key required.
 
     Parameters
     ----------
-    primary : str
-        Name of the primary screen.
-    secondary : str
-        Name of the secondary screen.
-    label_primary, label_secondary : str
-        Labels shown on the key in each mode.
-    icon_primary, icon_secondary : str
-        Iconify icons shown in each mode.
-    packages_dir : Path | None
-        Directory containing ``IconKey.dui``.
+    screens : list[str]
+        Ordered screen names. The cycler starts on the first one and
+        advances to the next on each trigger, wrapping around.
+
+    Raises
+    ------
+    ValueError
+        If *screens* is empty.
     """
 
-    def __init__(
-        self,
-        primary: str,
-        secondary: str,
-        *,
-        label_primary: str = "Settings",
-        label_secondary: str = "Back",
-        icon_primary: str = "mdi:cog",
-        icon_secondary: str = "mdi:arrow-left",
-        packages_dir: Path | None = None,
-    ) -> None:
-        pkg_dir = packages_dir or EXAMPLES_DIR
-        self._primary = primary
-        self._secondary = secondary
-        self._labels = (label_primary, label_secondary)
-        self._icons = (icon_primary, icon_secondary)
+    def __init__(self, screens: list[str]) -> None:
+        if not screens:
+            raise ValueError("ScreenCycler requires at least one screen")
+        self._screens = list(screens)
+        self._index = 0
         self._deck: Any = None
-        self._on_secondary = False
-
-        self._key = DuiKey(load_package(pkg_dir / "IconKey.dui"))
-        self._render_label()
-
-        @self._key.on_event("click")
-        async def _click() -> None:
-            await self._toggle()
 
     @property
-    def key(self) -> DuiKey:
-        """The navigation :class:`DuiKey`."""
-        return self._key
+    def current(self) -> str:
+        """Name of the screen the cycler currently points to."""
+        return self._screens[self._index]
 
     def bind_deck(self, deck: Any) -> None:
         """Attach the deck so the controller can call ``set_screen``."""
         self._deck = deck
 
-    async def _toggle(self) -> None:
-        """Swap between primary and secondary screens."""
+    def attach(self, card: DuiCard, event: str = "next_screen") -> None:
+        """Register the cycler on *card*'s *event*.
+
+        Parameters
+        ----------
+        card : DuiCard
+            Card whose event will trigger screen changes (typically the
+            dashboard card).
+        event : str, default="next_screen"
+            Name of the event declared in the card's manifest.
+        """
+
+        @card.on(event)
+        async def _trigger() -> None:
+            await self.advance()
+
+    async def advance(self) -> None:
+        """Move to the next screen, wrapping at the end."""
         if self._deck is None:
             return
-        target = self._primary if self._on_secondary else self._secondary
-        self._on_secondary = not self._on_secondary
-        self._render_label()
-        log.info("Navigating to screen: %s", target)
+        self._index = (self._index + 1) % len(self._screens)
+        target = self._screens[self._index]
+        log.info("Cycling to screen: %s", target)
         await self._deck.set_screen(target)
-
-    def _render_label(self) -> None:
-        """Update the key label/icon for the current mode."""
-        idx = 1 if self._on_secondary else 0
-        self._key.set_many(label=self._labels[idx], icon=self._icons[idx])
 
 
 # ===========================================================================
@@ -992,11 +992,10 @@ class StreamDeckApp:
         self.scenes = SceneController(
             scene_defs, packages_dir=self._packages_dir
         )
-        self.nav = NavigationController(
-            primary="main",
-            secondary="settings",
-            packages_dir=self._packages_dir,
-        )
+        # Cycle "main" -> "settings" -> back via the dashboard encoder
+        # press-release (the manifest declares it as ``next_screen``).
+        self.nav = ScreenCycler(["main", "settings"])
+        self.nav.attach(self.dashboard.card)
 
     async def on_connect(self, deck: Any) -> None:
         """Configure screens for *deck* and start the demo.
@@ -1062,8 +1061,9 @@ class StreamDeckApp:
             screen.set_card(2, self.timer.card)
             screen.set_card(3, self.dashboard.card)
 
-        # Favourites first, then scenes, then a single navigation key at
-        # the very last position if there's room.
+        # Favourites first, then scenes -- using every available key.
+        # Screen cycling is driven by the dashboard encoder, so no
+        # navigation key is needed.
         num_favs = min(len(self.favorites.keys), caps.key_count)
         remaining = max(0, caps.key_count - num_favs)
         num_scenes = min(len(self.scenes.keys), remaining)
@@ -1071,17 +1071,14 @@ class StreamDeckApp:
         self.favorites.install(screen, list(range(num_favs)))
         self.scenes.install(screen, list(range(num_favs, num_favs + num_scenes)))
 
-        # Reserve the last key for navigation if at least one slot is free.
-        nav_index = caps.key_count - 1
-        if nav_index >= num_favs + num_scenes:
-            screen.set_key(nav_index, self.nav.key)
-
     def _build_settings_screen(self, deck: Any) -> None:
-        """Layout: just the navigation key + dashboard card.
+        """Layout: focused settings view -- dashboard + lights cards only.
 
-        Demonstrates that the same controller can appear on multiple
+        Demonstrates that the same controllers can appear on multiple
         screens -- DeckUI does not care, it simply renders whatever's
-        installed when the screen is active.
+        installed when the screen is active. The dashboard card is
+        reused here so the user can keep cycling screens with its
+        encoder press-release.
 
         Parameters
         ----------
@@ -1091,13 +1088,10 @@ class StreamDeckApp:
         screen = deck.screen("settings")
         if screen.touch_strip is not None:
             screen.touch_strip.background_color = "#0a0a0a"
-            screen.set_card(0, self.dashboard.card)
-            screen.set_card(1, self.lights.card)
-
-        # Place the navigation key at slot 0 so users always know where
-        # to go to get back.
-        if deck.capabilities.key_count > 0:
-            screen.set_key(0, self.nav.key)
+            # Keep the dashboard in the same slot on every screen so the
+            # encoder used to cycle screens is always the rightmost one.
+            screen.set_card(0, self.lights.card)
+            screen.set_card(3, self.dashboard.card)
 
 
 # ===========================================================================
