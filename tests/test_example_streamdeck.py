@@ -11,6 +11,7 @@ import pytest
 from deckui.dui.card import DuiCard
 from deckui.dui.key import DuiKey
 from deckui.dui.schema import (
+    ColorBinding,
     EventMapping,
     IconifyBinding,
     ImageBinding,
@@ -82,9 +83,12 @@ _DASH_SVG = (
 
 _KEY_SVG = (
     '<svg id="TestKey" xmlns="http://www.w3.org/2000/svg" width="120" height="120">'
-    '<rect id="background" width="120" height="120" fill="#1c1c1c"/>'
+    '<rect id="background" color="#1c1c1c" fill="currentColor" '
+    'width="120" height="120"/>'
+    '<g id="foreground" color="#dedede">'
     '<g id="icon"></g>'
-    '<text id="label" x="60" y="100" font-size="14" fill="#fff">Key</text>'
+    '<text id="label" x="60" y="100" font-size="14" fill="currentColor">Key</text>'
+    "</g>"
     "</svg>"
 )
 
@@ -292,7 +296,9 @@ def _iconkey_spec() -> PackageSpec:
     Returns
     -------
     PackageSpec
-        Spec with label, icon bindings and click event.
+        Spec mirroring ``IconKey.dui`` -- label, icon, background and
+        foreground colour bindings, plus ``click``, ``press``, and
+        ``release`` events.
     """
     return PackageSpec(
         name="IconKey",
@@ -302,9 +308,17 @@ def _iconkey_spec() -> PackageSpec:
         bindings={
             "label": TextBinding(node="label", default="Key"),
             "icon": IconifyBinding(node="icon", size=55, default="ph:placeholder-bold"),
+            "background": ColorBinding(
+                node="background", attribute="color", default="#1c1c1c"
+            ),
+            "foreground": ColorBinding(
+                node="foreground", attribute="color", default="#dedede"
+            ),
         },
         events=(
             EventMapping(name="click", source="key_press_release", max_duration_ms=300),
+            EventMapping(name="press", source="key_press"),
+            EventMapping(name="release", source="key_release"),
         ),
     )
 
@@ -618,6 +632,53 @@ class TestSceneController:
         screen = MagicMock()
         ctrl.install(screen, list(range(10)))
         assert screen.set_key.call_count == len(SCENE_DEFS)
+
+    def test_initial_colors_are_defaults(self, ctrl: SceneController) -> None:
+        """Each key starts with default background/foreground colors."""
+        for key in ctrl.keys:
+            assert key.get("background") == SceneController.DEFAULT_BACKGROUND
+            assert key.get("foreground") == SceneController.DEFAULT_FOREGROUND
+
+    async def test_press_swaps_colors(self, ctrl: SceneController) -> None:
+        """key.dispatch(pressed=True) swaps fg/bg via the press handler."""
+        key = ctrl.keys[0]
+        await key.dispatch(pressed=True)
+        assert key.get("background") == SceneController.DEFAULT_FOREGROUND
+        assert key.get("foreground") == SceneController.DEFAULT_BACKGROUND
+
+    async def test_release_restores_colors(self, ctrl: SceneController) -> None:
+        """A release after a press restores the original colors."""
+        key = ctrl.keys[0]
+        await key.dispatch(pressed=True)
+        await key.dispatch(pressed=False)
+        assert key.get("background") == SceneController.DEFAULT_BACKGROUND
+        assert key.get("foreground") == SceneController.DEFAULT_FOREGROUND
+
+    async def test_press_release_requests_refresh(
+        self, ctrl: SceneController
+    ) -> None:
+        """Press and release each call request_refresh on the key."""
+        key = ctrl.keys[0]
+        refreshes = 0
+
+        async def _refresh() -> None:
+            nonlocal refreshes
+            refreshes += 1
+
+        key.set_refresh_callback(_refresh)
+        await key.dispatch(pressed=True)
+        await key.dispatch(pressed=False)
+        assert refreshes == 2
+
+    async def test_each_key_has_independent_handlers(
+        self, ctrl: SceneController
+    ) -> None:
+        """Closure capture is per-key: pressing one key only affects that key."""
+        first, second = ctrl.keys[0], ctrl.keys[1]
+        await first.dispatch(pressed=True)
+        # First is inverted, second is untouched.
+        assert first.get("background") == SceneController.DEFAULT_FOREGROUND
+        assert second.get("background") == SceneController.DEFAULT_BACKGROUND
 
 
 # ===================================================================

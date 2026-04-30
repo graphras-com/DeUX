@@ -778,8 +778,17 @@ class SceneController:
     """Scene-activation keys -- one :class:`DuiKey` per scene definition.
 
     Loads ``IconKey.dui`` once and instantiates a key per scene.  Each
-    key's click handler logs the scene name; replace the body with your
-    own automation.
+    key has three handlers, demonstrating that ``press`` and ``release``
+    are emitted alongside the higher-level ``click`` event:
+
+    * ``press``   -- inverts the foreground / background colours so the
+      key visually flashes while held.
+    * ``release`` -- restores the original colours.
+    * ``click``   -- logs the scene name (replace with your automation).
+
+    The colour swap also showcases how to update bindings from a key
+    handler and call :meth:`DuiKey.request_refresh` to push the change
+    to the device immediately.
 
     Parameters
     ----------
@@ -789,6 +798,10 @@ class SceneController:
     packages_dir : Path | None
         Directory containing ``IconKey.dui``.
     """
+
+    # Defaults match the IconKey.dui manifest.
+    DEFAULT_BACKGROUND = "#1c1c1c"
+    DEFAULT_FOREGROUND = "#dedede"
 
     def __init__(
         self,
@@ -802,13 +815,52 @@ class SceneController:
 
         for scene in self._scenes:
             key = DuiKey(self._spec)
-            key.set_many(label=scene["label"], icon=scene["icon"])
+            key.set_many(
+                label=scene["label"],
+                icon=scene["icon"],
+                background=self.DEFAULT_BACKGROUND,
+                foreground=self.DEFAULT_FOREGROUND,
+            )
 
-            @key.on_event("click")
-            async def _click(name: str = scene["label"]) -> None:
-                log.info("Scene activated: %s", name)
-
+            # Bind handlers via a helper so each key captures its own
+            # *key* reference instead of the loop variable.
+            self._bind_handlers(key, scene["label"])
             self._keys.append(key)
+
+    def _bind_handlers(self, key: DuiKey, label: str) -> None:
+        """Attach press/release/click handlers to *key*.
+
+        Splitting this into a helper guarantees correct closure capture
+        for *key* and *label* per iteration.
+
+        Parameters
+        ----------
+        key : DuiKey
+            The key to wire.
+        label : str
+            Scene label, logged on click.
+        """
+
+        @key.on_event("press")
+        async def _press() -> None:
+            # Invert colours by swapping background <-> foreground.
+            key.set_many(
+                background=self.DEFAULT_FOREGROUND,
+                foreground=self.DEFAULT_BACKGROUND,
+            )
+            await key.request_refresh()
+
+        @key.on_event("release")
+        async def _release() -> None:
+            key.set_many(
+                background=self.DEFAULT_BACKGROUND,
+                foreground=self.DEFAULT_FOREGROUND,
+            )
+            await key.request_refresh()
+
+        @key.on_event("click")
+        async def _click() -> None:
+            log.info("Scene activated: %s", label)
 
     @property
     def keys(self) -> list[DuiKey]:
