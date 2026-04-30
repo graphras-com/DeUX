@@ -4,36 +4,36 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-# Make examples importable
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "examples"))
-
-from streamdeck import (
-    MEDIA_CATALOG,
-    AudioPlayer,
-    DashboardController,
-    LightsController,
-    TimerController,
-    setup_audio_card,
-    setup_dashboard_card,
-    setup_favorites,
-    setup_lights_card,
-    setup_scenes,
-    setup_timer_card,
-)
-
 from deckui.dui.card import DuiCard
+from deckui.dui.key import DuiKey
 from deckui.dui.schema import (
     EventMapping,
     IconifyBinding,
     PackageSpec,
     PackageType,
     RangeBinding,
+    SliderBinding,
     TextBinding,
     ToggleBinding,
+)
+
+# Make examples importable
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "examples"))
+
+from streamdeck import (
+    FAVORITE_KEYS,
+    MEDIA_CATALOG,
+    SCENE_KEYS,
+    AudioController,
+    DashboardController,
+    FavoritesController,
+    LightsController,
+    SceneController,
+    TimerController,
 )
 
 # ---------------------------------------------------------------------------
@@ -86,56 +86,216 @@ _KEY_SVG = (
     "</svg>"
 )
 
+_PICTURE_KEY_SVG = (
+    '<svg id="PictureKey" xmlns="http://www.w3.org/2000/svg" width="120" height="120">'
+    '<image id="picture" x="0" y="0" width="120" height="120" href=""/>'
+    "</svg>"
+)
 
-def _card_spec(name: str, svg: str, bindings: dict, events: tuple = ()) -> PackageSpec:
-    """Build a minimal TouchStripCard PackageSpec.
 
-    Parameters
-    ----------
-    name : str
-        Package name.
-    svg : str
-        SVG source string.
-    bindings : dict
-        Mapping of binding name to binding descriptor.
-    events : tuple
-        Event mappings.
+def _audio_spec() -> PackageSpec:
+    """Build a minimal AudioCard PackageSpec for testing.
 
     Returns
     -------
     PackageSpec
-        A valid spec for testing.
+        Spec with text, range, and event bindings matching AudioController.
     """
     return PackageSpec(
-        name=name,
+        name="AudioCard",
         type=PackageType.TOUCH_STRIP_CARD,
         version=1,
-        svg_source=svg,
-        bindings=bindings,
-        events=events,
+        svg_source=_AUDIO_SVG,
+        bindings={
+            "artist": TextBinding(node="artist", default=""),
+            "title": TextBinding(node="title", default=""),
+            "album": TextBinding(node="album", default=""),
+            "state": TextBinding(node="state", default="Stopped"),
+            "value_text": TextBinding(node="value_text", default="50%"),
+            "volume": RangeBinding(node="volume_bar", default=0.5, direction="horizontal"),
+        },
+        events=(
+            EventMapping(name="toggle_play_pause", source="encoder_hold", hold_ms=500),
+            EventMapping(
+                name="volume_up", source="encoder_turn", direction="right", accumulate=True
+            ),
+            EventMapping(
+                name="volume_down", source="encoder_turn", direction="left", accumulate=True
+            ),
+            EventMapping(
+                name="mute_toggle", source="encoder_press_release", max_duration_ms=300
+            ),
+            EventMapping(
+                name="next",
+                source="encoder_press_turn",
+                direction="right",
+                accumulate=True,
+                accumulate_max_steps=1,
+            ),
+            EventMapping(
+                name="previous",
+                source="encoder_press_turn",
+                direction="left",
+                accumulate=True,
+                accumulate_max_steps=1,
+            ),
+        ),
     )
 
 
-def _key_spec(name: str = "TestKey", svg: str = _KEY_SVG) -> PackageSpec:
-    """Build a minimal Key PackageSpec.
-
-    Parameters
-    ----------
-    name : str
-        Package name.
-    svg : str
-        SVG source string.
+def _light_spec() -> PackageSpec:
+    """Build a minimal LightCard PackageSpec for testing.
 
     Returns
     -------
     PackageSpec
-        A valid key spec for testing.
+        Spec with toggle, text, slider, and event bindings matching LightsController.
     """
     return PackageSpec(
-        name=name,
+        name="LightCard",
+        type=PackageType.TOUCH_STRIP_CARD,
+        version=1,
+        svg_source=_LIGHT_SVG,
+        bindings={
+            "lights": ToggleBinding(node_on="lights_on", node_off="lights_off", default=False),
+            "brightness_value_text": TextBinding(
+                node="brightness_value_text", default="0%"
+            ),
+            "kelvin_value_text": TextBinding(node="kelvin_value_text", default="2000K"),
+            "brightness": SliderBinding(
+                node="brightness_indicator",
+                default=0.0,
+                direction="horizontal",
+                min_pos=1.5,
+                max_pos=183.5,
+            ),
+            "kelvin": SliderBinding(
+                node="kelvin_indicator",
+                default=0.0,
+                direction="horizontal",
+                min_pos=1.5,
+                max_pos=183.5,
+            ),
+        },
+        events=(
+            EventMapping(name="toggle", source="encoder_press_release"),
+            EventMapping(
+                name="brightness_up",
+                source="encoder_turn",
+                direction="right",
+                accumulate=True,
+            ),
+            EventMapping(
+                name="brightness_down",
+                source="encoder_turn",
+                direction="left",
+                accumulate=True,
+            ),
+            EventMapping(
+                name="kelvin_up",
+                source="encoder_press_turn",
+                direction="right",
+                accumulate=True,
+                accumulate_max_steps=1,
+            ),
+            EventMapping(
+                name="kelvin_down",
+                source="encoder_press_turn",
+                direction="left",
+                accumulate=True,
+                accumulate_max_steps=1,
+            ),
+        ),
+    )
+
+
+def _timer_spec() -> PackageSpec:
+    """Build a minimal TimerCard PackageSpec for testing.
+
+    Returns
+    -------
+    PackageSpec
+        Spec with text and event bindings matching TimerController.
+    """
+    return PackageSpec(
+        name="TimerCard",
+        type=PackageType.TOUCH_STRIP_CARD,
+        version=1,
+        svg_source=_TIMER_SVG,
+        bindings={
+            "timer": TextBinding(node="timer", default="00:00:00"),
+        },
+        events=(
+            EventMapping(name="toggle", source="encoder_press_release", max_duration_ms=300),
+            EventMapping(name="reset", source="encoder_hold", hold_ms=350),
+            EventMapping(
+                name="increase_duration",
+                source="encoder_turn",
+                direction="right",
+                accumulate=True,
+            ),
+            EventMapping(
+                name="decrease_duration",
+                source="encoder_turn",
+                direction="left",
+                accumulate=True,
+            ),
+        ),
+    )
+
+
+def _dash_spec() -> PackageSpec:
+    """Build a minimal DashboardCard PackageSpec for testing.
+
+    Returns
+    -------
+    PackageSpec
+        Spec with text, range, and event bindings matching DashboardController.
+    """
+    return PackageSpec(
+        name="DashboardCard",
+        type=PackageType.TOUCH_STRIP_CARD,
+        version=1,
+        svg_source=_DASH_SVG,
+        bindings={
+            "date": TextBinding(node="date", default=""),
+            "time": TextBinding(node="time", default=""),
+            "temperature": TextBinding(node="temperature", default=""),
+            "humidity": TextBinding(node="humidity", default=""),
+            "deck_brightness": RangeBinding(
+                node="deck_brightness", default=0.5, direction="horizontal"
+            ),
+        },
+        events=(
+            EventMapping(
+                name="brightness_up",
+                source="encoder_turn",
+                direction="right",
+                accumulate=True,
+            ),
+            EventMapping(
+                name="brightness_down",
+                source="encoder_turn",
+                direction="left",
+                accumulate=True,
+            ),
+        ),
+    )
+
+
+def _iconkey_spec() -> PackageSpec:
+    """Build a minimal IconKey PackageSpec for testing.
+
+    Returns
+    -------
+    PackageSpec
+        Spec with label, icon bindings and click event.
+    """
+    return PackageSpec(
+        name="IconKey",
         type=PackageType.KEY,
         version=1,
-        svg_source=svg,
+        svg_source=_KEY_SVG,
         bindings={
             "label": TextBinding(node="label", default="Key"),
             "icon": IconifyBinding(node="icon", size=55, default="ph:placeholder-bold"),
@@ -146,410 +306,325 @@ def _key_spec(name: str = "TestKey", svg: str = _KEY_SVG) -> PackageSpec:
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# AudioPlayer tests
-# ═══════════════════════════════════════════════════════════════════════════
+def _picturekey_spec() -> PackageSpec:
+    """Build a minimal PictureKey PackageSpec for testing.
+
+    Returns
+    -------
+    PackageSpec
+        Spec with picture binding and click event.
+    """
+    from deckui.dui.schema import ImageBinding
+
+    return PackageSpec(
+        name="PictureKey",
+        type=PackageType.KEY,
+        version=1,
+        svg_source=_PICTURE_KEY_SVG,
+        bindings={
+            "picture": ImageBinding(node="picture"),
+        },
+        events=(
+            EventMapping(name="click", source="key_press_release", max_duration_ms=300),
+        ),
+    )
 
 
-class TestAudioPlayer:
-    """Tests for the mock AudioPlayer."""
+# ===================================================================
+# AudioController tests
+# ===================================================================
 
-    def test_initial_state(self) -> None:
-        player = AudioPlayer(MEDIA_CATALOG, initial_volume=0.5)
-        assert player.volume_level == 0.5
-        assert player.is_muted is False
-        assert player.is_playing is False
 
-    def test_current_track_is_first(self) -> None:
-        player = AudioPlayer(MEDIA_CATALOG)
-        assert player.current_track is MEDIA_CATALOG[0]
+class TestAudioController:
+    """Tests for AudioController state and card bindings."""
 
-    async def test_play(self) -> None:
-        player = AudioPlayer(MEDIA_CATALOG)
-        await player.play()
-        assert player.is_playing is True
+    @pytest.fixture
+    def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> AudioController:
+        """An AudioController with a mocked load_package."""
+        monkeypatch.setattr(
+            "streamdeck.load_package", lambda _path: _audio_spec()
+        )
+        return AudioController(MEDIA_CATALOG, initial_volume=0.5)
 
-    async def test_play_specific_track(self) -> None:
-        player = AudioPlayer(MEDIA_CATALOG)
-        await player.play(MEDIA_CATALOG[2])
-        assert player.is_playing is True
-        assert player.current_track is MEDIA_CATALOG[2]
+    def test_initial_state(self, ctrl: AudioController) -> None:
+        assert ctrl.volume_level == 0.5
+        assert ctrl.is_muted is False
+        assert ctrl.is_playing is False
 
-    async def test_pause(self) -> None:
-        player = AudioPlayer(MEDIA_CATALOG)
-        await player.play()
-        await player.pause()
-        assert player.is_playing is False
+    def test_card_is_dui_card(self, ctrl: AudioController) -> None:
+        assert isinstance(ctrl.card, DuiCard)
 
-    async def test_play_pause_toggle(self) -> None:
-        player = AudioPlayer(MEDIA_CATALOG)
-        await player.play_pause()
-        assert player.is_playing is True
-        await player.play_pause()
-        assert player.is_playing is False
+    def test_card_initial_bindings(self, ctrl: AudioController) -> None:
+        assert ctrl.card.get("artist") == MEDIA_CATALOG[0]["artist"]
+        assert ctrl.card.get("title") == MEDIA_CATALOG[0]["title"]
+        assert ctrl.card.get("state") == "Paused"
+        assert ctrl.card.get("value_text") == "50%"
 
-    async def test_next_track_wraps(self) -> None:
-        player = AudioPlayer(MEDIA_CATALOG)
+    def test_current_track_is_first(self, ctrl: AudioController) -> None:
+        assert ctrl.current_track is MEDIA_CATALOG[0]
+
+    async def test_play(self, ctrl: AudioController) -> None:
+        await ctrl.play()
+        assert ctrl.is_playing is True
+        assert ctrl.card.get("state") == "Playing"
+
+    async def test_play_specific_track(self, ctrl: AudioController) -> None:
+        await ctrl.play(MEDIA_CATALOG[2])
+        assert ctrl.is_playing is True
+        assert ctrl.current_track is MEDIA_CATALOG[2]
+        assert ctrl.card.get("artist") == MEDIA_CATALOG[2]["artist"]
+
+    async def test_pause(self, ctrl: AudioController) -> None:
+        await ctrl.play()
+        await ctrl.pause()
+        assert ctrl.is_playing is False
+        assert ctrl.card.get("state") == "Paused"
+
+    async def test_play_pause_toggle(self, ctrl: AudioController) -> None:
+        await ctrl.play_pause()
+        assert ctrl.is_playing is True
+        await ctrl.play_pause()
+        assert ctrl.is_playing is False
+
+    async def test_next_track_wraps(self, ctrl: AudioController) -> None:
         for i in range(len(MEDIA_CATALOG)):
-            t = await player.next_track()
+            t = await ctrl.next_track()
             assert t is MEDIA_CATALOG[(i + 1) % len(MEDIA_CATALOG)]
+        assert ctrl.card.get("artist") == ctrl.current_track["artist"]
 
-    async def test_previous_track_wraps(self) -> None:
-        player = AudioPlayer(MEDIA_CATALOG)
-        t = await player.previous_track()
+    async def test_previous_track_wraps(self, ctrl: AudioController) -> None:
+        t = await ctrl.previous_track()
         assert t is MEDIA_CATALOG[-1]
+        assert ctrl.card.get("artist") == MEDIA_CATALOG[-1]["artist"]
 
-    async def test_set_volume_clamps(self) -> None:
-        player = AudioPlayer(MEDIA_CATALOG)
-        await player.set_volume(1.5)
-        assert player.volume_level == 1.0
-        await player.set_volume(-0.5)
-        assert player.volume_level == 0.0
+    async def test_set_volume_clamps(self, ctrl: AudioController) -> None:
+        await ctrl.set_volume(1.5)
+        assert ctrl.volume_level == 1.0
+        await ctrl.set_volume(-0.5)
+        assert ctrl.volume_level == 0.0
 
-    async def test_toggle_mute(self) -> None:
-        player = AudioPlayer(MEDIA_CATALOG)
-        await player.toggle_mute()
-        assert player.is_muted is True
-        await player.toggle_mute()
-        assert player.is_muted is False
+    async def test_set_volume_updates_card(self, ctrl: AudioController) -> None:
+        await ctrl.set_volume(0.75)
+        assert ctrl.card.get("value_text") == "75%"
+
+    async def test_toggle_mute(self, ctrl: AudioController) -> None:
+        await ctrl.toggle_mute()
+        assert ctrl.is_muted is True
+        assert ctrl.card.get("value_text") == "Muted"
+        await ctrl.toggle_mute()
+        assert ctrl.is_muted is False
+        assert ctrl.card.get("value_text") == "50%"
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ===================================================================
 # LightsController tests
-# ═══════════════════════════════════════════════════════════════════════════
+# ===================================================================
 
 
 class TestLightsController:
-    """Tests for the mock LightsController."""
+    """Tests for LightsController state and card bindings."""
 
-    def test_initial_state(self) -> None:
-        ctrl = LightsController(brightness=70, kelvin=3500)
+    @pytest.fixture
+    def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> LightsController:
+        """A LightsController with a mocked load_package."""
+        monkeypatch.setattr(
+            "streamdeck.load_package", lambda _path: _light_spec()
+        )
+        return LightsController(brightness=80, kelvin=4000)
+
+    def test_initial_state(self, ctrl: LightsController) -> None:
         assert ctrl.is_on is True
-        assert ctrl.brightness == 70
-        assert ctrl.kelvin == 3500
+        assert ctrl.brightness == 80
+        assert ctrl.kelvin == 4000
 
-    async def test_toggle(self) -> None:
-        ctrl = LightsController()
+    def test_card_initial_bindings(self, ctrl: LightsController) -> None:
+        assert ctrl.card.get("lights") is True
+        assert ctrl.card.get("brightness_value_text") == "80%"
+        assert ctrl.card.get("kelvin_value_text") == "4000K"
+
+    async def test_toggle(self, ctrl: LightsController) -> None:
         await ctrl.toggle()
         assert ctrl.is_on is False
+        assert ctrl.card.get("lights") is False
         await ctrl.toggle()
         assert ctrl.is_on is True
 
-    async def test_set_brightness_clamps(self) -> None:
-        ctrl = LightsController()
+    async def test_set_brightness_clamps(self, ctrl: LightsController) -> None:
         await ctrl.set_brightness(150)
         assert ctrl.brightness == 100
+        assert ctrl.card.get("brightness_value_text") == "100%"
         await ctrl.set_brightness(-10)
         assert ctrl.brightness == 0
 
-    async def test_set_kelvin_clamps(self) -> None:
-        ctrl = LightsController()
+    async def test_set_kelvin_clamps(self, ctrl: LightsController) -> None:
         await ctrl.set_kelvin(1000)
         assert ctrl.kelvin == 2000
+        assert ctrl.card.get("kelvin_value_text") == "2000K"
         await ctrl.set_kelvin(9000)
         assert ctrl.kelvin == 6500
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ===================================================================
 # TimerController tests
-# ═══════════════════════════════════════════════════════════════════════════
+# ===================================================================
 
 
 class TestTimerController:
-    """Tests for the mock TimerController."""
+    """Tests for TimerController state and card bindings."""
 
-    def test_initial_format(self) -> None:
-        ctrl = TimerController(initial_seconds=3661)
-        assert ctrl._format() == "01:01:01"
+    @pytest.fixture
+    def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> TimerController:
+        """A TimerController with a mocked load_package."""
+        monkeypatch.setattr(
+            "streamdeck.load_package", lambda _path: _timer_spec()
+        )
+        return TimerController(initial_seconds=300)
 
-    async def test_toggle_starts_and_pauses(self) -> None:
-        ctrl = TimerController()
+    def test_initial_format(self, ctrl: TimerController) -> None:
+        assert ctrl.format_time() == "00:05:00"
+
+    def test_card_initial_binding(self, ctrl: TimerController) -> None:
+        assert ctrl.card.get("timer") == "00:05:00"
+
+    async def test_toggle_starts_and_pauses(self, ctrl: TimerController) -> None:
         await ctrl.toggle()
         assert ctrl.is_running is True
         await ctrl.toggle()
         assert ctrl.is_running is False
 
-    async def test_reset(self) -> None:
-        ctrl = TimerController(initial_seconds=600)
+    async def test_reset(self, ctrl: TimerController) -> None:
         await ctrl.toggle()
         await ctrl.reset()
         assert ctrl.is_running is False
-        assert ctrl.remaining == 600
+        assert ctrl.remaining == 300
 
-    async def test_adjust_duration(self) -> None:
-        ctrl = TimerController(initial_seconds=300)
+    async def test_adjust_duration(self, ctrl: TimerController) -> None:
         await ctrl.adjust_duration(60)
         assert ctrl.duration == 360
         assert ctrl.remaining == 360
+        assert ctrl.card.get("timer") == "00:06:00"
 
-    async def test_adjust_duration_clamps_to_zero(self) -> None:
+    async def test_adjust_duration_clamps_to_zero(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "streamdeck.load_package", lambda _path: _timer_spec()
+        )
         ctrl = TimerController(initial_seconds=10)
         await ctrl.adjust_duration(-100)
         assert ctrl.duration == 0
+        assert ctrl.card.get("timer") == "00:00:00"
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+# ===================================================================
 # DashboardController tests
-# ═══════════════════════════════════════════════════════════════════════════
+# ===================================================================
 
 
 class TestDashboardController:
-    """Tests for the mock DashboardController."""
+    """Tests for DashboardController state and card bindings."""
 
-    def test_initial_state(self) -> None:
-        ctrl = DashboardController(deck_brightness=40)
-        assert ctrl.deck_brightness == 40
-        assert ctrl.temperature == "22°C"
+    @pytest.fixture
+    def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> DashboardController:
+        """A DashboardController with a mocked load_package."""
+        monkeypatch.setattr(
+            "streamdeck.load_package", lambda _path: _dash_spec()
+        )
+        return DashboardController(deck_brightness=60)
+
+    def test_initial_state(self, ctrl: DashboardController) -> None:
+        assert ctrl.deck_brightness == 60
+        assert ctrl.temperature == "22C"
         assert ctrl.humidity == "45%"
 
-    def test_get_date_format(self) -> None:
-        ctrl = DashboardController()
+    def test_card_initial_bindings(self, ctrl: DashboardController) -> None:
+        assert ctrl.card.get("temperature") == "22C"
+        assert ctrl.card.get("humidity") == "45%"
+
+    def test_get_date_format(self, ctrl: DashboardController) -> None:
         date = ctrl.get_date()
-        # Should be YYYY-MM-DD
         assert len(date) == 10
         assert date[4] == "-" and date[7] == "-"
 
-    def test_get_time_format(self) -> None:
-        ctrl = DashboardController()
-        time_str = ctrl.get_time()
-        assert ":" in time_str
+    def test_get_time_format(self, ctrl: DashboardController) -> None:
+        assert ":" in ctrl.get_time()
 
-    async def test_set_brightness_clamps(self) -> None:
-        ctrl = DashboardController()
+    async def test_set_brightness_clamps(self, ctrl: DashboardController) -> None:
         await ctrl.set_brightness(200)
         assert ctrl.deck_brightness == 100
         await ctrl.set_brightness(-50)
         assert ctrl.deck_brightness == 0
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Card setup function tests
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-class TestSetupAudioCard:
-    """Tests for setup_audio_card wiring."""
-
-    @pytest.fixture
-    def audio_spec(self) -> PackageSpec:
-        """Minimal AudioCard spec with volume range and text bindings."""
-        return _card_spec(
-            "AudioCard",
-            _AUDIO_SVG,
-            bindings={
-                "artist": TextBinding(node="artist", default=""),
-                "title": TextBinding(node="title", default=""),
-                "album": TextBinding(node="album", default=""),
-                "state": TextBinding(node="state", default="Stopped"),
-                "value_text": TextBinding(node="value_text", default="50%"),
-                "volume": RangeBinding(node="volume_bar", default=0.5, direction="horizontal"),
-            },
-            events=(
-                EventMapping(name="toggle_play_pause", source="encoder_hold", hold_ms=500),
-                EventMapping(
-                    name="volume_up", source="encoder_turn", direction="right", accumulate=True
-                ),
-                EventMapping(
-                    name="volume_down", source="encoder_turn", direction="left", accumulate=True
-                ),
-                EventMapping(
-                    name="mute_toggle",
-                    source="encoder_press_release",
-                    max_duration_ms=300,
-                ),
-                EventMapping(
-                    name="next",
-                    source="encoder_press_turn",
-                    direction="right",
-                    accumulate=True,
-                    accumulate_max_steps=1,
-                ),
-                EventMapping(
-                    name="previous",
-                    source="encoder_press_turn",
-                    direction="left",
-                    accumulate=True,
-                    accumulate_max_steps=1,
-                ),
-            ),
-        )
-
-    def test_populates_initial_state(self, audio_spec: PackageSpec) -> None:
-        card = DuiCard(audio_spec)
-        player = AudioPlayer(MEDIA_CATALOG, initial_volume=0.5)
-        setup_audio_card(card, player)
-
-        assert card.get("artist") == MEDIA_CATALOG[0]["artist"]
-        assert card.get("title") == MEDIA_CATALOG[0]["title"]
-        assert card.get("state") == "Paused"
-        assert card.get("value_text") == "50%"
-
-
-class TestSetupLightsCard:
-    """Tests for setup_lights_card wiring."""
-
-    @pytest.fixture
-    def light_spec(self) -> PackageSpec:
-        """Minimal LightCard spec."""
-        return _card_spec(
-            "LightCard",
-            _LIGHT_SVG,
-            bindings={
-                "lights": ToggleBinding(
-                    node_on="lights_on", node_off="lights_off", default=False
-                ),
-                "brightness_value_text": TextBinding(
-                    node="brightness_value_text", default="0%"
-                ),
-                "kelvin_value_text": TextBinding(node="kelvin_value_text", default="2000K"),
-            },
-            events=(
-                EventMapping(name="toggle", source="encoder_press_release"),
-                EventMapping(
-                    name="brightness_up",
-                    source="encoder_turn",
-                    direction="right",
-                    accumulate=True,
-                ),
-                EventMapping(
-                    name="brightness_down",
-                    source="encoder_turn",
-                    direction="left",
-                    accumulate=True,
-                ),
-                EventMapping(
-                    name="kelvin_up",
-                    source="encoder_press_turn",
-                    direction="right",
-                    accumulate=True,
-                    accumulate_max_steps=1,
-                ),
-                EventMapping(
-                    name="kelvin_down",
-                    source="encoder_press_turn",
-                    direction="left",
-                    accumulate=True,
-                    accumulate_max_steps=1,
-                ),
-            ),
-        )
-
-    def test_populates_initial_state(self, light_spec: PackageSpec) -> None:
-        card = DuiCard(light_spec)
-        lights = LightsController(brightness=80, kelvin=4000)
-        setup_lights_card(card, lights)
-
-        assert card.get("lights") is True
-        assert card.get("brightness_value_text") == "80%"
-        assert card.get("kelvin_value_text") == "4000K"
-
-
-class TestSetupTimerCard:
-    """Tests for setup_timer_card wiring."""
-
-    @pytest.fixture
-    def timer_spec(self) -> PackageSpec:
-        """Minimal TimerCard spec."""
-        return _card_spec(
-            "TimerCard",
-            _TIMER_SVG,
-            bindings={
-                "timer": TextBinding(node="timer", default="00:00:00"),
-            },
-            events=(
-                EventMapping(
-                    name="toggle", source="encoder_press_release", max_duration_ms=300
-                ),
-                EventMapping(name="reset", source="encoder_hold", hold_ms=350),
-                EventMapping(
-                    name="increase_duration",
-                    source="encoder_turn",
-                    direction="right",
-                    accumulate=True,
-                ),
-                EventMapping(
-                    name="decrease_duration",
-                    source="encoder_turn",
-                    direction="left",
-                    accumulate=True,
-                ),
-            ),
-        )
-
-    def test_populates_initial_state(self, timer_spec: PackageSpec) -> None:
-        card = DuiCard(timer_spec)
-        timer = TimerController(initial_seconds=300)
-        setup_timer_card(card, timer)
-
-        assert card.get("timer") == "00:05:00"
-
-
-class TestSetupDashboardCard:
-    """Tests for setup_dashboard_card wiring."""
-
-    @pytest.fixture
-    def dash_spec(self) -> PackageSpec:
-        """Minimal DashboardCard spec."""
-        return _card_spec(
-            "DashboardCard",
-            _DASH_SVG,
-            bindings={
-                "date": TextBinding(node="date", default=""),
-                "time": TextBinding(node="time", default=""),
-                "temperature": TextBinding(node="temperature", default=""),
-                "humidity": TextBinding(node="humidity", default=""),
-                "deck_brightness": RangeBinding(
-                    node="deck_brightness", default=0.5, direction="horizontal"
-                ),
-            },
-            events=(
-                EventMapping(
-                    name="brightness_up",
-                    source="encoder_turn",
-                    direction="right",
-                    accumulate=True,
-                ),
-                EventMapping(
-                    name="brightness_down",
-                    source="encoder_turn",
-                    direction="left",
-                    accumulate=True,
-                ),
-            ),
-        )
-
-    def test_populates_initial_state(self, dash_spec: PackageSpec) -> None:
-        card = DuiCard(dash_spec)
-        dashboard = DashboardController(deck_brightness=60)
+    async def test_set_brightness_calls_deck(self, ctrl: DashboardController) -> None:
         mock_deck = MagicMock()
-        setup_dashboard_card(card, dashboard, mock_deck)
+        mock_deck.set_brightness = AsyncMock()
+        ctrl.bind_deck(mock_deck)
+        await ctrl.set_brightness(75)
+        mock_deck.set_brightness.assert_awaited_once_with(75)
 
-        assert card.get("temperature") == "22°C"
-        assert card.get("humidity") == "45%"
+    async def test_set_brightness_without_deck(self, ctrl: DashboardController) -> None:
+        await ctrl.set_brightness(50)
+        assert ctrl.deck_brightness == 50
 
 
-class TestSetupFavorites:
-    """Tests for setup_favorites key creation."""
+# ===================================================================
+# SceneController tests
+# ===================================================================
 
-    def test_creates_keys_at_correct_positions(self) -> None:
-        spec = _key_spec()
+
+class TestSceneController:
+    """Tests for SceneController key creation."""
+
+    @pytest.fixture
+    def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> SceneController:
+        """A SceneController with a mocked load_package."""
+        monkeypatch.setattr(
+            "streamdeck.load_package", lambda _path: _iconkey_spec()
+        )
+        return SceneController(SCENE_KEYS)
+
+    def test_creates_correct_number_of_keys(self, ctrl: SceneController) -> None:
+        assert len(ctrl.keys) == len(SCENE_KEYS)
+
+    def test_keys_are_dui_keys(self, ctrl: SceneController) -> None:
+        for key in ctrl.keys:
+            assert isinstance(key, DuiKey)
+
+    def test_install_places_keys(self, ctrl: SceneController) -> None:
         screen = MagicMock()
-        player = AudioPlayer(MEDIA_CATALOG)
-        keys = setup_favorites(screen, player, spec)
-
-        assert len(keys) == 4
-        # Verify set_key was called for each favorite position
+        ctrl.install(screen)
         positions = [call.args[0] for call in screen.set_key.call_args_list]
-        assert positions == [0, 1, 4, 5]
+        assert positions == [s["position"] for s in SCENE_KEYS]
 
 
-class TestSetupScenes:
-    """Tests for setup_scenes key creation."""
+# ===================================================================
+# FavoritesController tests
+# ===================================================================
 
-    def test_creates_keys_at_correct_positions(self) -> None:
-        spec = _key_spec()
+
+class TestFavoritesController:
+    """Tests for FavoritesController key creation."""
+
+    @pytest.fixture
+    def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> FavoritesController:
+        """A FavoritesController with mocked load_package calls."""
+        specs = {"AudioCard.dui": _audio_spec(), "PictureKey.dui": _picturekey_spec()}
+        monkeypatch.setattr(
+            "streamdeck.load_package",
+            lambda path: specs[Path(path).name],
+        )
+        audio = AudioController(MEDIA_CATALOG, initial_volume=0.3)
+        return FavoritesController(FAVORITE_KEYS, audio)
+
+    def test_creates_correct_number_of_keys(self, ctrl: FavoritesController) -> None:
+        assert len(ctrl.keys) == len(FAVORITE_KEYS)
+
+    def test_keys_are_dui_keys(self, ctrl: FavoritesController) -> None:
+        for key in ctrl.keys:
+            assert isinstance(key, DuiKey)
+
+    def test_install_places_keys(self, ctrl: FavoritesController) -> None:
         screen = MagicMock()
-        setup_scenes(screen, spec)
-
+        ctrl.install(screen)
         positions = [call.args[0] for call in screen.set_key.call_args_list]
-        assert positions == [2, 3, 6, 7]
+        assert positions == [f["position"] for f in FAVORITE_KEYS]

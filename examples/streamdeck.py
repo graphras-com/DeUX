@@ -1,27 +1,30 @@
 #!/usr/bin/env python3
-"""Stream Deck+ demo -- showcases DeckUI with mockup controllers.
+"""Stream Deck+ demo -- showcases DeckUI with self-contained controllers.
 
 This example demonstrates how to build a complete Stream Deck+ application
-using DeckUI's declarative UI system.  It sets up four touchscreen cards
-(audio player, lights, timer, dashboard) and eight physical keys (four
-album-art favorites and four scene-activation buttons).
+using DeckUI's declarative UI system.  Each controller owns its DUI card,
+loads the ``.dui`` package, manages internal state, and wires up all event
+handlers -- making every controller a single, readable unit.
+
+Four touchscreen cards (audio, lights, timer, dashboard) and eight physical
+keys (four album-art favourites, four scene buttons) are set up.
 
 No real hardware or external services are required -- every controller uses
 in-memory state and logs actions to the console.
 
 Layout
 ------
-Keys (8-key, 2×4 grid)::
+Keys (8-key, 2x4 grid)::
 
-    ┌──────┬──────┬──────┬──────┐
-    │ Fav0 │ Fav1 │Scene0│Scene1│
-    ├──────┼──────┼──────┼──────┤
-    │ Fav2 │ Fav3 │Scene2│Scene3│
-    └──────┴──────┴──────┴──────┘
+    +------+------+------+------+
+    | Fav0 | Fav1 |Scene0|Scene1|
+    +------+------+------+------+
+    | Fav2 | Fav3 |Scene2|Scene3|
+    +------+------+------+------+
 
-Touch-strip cards (left → right)::
+Touch-strip cards (left to right)::
 
-    [ Audio Player ] [ Lights ] [ Timer ] [ Dashboard ]
+    [ Audio ] [ Lights ] [ Timer ] [ Dashboard ]
 
 Running
 -------
@@ -43,8 +46,11 @@ from deckui import DeckManager, DeviceInfo, DuiCard, DuiKey, load_package
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
 log = logging.getLogger(__name__)
 
+# Resolve examples directory for .dui package loading
+EXAMPLES_DIR = Path(__file__).resolve().parent
+
 # ---------------------------------------------------------------------------
-# Media catalog -- four classic albums used as favorites
+# Media catalog -- four classic albums used as favourites
 # ---------------------------------------------------------------------------
 
 MEDIA_CATALOG: list[dict[str, str]] = [
@@ -74,10 +80,7 @@ MEDIA_CATALOG: list[dict[str, str]] = [
     },
 ]
 
-# ---------------------------------------------------------------------------
-# Key definitions
-# ---------------------------------------------------------------------------
-
+# Key layout definitions
 SCENE_KEYS: list[dict[str, Any]] = [
     {"position": 2, "label": "Normal", "icon": "fa-regular:smile-beam"},
     {"position": 3, "label": "Tired", "icon": "fa-regular:tired"},
@@ -92,37 +95,58 @@ FAVORITE_KEYS: list[dict[str, Any]] = [
     {"position": 5, "media": MEDIA_CATALOG[3]},
 ]
 
-# Resolve examples directory for .dui package loading
-EXAMPLES_DIR = Path(__file__).resolve().parent
+
+# ===================================================================
+# Controllers -- each owns its card, state, and event handlers
+# ===================================================================
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Mock controllers
-# ═══════════════════════════════════════════════════════════════════════════
+class AudioController:
+    """Audio player card controller.
 
+    Loads the ``AudioCard.dui`` package, manages playback state (volume,
+    mute, play/pause, track navigation) and exposes the wired
+    :class:`~deckui.DuiCard` via the :pyattr:`card` property.
 
-class AudioPlayer:
-    """In-memory mock audio player with volume, mute, and track state.
+    Favourite keys call :meth:`play` to start a specific track.
 
     Parameters
     ----------
     catalog : list[dict[str, str]]
-        List of media entries, each with ``artist``, ``album``, ``title``,
+        Media entries, each with ``artist``, ``album``, ``title``,
         and ``cover`` keys.
     initial_volume : float, default=0.3
-        Starting volume level (0.0–1.0).
+        Starting volume level (0.0 -- 1.0).
+    packages_dir : Path | None
+        Directory containing ``.dui`` packages.  Defaults to the
+        ``examples/`` directory next to this script.
     """
 
     def __init__(
         self,
         catalog: list[dict[str, str]],
         initial_volume: float = 0.3,
+        packages_dir: Path | None = None,
     ) -> None:
         self._catalog = list(catalog)
         self._index = 0
         self.volume_level: float = initial_volume
         self.is_muted: bool = False
         self.is_playing: bool = False
+
+        pkg_dir = packages_dir or EXAMPLES_DIR
+        spec = load_package(pkg_dir / "AudioCard.dui")
+        self._card = DuiCard(spec)
+
+        self._sync_card()
+        self._bind_events()
+
+    # -- public API --------------------------------------------------------
+
+    @property
+    def card(self) -> DuiCard:
+        """The wired DuiCard ready to install on a screen."""
+        return self._card
 
     @property
     def current_track(self) -> dict[str, str]:
@@ -142,11 +166,13 @@ class AudioPlayer:
         self.is_playing = True
         t = self.current_track
         log.info("Playing: %s -- %s", t["artist"], t["title"])
+        self._sync_card()
 
     async def pause(self) -> None:
         """Pause playback."""
         self.is_playing = False
         log.info("Paused")
+        self._sync_card()
 
     async def play_pause(self) -> None:
         """Toggle between play and pause."""
@@ -166,6 +192,7 @@ class AudioPlayer:
         self._index = (self._index + 1) % len(self._catalog)
         t = self.current_track
         log.info("Next: %s -- %s", t["artist"], t["title"])
+        self._sync_card()
         return t
 
     async def previous_track(self) -> dict[str, str]:
@@ -179,6 +206,7 @@ class AudioPlayer:
         self._index = (self._index - 1) % len(self._catalog)
         t = self.current_track
         log.info("Previous: %s -- %s", t["artist"], t["title"])
+        self._sync_card()
         return t
 
     async def set_volume(self, level: float) -> None:
@@ -191,33 +219,110 @@ class AudioPlayer:
         """
         self.volume_level = max(0.0, min(1.0, level))
         log.info("Volume: %.0f%%", self.volume_level * 100)
+        self._sync_volume_text()
 
     async def toggle_mute(self) -> None:
         """Toggle mute state."""
         self.is_muted = not self.is_muted
         log.info("Muted: %s", self.is_muted)
+        self._sync_volume_text()
+
+    # -- internal ----------------------------------------------------------
+
+    def _sync_card(self) -> None:
+        """Push the full player state into card bindings."""
+        t = self.current_track
+        self._card.set_many(
+            artist=t["artist"],
+            title=t["title"],
+            album=t["album"],
+            state="Playing" if self.is_playing else "Paused",
+        )
+        vol_pct = self.volume_level * 100
+        self._card.set_range("volume", vol_pct, min_val=0, max_val=100)
+        self._sync_volume_text()
+
+    def _sync_volume_text(self) -> None:
+        """Update only the volume / mute text binding."""
+        if self.is_muted:
+            self._card.set("value_text", "Muted")
+        else:
+            self._card.set("value_text", f"{int(self.volume_level * 100)}%")
+
+    def _bind_events(self) -> None:
+        """Register card event handlers."""
+        card = self._card
+
+        @card.on("toggle_play_pause")
+        async def _toggle() -> None:
+            await self.play_pause()
+
+        @card.on("volume_up")
+        async def _vol_up(steps: int) -> None:
+            new = card.adjust_range("volume", steps, min_val=0, max_val=100)
+            await self.set_volume(new / 100.0)
+
+        @card.on("volume_down")
+        async def _vol_down(steps: int) -> None:
+            new = card.adjust_range("volume", -abs(steps), min_val=0, max_val=100)
+            await self.set_volume(new / 100.0)
+
+        @card.on("mute_toggle")
+        async def _mute() -> None:
+            await self.toggle_mute()
+
+        @card.on("next")
+        async def _next(steps: int) -> None:
+            await self.next_track()
+
+        @card.on("previous")
+        async def _prev(steps: int) -> None:
+            await self.previous_track()
 
 
 class LightsController:
-    """Mock controller for a lights card with brightness and colour-temperature.
+    """Lights card controller with on/off, brightness, and colour temperature.
+
+    Loads the ``LightCard.dui`` package and manages the light state
+    internally.
 
     Parameters
     ----------
     brightness : int, default=80
-        Initial brightness percentage (0–100).
+        Initial brightness percentage (0 -- 100).
     kelvin : int, default=4000
-        Initial colour temperature in Kelvin (2000–6500).
+        Initial colour temperature in Kelvin (2000 -- 6500).
+    packages_dir : Path | None
+        Directory containing ``.dui`` packages.
     """
 
-    def __init__(self, brightness: int = 80, kelvin: int = 4000) -> None:
+    def __init__(
+        self,
+        brightness: int = 80,
+        kelvin: int = 4000,
+        packages_dir: Path | None = None,
+    ) -> None:
         self.is_on: bool = True
         self.brightness: int = brightness
         self.kelvin: int = kelvin
+
+        pkg_dir = packages_dir or EXAMPLES_DIR
+        spec = load_package(pkg_dir / "LightCard.dui")
+        self._card = DuiCard(spec)
+
+        self._sync_card()
+        self._bind_events()
+
+    @property
+    def card(self) -> DuiCard:
+        """The wired DuiCard ready to install on a screen."""
+        return self._card
 
     async def toggle(self) -> None:
         """Toggle lights on/off."""
         self.is_on = not self.is_on
         log.info("Lights: %s", "ON" if self.is_on else "OFF")
+        self._card.set("lights", self.is_on)
 
     async def set_brightness(self, value: int) -> None:
         """Set brightness percentage.
@@ -229,6 +334,7 @@ class LightsController:
         """
         self.brightness = max(0, min(100, value))
         log.info("Brightness: %d%%", self.brightness)
+        self._card.set("brightness_value_text", f"{self.brightness}%")
 
     async def set_kelvin(self, value: int) -> None:
         """Set colour temperature.
@@ -236,27 +342,78 @@ class LightsController:
         Parameters
         ----------
         value : int
-            Colour temperature in Kelvin (clamped to 2000–6500).
+            Colour temperature in Kelvin (clamped to 2000 -- 6500).
         """
         self.kelvin = max(2000, min(6500, value))
         log.info("Kelvin: %dK", self.kelvin)
+        self._card.set("kelvin_value_text", f"{self.kelvin}K")
+
+    def _sync_card(self) -> None:
+        """Push the full light state into card bindings."""
+        self._card.set("lights", self.is_on)
+        self._card.set("brightness_value_text", f"{self.brightness}%")
+        self._card.set("kelvin_value_text", f"{self.kelvin}K")
+
+    def _bind_events(self) -> None:
+        """Register card event handlers."""
+
+        @self._card.on("toggle")
+        async def _toggle() -> None:
+            await self.toggle()
+
+        @self._card.on("brightness_up")
+        async def _bright_up(steps: int) -> None:
+            await self.set_brightness(self.brightness + steps * 5)
+
+        @self._card.on("brightness_down")
+        async def _bright_down(steps: int) -> None:
+            await self.set_brightness(self.brightness - abs(steps) * 5)
+
+        @self._card.on("kelvin_up")
+        async def _kelvin_up(steps: int) -> None:
+            await self.set_kelvin(self.kelvin + steps * 100)
+
+        @self._card.on("kelvin_down")
+        async def _kelvin_down(steps: int) -> None:
+            await self.set_kelvin(self.kelvin - abs(steps) * 100)
 
 
 class TimerController:
-    """Mock countdown timer with start/pause/reset.
+    """Countdown timer card controller.
+
+    Loads the ``TimerCard.dui`` package and manages a simple countdown
+    timer with start/pause, reset, and duration adjustment.
 
     Parameters
     ----------
     initial_seconds : int, default=300
         Initial duration in seconds.
+    packages_dir : Path | None
+        Directory containing ``.dui`` packages.
     """
 
-    def __init__(self, initial_seconds: int = 300) -> None:
+    def __init__(
+        self,
+        initial_seconds: int = 300,
+        packages_dir: Path | None = None,
+    ) -> None:
         self.duration: int = initial_seconds
         self.remaining: int = initial_seconds
         self.is_running: bool = False
 
-    def _format(self) -> str:
+        pkg_dir = packages_dir or EXAMPLES_DIR
+        spec = load_package(pkg_dir / "TimerCard.dui")
+        self._card = DuiCard(spec)
+
+        self._sync_card()
+        self._bind_events()
+
+    @property
+    def card(self) -> DuiCard:
+        """The wired DuiCard ready to install on a screen."""
+        return self._card
+
+    def format_time(self) -> str:
         """Format remaining time as ``HH:MM:SS``.
 
         Returns
@@ -271,13 +428,19 @@ class TimerController:
     async def toggle(self) -> None:
         """Start or pause the timer."""
         self.is_running = not self.is_running
-        log.info("Timer %s -- %s", "started" if self.is_running else "paused", self._format())
+        log.info(
+            "Timer %s -- %s",
+            "started" if self.is_running else "paused",
+            self.format_time(),
+        )
+        self._sync_card()
 
     async def reset(self) -> None:
         """Reset the timer to its initial duration."""
         self.is_running = False
         self.remaining = self.duration
-        log.info("Timer reset -- %s", self._format())
+        log.info("Timer reset -- %s", self.format_time())
+        self._sync_card()
 
     async def adjust_duration(self, delta_seconds: int) -> None:
         """Adjust the timer duration.
@@ -289,22 +452,79 @@ class TimerController:
         """
         self.duration = max(0, self.duration + delta_seconds)
         self.remaining = self.duration
-        log.info("Timer duration: %s", self._format())
+        log.info("Timer duration: %s", self.format_time())
+        self._sync_card()
+
+    def _sync_card(self) -> None:
+        """Push the timer display into the card binding."""
+        self._card.set("timer", self.format_time())
+
+    def _bind_events(self) -> None:
+        """Register card event handlers."""
+
+        @self._card.on("toggle")
+        async def _toggle() -> None:
+            await self.toggle()
+
+        @self._card.on("reset")
+        async def _reset() -> None:
+            await self.reset()
+
+        @self._card.on("increase_duration")
+        async def _increase(steps: int) -> None:
+            await self.adjust_duration(steps * 30)
+
+        @self._card.on("decrease_duration")
+        async def _decrease(steps: int) -> None:
+            await self.adjust_duration(-abs(steps) * 30)
 
 
 class DashboardController:
-    """Mock dashboard displaying time, weather, and deck brightness.
+    """Dashboard card controller showing time, weather, and deck brightness.
+
+    Loads the ``DashboardCard.dui`` package.  Brightness encoder events
+    update both the internal state and the physical deck brightness via
+    the *deck* handle passed to :meth:`bind_deck`.
 
     Parameters
     ----------
     deck_brightness : int, default=60
-        Initial deck brightness percentage (0–100).
+        Initial deck brightness percentage (0 -- 100).
+    packages_dir : Path | None
+        Directory containing ``.dui`` packages.
     """
 
-    def __init__(self, deck_brightness: int = 60) -> None:
+    def __init__(
+        self,
+        deck_brightness: int = 60,
+        packages_dir: Path | None = None,
+    ) -> None:
         self.deck_brightness: int = deck_brightness
-        self.temperature: str = "22°C"
+        self.temperature: str = "22C"
         self.humidity: str = "45%"
+        self._deck: Any = None
+
+        pkg_dir = packages_dir or EXAMPLES_DIR
+        spec = load_package(pkg_dir / "DashboardCard.dui")
+        self._card = DuiCard(spec)
+
+        self._sync_card()
+        self._bind_events()
+
+    @property
+    def card(self) -> DuiCard:
+        """The wired DuiCard ready to install on a screen."""
+        return self._card
+
+    def bind_deck(self, deck: Any) -> None:
+        """Attach the deck handle so brightness changes reach the hardware.
+
+        Parameters
+        ----------
+        deck
+            The :class:`~deckui.runtime.deck.Deck` instance.
+        """
+        self._deck = deck
 
     def get_date(self) -> str:
         """Return the current date formatted as ``YYYY-MM-DD``.
@@ -329,320 +549,196 @@ class DashboardController:
     async def set_brightness(self, value: int) -> None:
         """Set the deck brightness.
 
+        Updates both internal state and the physical deck (if bound).
+
         Parameters
         ----------
         value : int
-            Brightness percentage (0–100).
+            Brightness percentage (0 -- 100).
         """
         self.deck_brightness = max(0, min(100, value))
         log.info("Deck brightness: %d%%", self.deck_brightness)
+        if self._deck is not None:
+            await self._deck.set_brightness(self.deck_brightness)
+
+    def _sync_card(self) -> None:
+        """Push the full dashboard state into card bindings."""
+        self._card.set_many(
+            date=self.get_date(),
+            time=self.get_time(),
+            temperature=self.temperature,
+            humidity=self.humidity,
+        )
+        self._card.set_range(
+            "deck_brightness",
+            self.deck_brightness,
+            min_val=0,
+            max_val=100,
+        )
+
+    def _bind_events(self) -> None:
+        """Register card event handlers."""
+        card = self._card
+
+        @card.on("brightness_up")
+        async def _bright_up(steps: int) -> None:
+            new = card.adjust_range("deck_brightness", steps, min_val=0, max_val=100)
+            await self.set_brightness(int(new))
+
+        @card.on("brightness_down")
+        async def _bright_down(steps: int) -> None:
+            new = card.adjust_range("deck_brightness", -abs(steps), min_val=0, max_val=100)
+            await self.set_brightness(int(new))
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Card setup helpers
-# ═══════════════════════════════════════════════════════════════════════════
+class SceneController:
+    """Scene-activation key controller.
 
-
-def setup_audio_card(card: DuiCard, player: AudioPlayer) -> None:
-    """Wire an AudioCard DUI card to the mock audio player.
-
-    Binds encoder events (volume, mute, play/pause, next/previous)
-    and populates the card with the player's current state.
-
-    Parameters
-    ----------
-    card : DuiCard
-        A loaded ``AudioCard`` DUI card.
-    player : AudioPlayer
-        The mock audio player instance.
-    """
-    track = player.current_track
-    card.set_many(
-        artist=track["artist"],
-        title=track["title"],
-        album=track["album"],
-        state="Playing" if player.is_playing else "Paused",
-    )
-    vol_pct = player.volume_level * 100
-    card.set_range("volume", vol_pct, min_val=0, max_val=100)
-    card.set("value_text", f"{int(vol_pct)}%")
-
-    @card.on("toggle_play_pause")
-    async def _toggle() -> None:
-        await player.play_pause()
-        card.set("state", "Playing" if player.is_playing else "Paused")
-
-    @card.on("volume_up")
-    async def _vol_up(steps: int) -> None:
-        new = card.adjust_range("volume", steps, min_val=0, max_val=100)
-        await player.set_volume(new / 100.0)
-        card.set("value_text", f"{int(new)}%")
-
-    @card.on("volume_down")
-    async def _vol_down(steps: int) -> None:
-        new = card.adjust_range("volume", -abs(steps), min_val=0, max_val=100)
-        await player.set_volume(new / 100.0)
-        card.set("value_text", f"{int(new)}%")
-
-    @card.on("mute_toggle")
-    async def _mute() -> None:
-        await player.toggle_mute()
-        if player.is_muted:
-            card.set("value_text", "Muted")
-        else:
-            vol_pct = player.volume_level * 100
-            card.set("value_text", f"{int(vol_pct)}%")
-
-    @card.on("next")
-    async def _next(steps: int) -> None:
-        track = await player.next_track()
-        card.set_many(artist=track["artist"], title=track["title"], album=track["album"])
-
-    @card.on("previous")
-    async def _prev(steps: int) -> None:
-        track = await player.previous_track()
-        card.set_many(artist=track["artist"], title=track["title"], album=track["album"])
-
-
-def setup_lights_card(card: DuiCard, lights: LightsController) -> None:
-    """Wire a LightCard DUI card to the mock lights controller.
+    Loads the ``IconKey.dui`` package and creates one :class:`~deckui.DuiKey`
+    per scene definition.  Each key click logs the scene name.
 
     Parameters
     ----------
-    card : DuiCard
-        A loaded ``LightCard`` DUI card.
-    lights : LightsController
-        The mock lights controller instance.
+    scenes : list[dict[str, Any]]
+        Scene definitions, each with ``position``, ``label``, and ``icon``.
+    packages_dir : Path | None
+        Directory containing ``.dui`` packages.
     """
-    card.set("lights", lights.is_on)
-    card.set("brightness_value_text", f"{lights.brightness}%")
-    card.set("kelvin_value_text", f"{lights.kelvin}K")
 
-    @card.on("toggle")
-    async def _toggle() -> None:
-        await lights.toggle()
-        card.set("lights", lights.is_on)
+    def __init__(
+        self,
+        scenes: list[dict[str, Any]],
+        packages_dir: Path | None = None,
+    ) -> None:
+        self._scenes = scenes
+        pkg_dir = packages_dir or EXAMPLES_DIR
+        self._spec = load_package(pkg_dir / "IconKey.dui")
+        self._keys: list[DuiKey] = []
 
-    @card.on("brightness_up")
-    async def _bright_up(steps: int) -> None:
-        await lights.set_brightness(lights.brightness + steps * 5)
-        card.set("brightness_value_text", f"{lights.brightness}%")
+        for scene in self._scenes:
+            key = DuiKey(self._spec)
+            key.set("label", scene["label"])
+            key.set("icon", scene["icon"])
 
-    @card.on("brightness_down")
-    async def _bright_down(steps: int) -> None:
-        await lights.set_brightness(lights.brightness - abs(steps) * 5)
-        card.set("brightness_value_text", f"{lights.brightness}%")
+            @key.on_event("click")
+            async def _click(name: str = scene["label"]) -> None:
+                log.info("Scene activated: %s", name)
 
-    @card.on("kelvin_up")
-    async def _kelvin_up(steps: int) -> None:
-        await lights.set_kelvin(lights.kelvin + steps * 100)
-        card.set("kelvin_value_text", f"{lights.kelvin}K")
+            self._keys.append(key)
 
-    @card.on("kelvin_down")
-    async def _kelvin_down(steps: int) -> None:
-        await lights.set_kelvin(lights.kelvin - abs(steps) * 100)
-        card.set("kelvin_value_text", f"{lights.kelvin}K")
+    @property
+    def keys(self) -> list[DuiKey]:
+        """The created scene keys (same order as *scenes*)."""
+        return list(self._keys)
+
+    def install(self, screen: Any) -> None:
+        """Place all scene keys onto a screen at their configured positions.
+
+        Parameters
+        ----------
+        screen
+            The :class:`~deckui.ui.screen.Screen` to install keys on.
+        """
+        for scene, key in zip(self._scenes, self._keys, strict=True):
+            screen.set_key(scene["position"], key)
 
 
-def setup_timer_card(card: DuiCard, timer: TimerController) -> None:
-    """Wire a TimerCard DUI card to the mock timer controller.
+class FavoritesController:
+    """Favourite-media key controller.
+
+    Loads the ``PictureKey.dui`` package and creates one
+    :class:`~deckui.DuiKey` per favourite.  Clicking a key calls
+    :meth:`AudioController.play` with the associated track.
 
     Parameters
     ----------
-    card : DuiCard
-        A loaded ``TimerCard`` DUI card.
-    timer : TimerController
-        The mock timer controller instance.
+    favorites : list[dict[str, Any]]
+        Favourite definitions, each with ``position`` and ``media``.
+    audio : AudioController
+        The audio controller that handles playback.
+    packages_dir : Path | None
+        Directory containing ``.dui`` packages.
     """
-    card.set("timer", timer._format())
 
-    @card.on("toggle")
-    async def _toggle() -> None:
-        await timer.toggle()
-        card.set("timer", timer._format())
+    def __init__(
+        self,
+        favorites: list[dict[str, Any]],
+        audio: AudioController,
+        packages_dir: Path | None = None,
+    ) -> None:
+        self._favorites = favorites
+        self._audio = audio
+        pkg_dir = packages_dir or EXAMPLES_DIR
+        self._spec = load_package(pkg_dir / "PictureKey.dui")
+        self._keys: list[DuiKey] = []
 
-    @card.on("reset")
-    async def _reset() -> None:
-        await timer.reset()
-        card.set("timer", timer._format())
+        for fav in self._favorites:
+            key = DuiKey(self._spec)
+            media = fav["media"]
 
-    @card.on("increase_duration")
-    async def _increase(steps: int) -> None:
-        await timer.adjust_duration(steps * 30)
-        card.set("timer", timer._format())
+            @key.on_event("click")
+            async def _click(m: dict[str, str] = media) -> None:
+                log.info("Favourite pressed: %s -- %s", m["artist"], m["title"])
+                await self._audio.play(m)
 
-    @card.on("decrease_duration")
-    async def _decrease(steps: int) -> None:
-        await timer.adjust_duration(-abs(steps) * 30)
-        card.set("timer", timer._format())
+            self._keys.append(key)
 
+    @property
+    def keys(self) -> list[DuiKey]:
+        """The created favourite keys (same order as *favorites*)."""
+        return list(self._keys)
 
-def setup_dashboard_card(
-    card: DuiCard,
-    dashboard: DashboardController,
-    deck: Any,
-) -> None:
-    """Wire a DashboardCard DUI card to the mock dashboard controller.
+    def install(self, screen: Any) -> None:
+        """Place all favourite keys onto a screen at their configured positions.
 
-    The ``brightness_up`` / ``brightness_down`` events update both the
-    dashboard state and the physical deck brightness.
-
-    Parameters
-    ----------
-    card : DuiCard
-        A loaded ``DashboardCard`` DUI card.
-    dashboard : DashboardController
-        The mock dashboard controller instance.
-    deck
-        The :class:`~deckui.runtime.deck.Deck` handle, used to set
-        hardware brightness.
-    """
-    card.set_many(
-        date=dashboard.get_date(),
-        time=dashboard.get_time(),
-        temperature=dashboard.temperature,
-        humidity=dashboard.humidity,
-    )
-    card.set_range(
-        "deck_brightness",
-        dashboard.deck_brightness,
-        min_val=0,
-        max_val=100,
-    )
-
-    @card.on("brightness_up")
-    async def _bright_up(steps: int) -> None:
-        new = card.adjust_range("deck_brightness", steps, min_val=0, max_val=100)
-        await dashboard.set_brightness(int(new))
-        await deck.set_brightness(int(new))
-
-    @card.on("brightness_down")
-    async def _bright_down(steps: int) -> None:
-        new = card.adjust_range("deck_brightness", -abs(steps), min_val=0, max_val=100)
-        await dashboard.set_brightness(int(new))
-        await deck.set_brightness(int(new))
+        Parameters
+        ----------
+        screen
+            The :class:`~deckui.ui.screen.Screen` to install keys on.
+        """
+        for fav, key in zip(self._favorites, self._keys, strict=True):
+            screen.set_key(fav["position"], key)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Key setup helpers
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-def setup_favorites(
-    screen: Any,
-    player: AudioPlayer,
-    picturekey_spec: Any,
-) -> list[DuiKey]:
-    """Create favourite-media keys that play a track on press.
-
-    Parameters
-    ----------
-    screen
-        The active :class:`~deckui.ui.screen.Screen`.
-    player : AudioPlayer
-        The mock audio player instance.
-    picturekey_spec
-        A loaded ``PictureKey`` :class:`~deckui.dui.schema.PackageSpec`.
-
-    Returns
-    -------
-    list[DuiKey]
-        The created DuiKey instances.
-    """
-    keys: list[DuiKey] = []
-    for fav in FAVORITE_KEYS:
-        key = DuiKey(picturekey_spec)
-        media = fav["media"]
-
-        @key.on_event("click")
-        async def _click(m: dict[str, str] = media) -> None:
-            log.info("Favorite pressed: %s -- %s", m["artist"], m["title"])
-            await player.play(m)
-
-        screen.set_key(fav["position"], key)
-        keys.append(key)
-    return keys
-
-
-def setup_scenes(screen: Any, iconkey_spec: Any) -> None:
-    """Create scene-activation keys that log the activated scene.
-
-    Parameters
-    ----------
-    screen
-        The active :class:`~deckui.ui.screen.Screen`.
-    iconkey_spec
-        A loaded ``IconKey`` :class:`~deckui.dui.schema.PackageSpec`.
-    """
-    for scene in SCENE_KEYS:
-        key = DuiKey(iconkey_spec)
-        key.set("label", scene["label"])
-        key.set("icon", scene["icon"])
-
-        @key.on_event("click")
-        async def _click(name: str = scene["label"]) -> None:
-            log.info("Scene activated: %s", name)
-
-        screen.set_key(scene["position"], key)
-
-
-# ═══════════════════════════════════════════════════════════════════════════
+# ===================================================================
 # Main application
-# ═══════════════════════════════════════════════════════════════════════════
+# ===================================================================
 
 
 async def run() -> None:
     """Start the Stream Deck+ demo application.
 
-    Creates a :class:`~deckui.DeckManager`, registers connect/disconnect
-    handlers, loads all DUI packages, and wires up the controllers.
-    Runs until interrupted.
+    Creates controllers, registers connect/disconnect handlers, and runs
+    until interrupted.
     """
-    player = AudioPlayer(MEDIA_CATALOG, initial_volume=0.3)
+    audio = AudioController(MEDIA_CATALOG, initial_volume=0.3)
     lights = LightsController(brightness=80, kelvin=4000)
     timer = TimerController(initial_seconds=300)
     dashboard = DashboardController(deck_brightness=60)
+    scenes = SceneController(SCENE_KEYS)
+    favorites = FavoritesController(FAVORITE_KEYS, audio)
 
     manager = DeckManager(brightness=60, auto_reconnect=True)
-
-    # Load .dui packages from the examples directory
-    audiocard_spec = load_package(EXAMPLES_DIR / "AudioCard.dui")
-    lightcard_spec = load_package(EXAMPLES_DIR / "LightCard.dui")
-    timercard_spec = load_package(EXAMPLES_DIR / "TimerCard.dui")
-    dashcard_spec = load_package(EXAMPLES_DIR / "DashboardCard.dui")
-    iconkey_spec = load_package(EXAMPLES_DIR / "IconKey.dui")
-    picturekey_spec = load_package(EXAMPLES_DIR / "PictureKey.dui")
 
     @manager.on_connect()
     async def on_deck_connect(deck: Any) -> None:
         """Handle a new deck connection -- set up the full UI."""
         log.info("Deck connected")
 
+        dashboard.bind_deck(deck)
         screen = deck.screen("main")
 
-        # -- Touch-strip cards --
+        # Touch-strip cards
         if screen.touch_strip is not None:
             screen.touch_strip.background_color = "#1c1c1c"
+            screen.set_card(0, audio.card)
+            screen.set_card(1, lights.card)
+            screen.set_card(2, timer.card)
+            screen.set_card(3, dashboard.card)
 
-            audio_card = DuiCard(audiocard_spec)
-            setup_audio_card(audio_card, player)
-            screen.set_card(0, audio_card)
-
-            light_card = DuiCard(lightcard_spec)
-            setup_lights_card(light_card, lights)
-            screen.set_card(1, light_card)
-
-            timer_card = DuiCard(timercard_spec)
-            setup_timer_card(timer_card, timer)
-            screen.set_card(2, timer_card)
-
-            dash_card = DuiCard(dashcard_spec)
-            setup_dashboard_card(dash_card, dashboard, deck)
-            screen.set_card(3, dash_card)
-
-        # -- Physical keys --
-        setup_favorites(screen, player, picturekey_spec)
-        setup_scenes(screen, iconkey_spec)
+        # Physical keys
+        favorites.install(screen)
+        scenes.install(screen)
 
         await deck.set_screen("main")
         log.info("Deck ready!")
