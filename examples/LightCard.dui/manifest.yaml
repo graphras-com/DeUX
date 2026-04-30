@@ -48,11 +48,13 @@ events:
     source: encoder_turn
     direction: right
     accumulate: true
+    accumulate_delay: 0.1
 
   - name: brightness_down
     source: encoder_turn
     direction: left
     accumulate: true
+    accumulate_delay: 0.1
 
   - name: kelvin_up
     source: encoder_press_turn
