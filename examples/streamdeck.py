@@ -699,73 +699,6 @@ class FavoritesController:
             screen.set_key(pos, key)
 
 
-def compute_key_layout(
-    key_count: int,
-    key_cols: int,
-    num_favorites: int,
-    num_scenes: int,
-) -> tuple[list[int], list[int]]:
-    """Compute key positions for favourites and scenes based on device layout.
-
-    Favourites fill from the left of each row, scenes fill from the right.
-    On devices with fewer keys than items, the lists are truncated.
-
-    Parameters
-    ----------
-    key_count : int
-        Total number of physical keys.
-    key_cols : int
-        Number of key columns per row.
-    num_favorites : int
-        Number of favourite keys to place.
-    num_scenes : int
-        Number of scene keys to place.
-
-    Returns
-    -------
-    tuple[list[int], list[int]]
-        ``(favorite_positions, scene_positions)`` -- lists of key indices.
-
-    Examples
-    --------
-    Stream Deck+ (8 keys, 4 cols)::
-
-        >>> compute_key_layout(8, 4, 4, 4)
-        ([0, 1, 4, 5], [2, 3, 6, 7])
-
-    Stream Deck Mini (6 keys, 3 cols)::
-
-        >>> compute_key_layout(6, 3, 4, 4)
-        ([0, 3], [1, 2, 4, 5])
-
-    Stream Deck XL (32 keys, 8 cols)::
-
-        >>> compute_key_layout(32, 8, 4, 4)
-        ([0, 1, 8, 9], [2, 3, 10, 11])
-    """
-    key_rows = key_count // key_cols if key_cols > 0 else 1
-
-    # Determine how many columns each group gets.  Favourites get at most
-    # half the columns (rounded down), scenes get the rest.
-    fav_cols = min(key_cols // 2, num_favorites)
-    scene_cols = min(key_cols - fav_cols, num_scenes)
-
-    fav_positions: list[int] = []
-    scene_positions: list[int] = []
-    for row in range(key_rows):
-        row_start = row * key_cols
-        for col in range(fav_cols):
-            idx = row_start + col
-            if idx < key_count and len(fav_positions) < num_favorites:
-                fav_positions.append(idx)
-        for col in range(fav_cols, fav_cols + scene_cols):
-            idx = row_start + col
-            if idx < key_count and len(scene_positions) < num_scenes:
-                scene_positions.append(idx)
-
-    return fav_positions, scene_positions
-
-
 # ===================================================================
 # Main application
 # ===================================================================
@@ -809,15 +742,11 @@ async def run() -> None:
             screen.set_card(2, timer.card)
             screen.set_card(3, dashboard.card)
 
-        # Physical keys -- layout adapts to device key count
-        fav_positions, scene_positions = compute_key_layout(
-            caps.key_count,
-            caps.key_cols,
-            len(MEDIA_CATALOG),
-            len(SCENE_DEFS),
-        )
-        favorites.install(screen, fav_positions)
-        scenes.install(screen, scene_positions)
+        # Physical keys: 0-3 favourites, 4-7 scenes, rest empty
+        num_favs = min(len(MEDIA_CATALOG), caps.key_count)
+        num_scenes = min(len(SCENE_DEFS), max(0, caps.key_count - num_favs))
+        favorites.install(screen, list(range(num_favs)))
+        scenes.install(screen, list(range(num_favs, num_favs + num_scenes)))
 
         await deck.set_screen("main")
         log.info("Deck ready!")

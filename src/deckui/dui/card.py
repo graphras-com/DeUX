@@ -304,7 +304,7 @@ class DuiCard(Card):
         """Route encoder turn through the event map."""
         handler = self._events.handle_encoder_turn(direction)
         if handler is not None:
-            self.queue_pending_callback(handler, ())
+            self.queue_pending_callback(handler, (direction,))
 
     def handle_encoder_press(self) -> None:
         """Route encoder press through the event map."""
