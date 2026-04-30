@@ -28,8 +28,18 @@ A high-level, asyncio-native Python library for Elgato Stream Deck devices. Defi
 
 ## Installation
 
+Install directly from GitHub:
+
 ```bash
-pip install deckui
+pip install git+https://github.com/graphras-com/DeckUI.git
+```
+
+Or clone and install locally:
+
+```bash
+git clone https://github.com/graphras-com/DeckUI.git
+cd DeckUI
+pip install .
 ```
 
 For development:
