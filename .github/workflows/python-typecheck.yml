@@ -1,5 +1,8 @@
 name: Reusable Python Type Check
 
+permissions:
+  contents: read
+
 on:
   workflow_call:
     inputs:
