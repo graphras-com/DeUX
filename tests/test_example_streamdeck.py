@@ -48,6 +48,8 @@ _AUDIO_SVG = (
     '<text id="state" x="4" y="70" font-size="10" fill="#aaa">Stopped</text>'
     '<text id="value_text" x="4" y="85" font-size="10" fill="#aaa">50%</text>'
     '<rect id="volume_bar" x="4" y="90" width="189" height="4" fill="#dedede"/>'
+    '<image id="cover" x="0" y="0" width="98" height="98" href=""/>'
+    '<rect id="cover_placeholder" x="0" y="0" width="98" height="98" fill="#333"/>'
     "</svg>"
 )
 
@@ -113,6 +115,7 @@ def _audio_spec() -> PackageSpec:
             "state": TextBinding(node="state", default="Stopped"),
             "value_text": TextBinding(node="value_text", default="50%"),
             "volume": RangeBinding(node="volume_bar", default=0.5, direction="horizontal"),
+            "cover": ImageBinding(node="cover"),
         },
         events=(
             EventMapping(name="toggle_play_pause", source="encoder_hold", hold_ms=500),
@@ -342,12 +345,12 @@ class TestAudioController:
     """Tests for AudioController state and card bindings."""
 
     @pytest.fixture
-    def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> AudioController:
+    def ctrl(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> AudioController:
         """An AudioController with a mocked load_package."""
         monkeypatch.setattr(
             "streamdeck.load_package", lambda _path: _audio_spec()
         )
-        return AudioController(MEDIA_CATALOG, initial_volume=0.5)
+        return AudioController(MEDIA_CATALOG, initial_volume=0.5, packages_dir=tmp_path)
 
     def test_initial_state(self, ctrl: AudioController) -> None:
         assert ctrl.volume_level == 0.5
@@ -626,15 +629,15 @@ class TestFavoritesController:
     """Tests for FavoritesController key creation."""
 
     @pytest.fixture
-    def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> FavoritesController:
+    def ctrl(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> FavoritesController:
         """A FavoritesController with mocked load_package calls."""
         specs = {"AudioCard.dui": _audio_spec(), "PictureKey.dui": _picturekey_spec()}
         monkeypatch.setattr(
             "streamdeck.load_package",
             lambda path: specs[Path(path).name],
         )
-        audio = AudioController(MEDIA_CATALOG, initial_volume=0.3)
-        return FavoritesController(MEDIA_CATALOG, audio)
+        audio = AudioController(MEDIA_CATALOG, initial_volume=0.3, packages_dir=tmp_path)
+        return FavoritesController(MEDIA_CATALOG, audio, packages_dir=tmp_path)
 
     def test_creates_correct_number_of_keys(self, ctrl: FavoritesController) -> None:
         assert len(ctrl.keys) == len(MEDIA_CATALOG)

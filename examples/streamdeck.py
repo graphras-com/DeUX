@@ -115,8 +115,8 @@ class AudioController:
         self.is_muted: bool = False
         self.is_playing: bool = False
 
-        pkg_dir = packages_dir or EXAMPLES_DIR
-        spec = load_package(pkg_dir / "AudioCard.dui")
+        self._pkg_dir = packages_dir or EXAMPLES_DIR
+        spec = load_package(self._pkg_dir / "AudioCard.dui")
         self._card = DuiCard(spec)
 
         self._sync_card()
@@ -148,12 +148,14 @@ class AudioController:
         t = self.current_track
         log.info("Playing: %s -- %s", t["artist"], t["title"])
         self._sync_card()
+        await self._card.request_refresh()
 
     async def pause(self) -> None:
         """Pause playback."""
         self.is_playing = False
         log.info("Paused")
         self._sync_card()
+        await self._card.request_refresh()
 
     async def play_pause(self) -> None:
         """Toggle between play and pause."""
@@ -219,6 +221,9 @@ class AudioController:
             album=t["album"],
             state="Playing" if self.is_playing else "Paused",
         )
+        cover_path = self._pkg_dir / t["cover"]
+        if cover_path.exists():
+            self._card.set("cover", Image.open(cover_path))
         vol_pct = self.volume_level * 100
         self._card.set_range("volume", vol_pct, min_val=0, max_val=100)
         self._sync_volume_text()
