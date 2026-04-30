@@ -1,5 +1,8 @@
 name: Reusable Python Tests
 
+permissions:
+  contents: read
+
 on:
   workflow_call:
     inputs:

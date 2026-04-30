@@ -1,5 +1,8 @@
 name: Reusable Release
 
+permissions:
+  contents: write
+
 on:
   workflow_call:
 
