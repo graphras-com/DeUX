@@ -41,6 +41,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from PIL import Image
+
 from deckui import DeckManager, DeviceInfo, DuiCard, DuiKey, load_package
 
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
@@ -675,6 +677,11 @@ class FavoritesController:
         for fav in self._favorites:
             key = DuiKey(self._spec)
             media = fav["media"]
+
+            # Load the album cover and set it on the key
+            cover_path = pkg_dir / media["cover"]
+            if cover_path.exists():
+                key.set("picture", Image.open(cover_path))
 
             @key.on_event("click")
             async def _click(m: dict[str, str] = media) -> None:
