@@ -1,0 +1,43 @@
+<svg id="LightCard" xmlns="http://www.w3.org/2000/svg" width="197" height="98" font-family="ArialMT,Arial,sans-serif">
+    <style>
+        .background_color {color: #1c1c1c;}
+        .text_color {color: #dedede;}
+        .dark_color {color: #1c1c1c;}
+        .bright_color {color: #dedede;}
+        .cool_color {color: #dedede;}
+        .warm_color {color: #f2b23a;}
+        .lights_color {color: #FFD700"}
+        
+    </style>
+    <rect id="background" class="background_color" x="0" y="0" width="197" height="98" fill="currentColor"/>
+    <g transform="translate(87 6)">
+        <path id="lights_off" class="bright_color" transform="scale(.4 .4)" fill="currentColor" d="M30.133.871c-6 0-10.875 2.203-14.04 5.977l25.97 25.992c2.343-3.516 6.07-7.406 6.07-14.18c0-10.664-7.196-17.789-18-17.789m17.32 46.477c.75.726 1.851.703 2.555 0c.703-.703.726-1.852 0-2.555L8.523 3.262c-.726-.703-1.898-.68-2.578 0c-.68.703-.656 1.898 0 2.554Zm-25.805-4.196h14.79c.421 0 .68-.234.68-.656v-1.523L12.39 16.223c-.188.75-.258 1.57-.258 2.437c0 10.125 8.226 13.781 8.226 19.453v3.75c0 .797.492 1.29 1.29 1.29m.867 6.328H37.75c1.195 0 2.156-.984 2.156-2.203s-.96-2.203-2.156-2.203H22.516c-1.196 0-2.157.985-2.157 2.203c0 1.22.961 2.203 2.156 2.203m7.618 5.649c3.234 0 5.508-1.477 5.742-3.75H24.39c.187 2.273 2.484 3.75 5.742 3.75" />
+        <path id="lights_on" class="lights_color" transform="translate(0.9 0) scale(.4 .4)" fill="currentColor" d="M19.504 43.152h16.969c.797 0 1.289-.492 1.289-1.289v-3.75c0-5.672 8.25-9.328 8.25-19.453C46.012 7.996 38.793.871 27.988.871s-18 7.125-18 17.79c0 10.124 8.227 13.78 8.227 19.452v3.75c0 .797.515 1.29 1.289 1.29m.867 6.328h15.235c1.195 0 2.156-.984 2.156-2.203s-.961-2.203-2.157-2.203H20.371c-1.195 0-2.156.985-2.156 2.203c0 1.22.96 2.203 2.156 2.203m7.617 5.649c3.235 0 5.508-1.477 5.742-3.75H22.246c.211 2.273 2.484 3.75 5.742 3.75" />
+    </g>
+    <g transform="translate(4 42)">
+        <defs>
+            <linearGradient id="brightness_gradient" x1="0" x2="100%" y1="0" y2="0">
+                <stop class="dark_color" offset="0%" stop-color="currentColor"/>
+                <stop class="bright_color" offset="100%" stop-color="currentColor"/>
+            </linearGradient>
+        </defs>
+        <text id="brightness_label" class="text_color" x="0" y="0" font-size="14" fill="currentColor" text-anchor="start">Brightness</text>
+        <text id="brightness_value_text" class="text_color" x="189" y="0" font-size="14" fill="currentColor" text-anchor="end">50%</text>
+        <rect id="brightness_frame" class="text_color" x="0" y="4" width="189" height="14" stroke="currentColor" fill="none" stroke-width="1" rx="3" ry="3"/>
+        <rect id="brightness_background" x="1" y="5" width="187" height="12" stroke="none" fill="url(#brightness_gradient)" rx="2" ry="2"/>
+        <rect id="brightness_indicator" class="text_color" x="1.5" y="5.5" data-min-x="183.5" data-max="183.5" width="4" height="11" stroke="black" stroke-width="0.5" fill="currentColor" rx="1.5" ry="1.5"/>
+    </g>
+    <g transform="translate(4 76)">
+        <defs>
+            <linearGradient id="kelvin_gradient" x1="0" x2="100%" y1="0" y2="0">
+                <stop class="warm_color" offset="0%" stop-color="currentColor"/>
+                <stop class="cool_color" offset="100%" stop-color="currentColor"/>
+            </linearGradient>
+        </defs>
+        <text id="kelvin_label" class="text_color" x="0" y="0" font-size="14" fill="currentColor" text-anchor="start">Kelvin</text>
+        <text id="kelvin_value_text" class="text_color" x="189" y="0" font-size="14" fill="currentColor" text-anchor="end">2500K</text>
+        <rect id="kelvin_frame" class="text_color" x="0" y="4" width="189" height="14" stroke="currentColor" fill="none" stroke-width="1" rx="3" ry="3"/>
+        <rect id="kelvin_background" x="1" y="5" width="187" height="12" stroke="none" fill="url(#kelvin_gradient)" rx="2" ry="2"/>
+        <rect id="kelvin_indicator" class="text_color" x="1.5" y="5.5" data-min-x="183.5" data-max="183.5" width="4" height="11" stroke="black" stroke-width="0.5" fill="currentColor" rx="1.5" ry="1.5"/>
+    </g>
+</svg>

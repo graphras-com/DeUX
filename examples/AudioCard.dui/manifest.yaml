@@ -1,0 +1,103 @@
+name: AudioCard
+type: TouchStripCard
+version: 1
+description: Audio UI with play/pause, mute and volume control
+author: Graphras.com
+license: Apache-2.0
+category: media
+layout: layout.svg
+
+bindings:
+  artist:
+    type: text
+    node: artist
+    default: ""
+    max_width: 185
+    overflow: ellipsis
+
+  title:
+    type: text
+    node: title
+    default: ""
+    max_width: 185
+    overflow: ellipsis
+
+  album:
+    type: text
+    node: album
+    default: ""
+    max_width: 185
+    overflow: ellipsis
+
+  state:
+    type: text
+    node: state
+    default: "Stopped"
+
+  cover:
+    type: image
+    node: cover
+    fit: cover
+    placeholder_node: cover_placeholder
+
+  value_text:
+    type: text
+    node: value_text
+    default: "50%"
+
+  bar_color:
+    type: color
+    node: volume_bar
+    attribute: fill
+    default: "#dedede"
+
+  volume:
+    type: range
+    node: volume_bar
+    default: 0.5
+    direction: horizontal
+
+spinner:
+  type: rotation
+  node: spinner
+  frames: 8
+  interval_ms: 100
+
+events:
+  - name: toggle_play_pause
+    source: encoder_hold
+    hold_ms: 500
+
+  - name: volume_down
+    source: encoder_turn
+    direction: left
+    accumulate: false
+
+  - name: volume_up
+    source: encoder_turn
+    direction: right
+    accumulate: false
+
+  - name: mute_toggle
+    source: encoder_press_release
+    max_duration_ms: 300
+
+  - name: previous
+    source: encoder_press_turn
+    direction: left
+    accumulate: true
+    accumulate_max_steps: 1
+
+  - name: next
+    source: encoder_press_turn
+    direction: right
+    accumulate: true
+    accumulate_max_steps: 1
+
+regions:
+  card:
+    x: 0
+    y: 0
+    width: 197
+    height: 98
+    events: [tap, long_press]

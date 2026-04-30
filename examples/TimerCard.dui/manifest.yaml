@@ -1,0 +1,43 @@
+name: TimerCard
+type: TouchStripCard
+version: 1
+description: A Timer Card to set, start, pause, reset a timer
+author: Graphras.com
+license: Apache-2.0
+category: utilities
+layout: layout.svg
+
+bindings:
+  timer:
+    type: text
+    node: timer
+    default: "00:00:00"
+    max_width: 190
+    overflow: ellipsis
+
+events:
+  - name: decrease_duration
+    source: encoder_turn
+    direction: left
+    accumulate: true
+
+  - name: increase_duration
+    source: encoder_turn
+    direction: right
+    accumulate: true
+
+  - name: toggle
+    source: encoder_press_release
+    max_duration_ms: 300
+
+  - name: reset
+    source: encoder_hold
+    hold_ms: 350
+
+regions:
+  card:
+    x: 0
+    y: 0
+    width: 197
+    height: 98
+    events: []

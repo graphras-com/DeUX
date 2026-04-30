@@ -1,0 +1,75 @@
+name: LightCard
+type: TouchStripCard
+version: 1
+description: Lights controller with on/off switch, brightness and kelvin adjust
+author: Graphras.com
+license: Apache-2.0
+category: home-automation
+layout: layout.svg
+
+bindings:
+  lights:
+    type: toggle
+    node_on: lights_on
+    node_off: lights_off
+    default: false
+
+  brightness_value_text:
+    type: text
+    node: brightness_value_text
+    default: "0%"
+
+  brightness:
+    type: slider
+    node: brightness_indicator
+    default: 0.0
+    direction: horizontal
+    min_pos: 1.5
+    max_pos: 183.5
+
+  kelvin_value_text:
+    type: text
+    node: kelvin_value_text
+    default: "2000K"
+
+  kelvin:
+    type: slider
+    node: kelvin_indicator
+    default: 0.0
+    direction: horizontal
+    min_pos: 1.5
+    max_pos: 183.5
+
+events:
+  - name: toggle
+    source: encoder_press_release
+
+  - name: brightness_up
+    source: encoder_turn
+    direction: right
+    accumulate: true
+
+  - name: brightness_down
+    source: encoder_turn
+    direction: left
+    accumulate: true
+
+  - name: kelvin_up
+    source: encoder_press_turn
+    direction: right
+    accumulate: true
+    accumulate_max_steps: 1
+
+  - name: kelvin_down
+    source: encoder_press_turn
+    direction: left
+    accumulate: true
+    accumulate_max_steps: 1
+
+regions:
+  card:
+    x: 0
+    y: 0
+    width: 197
+    height: 98
+    events: [tap, long_press]
