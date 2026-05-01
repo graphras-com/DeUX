@@ -68,6 +68,8 @@ _LIGHT_SVG = (
 
 _TIMER_SVG = (
     '<svg id="TimerCard" xmlns="http://www.w3.org/2000/svg" width="197" height="98">'
+    '<rect id="background" width="197" height="98" fill="#1c1c1c"/>'
+    '<rect id="foreground" width="197" height="98" fill="#dedede"/>'
     '<text id="timer" x="4" y="50" font-size="20" fill="#fff">00:00:00</text>'
     "</svg>"
 )
@@ -232,6 +234,12 @@ def _timer_spec() -> PackageSpec:
         svg_source=_TIMER_SVG,
         bindings={
             "timer": TextBinding(node="timer", default="00:00:00"),
+            "background": ColorBinding(
+                node="background", attribute="color", default="#1c1c1c"
+            ),
+            "foreground": ColorBinding(
+                node="foreground", attribute="color", default="#dedede"
+            ),
         },
         events=(
             EventMapping(name="toggle", source="encoder_press_release", max_duration_ms=300),
@@ -640,25 +648,25 @@ class TestSceneController:
         assert screen.set_key.call_count == len(SCENE_DEFS)
 
     def test_initial_colors_are_defaults(self, ctrl: SceneController) -> None:
-        """Each key starts with default background/foreground colors."""
+        """Each key starts with default background/foreground colors from manifest."""
         for key in ctrl.keys:
-            assert key.get("background") == SceneController.DEFAULT_BACKGROUND
-            assert key.get("foreground") == SceneController.DEFAULT_FOREGROUND
+            assert key.get("background") == "#1c1c1c"
+            assert key.get("foreground") == "#dedede"
 
     async def test_press_swaps_colors(self, ctrl: SceneController) -> None:
         """key.dispatch(pressed=True) swaps fg/bg via the press handler."""
         key = ctrl.keys[0]
         await key.dispatch(pressed=True)
-        assert key.get("background") == SceneController.DEFAULT_FOREGROUND
-        assert key.get("foreground") == SceneController.DEFAULT_BACKGROUND
+        assert key.get("background") == "#dedede"
+        assert key.get("foreground") == "#1c1c1c"
 
     async def test_release_restores_colors(self, ctrl: SceneController) -> None:
         """A release after a press restores the original colors."""
         key = ctrl.keys[0]
         await key.dispatch(pressed=True)
         await key.dispatch(pressed=False)
-        assert key.get("background") == SceneController.DEFAULT_BACKGROUND
-        assert key.get("foreground") == SceneController.DEFAULT_FOREGROUND
+        assert key.get("background") == "#1c1c1c"
+        assert key.get("foreground") == "#dedede"
 
     async def test_press_release_requests_refresh(
         self, ctrl: SceneController
@@ -692,8 +700,8 @@ class TestSceneController:
         first, second = ctrl.keys[0], ctrl.keys[1]
         await first.dispatch(pressed=True)
         # First is inverted, second is untouched.
-        assert first.get("background") == SceneController.DEFAULT_FOREGROUND
-        assert second.get("background") == SceneController.DEFAULT_BACKGROUND
+        assert first.get("background") == "#dedede"
+        assert second.get("background") == "#1c1c1c"
 
 
 # ===================================================================
