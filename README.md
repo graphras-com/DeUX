@@ -9,22 +9,25 @@
 
 A high-level, asyncio-native Python library for Elgato Stream Deck devices. Define screen layouts, key actions, encoder controls, and touchscreen card UIs using a declarative, event-driven API.
 
+![Stream Deck+](images/streamdeckplus.png "DeckUI on Stream Deck+")
+
 ## Features
 
+- Multi-screen Multi-deck support via `DeckManager`
 - Auto-discovery, hot-plug detection, and auto-reconnect via `DeckManager`
 - Screen-based navigation with atomic screen switching
-- Key slots with `on_press` / `on_release` decorators
-- Encoder slots for rotary dial events (turn, press, hold)
+- Key slots with event decorators (press, release, press_release, hold)
+- Encoder slots for rotary dial events (turn, press, release, press_release, hold)
 - TouchStrip and InfoScreen support
 - `.dui` package format: declarative touchscreen card UIs using SVG layouts + YAML manifests with data bindings
 - Iconify icon integration
 - Supports Stream Deck+, Mini, Neo, and XL
 
-## Requirements
+## System requirements
 
 - Python 3.11+
-- `libhidapi` (system dependency for USB HID communication)
-- `libcairo2-dev` (for SVG rendering via CairoSVG)
+- [HIDAPI](https://github.com/libusb/hidapi) (For USB HID communication)
+- [CairoSVG](https://github.com/Kozea/CairoSVG) (For SVG rendering)
 
 ## Quick Start (macOS)
 
@@ -32,6 +35,23 @@ Install system dependencies, clone the repo, and run the example:
 
 ```bash
 brew install hidapi cairo
+
+git clone https://github.com/graphras-com/DeckUI.git
+cd DeckUI
+
+python3 -m venv .venv
+source .venv/bin/activate
+pip install .
+
+python examples/streamdeck.py
+```
+
+## Quick Start (Linux)
+
+Install system dependencies, clone the repo, and run the example:
+
+```bash
+apt-get install libhidapi libcairo2-dev
 
 git clone https://github.com/graphras-com/DeckUI.git
 cd DeckUI
@@ -99,7 +119,7 @@ from deckui.dui import load_package, DuiCard
 
 spec = load_package("./AudioCard.dui")
 card = DuiCard(spec)
-card.set("artist", "Ash Walker")
+card.set("artist", "The Beatles")
 
 @card.on("toggle_play_pause")
 async def handle():
