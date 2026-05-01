@@ -26,6 +26,23 @@ A high-level, asyncio-native Python library for Elgato Stream Deck devices. Defi
 - `libhidapi` (system dependency for USB HID communication)
 - `libcairo2-dev` (for SVG rendering via CairoSVG)
 
+## Quick Start (macOS)
+
+Install system dependencies, clone the repo, and run the example:
+
+```bash
+brew install hidapi cairo
+
+git clone https://github.com/graphras-com/DeckUI.git
+cd DeckUI
+
+python3 -m venv .venv
+source .venv/bin/activate
+pip install .
+
+python examples/streamdeck.py
+```
+
 ## Installation
 
 Install directly from GitHub:
