@@ -436,8 +436,6 @@ class TimerController:
     ADJUST_STEP_S = 30
     FLASH_COUNT = 6
     FLASH_INTERVAL_S = 0.3
-    DEFAULT_BACKGROUND = "#dedede"
-    DEFAULT_FOREGROUND = "#1c1c1c"
 
     def __init__(
         self,
@@ -451,6 +449,11 @@ class TimerController:
         pkg_dir = packages_dir or EXAMPLES_DIR
         self._card = DuiCard(load_package(pkg_dir / "TimerCard.dui"))
         self._tick_task: asyncio.Task[None] | None = None
+
+        # Read default colours from the manifest so the controller stays
+        # in sync with the .dui package.
+        self._default_background: str = self._card.get("background")
+        self._default_foreground: str = self._card.get("foreground")
 
         self._sync_card()
         self._bind_events()
@@ -569,21 +572,21 @@ class TimerController:
             swapped = not swapped
             if swapped:
                 self._card.set_many(
-                    background=self.DEFAULT_FOREGROUND,
-                    foreground=self.DEFAULT_BACKGROUND,
+                    background=self._default_foreground,
+                    foreground=self._default_background,
                 )
             else:
                 self._card.set_many(
-                    background=self.DEFAULT_BACKGROUND,
-                    foreground=self.DEFAULT_FOREGROUND,
+                    background=self._default_background,
+                    foreground=self._default_foreground,
                 )
             await self._card.request_refresh()
             await asyncio.sleep(self.FLASH_INTERVAL_S)
 
         # Ensure colors are restored to their original values.
         self._card.set_many(
-            background=self.DEFAULT_BACKGROUND,
-            foreground=self.DEFAULT_FOREGROUND,
+            background=self._default_background,
+            foreground=self._default_foreground,
         )
         await self._card.request_refresh()
 
@@ -837,10 +840,6 @@ class SceneController:
         Directory containing ``IconKey.dui``.
     """
 
-    # Defaults match the IconKey.dui manifest.
-    DEFAULT_BACKGROUND = "#1c1c1c"
-    DEFAULT_FOREGROUND = "#dedede"
-
     def __init__(
         self,
         scenes: list[dict[str, str]],
@@ -856,8 +855,6 @@ class SceneController:
             key.set_many(
                 label=scene["label"],
                 icon=scene["icon"],
-                background=self.DEFAULT_BACKGROUND,
-                foreground=self.DEFAULT_FOREGROUND,
             )
 
             # Bind handlers via a helper so each key captures its own
@@ -869,7 +866,10 @@ class SceneController:
         """Attach press/release/click handlers to *key*.
 
         Splitting this into a helper guarantees correct closure capture
-        for *key* and *label* per iteration.
+        for *key* and *label* per iteration.  The original background and
+        foreground colours are read from the key's current bindings (set
+        by the manifest defaults) so the controller stays in sync with
+        the ``.dui`` package.
 
         Parameters
         ----------
@@ -878,22 +878,18 @@ class SceneController:
         label : str
             Scene label, logged on click.
         """
+        bg = key.get("background")
+        fg = key.get("foreground")
 
         @key.on_event("press")
         async def _press() -> None:
             # Invert colours by swapping background <-> foreground.
-            key.set_many(
-                background=self.DEFAULT_FOREGROUND,
-                foreground=self.DEFAULT_BACKGROUND,
-            )
+            key.set_many(background=fg, foreground=bg)
             await key.request_refresh()
 
         @key.on_event("release")
         async def _release() -> None:
-            key.set_many(
-                background=self.DEFAULT_BACKGROUND,
-                foreground=self.DEFAULT_FOREGROUND,
-            )
+            key.set_many(background=bg, foreground=fg)
             await key.request_refresh()
 
         @key.on_event("click")

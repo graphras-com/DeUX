@@ -4,27 +4,64 @@
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org)
 [![gitleaks](https://img.shields.io/badge/protected%20by-gitleaks-blue)](https://github.com/gitleaks/gitleaks)
 [![Dependabot](https://img.shields.io/badge/dependabot-enabled-brightgreen?logo=dependabot)](https://github.com/graphras-com/DeckUI/network/updates)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/graphras-com/DeckUI/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/docs-online-blue)](https://graphras-com.github.io/DeckUI/)
 
 A high-level, asyncio-native Python library for Elgato Stream Deck devices. Define screen layouts, key actions, encoder controls, and touchscreen card UIs using a declarative, event-driven API.
 
+![Stream Deck+](images/streamdeckplus.png "DeckUI on Stream Deck+")
+
 ## Features
 
+- Multi-screen Multi-deck support via `DeckManager`
 - Auto-discovery, hot-plug detection, and auto-reconnect via `DeckManager`
 - Screen-based navigation with atomic screen switching
-- Key slots with `on_press` / `on_release` decorators
-- Encoder slots for rotary dial events (turn, press, hold)
+- Key slots with event decorators (press, release, press_release, hold)
+- Encoder slots for rotary dial events (turn, press, release, press_release, hold)
 - TouchStrip and InfoScreen support
 - `.dui` package format: declarative touchscreen card UIs using SVG layouts + YAML manifests with data bindings
 - Iconify icon integration
 - Supports Stream Deck+, Mini, Neo, and XL
 
-## Requirements
+## System requirements
 
 - Python 3.11+
-- `libhidapi` (system dependency for USB HID communication)
-- `libcairo2-dev` (for SVG rendering via CairoSVG)
+- [HIDAPI](https://github.com/libusb/hidapi) (For USB HID communication)
+- [CairoSVG](https://github.com/Kozea/CairoSVG) (For SVG rendering)
+
+## Quick Start (macOS)
+
+Install system dependencies, clone the repo, and run the example:
+
+```bash
+brew install hidapi cairo
+
+git clone https://github.com/graphras-com/DeckUI.git
+cd DeckUI
+
+python3 -m venv .venv
+source .venv/bin/activate
+pip install .
+
+python examples/streamdeck.py
+```
+
+## Quick Start (Linux)
+
+Install system dependencies, clone the repo, and run the example:
+
+```bash
+apt-get install libhidapi libcairo2-dev
+
+git clone https://github.com/graphras-com/DeckUI.git
+cd DeckUI
+
+python3 -m venv .venv
+source .venv/bin/activate
+pip install .
+
+python examples/streamdeck.py
+```
 
 ## Installation
 
@@ -82,7 +119,7 @@ from deckui.dui import load_package, DuiCard
 
 spec = load_package("./AudioCard.dui")
 card = DuiCard(spec)
-card.set("artist", "Ash Walker")
+card.set("artist", "The Beatles")
 
 @card.on("toggle_play_pause")
 async def handle():
@@ -141,8 +178,8 @@ Dependabot is enabled for weekly updates of pip and GitHub Actions dependencies.
 
 ## Contributing
 
-Contributions are welcome. Please open an issue or pull request. This project follows the [Contributor Covenant v2.0](CODE_OF_CONDUCT.md) code of conduct.
+Contributions are welcome. Please open an issue or pull request. This project follows the [Contributor Covenant v2.0](https://github.com/graphras-com/DeckUI/blob/main/CODE_OF_CONDUCT.md) code of conduct.
 
 ## License
 
-Apache-2.0 -- see [LICENSE](LICENSE).
+Apache-2.0 -- see [LICENSE](https://github.com/graphras-com/DeckUI/blob/main/LICENSE).
