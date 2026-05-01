@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org)
 [![gitleaks](https://img.shields.io/badge/protected%20by-gitleaks-blue)](https://github.com/gitleaks/gitleaks)
 [![Dependabot](https://img.shields.io/badge/dependabot-enabled-brightgreen?logo=dependabot)](https://github.com/graphras-com/DeckUI/network/updates)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/graphras-com/DeckUI/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/docs-online-blue)](https://graphras-com.github.io/DeckUI/)
 
 A high-level, asyncio-native Python library for Elgato Stream Deck devices. Define screen layouts, key actions, encoder controls, and touchscreen card UIs using a declarative, event-driven API.
@@ -178,8 +178,8 @@ Dependabot is enabled for weekly updates of pip and GitHub Actions dependencies.
 
 ## Contributing
 
-Contributions are welcome. Please open an issue or pull request. This project follows the [Contributor Covenant v2.0](CODE_OF_CONDUCT.md) code of conduct.
+Contributions are welcome. Please open an issue or pull request. This project follows the [Contributor Covenant v2.0](https://github.com/graphras-com/DeckUI/blob/main/CODE_OF_CONDUCT.md) code of conduct.
 
 ## License
 
-Apache-2.0 -- see [LICENSE](LICENSE).
+Apache-2.0 -- see [LICENSE](https://github.com/graphras-com/DeckUI/blob/main/LICENSE).
