@@ -411,44 +411,100 @@ class LightsController:
 class TimerController:
     """Live countdown timer -- a real ticking timer driven by an asyncio task.
 
-    Loads ``TimerCard.dui`` and binds:
+    Loads ``TimerCard.dui`` and reads the initial duration from the
+    package's ``timer`` binding default value (e.g. ``"00:30:00"``),
+    so the ``.dui`` manifest is the single source of truth for the
+    starting time.
 
-    * encoder click  -> start/pause
-    * encoder hold   -> reset to *initial_seconds*
-    * encoder turn   -> add/remove 30 s
+    Encoder bindings
+    ~~~~~~~~~~~~~~~~
+    * **encoder click** -- start / pause the countdown.
+    * **encoder hold** -- reset to the current default duration.
+    * **encoder turn** -- coarse adjustment: +/- 10 min per step
+      (``increase_duration`` / ``decrease_duration``).
+    * **encoder hold+turn** -- fine adjustment: +/- 30 s per step
+      (``increase_duration_alt`` / ``decrease_duration_alt``).
 
-    While running, an internal asyncio task decrements ``remaining`` every
-    second and calls :meth:`DuiCard.request_refresh` so the display
-    updates live without any polling on the caller's side.
+    Default-duration semantics
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Every time the timer is **started**, the value of ``remaining`` at
+    that moment becomes the new default duration.  This means:
+
+    * Adjust the time with the encoder, then press to start -- the
+      adjusted value is now the default.
+    * **Reset** (encoder hold) always returns to the most recent default.
 
     Use :meth:`start_runtime` once the deck is connected and
     :meth:`stop_runtime` to clean up on disconnect.
 
     Parameters
     ----------
-    initial_seconds : int, default=300
-        Initial duration in seconds.
     packages_dir : Path | None
         Directory containing ``TimerCard.dui``.
     """
 
     TICK_INTERVAL_S = 1.0
-    ADJUST_STEP_S = 30
+    COARSE_STEP_S = 600
+    """Seconds added/removed per encoder-turn step (no hold) -- 10 minutes."""
+    FINE_STEP_S = 30
+    """Seconds added/removed per encoder-hold-turn step -- 30 seconds."""
     FLASH_COUNT = 6
     FLASH_INTERVAL_S = 0.3
 
+    # -- helpers --------------------------------------------------------
+
+    @staticmethod
+    def _parse_hhmmss(text: str) -> int:
+        """Parse an ``HH:MM:SS`` string into total seconds.
+
+        Parameters
+        ----------
+        text : str
+            Time string in ``HH:MM:SS`` format.
+
+        Returns
+        -------
+        int
+            Total number of seconds.
+
+        Raises
+        ------
+        ValueError
+            If *text* does not match the expected format.
+        """
+        parts = text.strip().split(":")
+        if len(parts) != 3:
+            raise ValueError(f"Expected HH:MM:SS, got {text!r}")
+        hours, minutes, seconds = (int(p) for p in parts)
+        return hours * 3600 + minutes * 60 + seconds
+
+    # -- construction ---------------------------------------------------
+
     def __init__(
         self,
-        initial_seconds: int = 300,
         packages_dir: Path | None = None,
     ) -> None:
-        self.duration: int = initial_seconds
-        self.remaining: int = initial_seconds
-        self.is_running: bool = False
-
         pkg_dir = packages_dir or EXAMPLES_DIR
         self._card = DuiCard(load_package(pkg_dir / "TimerCard.dui"))
         self._tick_task: asyncio.Task[None] | None = None
+
+        # Read the initial duration from the .dui manifest's timer
+        # binding default (e.g. "00:30:00") so the package is the
+        # single source of truth.
+        default_text: str = self._card.get("timer")
+        initial_seconds = self._parse_hhmmss(default_text)
+        log.info(
+            "TimerCard default: %s (%d s)", default_text, initial_seconds
+        )
+
+        # ``_default_duration`` is the value that :meth:`reset` restores.
+        # It is updated every time the user **starts** the timer, so
+        # adjustments made before pressing start become the new default.
+        self._default_duration: int = initial_seconds
+
+        self.duration: int = initial_seconds
+        self.remaining: int = initial_seconds
+        self.is_running: bool = False
 
         # Read default colours from the manifest so the controller stays
         # in sync with the .dui package.
@@ -497,24 +553,46 @@ class TimerController:
                 await task
 
     async def toggle(self) -> None:
-        """Start or pause the countdown."""
-        # When the timer was paused at 0 (or has rolled to 0 since pause)
-        # restart from the configured duration so the user gets a fresh run.
-        if not self.is_running and self.remaining <= 0:
-            self.remaining = self.duration
+        """Start or pause the countdown.
+
+        When starting, the current ``remaining`` value is captured as the
+        new default duration.  This means the user can adjust the time
+        with the encoder, press start, and subsequent resets will return
+        to that adjusted value rather than the original package default.
+
+        If the timer was paused at zero, it restarts from the current
+        default so the user gets a fresh run without needing to reset.
+        """
+        if not self.is_running:
+            # About to start -- if we ran out, reload the default first.
+            if self.remaining <= 0:
+                self.remaining = self._default_duration
+
+            # Snapshot whatever the user dialled in as the new default.
+            self._default_duration = self.remaining
+            self.duration = self.remaining
+            log.info(
+                "Timer started -- %s (new default: %d s)",
+                self.format_time(),
+                self._default_duration,
+            )
+        else:
+            log.info("Timer paused -- %s", self.format_time())
+
         self.is_running = not self.is_running
-        log.info(
-            "Timer %s -- %s",
-            "started" if self.is_running else "paused",
-            self.format_time(),
-        )
         self._sync_card()
         await self._card.request_refresh()
 
     async def reset(self) -> None:
-        """Stop the countdown and reload the configured duration."""
+        """Stop the countdown and reload the current default duration.
+
+        The default duration is set each time the timer is started (see
+        :meth:`toggle`), so reset always returns to the value the user
+        last started the timer with.
+        """
         self.is_running = False
-        self.remaining = self.duration
+        self.duration = self._default_duration
+        self.remaining = self._default_duration
         log.info("Timer reset -- %s", self.format_time())
         self._sync_card()
         await self._card.request_refresh()
@@ -541,7 +619,19 @@ class TimerController:
         self._card.set("timer", self.format_time())
 
     def _bind_events(self) -> None:
-        """Register card event handlers."""
+        """Register card event handlers.
+
+        Events wired here correspond to the ``events`` section in the
+        ``TimerCard.dui`` manifest:
+
+        * ``toggle`` (encoder click) -- start / pause.
+        * ``reset`` (encoder hold) -- reset to default.
+        * ``increase_duration`` / ``decrease_duration`` (encoder turn)
+          -- coarse adjustment, :attr:`COARSE_STEP_S` per step.
+        * ``increase_duration_alt`` / ``decrease_duration_alt``
+          (encoder hold+turn) -- fine adjustment, :attr:`FINE_STEP_S`
+          per step.
+        """
 
         @self._card.on("toggle")
         async def _toggle() -> None:
@@ -551,13 +641,25 @@ class TimerController:
         async def _reset() -> None:
             await self.reset()
 
+        # -- coarse: encoder turn (no hold) -- +/- 10 min per step ---
+
         @self._card.on("increase_duration")
         async def _increase(steps: int) -> None:
-            await self.adjust_duration(steps * self.ADJUST_STEP_S)
+            await self.adjust_duration(steps * self.COARSE_STEP_S)
 
         @self._card.on("decrease_duration")
         async def _decrease(steps: int) -> None:
-            await self.adjust_duration(-abs(steps) * self.ADJUST_STEP_S)
+            await self.adjust_duration(-abs(steps) * self.COARSE_STEP_S)
+
+        # -- fine: encoder hold+turn -- +/- 30 s per step ------------
+
+        @self._card.on("increase_duration_alt")
+        async def _increase_alt(steps: int) -> None:
+            await self.adjust_duration(steps * self.FINE_STEP_S)
+
+        @self._card.on("decrease_duration_alt")
+        async def _decrease_alt(steps: int) -> None:
+            await self.adjust_duration(-abs(steps) * self.FINE_STEP_S)
 
     async def _flash_notification(self) -> None:
         """Flash foreground/background colors to signal timer completion.
@@ -1013,7 +1115,7 @@ class StreamDeckApp:
             brightness=80, kelvin=4000, packages_dir=self._packages_dir
         )
         self.timer = TimerController(
-            initial_seconds=300, packages_dir=self._packages_dir
+            packages_dir=self._packages_dir
         )
         self.dashboard = DashboardController(
             deck_brightness=60, packages_dir=self._packages_dir

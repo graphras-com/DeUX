@@ -233,7 +233,7 @@ def _timer_spec() -> PackageSpec:
         version=1,
         svg_source=_TIMER_SVG,
         bindings={
-            "timer": TextBinding(node="timer", default="00:00:00"),
+            "timer": TextBinding(node="timer", default="00:30:00"),
             "background": ColorBinding(
                 node="background", attribute="color", default="#1c1c1c"
             ),
@@ -253,6 +253,18 @@ def _timer_spec() -> PackageSpec:
             EventMapping(
                 name="decrease_duration",
                 source="encoder_turn",
+                direction="left",
+                accumulate=True,
+            ),
+            EventMapping(
+                name="increase_duration_alt",
+                source="encoder_hold_turn",
+                direction="right",
+                accumulate=True,
+            ),
+            EventMapping(
+                name="decrease_duration_alt",
+                source="encoder_hold_turn",
                 direction="left",
                 accumulate=True,
             ),
@@ -519,13 +531,13 @@ class TestTimerController:
         monkeypatch.setattr(
             "streamdeck.load_package", lambda _path: _timer_spec()
         )
-        return TimerController(initial_seconds=300)
+        return TimerController()
 
     def test_initial_format(self, ctrl: TimerController) -> None:
-        assert ctrl.format_time() == "00:05:00"
+        assert ctrl.format_time() == "00:30:00"
 
     def test_card_initial_binding(self, ctrl: TimerController) -> None:
-        assert ctrl.card.get("timer") == "00:05:00"
+        assert ctrl.card.get("timer") == "00:30:00"
 
     async def test_toggle_starts_and_pauses(self, ctrl: TimerController) -> None:
         await ctrl.toggle()
@@ -537,13 +549,13 @@ class TestTimerController:
         await ctrl.toggle()
         await ctrl.reset()
         assert ctrl.is_running is False
-        assert ctrl.remaining == 300
+        assert ctrl.remaining == 1800
 
     async def test_adjust_duration(self, ctrl: TimerController) -> None:
         await ctrl.adjust_duration(60)
-        assert ctrl.duration == 360
-        assert ctrl.remaining == 360
-        assert ctrl.card.get("timer") == "00:06:00"
+        assert ctrl.duration == 1860
+        assert ctrl.remaining == 1860
+        assert ctrl.card.get("timer") == "00:31:00"
 
     async def test_adjust_duration_clamps_to_zero(
         self, monkeypatch: pytest.MonkeyPatch
@@ -551,10 +563,28 @@ class TestTimerController:
         monkeypatch.setattr(
             "streamdeck.load_package", lambda _path: _timer_spec()
         )
-        ctrl = TimerController(initial_seconds=10)
-        await ctrl.adjust_duration(-100)
+        ctrl = TimerController()
+        await ctrl.adjust_duration(-10000)
         assert ctrl.duration == 0
         assert ctrl.card.get("timer") == "00:00:00"
+
+    async def test_toggle_snapshots_default(
+        self, ctrl: TimerController
+    ) -> None:
+        """Starting the timer captures remaining as new default."""
+        await ctrl.adjust_duration(60)  # 1860 s
+        await ctrl.toggle()  # start -> snapshots 1860 as default
+        await ctrl.toggle()  # pause
+        await ctrl.reset()
+        assert ctrl.remaining == 1860
+
+    async def test_coarse_step(self, ctrl: TimerController) -> None:
+        """increase_duration / decrease_duration use COARSE_STEP_S (600 s / 10 min)."""
+        assert ctrl.COARSE_STEP_S == 600
+
+    async def test_fine_step(self, ctrl: TimerController) -> None:
+        """increase_duration_alt / decrease_duration_alt use FINE_STEP_S (30 s)."""
+        assert ctrl.FINE_STEP_S == 30
 
 
 # ===================================================================

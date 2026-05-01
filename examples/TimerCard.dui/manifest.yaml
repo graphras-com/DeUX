@@ -11,7 +11,7 @@ bindings:
   timer:
     type: text
     node: timer
-    default: "00:00:00"
+    default: "00:30:00"
     max_width: 190
     overflow: ellipsis
 
@@ -34,11 +34,23 @@ events:
     accumulate: true
     accumulate_delay: 0.01
 
+  - name: decrease_duration_alt
+    source: encoder_press_turn
+    direction: left
+    accumulate: true
+    accumulate_delay: 0.01
+
   - name: increase_duration
     source: encoder_turn
     direction: right
     accumulate: true
     accumulate_delay: 0.01
+
+  - name: increase_duration_alt
+    source: encoder_press_turn
+    direction: right
+    accumulate: true
+    accumulate_delay: 0.01   
 
   - name: toggle
     source: encoder_press_release
