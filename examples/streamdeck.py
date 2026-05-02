@@ -248,11 +248,22 @@ class LightsController:
     * encoder turn        -> brightness up/down (5 % per step)
     * encoder press+turn  -> kelvin up/down (100 K per step)
 
+    The display ranges (:attr:`BRIGHTNESS_MIN`/``MAX``,
+    :attr:`KELVIN_MIN`/``MAX``) are owned by the controller, not the
+    backend service.  A real backend may clamp differently — keeping the
+    ranges here means the UI is stable when you swap the mock for, say,
+    Home Assistant.
+
     Parameters
     ----------
     packages_dir : Path | None
         Directory containing ``LightCard.dui``.
     """
+
+    BRIGHTNESS_MIN = 0
+    BRIGHTNESS_MAX = 100
+    KELVIN_MIN = 2000
+    KELVIN_MAX = 6500
 
     def __init__(
         self,
@@ -266,12 +277,12 @@ class LightsController:
         bright_norm: float = self._card.get("brightness")
         kelvin_norm: float = self._card.get("kelvin")
         brightness = int(
-            MockLightsService.BRIGHTNESS_MIN
-            + bright_norm * (MockLightsService.BRIGHTNESS_MAX - MockLightsService.BRIGHTNESS_MIN)
+            self.BRIGHTNESS_MIN
+            + bright_norm * (self.BRIGHTNESS_MAX - self.BRIGHTNESS_MIN)
         )
         kelvin = int(
-            MockLightsService.KELVIN_MIN
-            + kelvin_norm * (MockLightsService.KELVIN_MAX - MockLightsService.KELVIN_MIN)
+            self.KELVIN_MIN
+            + kelvin_norm * (self.KELVIN_MAX - self.KELVIN_MIN)
         )
         self._svc = MockLightsService(
             is_on=self._card.get("lights"),
@@ -310,15 +321,15 @@ class LightsController:
         self._card.set_range(
             "brightness",
             self._svc.brightness,
-            min_val=MockLightsService.BRIGHTNESS_MIN,
-            max_val=MockLightsService.BRIGHTNESS_MAX,
+            min_val=self.BRIGHTNESS_MIN,
+            max_val=self.BRIGHTNESS_MAX,
         )
         self._card.set("kelvin_value_text", f"{self._svc.kelvin}K")
         self._card.set_range(
             "kelvin",
             self._svc.kelvin,
-            min_val=MockLightsService.KELVIN_MIN,
-            max_val=MockLightsService.KELVIN_MAX,
+            min_val=self.KELVIN_MIN,
+            max_val=self.KELVIN_MAX,
         )
 
     def _subscribe_events(self) -> None:
@@ -335,8 +346,8 @@ class LightsController:
             self._card.set_range(
                 "brightness",
                 brightness,
-                min_val=MockLightsService.BRIGHTNESS_MIN,
-                max_val=MockLightsService.BRIGHTNESS_MAX,
+                min_val=self.BRIGHTNESS_MIN,
+                max_val=self.BRIGHTNESS_MAX,
             )
             await self._card.request_refresh()
 
@@ -346,8 +357,8 @@ class LightsController:
             self._card.set_range(
                 "kelvin",
                 kelvin,
-                min_val=MockLightsService.KELVIN_MIN,
-                max_val=MockLightsService.KELVIN_MAX,
+                min_val=self.KELVIN_MIN,
+                max_val=self.KELVIN_MAX,
             )
             await self._card.request_refresh()
 
@@ -682,6 +693,18 @@ class DashboardController:
     def bind_deck(self, deck: Any) -> None:
         """Attach the deck handle so brightness changes reach the hardware."""
         self._deck = deck
+
+    async def apply_brightness_to_deck(self) -> None:
+        """Push the current ``deck_brightness`` value to the bound deck.
+
+        Used on reconnect: ``Deck.start`` resets the hardware brightness
+        to the manager's startup default, so the application replays the
+        last user-selected value here.  Idempotent and a no-op if no deck
+        is currently bound.
+        """
+        if self._deck is None:
+            return
+        await self._deck.set_brightness(self._deck_brightness)
 
     async def start_runtime(self) -> None:
         """Start the background clock-tick task (idempotent)."""
@@ -1054,7 +1077,25 @@ class StreamDeckApp:
         self.nav.attach(self.dashboard.card)
 
     async def on_connect(self, deck: Any) -> None:
-        """Configure screens for *deck* and start the demo.
+        """Configure screens for *deck* and start (or resume) the demo.
+
+        Called once on first connect and again on every reconnect when
+        :class:`DeckManager` has ``auto_reconnect=True``.  Two pieces of
+        UI state must be replayed here because they are *device-side* and
+        therefore lost when the device disappears:
+
+        * **Active screen.**  ``Deck.set_screen`` does not survive a
+          disconnect/reconnect cycle, so we resume on
+          :attr:`ScreenCycler.current` (which tracks the user's last
+          choice on the app side) instead of jumping back to ``"main"``.
+        * **Hardware brightness.**  ``Deck.start`` resets the device to
+          the manager's startup brightness — we push the controller's
+          current value via :meth:`DashboardController.apply_brightness_to_deck`.
+
+        Card binding state, audio/lights/timer service state, and the
+        navigation cycler all live on ``self`` (the app), which is
+        constructed *outside* the manager scope, so they persist across
+        reconnects without any extra work.
 
         Parameters
         ----------
@@ -1080,16 +1121,24 @@ class StreamDeckApp:
         self._build_main_screen(deck)
         self._build_settings_screen(deck)
 
-        # Activate the main screen.  This also wires every key/card's
-        # request_refresh() to deck.refresh() under the hood.
-        await deck.set_screen("main")
+        # Resume on the user's last screen (defaults to the first screen
+        # in the cycler -- "main" -- on a cold start).  Also wires every
+        # key/card's request_refresh() to deck.refresh() under the hood.
+        await deck.set_screen(self.nav.current)
+
+        # Replay hardware brightness so the user's last value survives a
+        # reconnect (Deck.start resets to the manager's startup default).
+        await self.dashboard.apply_brightness_to_deck()
 
         # Start background tasks AFTER the screen is active so their
         # request_refresh() calls go to the right place.
         await self.timer.start_runtime()
         await self.dashboard.start_runtime()
 
-        log.info("Deck ready -- try the encoders, keys, and Settings button!")
+        log.info(
+            "Deck ready -- try the encoders, keys, "
+            "and press the dashboard encoder to switch screens!"
+        )
 
     async def on_disconnect(self, info: DeviceInfo) -> None:
         """Stop background tasks when the deck goes away."""
@@ -1128,13 +1177,22 @@ class StreamDeckApp:
         self.scenes.install(screen, list(range(num_favs, num_favs + num_scenes)))
 
     def _build_settings_screen(self, deck: Any) -> None:
-        """Layout: focused settings view -- dashboard + lights cards only.
+        """Layout: a placeholder screen with room for the user to extend.
 
-        Demonstrates that the same controllers can appear on multiple
-        screens -- DeckUI does not care, it simply renders whatever's
-        installed when the screen is active. The dashboard card is
-        reused here so the user can keep cycling screens with its
-        encoder press-release.
+        Demonstrates the core multi-screen story without committing to a
+        specific second-screen purpose:
+
+        * **Dashboard pinned on slot 3** -- present on every screen, so
+          the encoder used to cycle screens is always the rightmost one.
+        * **All other strip slots blank** -- ready for the reader to
+          drop in their own cards.
+        * **Fresh ``DuiKey`` instances per slot** -- every key slot gets
+          its own ``IconKey`` instance with the manifest's default icon
+          and the label ``"Unassigned"``.  We deliberately do not reuse
+          ``DuiKey`` instances from another screen (e.g. the scene keys
+          on ``main``) because :meth:`Screen.set_key` mutates the key's
+          ``_index`` attribute -- reusing an instance across two screens
+          at different slots would corrupt the original screen's render.
 
         Parameters
         ----------
@@ -1146,18 +1204,15 @@ class StreamDeckApp:
 
         if screen.touch_strip is not None:
             screen.touch_strip.background_color = "#1c1c1c"
-            pkg_dir = self._packages_dir or EXAMPLES_DIR
-            iconkey_spec = load_package(pkg_dir / "IconKey.dui")
-            for key_index in range(caps.key_count):
-                key = DuiKey(iconkey_spec)
-                key.set("label","Unassigned")
-                screen.set_key(key_index, key)
-
-            #caps.key_count
-            # Keep the dashboard in the same slot on every screen so the
-            # encoder used to cycle screens is always the rightmost one.
-            #screen.set_card(0, self.lights.card)
+            # Pin the dashboard so the cycling encoder is always available.
             screen.set_card(3, self.dashboard.card)
+
+        pkg_dir = self._packages_dir or EXAMPLES_DIR
+        iconkey_spec = load_package(pkg_dir / "IconKey.dui")
+        for key_index in range(caps.key_count):
+            key = DuiKey(iconkey_spec)
+            key.set("label", "Unassigned")
+            screen.set_key(key_index, key)
 
 
 # ===========================================================================
