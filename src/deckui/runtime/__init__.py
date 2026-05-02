@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .async_event import AsyncEvent
 from .capabilities import DeviceCapabilities
 from .deck import Deck, DeckError
 from .device_info import DeviceInfo
@@ -19,6 +20,7 @@ from .manager import DeckManager
 from .transport import AsyncTransport
 
 __all__ = [
+    "AsyncEvent",
     "AsyncHandler",
     "AsyncTransport",
     "Deck",

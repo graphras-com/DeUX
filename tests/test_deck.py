@@ -96,6 +96,46 @@ class TestDeckBrightness:
         await deck.set_brightness(60)
         assert deck.brightness == 60
 
+    async def test_set_brightness_emits_event(self, deck):
+        seen: list[int] = []
+
+        @deck.on_brightness_changed
+        async def _on(value: int) -> None:
+            seen.append(value)
+
+        await deck.set_brightness(42)
+        assert seen == [42]
+
+    async def test_set_brightness_idempotent_no_event(self, deck):
+        """Setting the same value emits no event and skips the hardware push."""
+        seen: list[int] = []
+
+        @deck.on_brightness_changed
+        async def _on(value: int) -> None:  # pragma: no cover - never invoked
+            seen.append(value)
+
+        # initial brightness is 80; setting to 80 should be a no-op.
+        await deck.set_brightness(80)
+        assert seen == []
+
+    async def test_set_brightness_skips_hw_when_unchanged(
+        self, deck, mock_streamdeck_device
+    ):
+        """A no-op call must not touch the hardware."""
+        deck._device = mock_streamdeck_device
+        await deck.set_brightness(80)  # equal to default
+        mock_streamdeck_device.set_brightness.assert_not_called()
+
+    async def test_set_brightness_emits_clamped_value(self, deck):
+        seen: list[int] = []
+
+        @deck.on_brightness_changed
+        async def _on(value: int) -> None:
+            seen.append(value)
+
+        await deck.set_brightness(999)
+        assert seen == [100]
+
 
 class TestDeckSetPage:
     async def test_sets_active_screen(self, deck):
@@ -119,6 +159,60 @@ class TestDeckSetPage:
         await deck.set_screen("main")
         deck._render_all_keys.assert_awaited_once()
         deck._render_touchscreen.assert_awaited_once()
+
+    async def test_emits_event_after_render(self, deck):
+        """on_screen_changed fires after the new screen has rendered."""
+        deck.screen("main")
+        deck._render_all_keys = AsyncMock()
+        deck._render_touchscreen = AsyncMock()
+
+        order: list[str] = []
+        deck._render_all_keys.side_effect = lambda: order.append("rendered")
+
+        @deck.on_screen_changed
+        async def _on(name: str) -> None:
+            order.append(f"event:{name}")
+
+        await deck.set_screen("main")
+        assert order == ["rendered", "event:main"]
+
+    async def test_idempotent_does_not_emit_or_re_render(self, deck):
+        """Re-setting the same screen emits nothing and re-renders nothing."""
+        deck.screen("main")
+        deck._render_all_keys = AsyncMock()
+        deck._render_touchscreen = AsyncMock()
+
+        await deck.set_screen("main")  # initial activation
+        seen: list[str] = []
+
+        @deck.on_screen_changed
+        async def _on(name: str) -> None:  # pragma: no cover - never invoked
+            seen.append(name)
+
+        deck._render_all_keys.reset_mock()
+        deck._render_touchscreen.reset_mock()
+
+        await deck.set_screen("main")
+        assert seen == []
+        deck._render_all_keys.assert_not_awaited()
+        deck._render_touchscreen.assert_not_awaited()
+
+    async def test_emits_event_on_screen_switch(self, deck):
+        deck.screen("main")
+        deck.screen("settings")
+        deck._render_all_keys = AsyncMock()
+        deck._render_touchscreen = AsyncMock()
+
+        seen: list[str] = []
+
+        @deck.on_screen_changed
+        async def _on(name: str) -> None:
+            seen.append(name)
+
+        await deck.set_screen("main")
+        await deck.set_screen("settings")
+        await deck.set_screen("main")
+        assert seen == ["main", "settings", "main"]
 
 
 class TestDeckActivePage:
