@@ -283,9 +283,11 @@ events:
 | `encoder_press` | Encoder pressed down |
 | `encoder_release` | Encoder released (always) |
 | `encoder_press_release` | Released within `max_duration_ms` (suppressed if hold fired) |
-| `encoder_turn` | Encoder rotated; filter with `direction` |
-| `encoder_press_turn` | Rotated while pressed; filter with `direction` |
+| `encoder_turn` | Encoder rotated **while not pressed**; filter with `direction` |
+| `encoder_press_turn` | Rotated **while pressed**; filter with `direction` |
 | `encoder_hold` | Held for `hold_ms` |
+
+`encoder_turn` and `encoder_press_turn` are mutually exclusive at runtime. While the encoder is pressed, only `encoder_press_turn` mappings are eligible — turning a pressed encoder will never fire `encoder_turn`, even if no `encoder_press_turn` is declared (or its `direction` filter doesn't match). Any turn while pressed cancels a pending `encoder_hold`.
 
 **Touch sources** (for regions):
 

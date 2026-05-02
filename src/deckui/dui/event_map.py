@@ -28,8 +28,14 @@ class EventMap:
       the handler after ``hold_ms`` while the key/encoder is still held.
       Suppresses any ``press_release`` or ``release`` event for that
       press–release cycle.
+    - ``encoder_turn``: fires turn events only while the encoder is
+      **not** pressed.  Turning while pressed never falls through to
+      this mapping.
     - ``encoder_press_turn``: fires turn events only while the encoder
-      is held down.
+      is held down.  When declared with a direction filter, mismatching
+      turns while pressed are silent — there is no fallback to
+      ``encoder_turn``.  Any turn while pressed cancels a pending
+      ``encoder_hold`` regardless of whether a handler fires.
     - Direction filtering: ``encoder_turn`` with ``direction: left``
       only fires for counter-clockwise turns.
 
@@ -167,6 +173,7 @@ class EventMap:
                     h = self._handlers.get(mapping.name)
                     if h is not None:
                         return h
+            return None
 
         for mapping in self._by_source.get("encoder_turn", []):
             if self._direction_matches(mapping, direction):
