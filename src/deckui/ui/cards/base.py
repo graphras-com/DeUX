@@ -43,8 +43,7 @@ class Card(ABC):
             print("Card tapped!")
     """
 
-    def __init__(self, index: int) -> None:
-        self._index = index
+    def __init__(self) -> None:
         self._tap_handler: AsyncHandler | None = None
         self._long_press_handler: AsyncHandler | None = None
         self._drag_handler: AsyncHandler | None = None
@@ -55,18 +54,6 @@ class Card(ABC):
         self._rendered: Image.Image | None = None
         self._dirty = True
         self._request_refresh: AsyncHandler | None = None
-
-    @property
-    def index(self) -> int:
-        """The index this card was constructed with.
-
-        Informational only — this is **not** updated when the card is
-        installed on a touch strip via :meth:`TouchStrip.set_card`.
-        A single ``Card`` may live on multiple screens at different
-        slot indices; the touch strip's slot list is the authoritative
-        source of truth.
-        """
-        return self._index
 
     def on_tap(self, handler: AsyncHandler) -> AsyncHandler:
         """Decorator to register a handler for short tap events in this zone.

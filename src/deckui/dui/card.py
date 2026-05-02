@@ -54,7 +54,7 @@ class DuiCard(Card):
     """
 
     def __init__(self, spec: PackageSpec) -> None:
-        super().__init__(-1)
+        super().__init__()
         self._spec = spec
         self._renderer = SvgRenderer(spec)
         self._events = EventMap(spec.events, spec.regions)

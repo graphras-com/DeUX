@@ -9,18 +9,11 @@ from deckui.ui.controls.encoder_slot import EncoderSlot
 
 
 class TestEncoderSlotInit:
-    def test_index(self, encoder: EncoderSlot):
-        assert encoder.index == 0
-
     def test_no_handlers_by_default(self, encoder: EncoderSlot):
         assert encoder._turn_handler is None
         assert encoder._press_handler is None
         assert encoder._release_handler is None
         assert encoder._press_turn_handler is None
-
-    def test_custom_index(self):
-        e = EncoderSlot(3)
-        assert e.index == 3
 
     def test_no_accumulator_by_default(self, encoder: EncoderSlot):
         assert encoder._accumulator is None

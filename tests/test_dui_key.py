@@ -47,18 +47,16 @@ class TestDuiKeyIsKeySlot:
         key = DuiKey(spec)
         assert isinstance(key, KeySlot)
 
-    def test_set_key_does_not_mutate_key_index(self):
-        """set_key installs the key on the screen without mutating it.
+    def test_set_key_installs_at_slot(self):
+        """set_key stores the key in the screen's slot map.
 
-        The key's ``index`` reflects the constructor value only -- the
-        screen's slot map is the authoritative source of truth.
+        The key itself carries no slot identity -- the screen's slot
+        map is the authoritative source of truth.
         """
         spec = _make_key_spec()
         key = DuiKey(spec)
-        original_index = key.index
         screen = Screen("test")
         screen.set_key(3, key)
-        assert key.index == original_index
         assert screen.keys[3] is key
 
     def test_has_spec(self):

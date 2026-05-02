@@ -21,50 +21,42 @@ class _ConcreteWidget(Card):
 class TestWidgetAbstractBase:
     def test_cannot_instantiate_directly(self):
         with pytest.raises(TypeError):
-            Card(0)
-
-    def test_index(self):
-        w = _ConcreteWidget(0)
-        assert w.index == 0
-
-    def test_custom_index(self):
-        w = _ConcreteWidget(3)
-        assert w.index == 3
+            Card()
 
     def test_initially_dirty(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         assert w.is_dirty is True
 
     def test_mark_clean(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         w.mark_clean()
         assert w.is_dirty is False
 
     def test_mark_dirty(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         w.mark_clean()
         w.mark_dirty()
         assert w.is_dirty is True
 
     def test_rendered_initially_none(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         assert w.rendered is None
 
     def test_set_rendered(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT))
         w.set_rendered(img)
         assert w.rendered is img
         assert w.is_dirty is False
 
     def test_set_rendered_none(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         w.set_rendered(None)
         assert w.rendered is None
         assert w.is_dirty is False
 
     def test_on_tap(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
 
         @w.on_tap
         async def handler():
@@ -73,7 +65,7 @@ class TestWidgetAbstractBase:
         assert w._tap_handler is handler
 
     def test_on_long_press(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
 
         @w.on_long_press
         async def handler():
@@ -82,7 +74,7 @@ class TestWidgetAbstractBase:
         assert w._long_press_handler is handler
 
     def test_on_drag(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
 
         @w.on_drag
         async def handler(x, y, x_out, y_out):
@@ -91,7 +83,7 @@ class TestWidgetAbstractBase:
         assert w._drag_handler is handler
 
     def test_on_tap_returns_handler(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
 
         async def handler():
             pass
@@ -100,7 +92,7 @@ class TestWidgetAbstractBase:
         assert result is handler
 
     def test_on_long_press_returns_handler(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
 
         async def handler():
             pass
@@ -109,7 +101,7 @@ class TestWidgetAbstractBase:
         assert result is handler
 
     def test_on_drag_returns_handler(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
 
         async def handler(x, y, x_out, y_out):
             pass
@@ -118,30 +110,30 @@ class TestWidgetAbstractBase:
         assert result is handler
 
     def test_handle_encoder_turn_noop(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         w.handle_encoder_turn(1)
 
     def test_handle_encoder_press_noop(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         w.handle_encoder_press()
 
     def test_handle_encoder_release_noop(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         w.handle_encoder_release()
 
     def test_check_selection_timeout_returns_false(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         assert w.check_selection_timeout() is False
 
     def test_render_returns_image(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         img = w.render()
         assert img.size == (PANEL_WIDTH, PANEL_HEIGHT)
 
 
 class TestWidgetEncoderDecorators:
     def test_on_encoder_turn(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
 
         @w.on_encoder_turn
         async def handler(direction: int):
@@ -150,7 +142,7 @@ class TestWidgetEncoderDecorators:
         assert w._encoder_turn_handler is handler
 
     def test_on_encoder_turn_returns_handler(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
 
         async def handler(direction: int):
             pass
@@ -159,7 +151,7 @@ class TestWidgetEncoderDecorators:
         assert result is handler
 
     def test_on_encoder_press(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
 
         @w.on_encoder_press
         async def handler():
@@ -168,7 +160,7 @@ class TestWidgetEncoderDecorators:
         assert w._encoder_press_handler is handler
 
     def test_on_encoder_press_returns_handler(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
 
         async def handler():
             pass
@@ -177,7 +169,7 @@ class TestWidgetEncoderDecorators:
         assert result is handler
 
     def test_on_encoder_release(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
 
         @w.on_encoder_release
         async def handler():
@@ -186,7 +178,7 @@ class TestWidgetEncoderDecorators:
         assert w._encoder_release_handler is handler
 
     def test_on_encoder_release_returns_handler(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
 
         async def handler():
             pass
@@ -195,7 +187,7 @@ class TestWidgetEncoderDecorators:
         assert result is handler
 
     def test_encoder_handlers_initially_none(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         assert w._encoder_turn_handler is None
         assert w._encoder_press_handler is None
         assert w._encoder_release_handler is None
@@ -203,11 +195,11 @@ class TestWidgetEncoderDecorators:
 
 class TestWidgetPendingCallbacks:
     def test_initially_empty(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         assert w.drain_pending_callbacks() == []
 
     def test_queue_and_drain(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
 
         async def handler(value: float):
             pass
@@ -218,7 +210,7 @@ class TestWidgetPendingCallbacks:
         assert callbacks[0] == (handler, (42.0,))
 
     def test_drain_clears_queue(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
 
         async def handler(value: float):
             pass
@@ -228,7 +220,7 @@ class TestWidgetPendingCallbacks:
         assert w.drain_pending_callbacks() == []
 
     def test_multiple_callbacks_preserved_in_order(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
 
         async def h1(value: float):
             pass
@@ -246,7 +238,7 @@ class TestWidgetPendingCallbacks:
 
 class TestWidgetDispatch:
     async def test_dispatch_encoder_turn_with_handler(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         called_with = []
 
         @w.on_encoder_turn
@@ -257,11 +249,11 @@ class TestWidgetDispatch:
         assert called_with == [3]
 
     async def test_dispatch_encoder_turn_no_handler(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         await w.dispatch_encoder_turn(1)
 
     async def test_dispatch_encoder_press_with_handler(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         called = []
 
         @w.on_encoder_press
@@ -272,7 +264,7 @@ class TestWidgetDispatch:
         assert called == [True]
 
     async def test_dispatch_encoder_release_with_handler(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         called = []
 
         @w.on_encoder_release
@@ -285,7 +277,7 @@ class TestWidgetDispatch:
     async def test_dispatch_touch_tap(self):
         from deckui.runtime.events import EventType, TouchEvent
 
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         called = []
 
         @w.on_tap
@@ -298,7 +290,7 @@ class TestWidgetDispatch:
     async def test_dispatch_touch_long_press(self):
         from deckui.runtime.events import EventType, TouchEvent
 
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         called = []
 
         @w.on_long_press
@@ -311,7 +303,7 @@ class TestWidgetDispatch:
     async def test_dispatch_touch_drag(self):
         from deckui.runtime.events import EventType, TouchEvent
 
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         called = []
 
         @w.on_drag
@@ -326,13 +318,13 @@ class TestWidgetDispatch:
     async def test_dispatch_touch_no_handler(self):
         from deckui.runtime.events import EventType, TouchEvent
 
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         await w.dispatch_touch(TouchEvent(event_type=EventType.TOUCH_SHORT, x=10, y=10))
 
 
 class TestWidgetRefreshCallback:
     async def test_set_and_request_refresh(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         called = []
 
         async def refresh():
@@ -343,39 +335,31 @@ class TestWidgetRefreshCallback:
         assert called == [True]
 
     async def test_request_refresh_no_callback(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         await w.request_refresh()
 
     async def test_prepare_assets_noop(self):
-        w = _ConcreteWidget(0)
+        w = _ConcreteWidget()
         await w.prepare_assets()
 
 
 class TestBlankCard:
     def test_is_card(self):
-        b = BlankCard(0)
+        b = BlankCard()
         assert isinstance(b, Card)
 
-    def test_index(self):
-        b = BlankCard(2)
-        assert b.index == 2
-
     def test_render_returns_none(self):
-        b = BlankCard(0)
+        b = BlankCard()
         assert b.render() is None
 
     def test_initially_dirty(self):
-        b = BlankCard(0)
+        b = BlankCard()
         assert b.is_dirty is True
 
 
 class TestTouchStripInit:
     def test_creates_four_cards(self, touchscreen: TouchStrip):
         assert len(touchscreen.cards) == 4
-
-    def test_card_indices(self, touchscreen: TouchStrip):
-        for i in range(4):
-            assert touchscreen.cards[i].index == i
 
     def test_default_cards_are_blank(self, touchscreen: TouchStrip):
         for w in touchscreen.cards:
@@ -387,7 +371,7 @@ class TestTouchStripCard:
         for i in range(4):
             w = touchscreen.card(i)
             assert isinstance(w, Card)
-            assert w.index == i
+            assert touchscreen.cards[i] is w
 
     def test_same_instance(self, touchscreen: TouchStrip):
         """card(i) returns the same object each time."""
@@ -406,24 +390,24 @@ class TestTouchStripCard:
 
 class TestTouchStripSetCard:
     def test_replace_with_custom_card(self, touchscreen: TouchStrip):
-        cw = _ConcreteWidget(2)
+        cw = _ConcreteWidget()
         touchscreen.set_card(2, cw)
         assert touchscreen.card(2) is cw
 
     def test_replace_with_blank(self, touchscreen: TouchStrip):
-        cw = _ConcreteWidget(0)
+        cw = _ConcreteWidget()
         touchscreen.set_card(0, cw)
-        blank = BlankCard(0)
+        blank = BlankCard()
         touchscreen.set_card(0, blank)
         assert touchscreen.card(0) is blank
 
     def test_index_too_low(self, touchscreen: TouchStrip):
         with pytest.raises(IndexError, match="Card index must be 0-3"):
-            touchscreen.set_card(-1, _ConcreteWidget(0))
+            touchscreen.set_card(-1, _ConcreteWidget())
 
     def test_index_too_high(self, touchscreen: TouchStrip):
         with pytest.raises(IndexError, match="Card index must be 0-3"):
-            touchscreen.set_card(4, _ConcreteWidget(0))
+            touchscreen.set_card(4, _ConcreteWidget())
 
     def test_rejects_non_card(self, touchscreen: TouchStrip):
         with pytest.raises(TypeError, match="Expected a Card instance"):

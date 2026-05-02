@@ -133,7 +133,7 @@ class TestDeckWireRefreshCallbacks:
         """set_screen wires deck.refresh on every key and card."""
         screen = deck.screen("main")
         key = screen.key(0)
-        card = _TestCard(0)
+        card = _TestCard()
         screen.set_card(0, card)
 
         deck._render_all_keys = AsyncMock()
@@ -282,7 +282,7 @@ class TestDeckDispatch:
     async def test_encoder_turn_dispatches_to_card(self, deck):
         """Encoder turn is forwarded to the card at that zone."""
         p = deck.screen("main")
-        card = _TestCard(1)
+        card = _TestCard()
         p.set_card(1, card)
         deck._active_screen = p
 
@@ -328,7 +328,7 @@ class TestDeckDispatch:
     async def test_encoder_press_dispatches_to_card(self, deck):
         """Encoder press is forwarded to the card's dispatch_encoder_press."""
         p = deck.screen("main")
-        card = _TestCard(0)
+        card = _TestCard()
         p.set_card(0, card)
         deck._active_screen = p
 
@@ -343,7 +343,7 @@ class TestDeckDispatch:
     async def test_encoder_release_dispatches_to_card(self, deck):
         """Encoder release is forwarded to the card's dispatch_encoder_release."""
         p = deck.screen("main")
-        card = _TestCard(0)
+        card = _TestCard()
         p.set_card(0, card)
         deck._active_screen = p
 
@@ -356,7 +356,7 @@ class TestDeckDispatch:
     async def test_encoder_press_release_does_not_call_press_handler(self, deck):
         """Card on_encoder_press is NOT called for release events."""
         p = deck.screen("main")
-        card = _TestCard(0)
+        card = _TestCard()
         p.set_card(0, card)
         deck._active_screen = p
 
@@ -429,7 +429,7 @@ class TestDeckDispatchCardCallbacks:
     async def test_encoder_turn_calls_card_encoder_turn_handler(self, deck):
         """Card on_encoder_turn handler is called on EncoderTurnEvent."""
         p = deck.screen("main")
-        card = _TestCard(0)
+        card = _TestCard()
         p.set_card(0, card)
         deck._active_screen = p
 
@@ -444,7 +444,7 @@ class TestDeckDispatchCardCallbacks:
     async def test_encoder_turn_order_encoder_then_card(self, deck):
         """Dispatch order: encoder handler -> card encoder handler."""
         p = deck.screen("main")
-        card = _TestCard(0)
+        card = _TestCard()
         p.set_card(0, card)
         deck._active_screen = p
 
@@ -463,7 +463,7 @@ class TestDeckDispatchCardCallbacks:
 
     async def test_drain_card_callbacks_helper(self, deck):
         """_drain_card_callbacks awaits all pending callbacks in order."""
-        card = _TestCard(0)
+        card = _TestCard()
         results = []
 
         async def h1(v: float):
@@ -482,7 +482,7 @@ class TestDeckDispatchCardCallbacks:
     async def test_refresh_drains_pending_callbacks(self, deck):
         """Programmatic queue_pending_callback + refresh drains callbacks."""
         p = deck.screen("main")
-        card = _TestCard(0)
+        card = _TestCard()
         p.set_card(0, card)
         deck._active_screen = p
         deck._render_touchscreen = AsyncMock()
@@ -532,7 +532,7 @@ class TestDeckRenderTouchscreen:
         deck._caps = STREAM_DECK_PLUS
         deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
         p = deck.screen("main")
-        card = _TestCard(0)
+        card = _TestCard()
         p.set_card(0, card)
         deck._active_screen = p
 
@@ -705,7 +705,7 @@ class TestDeckCheckTimeouts:
     async def test_expired_timeout_triggers_refresh(self, deck):
         """Card with expired timeout triggers a refresh."""
         p = deck.screen("main")
-        card = _TestCard(0)
+        card = _TestCard()
         card.check_selection_timeout = lambda: True
         p.set_card(0, card)
         deck._active_screen = p

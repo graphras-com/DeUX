@@ -26,8 +26,7 @@ class EncoderSlot:
             print(f"Turned by {direction}")
     """
 
-    def __init__(self, index: int) -> None:
-        self._index = index
+    def __init__(self) -> None:
         self._turn_handler: AsyncHandler | None = None
         self._press_handler: AsyncHandler | None = None
         self._release_handler: AsyncHandler | None = None
@@ -35,11 +34,6 @@ class EncoderSlot:
         self._accumulator: DialAccumulator | None = None
         self._press_turn_accumulator: DialAccumulator | None = None
         self._pressed: bool = False
-
-    @property
-    def index(self) -> int:
-        """The encoder index on the device."""
-        return self._index
 
     # -- Turn handlers -------------------------------------------------------
 

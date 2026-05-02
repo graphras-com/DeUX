@@ -52,7 +52,7 @@ class TestScreenForMini:
         screen = Screen("mini", STREAM_DECK_MINI)
         for i in range(6):
             k = screen.key(i)
-            assert k.index == i
+            assert screen.keys[i] is k
         with pytest.raises(IndexError, match="Key index must be 0-5"):
             screen.key(6)
 
@@ -92,7 +92,7 @@ class TestPageKey:
     def test_creates_key_slot(self, page: Screen):
         k = page.key(0)
         assert isinstance(k, KeySlot)
-        assert k.index == 0
+        assert page.keys[0] is k
 
     def test_same_instance(self, page: Screen):
         a = page.key(0)
@@ -102,7 +102,7 @@ class TestPageKey:
     def test_creates_all_indices(self, page: Screen):
         for i in range(8):
             k = page.key(i)
-            assert k.index == i
+            assert page.keys[i] is k
 
     def test_different_indices_different_instances(self, page: Screen):
         a = page.key(0)
@@ -129,7 +129,7 @@ class TestPageEncoder:
     def test_creates_encoder_slot(self, page: Screen):
         e = page.encoder(0)
         assert isinstance(e, EncoderSlot)
-        assert e.index == 0
+        assert page.encoders[0] is e
 
     def test_same_instance(self, page: Screen):
         a = page.encoder(0)
@@ -139,7 +139,7 @@ class TestPageEncoder:
     def test_creates_all_indices(self, page: Screen):
         for i in range(4):
             e = page.encoder(i)
-            assert e.index == i
+            assert page.encoders[i] is e
 
     def test_stored_in_encoders_dict(self, page: Screen):
         e = page.encoder(2)
@@ -195,16 +195,16 @@ class TestPageSetCard:
     def test_set_card_replaces(self, page: Screen):
         from tests.test_touch_strip import _ConcreteWidget
 
-        cw = _ConcreteWidget(0)
+        cw = _ConcreteWidget()
         page.set_card(0, cw)
         assert page.card(0) is cw
 
     def test_replace_preserves_others(self, page: Screen):
         original_1 = page.card(1)
-        page.set_card(0, BlankCard(0))
+        page.set_card(0, BlankCard())
         assert page.card(1) is original_1
 
     def test_set_card_no_touchscreen(self):
         screen = Screen("mini", STREAM_DECK_MINI)
         with pytest.raises(IndexError, match="no touchscreen"):
-            screen.set_card(0, BlankCard(0))
+            screen.set_card(0, BlankCard())

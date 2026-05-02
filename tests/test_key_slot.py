@@ -8,16 +8,11 @@ from deckui.ui.controls.key_slot import KeySlot
 
 
 class TestKeySlotInit:
-    def test_index(self, key_slot: KeySlot):
-        assert key_slot.index == 0
-
     def test_defaults(self, key_slot: KeySlot):
         assert key_slot.image_bytes is None
         assert key_slot.is_dirty is True
-
-    def test_custom_index(self):
-        k = KeySlot(7)
-        assert k.index == 7
+        assert key_slot._press_handler is None
+        assert key_slot._release_handler is None
 
 
 class TestKeySlotEventHandlers:

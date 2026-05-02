@@ -88,7 +88,7 @@ class TestScreenSetKey:
 
     def test_set_key_accepts_regular_key_slot(self):
         screen = Screen("test")
-        key = KeySlot(0)
+        key = KeySlot()
         screen.set_key(0, key)
         assert screen.keys[0] is key
 
@@ -113,7 +113,7 @@ class TestDeckDuiKeyRendering:
     def test_is_dui_key_false_for_regular(self):
         from deckui.runtime.deck import Deck
 
-        key = KeySlot(0)
+        key = KeySlot()
         assert Deck._is_dui_key(key) is False
 
 
