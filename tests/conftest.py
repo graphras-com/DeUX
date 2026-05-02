@@ -309,14 +309,14 @@ def dui_packages_dir(tmp_path):
 
 @pytest.fixture
 def key_slot():
-    """A fresh KeySlot at index 0."""
-    return KeySlot(0)
+    """A fresh KeySlot."""
+    return KeySlot()
 
 
 @pytest.fixture
 def encoder():
-    """A fresh EncoderSlot at index 0."""
-    return EncoderSlot(0)
+    """A fresh EncoderSlot."""
+    return EncoderSlot()
 
 
 @pytest.fixture

@@ -31,7 +31,7 @@ class TouchStrip:
         background_color: str = "black",
     ) -> None:
         self._panel_count = panel_count
-        self._cards: list[Card] = [BlankCard(i) for i in range(panel_count)]
+        self._cards: list[Card] = [BlankCard() for _ in range(panel_count)]
         self._background_color = background_color
 
     @property

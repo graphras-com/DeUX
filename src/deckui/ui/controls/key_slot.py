@@ -23,25 +23,12 @@ class KeySlot:
             print("pressed!")
     """
 
-    def __init__(self, index: int) -> None:
-        self._index = index
+    def __init__(self) -> None:
         self._press_handler: AsyncHandler | None = None
         self._release_handler: AsyncHandler | None = None
         self._image_bytes: bytes | None = None
         self._dirty = True
         self._request_refresh: AsyncHandler | None = None
-
-    @property
-    def index(self) -> int:
-        """The index this key slot was constructed with.
-
-        Informational only — this is **not** updated when the key is
-        installed on a screen via :meth:`Screen.set_key`.  A single
-        ``KeySlot`` (or :class:`~deckui.dui.DuiKey`) may live on multiple
-        screens at different slot indices; the screen's slot map is the
-        authoritative source of truth.
-        """
-        return self._index
 
     def set_refresh_callback(self, callback: AsyncHandler) -> None:
         """Register an async callback the key can invoke to request a refresh.

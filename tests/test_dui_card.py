@@ -51,17 +51,15 @@ class TestDuiCardIsCard:
         card = DuiCard(card_package_spec)
         assert isinstance(card, Card)
 
-    def test_set_card_does_not_mutate_card_index(self, card_package_spec):
-        """set_card installs the card on the strip without mutating it.
+    def test_set_card_installs_at_slot(self, card_package_spec):
+        """set_card stores the card in the strip's slot list.
 
-        The card's ``index`` reflects the constructor value only -- the
-        touch strip's slot list is the authoritative source of truth.
+        The card itself carries no slot identity -- the strip's slot
+        list is the authoritative source of truth.
         """
         card = DuiCard(card_package_spec)
-        original_index = card.index
         screen = Screen("test")
         screen.set_card(2, card)
-        assert card.index == original_index
         assert screen.touch_strip is not None
         assert screen.touch_strip.cards[2] is card
 

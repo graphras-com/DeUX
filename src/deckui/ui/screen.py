@@ -97,7 +97,7 @@ class Screen:
             )
 
         if index not in self._keys:
-            self._keys[index] = KeySlot(index)
+            self._keys[index] = KeySlot()
         return self._keys[index]
 
     def set_key(self, index: int, key: KeySlot) -> None:
@@ -151,7 +151,7 @@ class Screen:
             )
 
         if index not in self._encoders:
-            self._encoders[index] = EncoderSlot(index)
+            self._encoders[index] = EncoderSlot()
         return self._encoders[index]
 
     def card(self, index: int) -> Card:
