@@ -224,6 +224,16 @@ DEFAULT_MAX_DURATION_MS: int = 500
 DEFAULT_HOLD_MS: int = 500
 """Default hold duration (ms) for ``*_hold`` events."""
 
+DEFAULT_RELEASE_TURN_GRACE_MS: int = 150
+"""Default suppression window (ms) after a press cycle that included a turn.
+
+After releasing the encoder following a press during which one or more turns
+occurred, plain ``encoder_turn`` events are ignored for this many milliseconds.
+This debounces the very common ergonomic mistake of letting a finger continue
+to nudge the dial as it lifts off, preventing a ``encoder_press_turn`` gesture
+from accidentally bleeding into a ``encoder_turn`` event.
+"""
+
 
 @dataclass(frozen=True, slots=True)
 class Region:

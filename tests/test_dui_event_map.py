@@ -81,6 +81,61 @@ class TestEncoderTurn:
             em.handle_encoder_turn(-1) is None
         )
 
+    def test_turn_suppressed_while_pressed_when_no_press_turn_declared(self):
+        """encoder_turn must not fire while the encoder is pressed."""
+        events = _make_events(("scroll", "encoder_turn"))
+        em = EventMap(events)
+        handler = AsyncMock()
+        em.on("scroll", handler)
+
+        em.handle_encoder_press()
+        result = em.handle_encoder_turn(1)
+        assert result is None
+        handler.assert_not_called()
+
+    def test_turn_resumes_after_release(self):
+        """encoder_turn fires again once the encoder is released.
+
+        Uses ``release_turn_grace_ms=0`` so the post-release suppression
+        window (covered separately in :class:`TestPostReleaseTurnGrace`)
+        does not interfere with this assertion.
+        """
+        events = _make_events(("scroll", "encoder_turn"))
+        em = EventMap(events, release_turn_grace_ms=0)
+        handler = AsyncMock()
+        em.on("scroll", handler)
+
+        em.handle_encoder_press()
+        assert em.handle_encoder_turn(1) is None
+        em.handle_encoder_release()
+
+        result = em.handle_encoder_turn(1)
+        assert _handler(result) is handler
+
+    async def test_accumulator_tick_not_delivered_while_pressed(self):
+        """Accumulated encoder_turn ticks are dropped while the encoder is pressed."""
+        events = _make_events(
+            ("scroll", "encoder_turn", {"accumulate": True, "accumulate_delay": 0.02}),
+        )
+        em = EventMap(events, release_turn_grace_ms=0)
+        handler = AsyncMock()
+        em.on("scroll", handler)
+
+        em.handle_encoder_press()
+        em.handle_encoder_turn(1)
+        em.handle_encoder_turn(1)
+        em.handle_encoder_turn(-1)
+
+        await asyncio.sleep(0.1)
+        handler.assert_not_called()
+
+        em.handle_encoder_release()
+        em.handle_encoder_turn(1)
+        em.handle_encoder_turn(1)
+
+        await asyncio.sleep(0.1)
+        handler.assert_awaited_once_with(2)
+
 
 class TestEncoderPressRelease:
     def test_simple_press(self):
@@ -249,8 +304,8 @@ class TestEncoderPressTurn:
         result = em.handle_encoder_turn(1)
         assert _handler(result) is seek_handler
 
-    def test_regular_turn_fires_when_press_turn_direction_mismatches(self):
-        """Falls back to encoder_turn when press_turn direction doesn't match."""
+    def test_press_turn_direction_mismatch_does_not_fall_back(self):
+        """When pressed, a direction-mismatched press_turn does NOT fall back to encoder_turn."""
         events = _make_events(
             ("scroll", "encoder_turn"),
             ("seek_fwd", "encoder_press_turn", {"direction": "right"}),
@@ -263,7 +318,132 @@ class TestEncoderPressTurn:
 
         em.handle_encoder_press()
         result = em.handle_encoder_turn(-1)
+        assert result is None
+        scroll_handler.assert_not_called()
+        seek_handler.assert_not_called()
+
+
+class TestPostReleaseTurnGrace:
+    """Suppression of encoder_turn for a short window after a press+turn cycle.
+
+    Mirrors the real ergonomic problem: a finger lifting off a rotary encoder
+    after a press_turn gesture often produces a stray tick, which would
+    spuriously fire the unrelated encoder_turn handler (e.g. brightness on
+    DashboardCard) without this grace window.
+    """
+
+    async def test_turn_after_release_with_intervening_turn_is_suppressed(self):
+        events = _make_events(
+            ("scroll", "encoder_turn"),
+            ("seek", "encoder_press_turn"),
+        )
+        em = EventMap(events, release_turn_grace_ms=80)
+        scroll_handler = AsyncMock()
+        seek_handler = AsyncMock()
+        em.on("scroll", scroll_handler)
+        em.on("seek", seek_handler)
+
+        em.handle_encoder_press()
+        em.handle_encoder_turn(1)
+        em.handle_encoder_release()
+
+        result = em.handle_encoder_turn(1)
+        assert result is None
+        scroll_handler.assert_not_called()
+
+    async def test_turn_after_release_without_intervening_turn_fires(self):
+        """A clean press-release with no turn must NOT open a suppression window."""
+        events = _make_events(("scroll", "encoder_turn"))
+        em = EventMap(events, release_turn_grace_ms=80)
+        handler = AsyncMock()
+        em.on("scroll", handler)
+
+        em.handle_encoder_press()
+        em.handle_encoder_release()
+
+        result = em.handle_encoder_turn(1)
+        assert _handler(result) is handler
+
+    async def test_grace_window_expires(self):
+        events = _make_events(
+            ("scroll", "encoder_turn"),
+            ("seek", "encoder_press_turn"),
+        )
+        em = EventMap(events, release_turn_grace_ms=30)
+        scroll_handler = AsyncMock()
+        em.on("scroll", scroll_handler)
+        em.on("seek", AsyncMock())
+
+        em.handle_encoder_press()
+        em.handle_encoder_turn(1)
+        em.handle_encoder_release()
+
+        await asyncio.sleep(0.06)
+
+        result = em.handle_encoder_turn(1)
         assert _handler(result) is scroll_handler
+
+    async def test_grace_triggered_even_when_turn_was_silent(self):
+        """A silent turn-while-pressed (no press_turn declared) still opens the window."""
+        events = _make_events(("scroll", "encoder_turn"))
+        em = EventMap(events, release_turn_grace_ms=80)
+        handler = AsyncMock()
+        em.on("scroll", handler)
+
+        em.handle_encoder_press()
+        em.handle_encoder_turn(1)  # silent — no press_turn declared
+        em.handle_encoder_release()
+
+        result = em.handle_encoder_turn(1)
+        assert result is None
+        handler.assert_not_called()
+
+    async def test_press_turn_during_grace_is_not_suppressed(self):
+        """Suppression only blocks plain encoder_turn, not encoder_press_turn."""
+        events = _make_events(
+            ("scroll", "encoder_turn"),
+            ("seek", "encoder_press_turn"),
+        )
+        em = EventMap(events, release_turn_grace_ms=80)
+        seek_handler = AsyncMock()
+        em.on("scroll", AsyncMock())
+        em.on("seek", seek_handler)
+
+        em.handle_encoder_press()
+        em.handle_encoder_turn(1)
+        em.handle_encoder_release()
+
+        em.handle_encoder_press()
+        result = em.handle_encoder_turn(1)
+        assert _handler(result) is seek_handler
+
+    async def test_default_grace_window_is_active(self):
+        """The default grace window (DEFAULT_RELEASE_TURN_GRACE_MS) is non-zero."""
+        events = _make_events(("scroll", "encoder_turn"))
+        em = EventMap(events)  # default grace
+        handler = AsyncMock()
+        em.on("scroll", handler)
+
+        em.handle_encoder_press()
+        em.handle_encoder_turn(1)
+        em.handle_encoder_release()
+
+        result = em.handle_encoder_turn(1)
+        assert result is None
+        handler.assert_not_called()
+
+    async def test_grace_zero_disables_suppression(self):
+        events = _make_events(("scroll", "encoder_turn"))
+        em = EventMap(events, release_turn_grace_ms=0)
+        handler = AsyncMock()
+        em.on("scroll", handler)
+
+        em.handle_encoder_press()
+        em.handle_encoder_turn(1)
+        em.handle_encoder_release()
+
+        result = em.handle_encoder_turn(1)
+        assert _handler(result) is handler
 
 
 class TestKeyEvents:
@@ -615,7 +795,12 @@ class TestEncoderHold:
         hold_handler.assert_not_awaited()
 
     async def test_encoder_hold_cancelled_by_turn_without_press_turn_mapping(self):
-        """encoder_hold is cancelled by turn even without encoder_press_turn mapping."""
+        """encoder_hold is cancelled by turn even without encoder_press_turn mapping.
+
+        With no ``encoder_press_turn`` declared, the turn itself is silent — the
+        ``encoder_turn`` handler must not fire while the encoder is pressed —
+        but the physical motion still cancels the pending hold timer.
+        """
         events = _make_events(
             ("scroll", "encoder_turn"),
             ("enc_hold", "encoder_hold", {"hold_ms": 50}),
@@ -627,7 +812,9 @@ class TestEncoderHold:
         em.on("enc_hold", hold_handler)
 
         em.handle_encoder_press()
-        em.handle_encoder_turn(1)
+        result = em.handle_encoder_turn(1)
+        assert result is None
+        scroll_handler.assert_not_called()
 
         await asyncio.sleep(0.1)
         hold_handler.assert_not_awaited()
