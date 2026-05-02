@@ -58,7 +58,14 @@ class Card(ABC):
 
     @property
     def index(self) -> int:
-        """The card zone index on the touch strip."""
+        """The index this card was constructed with.
+
+        Informational only — this is **not** updated when the card is
+        installed on a touch strip via :meth:`TouchStrip.set_card`.
+        A single ``Card`` may live on multiple screens at different
+        slot indices; the touch strip's slot list is the authoritative
+        source of truth.
+        """
         return self._index
 
     def on_tap(self, handler: AsyncHandler) -> AsyncHandler:

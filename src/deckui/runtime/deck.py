@@ -332,7 +332,7 @@ class Deck:
         for key_index in range(caps.key_count):
             key_slot = screen.keys.get(key_index)
             if key_slot and self._is_dui_key(key_slot):
-                await self._render_dui_key(key_slot)
+                await self._render_dui_key(key_slot, key_index)
             else:
                 image_bytes = render_blank_key(
                     key_size=metrics.key_size if metrics else (120, 120),
@@ -356,8 +356,20 @@ class Deck:
         """Check whether a card or key has an active spinner animation."""
         return getattr(obj, "is_animating", False)
 
-    async def _render_dui_key(self, key_slot: KeySlot) -> None:
-        """Render a DuiKey and push to the device."""
+    async def _render_dui_key(self, key_slot: KeySlot, key_index: int) -> None:
+        """Render a DuiKey and push to the device.
+
+        Parameters
+        ----------
+        key_slot
+            The DuiKey to render.
+        key_index
+            The screen slot the key is currently installed at.  This is
+            authoritative for routing (a single DuiKey may live on
+            multiple screens at different slots), so the spinner
+            ``push_fn`` is rewired on every render to capture the active
+            slot.
+        """
         if not self._device:
             return
 
@@ -367,21 +379,19 @@ class Deck:
         if self._is_animating(dui_key):
             return
 
-        # Wire up push_fn for spinner animation support
-        if not dui_key._push_fn:  # noqa: SLF001
-            key_index = dui_key.index
+        # Re-wire push_fn every render so a DuiKey reused across screens
+        # always animates at the slot of the currently active screen.
+        async def _push_key_frame(frame_bytes: bytes) -> None:
+            loop = asyncio.get_running_loop()
+            async with self._device_lock:
+                await loop.run_in_executor(
+                    self._executor,
+                    self._device.set_key_image,
+                    key_index,
+                    frame_bytes,
+                )
 
-            async def _push_key_frame(frame_bytes: bytes) -> None:
-                loop = asyncio.get_running_loop()
-                async with self._device_lock:
-                    await loop.run_in_executor(
-                        self._executor,
-                        self._device.set_key_image,
-                        key_index,
-                        frame_bytes,
-                    )
-
-            dui_key.set_push_fn(_push_key_frame)
+        dui_key.set_push_fn(_push_key_frame)
 
         image_bytes = dui_key.render_image(
             key_size=self._caps.key_size if self._caps else (120, 120),
@@ -394,7 +404,7 @@ class Deck:
             await loop.run_in_executor(
                 self._executor,
                 self._device.set_key_image,
-                dui_key.index,
+                key_index,
                 image_bytes,
             )
 
@@ -409,39 +419,42 @@ class Deck:
 
         metrics = self._metrics
 
-        # Wire up push_fn for each DuiCard that needs spinner support
+        # Re-wire push_fn for every DuiCard each render so that a card
+        # reused on multiple screens always animates at the slot of the
+        # currently active screen.
+        from ..dui.card import DuiCard
+
         for card_idx, card in enumerate(screen.cards):
-            from ..dui.card import DuiCard
+            if not isinstance(card, DuiCard):
+                continue
+            x_pos = metrics.margin_left + card_idx * (
+                metrics.panel_width + metrics.panel_gap
+            )
+            y_pos = metrics.margin_top
 
-            if isinstance(card, DuiCard) and card._push_fn is None:  # noqa: SLF001
-                x_pos = metrics.margin_left + card_idx * (
-                    metrics.panel_width + metrics.panel_gap
-                )
-                y_pos = metrics.margin_top
+            async def _make_push(x: int, y: int, w: int, h: int) -> PushFn:
+                async def _push_card_frame(frame_bytes: bytes) -> None:
+                    loop = asyncio.get_running_loop()
+                    async with self._device_lock:
+                        await loop.run_in_executor(
+                            self._executor,
+                            self._device.set_touchscreen_image,
+                            frame_bytes,
+                            x,
+                            y,
+                            w,
+                            h,
+                        )
 
-                async def _make_push(x: int, y: int, w: int, h: int) -> PushFn:
-                    async def _push_card_frame(frame_bytes: bytes) -> None:
-                        loop = asyncio.get_running_loop()
-                        async with self._device_lock:
-                            await loop.run_in_executor(
-                                self._executor,
-                                self._device.set_touchscreen_image,
-                                frame_bytes,
-                                x,
-                                y,
-                                w,
-                                h,
-                            )
+                return _push_card_frame
 
-                    return _push_card_frame
-
-                push_fn = await _make_push(
-                    x_pos,
-                    y_pos,
-                    metrics.panel_width,
-                    metrics.panel_height,
-                )
-                card.set_push_fn(push_fn)
+            push_fn = await _make_push(
+                x_pos,
+                y_pos,
+                metrics.panel_width,
+                metrics.panel_height,
+            )
+            card.set_push_fn(push_fn)
 
         card_images = []
         for card in screen.cards:
@@ -520,9 +533,9 @@ class Deck:
         for card in screen.cards:
             await self._drain_card_callbacks(card)
 
-        for key_slot in screen.keys.values():
+        for key_index, key_slot in screen.keys.items():
             if key_slot.is_dirty and self._is_dui_key(key_slot):
-                await self._render_dui_key(key_slot)
+                await self._render_dui_key(key_slot, key_index)
 
         if screen.touch_strip is not None and screen.touch_strip.any_dirty:
             await self._render_touchscreen()

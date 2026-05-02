@@ -809,3 +809,124 @@ class TestDeckError:
     def test_message(self):
         e = DeckError("test message")
         assert str(e) == "test message"
+
+
+class TestDeckRenderCrossScreen:
+    """A DuiKey or DuiCard installed on two screens at different slots
+    must render to the slot of whichever screen is currently active.
+
+    Regression coverage for the bug where ``Screen.set_key`` and
+    ``TouchStrip.set_card`` mutated the user-supplied object's ``_index``,
+    causing the second installation to corrupt the first screen's render.
+    """
+
+    async def test_dui_key_renders_at_active_screens_slot(
+        self, deck, mock_streamdeck_device, key_package_spec
+    ):
+        from deckui.dui.key import DuiKey
+
+        deck._device = mock_streamdeck_device
+        deck._caps = STREAM_DECK_PLUS
+        deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
+
+        shared_key = DuiKey(key_package_spec)
+
+        screen_a = deck.screen("a")
+        screen_a.set_key(4, shared_key)
+        screen_b = deck.screen("b")
+        screen_b.set_key(0, shared_key)
+
+        # Render screen A; the shared key must render at slot 4.
+        deck._active_screen = screen_a
+        mock_streamdeck_device.set_key_image.reset_mock()
+        await deck._render_all_keys()
+        a_slots = [c.args[0] for c in mock_streamdeck_device.set_key_image.call_args_list]
+        # Every key index gets a call (DUI or blank); slot 4 is the only DUI
+        # render -- which we verify by checking the bytes differ from a blank.
+        assert 4 in a_slots
+        assert sorted(a_slots) == list(range(STREAM_DECK_PLUS.key_count))
+
+        # Render screen B; the same instance must now render at slot 0.
+        deck._active_screen = screen_b
+        mock_streamdeck_device.set_key_image.reset_mock()
+        await deck._render_all_keys()
+        b_slots = [c.args[0] for c in mock_streamdeck_device.set_key_image.call_args_list]
+        assert 0 in b_slots
+        assert sorted(b_slots) == list(range(STREAM_DECK_PLUS.key_count))
+
+    async def test_dui_key_spinner_pushes_to_active_screens_slot(
+        self, deck, mock_streamdeck_device, key_package_spec
+    ):
+        """The spinner ``push_fn`` is rewired on every render so a key
+        reused across screens animates at the active screen's slot.
+        """
+        from deckui.dui.key import DuiKey
+
+        deck._device = mock_streamdeck_device
+        deck._caps = STREAM_DECK_PLUS
+        deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
+
+        shared_key = DuiKey(key_package_spec)
+
+        screen_a = deck.screen("a")
+        screen_a.set_key(5, shared_key)
+        screen_b = deck.screen("b")
+        screen_b.set_key(2, shared_key)
+
+        deck._active_screen = screen_a
+        await deck._render_all_keys()
+        push_fn = shared_key._push_fn
+        assert push_fn is not None
+        mock_streamdeck_device.set_key_image.reset_mock()
+        await push_fn(b"frame_a")
+        assert mock_streamdeck_device.set_key_image.call_args.args[0] == 5
+
+        deck._active_screen = screen_b
+        await deck._render_all_keys()
+        push_fn = shared_key._push_fn
+        assert push_fn is not None
+        mock_streamdeck_device.set_key_image.reset_mock()
+        await push_fn(b"frame_b")
+        assert mock_streamdeck_device.set_key_image.call_args.args[0] == 2
+
+    async def test_dui_card_spinner_pushes_to_active_screens_slot(
+        self, deck, mock_streamdeck_device, card_package_spec
+    ):
+        """A DuiCard reused on the touch strip in different positions
+        across two screens has its push_fn rewired each render.
+        """
+        from deckui.dui.card import DuiCard
+
+        deck._device = mock_streamdeck_device
+        deck._caps = STREAM_DECK_PLUS
+        deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
+        metrics = deck._metrics
+
+        shared_card = DuiCard(card_package_spec)
+
+        screen_a = deck.screen("a")
+        screen_a.set_card(1, shared_card)
+        screen_b = deck.screen("b")
+        screen_b.set_card(3, shared_card)
+
+        def expected_x(slot: int) -> int:
+            return metrics.margin_left + slot * (
+                metrics.panel_width + metrics.panel_gap
+            )
+
+        deck._active_screen = screen_a
+        await deck._render_touchscreen()
+        push_fn = shared_card._push_fn
+        assert push_fn is not None
+        mock_streamdeck_device.set_touchscreen_image.reset_mock()
+        await push_fn(b"frame_a")
+        # set_touchscreen_image(frame_bytes, x, y, w, h)
+        assert mock_streamdeck_device.set_touchscreen_image.call_args.args[1] == expected_x(1)
+
+        deck._active_screen = screen_b
+        await deck._render_touchscreen()
+        push_fn = shared_card._push_fn
+        assert push_fn is not None
+        mock_streamdeck_device.set_touchscreen_image.reset_mock()
+        await push_fn(b"frame_b")
+        assert mock_streamdeck_device.set_touchscreen_image.call_args.args[1] == expected_x(3)

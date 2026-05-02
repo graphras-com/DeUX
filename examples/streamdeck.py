@@ -1182,17 +1182,18 @@ class StreamDeckApp:
         Demonstrates the core multi-screen story without committing to a
         specific second-screen purpose:
 
-        * **Dashboard pinned on slot 3** -- present on every screen, so
-          the encoder used to cycle screens is always the rightmost one.
+        * **Dashboard pinned on slot 3** -- the same controller instance
+          appears on both screens, demonstrating that ``DuiCard`` and
+          ``DuiKey`` instances may be installed on multiple screens at
+          different (or the same) slots.  The screen's slot map -- not
+          the object's ``index`` property -- is the source of truth for
+          rendering.
         * **All other strip slots blank** -- ready for the reader to
           drop in their own cards.
-        * **Fresh ``DuiKey`` instances per slot** -- every key slot gets
-          its own ``IconKey`` instance with the manifest's default icon
-          and the label ``"Unassigned"``.  We deliberately do not reuse
-          ``DuiKey`` instances from another screen (e.g. the scene keys
-          on ``main``) because :meth:`Screen.set_key` mutates the key's
-          ``_index`` attribute -- reusing an instance across two screens
-          at different slots would corrupt the original screen's render.
+        * **One ``IconKey`` per slot** -- each key gets its own
+          ``DuiKey`` instance with the manifest's default icon and the
+          label ``"Unassigned"`` so the reader has a clear template to
+          replace.
 
         Parameters
         ----------

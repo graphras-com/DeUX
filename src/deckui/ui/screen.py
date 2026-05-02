@@ -103,6 +103,11 @@ class Screen:
     def set_key(self, index: int, key: KeySlot) -> None:
         """Replace the key slot at *index* with a custom key.
 
+        The same ``KeySlot`` (or :class:`~deckui.dui.DuiKey`) instance may
+        be installed on multiple screens at different slot indices — the
+        screen's slot map is the single source of truth for routing, so
+        no state is mutated on *key* itself.
+
         Parameters
         ----------
         index
@@ -117,7 +122,6 @@ class Screen:
             )
         if not isinstance(key, KeySlot):
             raise TypeError(f"Expected KeySlot, got {type(key).__name__}")
-        key._index = index
         self._keys[index] = key
 
     def encoder(self, index: int) -> EncoderSlot:
