@@ -1177,19 +1177,22 @@ class StreamDeckApp:
         self.scenes.install(screen, list(range(num_favs, num_favs + num_scenes)))
 
     def _build_settings_screen(self, deck: Any) -> None:
-        """Layout: an "atmosphere" view -- lights + timer + dashboard, scenes only on keys.
+        """Layout: a placeholder screen with room for the user to extend.
 
-        Demonstrates the core multi-screen story:
+        Demonstrates the core multi-screen story without committing to a
+        specific second-screen purpose:
 
-        * **Same instance, different position** -- the dashboard card
-          stays pinned on slot 3 on both screens so the encoder used to
-          cycle screens is always the rightmost one.  The lights card
-          also appears on both screens, in different slots.
-        * **Per-screen key layout** -- ``main`` mixes favourites with
-          scenes; ``settings`` shows scenes only.  Screens are layouts,
-          not pages.
-        * **Slots are independent** -- slot 2 is intentionally left blank
-          here, which renders as the strip background colour.
+        * **Dashboard pinned on slot 3** -- present on every screen, so
+          the encoder used to cycle screens is always the rightmost one.
+        * **All other strip slots blank** -- ready for the reader to
+          drop in their own cards.
+        * **Fresh ``DuiKey`` instances per slot** -- every key slot gets
+          its own ``IconKey`` instance with the manifest's default icon
+          and the label ``"Unassigned"``.  We deliberately do not reuse
+          ``DuiKey`` instances from another screen (e.g. the scene keys
+          on ``main``) because :meth:`Screen.set_key` mutates the key's
+          ``_index`` attribute -- reusing an instance across two screens
+          at different slots would corrupt the original screen's render.
 
         Parameters
         ----------
@@ -1201,17 +1204,15 @@ class StreamDeckApp:
 
         if screen.touch_strip is not None:
             screen.touch_strip.background_color = "#1c1c1c"
-            screen.set_card(0, self.lights.card)
-            screen.set_card(1, self.timer.card)
-            # Slot 2 intentionally left blank.
+            # Pin the dashboard so the cycling encoder is always available.
             screen.set_card(3, self.dashboard.card)
 
-        # Scenes fill the key area; if there are more keys than scenes,
-        # the remaining slots stay blank (rendered as the deck's reset
-        # state -- a dark/black key) which looks intentional next to the
-        # lit scene keys.
-        num_scenes = min(len(self.scenes.keys), caps.key_count)
-        self.scenes.install(screen, list(range(num_scenes)))
+        pkg_dir = self._packages_dir or EXAMPLES_DIR
+        iconkey_spec = load_package(pkg_dir / "IconKey.dui")
+        for key_index in range(caps.key_count):
+            key = DuiKey(iconkey_spec)
+            key.set("label", "Unassigned")
+            screen.set_key(key_index, key)
 
 
 # ===========================================================================
