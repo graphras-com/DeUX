@@ -289,6 +289,8 @@ events:
 
 `encoder_turn` and `encoder_press_turn` are mutually exclusive at runtime. While the encoder is pressed, only `encoder_press_turn` mappings are eligible — turning a pressed encoder will never fire `encoder_turn`, even if no `encoder_press_turn` is declared (or its `direction` filter doesn't match). Any turn while pressed cancels a pending `encoder_hold`.
 
+After releasing the encoder following a press cycle that included at least one turn, plain `encoder_turn` events are suppressed for a short grace window (150 ms by default). This debounces the very common ergonomic mistake of letting a finger continue to nudge the dial while lifting off, so a `press_turn` gesture cannot accidentally bleed into an unrelated `encoder_turn` handler. Releases without an intervening turn — and `encoder_press_turn` events themselves — are never suppressed.
+
 **Touch sources** (for regions):
 
 | Source | Fires when |

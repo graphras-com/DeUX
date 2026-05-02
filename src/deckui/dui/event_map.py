@@ -8,6 +8,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from ..ui.controls.dial_accumulator import DialAccumulator
+from .schema import DEFAULT_RELEASE_TURN_GRACE_MS
 
 if TYPE_CHECKING:
     from ..runtime.events import AsyncHandler, EventType
@@ -30,7 +31,10 @@ class EventMap:
       press–release cycle.
     - ``encoder_turn``: fires turn events only while the encoder is
       **not** pressed.  Turning while pressed never falls through to
-      this mapping.
+      this mapping.  Immediately after releasing a press cycle that
+      included at least one turn, ``encoder_turn`` is suppressed for
+      ``release_turn_grace_ms`` to debounce the spurious tick a finger
+      often produces while lifting off the dial.
     - ``encoder_press_turn``: fires turn events only while the encoder
       is held down.  When declared with a direction filter, mismatching
       turns while pressed are silent — there is no fallback to
@@ -45,12 +49,19 @@ class EventMap:
         Event mappings from the package manifest.
     regions
         Touch regions from the package manifest.
+    release_turn_grace_ms
+        Suppression window (in milliseconds) applied to plain
+        ``encoder_turn`` events immediately after the encoder is released
+        following a press cycle that included at least one turn.  Defaults
+        to :data:`~deckui.dui.schema.DEFAULT_RELEASE_TURN_GRACE_MS`.  Pass
+        ``0`` to disable.
     """
 
     def __init__(
         self,
         events: tuple[EventMapping, ...],
         regions: tuple[Region, ...] = (),
+        release_turn_grace_ms: int = DEFAULT_RELEASE_TURN_GRACE_MS,
     ) -> None:
         self._mappings = events
         self._regions = regions
@@ -61,6 +72,10 @@ class EventMap:
 
         self._hold_task: asyncio.Task[None] | None = None
         self._hold_fired = False
+
+        self._press_had_turn = False
+        self._release_turn_grace_s = max(0, release_turn_grace_ms) / 1000.0
+        self._turn_suppressed_until = 0.0
 
         self._by_source: dict[str, list[EventMapping]] = {}
         for mapping in events:
@@ -163,6 +178,7 @@ class EventMap:
         """
         if self._pressed:
             self._cancel_hold_timer()
+            self._press_had_turn = True
 
             for mapping in self._by_source.get("encoder_press_turn", []):
                 if self._direction_matches(mapping, direction):
@@ -173,6 +189,9 @@ class EventMap:
                     h = self._handlers.get(mapping.name)
                     if h is not None:
                         return h
+            return None
+
+        if time.monotonic() < self._turn_suppressed_until:
             return None
 
         for mapping in self._by_source.get("encoder_turn", []):
@@ -201,6 +220,7 @@ class EventMap:
         self._press_time = time.monotonic()
         self._pressed = True
         self._hold_fired = False
+        self._press_had_turn = False
 
         self._start_hold_timer("encoder_hold")
 
@@ -220,6 +240,10 @@ class EventMap:
         fired for this press–release cycle (since the interaction was
         a hold, not a press-release gesture).
 
+        If at least one turn occurred during the press cycle, opens a
+        ``release_turn_grace_ms`` window during which subsequent plain
+        ``encoder_turn`` events are ignored.
+
         Returns
         -------
         list[AsyncHandler]
@@ -230,6 +254,12 @@ class EventMap:
 
         hold_fired = self._hold_fired
         self._hold_fired = False
+
+        if self._press_had_turn and self._release_turn_grace_s > 0:
+            self._turn_suppressed_until = (
+                time.monotonic() + self._release_turn_grace_s
+            )
+        self._press_had_turn = False
 
         handlers: list[AsyncHandler] = []
 
