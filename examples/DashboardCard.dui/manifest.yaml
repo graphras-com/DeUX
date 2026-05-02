@@ -58,11 +58,3 @@ events:
   - name: next_screen
     source: encoder_press_release
     max_duration_ms: 250
-    
-regions:
-  card:
-    x: 0
-    y: 0
-    width: 197
-    height: 98
-    events: []
