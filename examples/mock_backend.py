@@ -168,6 +168,8 @@ class MockLightsService:
 
     Parameters
     ----------
+    is_on : bool, default=True
+        Initial on/off state.
     brightness : int, default=80
         Initial brightness percentage (0 -- 100).
     kelvin : int, default=4000
@@ -181,10 +183,11 @@ class MockLightsService:
 
     def __init__(
         self,
+        is_on: bool = True,
         brightness: int = 80,
         kelvin: int = 4000,
     ) -> None:
-        self.is_on: bool = True
+        self.is_on: bool = is_on
         self.brightness: int = brightness
         self.kelvin: int = kelvin
 

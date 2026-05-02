@@ -390,7 +390,7 @@ class TestAudioController:
         monkeypatch.setattr(
             "streamdeck.load_package", lambda _path: _audio_spec()
         )
-        return AudioController(MEDIA_CATALOG, initial_volume=0.5, packages_dir=tmp_path)
+        return AudioController(MEDIA_CATALOG, packages_dir=tmp_path)
 
     def test_initial_state(self, ctrl: AudioController) -> None:
         assert ctrl.volume_level == 0.5
@@ -476,27 +476,27 @@ class TestLightsController:
         monkeypatch.setattr(
             "streamdeck.load_package", lambda _path: _light_spec()
         )
-        return LightsController(brightness=80, kelvin=4000)
+        return LightsController()
 
     def test_initial_state(self, ctrl: LightsController) -> None:
-        assert ctrl.is_on is True
-        assert ctrl.brightness == 80
-        assert ctrl.kelvin == 4000
+        assert ctrl.is_on is False
+        assert ctrl.brightness == 0
+        assert ctrl.kelvin == 2000
 
     def test_card_initial_bindings(self, ctrl: LightsController) -> None:
-        assert ctrl.card.get("lights") is True
-        assert ctrl.card.get("brightness_value_text") == "80%"
-        assert ctrl.card.get("kelvin_value_text") == "4000K"
-        # Slider bindings should be normalised (80/100 and (4000-2000)/(6500-2000))
-        assert ctrl.card.get("brightness") == pytest.approx(0.8)
-        assert ctrl.card.get("kelvin") == pytest.approx((4000 - 2000) / (6500 - 2000))
+        assert ctrl.card.get("lights") is False
+        assert ctrl.card.get("brightness_value_text") == "0%"
+        assert ctrl.card.get("kelvin_value_text") == "2000K"
+        # Slider bindings should be normalised (0/100 and (2000-2000)/(6500-2000))
+        assert ctrl.card.get("brightness") == pytest.approx(0.0)
+        assert ctrl.card.get("kelvin") == pytest.approx(0.0)
 
     async def test_toggle(self, ctrl: LightsController) -> None:
         await ctrl.toggle()
-        assert ctrl.is_on is False
-        assert ctrl.card.get("lights") is False
-        await ctrl.toggle()
         assert ctrl.is_on is True
+        assert ctrl.card.get("lights") is True
+        await ctrl.toggle()
+        assert ctrl.is_on is False
 
     async def test_set_brightness_clamps(self, ctrl: LightsController) -> None:
         await ctrl.set_brightness(150)
@@ -601,10 +601,10 @@ class TestDashboardController:
         monkeypatch.setattr(
             "streamdeck.load_package", lambda _path: _dash_spec()
         )
-        return DashboardController(deck_brightness=60)
+        return DashboardController()
 
     def test_initial_state(self, ctrl: DashboardController) -> None:
-        assert ctrl.deck_brightness == 60
+        assert ctrl.deck_brightness == 50
         assert ctrl.temperature == "22C"
         assert ctrl.humidity == "45%"
 
@@ -750,7 +750,7 @@ class TestFavoritesController:
             "streamdeck.load_package",
             lambda path: specs[Path(path).name],
         )
-        audio = AudioController(MEDIA_CATALOG, initial_volume=0.3, packages_dir=tmp_path)
+        audio = AudioController(MEDIA_CATALOG, packages_dir=tmp_path)
         return FavoritesController(MEDIA_CATALOG, audio, packages_dir=tmp_path)
 
     def test_creates_correct_number_of_keys(self, ctrl: FavoritesController) -> None:

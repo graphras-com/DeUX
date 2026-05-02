@@ -96,8 +96,6 @@ class AudioController:
     ----------
     catalog : list[dict[str, str]]
         Media entries with ``artist``, ``album``, ``title``, ``cover``.
-    initial_volume : float, default=0.3
-        Starting volume (0.0 -- 1.0).
     packages_dir : Path | None
         Directory containing ``AudioCard.dui``.  Defaults to ``examples/``.
     """
@@ -105,12 +103,15 @@ class AudioController:
     def __init__(
         self,
         catalog: list[dict[str, str]],
-        initial_volume: float = 0.3,
         packages_dir: Path | None = None,
     ) -> None:
-        self._svc = MockAudioService(catalog, initial_volume=initial_volume)
         self._pkg_dir = packages_dir or EXAMPLES_DIR
         self._card = DuiCard(load_package(self._pkg_dir / "AudioCard.dui"))
+
+        # Read the initial volume from the .dui package's range binding
+        # default so the package is the single source of truth.
+        initial_volume: float = self._card.get("volume")
+        self._svc = MockAudioService(catalog, initial_volume=initial_volume)
 
         self._sync_card()
         self._bind_events()
@@ -275,23 +276,34 @@ class LightsController:
 
     Parameters
     ----------
-    brightness : int, default=80
-        Initial brightness percentage (0 -- 100).
-    kelvin : int, default=4000
-        Initial colour temperature in Kelvin (2000 -- 6500).
     packages_dir : Path | None
         Directory containing ``LightCard.dui``.
     """
 
     def __init__(
         self,
-        brightness: int = 80,
-        kelvin: int = 4000,
         packages_dir: Path | None = None,
     ) -> None:
-        self._svc = MockLightsService(brightness=brightness, kelvin=kelvin)
         pkg_dir = packages_dir or EXAMPLES_DIR
         self._card = DuiCard(load_package(pkg_dir / "LightCard.dui"))
+
+        # Read initial values from the .dui package defaults.
+        # Slider defaults are normalised (0.0-1.0); denormalise to domain.
+        bright_norm: float = self._card.get("brightness")
+        kelvin_norm: float = self._card.get("kelvin")
+        brightness = int(
+            MockLightsService.BRIGHTNESS_MIN
+            + bright_norm * (MockLightsService.BRIGHTNESS_MAX - MockLightsService.BRIGHTNESS_MIN)
+        )
+        kelvin = int(
+            MockLightsService.KELVIN_MIN
+            + kelvin_norm * (MockLightsService.KELVIN_MAX - MockLightsService.KELVIN_MIN)
+        )
+        self._svc = MockLightsService(
+            is_on=self._card.get("lights"),
+            brightness=brightness,
+            kelvin=kelvin,
+        )
 
         self._sync_card()
         self._bind_events()
@@ -641,8 +653,6 @@ class DashboardController:
 
     Parameters
     ----------
-    deck_brightness : int, default=60
-        Initial deck brightness percentage (0 -- 100).
     packages_dir : Path | None
         Directory containing ``DashboardCard.dui``.
     """
@@ -651,15 +661,19 @@ class DashboardController:
 
     def __init__(
         self,
-        deck_brightness: int = 60,
         packages_dir: Path | None = None,
     ) -> None:
-        self._svc = MockDashboardService(deck_brightness=deck_brightness)
         self._deck: Any = None
         self._clock_task: asyncio.Task[None] | None = None
 
         pkg_dir = packages_dir or EXAMPLES_DIR
         self._card = DuiCard(load_package(pkg_dir / "DashboardCard.dui"))
+
+        # Read initial brightness from the .dui package's range binding
+        # default (normalised 0.0-1.0) and convert to 0-100 domain.
+        bright_norm: float = self._card.get("deck_brightness")
+        deck_brightness = int(bright_norm * 100)
+        self._svc = MockDashboardService(deck_brightness=deck_brightness)
 
         self._sync_card()
         self._bind_events()
@@ -1036,16 +1050,16 @@ class StreamDeckApp:
     ) -> None:
         self._packages_dir = packages_dir or EXAMPLES_DIR
         self.audio = AudioController(
-            catalog, initial_volume=0.3, packages_dir=self._packages_dir
+            catalog, packages_dir=self._packages_dir
         )
         self.lights = LightsController(
-            brightness=80, kelvin=4000, packages_dir=self._packages_dir
+            packages_dir=self._packages_dir
         )
         self.timer = TimerController(
             packages_dir=self._packages_dir
         )
         self.dashboard = DashboardController(
-            deck_brightness=60, packages_dir=self._packages_dir
+            packages_dir=self._packages_dir
         )
         self.favorites = FavoritesController(
             catalog, self.audio, packages_dir=self._packages_dir
@@ -1181,7 +1195,9 @@ async def run() -> None:
     4. ``async with`` the manager and ``await manager.wait_closed()``.
     """
     app = StreamDeckApp(MEDIA_CATALOG, SCENE_DEFS)
-    manager = DeckManager(brightness=60, auto_reconnect=True)
+    manager = DeckManager(
+        brightness=app.dashboard.deck_brightness, auto_reconnect=True
+    )
 
     @manager.on_connect()
     async def _on_connect(deck: Any) -> None:
