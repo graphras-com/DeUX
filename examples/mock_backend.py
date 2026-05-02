@@ -453,38 +453,28 @@ class MockTimerService:
 
 
 class MockDashboardService:
-    """Simulated dashboard backend -- brightness, weather, clock.
+    """Simulated dashboard telemetry backend -- weather and clock.
 
-    Events
-    ------
-    on_brightness_changed : AsyncEvent
-        Emitted when deck brightness changes.
-        Signature: ``(deck_brightness: int) -> None``.
+    This service represents an external data source (e.g. a weather API
+    or home-automation hub) that provides read-only telemetry.  Device
+    control (deck brightness, screen cycling) is application logic and
+    belongs in the controller layer, not here.
 
     Parameters
     ----------
-    deck_brightness : int, default=60
-        Initial deck brightness percentage (0 -- 100).
+    temperature : str, default="22C"
+        Initial temperature reading.
+    humidity : str, default="45%"
+        Initial humidity reading.
     """
 
-    def __init__(self, deck_brightness: int = 60) -> None:
-        self.deck_brightness: int = deck_brightness
-        self.temperature: str = "22C"
-        self.humidity: str = "45%"
-
-        self.on_brightness_changed = AsyncEvent()
-
-    async def set_brightness(self, value: int) -> None:
-        """Set the deck brightness (clamped to 0 -- 100).
-
-        Parameters
-        ----------
-        value : int
-            Target brightness.
-        """
-        self.deck_brightness = max(0, min(100, value))
-        log.info("Deck brightness: %d%%", self.deck_brightness)
-        await self.on_brightness_changed.emit(self.deck_brightness)
+    def __init__(
+        self,
+        temperature: str = "22C",
+        humidity: str = "45%",
+    ) -> None:
+        self.temperature: str = temperature
+        self.humidity: str = humidity
 
     @staticmethod
     def get_date() -> str:
