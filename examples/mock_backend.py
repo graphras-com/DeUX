@@ -414,7 +414,6 @@ class MockDashboardService:
     """
 
     UPDATE_INTERVAL_S = 5.0
-    """Seconds between simulated telemetry pushes."""
 
     def __init__(
         self,

@@ -449,9 +449,7 @@ class TimerController:
     FLASH_COUNT = 6
     FLASH_INTERVAL_S = 0.3
     COARSE_STEP_S = 600
-    """Seconds added/removed per encoder-turn step (no hold) -- 10 minutes."""
     FINE_STEP_S = 30
-    """Seconds added/removed per encoder-hold-turn step -- 30 seconds."""
 
     def __init__(
         self,
