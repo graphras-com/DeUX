@@ -15,7 +15,6 @@ Swap these classes for real integrations and the DeckUI wiring in
 
 from __future__ import annotations
 
-import asyncio
 import datetime
 import logging
 from collections.abc import Awaitable, Callable
