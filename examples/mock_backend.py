@@ -5,14 +5,21 @@ Each service simulates a real-world backend (audio player, smart lights,
 countdown timer, dashboard telemetry) so that ``streamdeck.py`` can focus
 exclusively on demonstrating DeckUI's API.
 
-Swap these classes for real integrations (Spotify, Home Assistant, etc.)
-and the DeckUI wiring in ``streamdeck.py`` stays the same.
+Services emit async events when their state changes, allowing controllers
+to react and update the UI accordingly -- exactly as a real integration
+(Spotify, Home Assistant, etc.) would work.
+
+Swap these classes for real integrations and the DeckUI wiring in
+``streamdeck.py`` stays the same.
 """
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import logging
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -56,12 +63,82 @@ SCENE_DEFS: list[dict[str, str]] = [
 
 
 # ===========================================================================
+# Async event helper
+# ===========================================================================
+
+
+class AsyncEvent:
+    """A simple async event that can have multiple subscribers.
+
+    Subscribers are registered with the call operator (used as a
+    decorator) and invoked with :meth:`emit`.  This mirrors the
+    pattern a real backend SDK would expose for property-change
+    notifications.
+
+    Examples
+    --------
+    ::
+
+        svc = SomeService()
+
+        @svc.on_brightness_changed
+        async def _handle(value: int) -> None:
+            print(f"brightness is now {value}")
+
+        await svc.on_brightness_changed.emit(75)
+    """
+
+    def __init__(self) -> None:
+        self._handlers: list[Callable[..., Awaitable[None]]] = []
+
+    def __call__(
+        self, fn: Callable[..., Awaitable[None]]
+    ) -> Callable[..., Awaitable[None]]:
+        """Register *fn* as a subscriber (decorator usage).
+
+        Parameters
+        ----------
+        fn : Callable[..., Awaitable[None]]
+            Async callback to invoke when the event fires.
+
+        Returns
+        -------
+        Callable[..., Awaitable[None]]
+            The original function, unmodified.
+        """
+        self._handlers.append(fn)
+        return fn
+
+    async def emit(self, *args: Any, **kwargs: Any) -> None:
+        """Invoke all registered handlers with the given arguments.
+
+        Parameters
+        ----------
+        *args : Any
+            Positional arguments forwarded to each handler.
+        **kwargs : Any
+            Keyword arguments forwarded to each handler.
+        """
+        for handler in self._handlers:
+            await handler(*args, **kwargs)
+
+
+# ===========================================================================
 # Mock services
 # ===========================================================================
 
 
 class MockAudioService:
     """Simulated audio player -- play/pause, volume, mute, track navigation.
+
+    Events
+    ------
+    on_track_changed : AsyncEvent
+        Emitted when the current track or playback state changes.
+        Signature: ``(track: dict[str, str], is_playing: bool) -> None``.
+    on_volume_changed : AsyncEvent
+        Emitted when volume level or mute state changes.
+        Signature: ``(volume_level: float, volume_text: str) -> None``.
 
     Parameters
     ----------
@@ -82,6 +159,9 @@ class MockAudioService:
         self.is_muted: bool = False
         self.is_playing: bool = False
 
+        self.on_track_changed = AsyncEvent()
+        self.on_volume_changed = AsyncEvent()
+
     @property
     def current_track(self) -> dict[str, str]:
         """The currently selected media entry."""
@@ -94,7 +174,7 @@ class MockAudioService:
             return "Muted"
         return f"{int(self.volume_level * 100)}%"
 
-    def play(self, track: dict[str, str] | None = None) -> None:
+    async def play(self, track: dict[str, str] | None = None) -> None:
         """Start playback, optionally jumping to *track*.
 
         Parameters
@@ -107,20 +187,22 @@ class MockAudioService:
         self.is_playing = True
         t = self.current_track
         log.info("Playing: %s -- %s", t["artist"], t["title"])
+        await self.on_track_changed.emit(t, self.is_playing)
 
-    def pause(self) -> None:
+    async def pause(self) -> None:
         """Pause playback."""
         self.is_playing = False
         log.info("Paused")
+        await self.on_track_changed.emit(self.current_track, self.is_playing)
 
-    def play_pause(self) -> None:
+    async def play_pause(self) -> None:
         """Toggle play/pause."""
         if self.is_playing:
-            self.pause()
+            await self.pause()
         else:
-            self.play()
+            await self.play()
 
-    def next_track(self) -> dict[str, str]:
+    async def next_track(self) -> dict[str, str]:
         """Advance to the next track (wraps).
 
         Returns
@@ -131,9 +213,10 @@ class MockAudioService:
         self._index = (self._index + 1) % len(self._catalog)
         t = self.current_track
         log.info("Next: %s -- %s", t["artist"], t["title"])
+        await self.on_track_changed.emit(t, self.is_playing)
         return t
 
-    def previous_track(self) -> dict[str, str]:
+    async def previous_track(self) -> dict[str, str]:
         """Go back to the previous track (wraps).
 
         Returns
@@ -144,9 +227,10 @@ class MockAudioService:
         self._index = (self._index - 1) % len(self._catalog)
         t = self.current_track
         log.info("Previous: %s -- %s", t["artist"], t["title"])
+        await self.on_track_changed.emit(t, self.is_playing)
         return t
 
-    def set_volume(self, level: float) -> None:
+    async def set_volume(self, level: float) -> None:
         """Set volume in [0.0, 1.0] (clamped).
 
         Parameters
@@ -156,15 +240,29 @@ class MockAudioService:
         """
         self.volume_level = max(0.0, min(1.0, level))
         log.info("Volume: %.0f%%", self.volume_level * 100)
+        await self.on_volume_changed.emit(self.volume_level, self.volume_text)
 
-    def toggle_mute(self) -> None:
+    async def toggle_mute(self) -> None:
         """Toggle mute."""
         self.is_muted = not self.is_muted
         log.info("Muted: %s", self.is_muted)
+        await self.on_volume_changed.emit(self.volume_level, self.volume_text)
 
 
 class MockLightsService:
     """Simulated smart-light backend -- on/off, brightness, colour temperature.
+
+    Events
+    ------
+    on_toggled : AsyncEvent
+        Emitted when the on/off state changes.
+        Signature: ``(is_on: bool) -> None``.
+    on_brightness_changed : AsyncEvent
+        Emitted when brightness changes.
+        Signature: ``(brightness: int) -> None``.
+    on_kelvin_changed : AsyncEvent
+        Emitted when colour temperature changes.
+        Signature: ``(kelvin: int) -> None``.
 
     Parameters
     ----------
@@ -191,12 +289,17 @@ class MockLightsService:
         self.brightness: int = brightness
         self.kelvin: int = kelvin
 
-    def toggle(self) -> None:
+        self.on_toggled = AsyncEvent()
+        self.on_brightness_changed = AsyncEvent()
+        self.on_kelvin_changed = AsyncEvent()
+
+    async def toggle(self) -> None:
         """Toggle lights on/off."""
         self.is_on = not self.is_on
         log.info("Lights: %s", "ON" if self.is_on else "OFF")
+        await self.on_toggled.emit(self.is_on)
 
-    def set_brightness(self, value: int) -> None:
+    async def set_brightness(self, value: int) -> None:
         """Set brightness percentage (clamped to 0 -- 100).
 
         Parameters
@@ -206,8 +309,9 @@ class MockLightsService:
         """
         self.brightness = max(self.BRIGHTNESS_MIN, min(self.BRIGHTNESS_MAX, value))
         log.info("Brightness: %d%%", self.brightness)
+        await self.on_brightness_changed.emit(self.brightness)
 
-    def set_kelvin(self, value: int) -> None:
+    async def set_kelvin(self, value: int) -> None:
         """Set colour temperature (clamped to 2000 -- 6500 K).
 
         Parameters
@@ -217,10 +321,21 @@ class MockLightsService:
         """
         self.kelvin = max(self.KELVIN_MIN, min(self.KELVIN_MAX, value))
         log.info("Kelvin: %dK", self.kelvin)
+        await self.on_kelvin_changed.emit(self.kelvin)
 
 
 class MockTimerService:
     """Simulated countdown timer -- duration, remaining, start/pause/reset.
+
+    Events
+    ------
+    on_timer_changed : AsyncEvent
+        Emitted when the timer display should update (toggle, reset,
+        adjust, or tick).
+        Signature: ``(formatted_time: str) -> None``.
+    on_finished : AsyncEvent
+        Emitted when the countdown reaches zero.
+        Signature: ``() -> None``.
 
     Parameters
     ----------
@@ -238,6 +353,9 @@ class MockTimerService:
         self.duration: int = initial_seconds
         self.remaining: int = initial_seconds
         self.is_running: bool = False
+
+        self.on_timer_changed = AsyncEvent()
+        self.on_finished = AsyncEvent()
 
     @staticmethod
     def parse_hhmmss(text: str) -> int:
@@ -276,7 +394,7 @@ class MockTimerService:
         m, s = divmod(rem, 60)
         return f"{h:02d}:{m:02d}:{s:02d}"
 
-    def toggle(self) -> None:
+    async def toggle(self) -> None:
         """Start or pause the countdown.
 
         When starting, the current ``remaining`` value is captured as the
@@ -296,15 +414,17 @@ class MockTimerService:
         else:
             log.info("Timer paused -- %s", self.format_time())
         self.is_running = not self.is_running
+        await self.on_timer_changed.emit(self.format_time())
 
-    def reset(self) -> None:
+    async def reset(self) -> None:
         """Stop the countdown and reload the current default duration."""
         self.is_running = False
         self.duration = self._default_duration
         self.remaining = self._default_duration
         log.info("Timer reset -- %s", self.format_time())
+        await self.on_timer_changed.emit(self.format_time())
 
-    def adjust_duration(self, delta_seconds: int) -> None:
+    async def adjust_duration(self, delta_seconds: int) -> None:
         """Add (or subtract) seconds to/from the configured duration.
 
         Parameters
@@ -315,27 +435,32 @@ class MockTimerService:
         self.duration = max(0, self.duration + delta_seconds)
         self.remaining = self.duration
         log.info("Timer duration: %s", self.format_time())
+        await self.on_timer_changed.emit(self.format_time())
 
-    def tick(self) -> bool:
+    async def tick(self) -> None:
         """Decrement *remaining* by one second if running.
 
-        Returns
-        -------
-        bool
-            True if the timer just finished (hit zero this tick).
+        Emits :attr:`on_timer_changed` on every active tick and
+        :attr:`on_finished` when the countdown reaches zero.
         """
         if not self.is_running or self.remaining <= 0:
-            return False
+            return
         self.remaining -= 1
+        await self.on_timer_changed.emit(self.format_time())
         if self.remaining <= 0 and self.is_running:
             self.is_running = False
             log.info("Timer finished")
-            return True
-        return False
+            await self.on_finished.emit()
 
 
 class MockDashboardService:
     """Simulated dashboard backend -- brightness, weather, clock.
+
+    Events
+    ------
+    on_brightness_changed : AsyncEvent
+        Emitted when deck brightness changes.
+        Signature: ``(deck_brightness: int) -> None``.
 
     Parameters
     ----------
@@ -348,7 +473,9 @@ class MockDashboardService:
         self.temperature: str = "22C"
         self.humidity: str = "45%"
 
-    def set_brightness(self, value: int) -> None:
+        self.on_brightness_changed = AsyncEvent()
+
+    async def set_brightness(self, value: int) -> None:
         """Set the deck brightness (clamped to 0 -- 100).
 
         Parameters
@@ -358,6 +485,7 @@ class MockDashboardService:
         """
         self.deck_brightness = max(0, min(100, value))
         log.info("Deck brightness: %d%%", self.deck_brightness)
+        await self.on_brightness_changed.emit(self.deck_brightness)
 
     @staticmethod
     def get_date() -> str:

@@ -10,6 +10,14 @@ telemetry) lives in :mod:`mock_backend` so this file focuses purely on
 DeckUI wiring.  Swap those mock services for real integrations and the
 code below stays the same.
 
+**Event-driven architecture** -- controllers never update the UI directly
+in response to user input.  Instead, DUI event handlers call service
+methods (e.g. ``svc.set_brightness(80)``), and the service emits an
+async event (e.g. ``on_brightness_changed``) once the state has actually
+changed.  The controller subscribes to that event and updates the card
+bindings there.  This is the same pattern a real backend would use:
+the UI always reflects *confirmed* state, not *requested* state.
+
 What it demonstrates
 --------------------
 * :class:`~deckui.DeckManager` for auto-discovery and hot-plug.
@@ -69,13 +77,20 @@ EXAMPLES_DIR = Path(__file__).resolve().parent
 # ===========================================================================
 #
 # Each controller owns one ``.dui`` widget (card or key) and a mock
-# service from ``mock_backend``.  Controllers push service state into
-# card bindings via :meth:`DuiCard.set` / :meth:`DuiCard.set_many` /
-# :meth:`DuiCard.set_range`, and wire DUI event handlers that delegate
-# to the service, then refresh.  Controllers never touch the deck
-# directly: they call :meth:`DuiCard.request_refresh` /
-# :meth:`DuiKey.request_refresh` when state changes, and the deck
-# re-renders dirty regions automatically.
+# service from ``mock_backend``.
+#
+# The flow is:
+#
+#   1. A DUI event fires (encoder turn, key press, etc.).
+#   2. The controller's event handler calls the *service* method
+#      (e.g. ``svc.set_brightness(80)``).
+#   3. The service updates its internal state and emits an async event
+#      (e.g. ``on_brightness_changed``).
+#   4. The controller's *subscriber* for that event updates the card
+#      bindings and calls ``request_refresh()``.
+#
+# This decouples "what happened" from "how the UI reacts" -- exactly
+# how a real integration (Spotify, Home Assistant, etc.) would work.
 # ===========================================================================
 
 
@@ -89,8 +104,9 @@ class AudioController:
     * encoder click    -> mute toggle
     * encoder press+turn -> previous/next track
 
-    Favourite keys (see :class:`FavoritesController`) call :meth:`play`
-    to start a specific track.
+    Favourite keys (see :class:`FavoritesController`) call
+    :meth:`MockAudioService.play` via the service to start a specific
+    track.
 
     Parameters
     ----------
@@ -114,7 +130,8 @@ class AudioController:
         self._svc = MockAudioService(catalog, initial_volume=initial_volume)
 
         self._sync_card()
-        self._bind_events()
+        self._subscribe_events()
+        self._bind_dui_events()
 
     # -- public API -----------------------------------------------------
 
@@ -122,6 +139,11 @@ class AudioController:
     def card(self) -> DuiCard:
         """The :class:`DuiCard` ready to install on a screen."""
         return self._card
+
+    @property
+    def svc(self) -> MockAudioService:
+        """The underlying audio service (for external callers like favourites)."""
+        return self._svc
 
     @property
     def volume_level(self) -> float:
@@ -143,74 +165,10 @@ class AudioController:
         """The currently selected media entry."""
         return self._svc.current_track
 
-    async def play(self, track: dict[str, str] | None = None) -> None:
-        """Start playback (optionally jumping to *track*) and refresh.
-
-        Parameters
-        ----------
-        track : dict[str, str] | None
-            If given and present in the catalog, jump to it first.
-        """
-        self._svc.play(track)
-        self._sync_card()
-        await self._card.request_refresh()
-
-    async def pause(self) -> None:
-        """Pause playback and refresh."""
-        self._svc.pause()
-        self._sync_card()
-        await self._card.request_refresh()
-
-    async def play_pause(self) -> None:
-        """Toggle play/pause."""
-        self._svc.play_pause()
-        self._sync_card()
-        await self._card.request_refresh()
-
-    async def next_track(self) -> dict[str, str]:
-        """Advance to the next track (wraps).
-
-        Returns
-        -------
-        dict[str, str]
-            The new current track.
-        """
-        t = self._svc.next_track()
-        self._sync_card()
-        return t
-
-    async def previous_track(self) -> dict[str, str]:
-        """Go back to the previous track (wraps).
-
-        Returns
-        -------
-        dict[str, str]
-            The new current track.
-        """
-        t = self._svc.previous_track()
-        self._sync_card()
-        return t
-
-    async def set_volume(self, level: float) -> None:
-        """Set volume in [0.0, 1.0] and refresh.
-
-        Parameters
-        ----------
-        level : float
-            Volume between 0.0 and 1.0.  Out-of-range values are clamped.
-        """
-        self._svc.set_volume(level)
-        self._sync_volume_text()
-
-    async def toggle_mute(self) -> None:
-        """Toggle mute and refresh the volume text."""
-        self._svc.toggle_mute()
-        self._sync_volume_text()
-
     # -- internal -------------------------------------------------------
 
     def _sync_card(self) -> None:
-        """Push the full player state into card bindings."""
+        """Push the full player state into card bindings (initial load only)."""
         t = self._svc.current_track
         self._card.set_many(
             artist=t["artist"],
@@ -221,48 +179,64 @@ class AudioController:
         cover_path = self._pkg_dir / t["cover"]
         if cover_path.exists():
             self._card.set("cover", Image.open(cover_path))
-        # set_range normalises 0-100 -> 0.0-1.0 so the SVG range binding
-        # gets the value it expects.
         self._card.set_range(
             "volume", self._svc.volume_level * 100, min_val=0, max_val=100
         )
-        self._sync_volume_text()
-
-    def _sync_volume_text(self) -> None:
-        """Update only the volume / mute text binding."""
         self._card.set("value_text", self._svc.volume_text)
 
-    def _bind_events(self) -> None:
-        """Register card event handlers (declared in the manifest)."""
+    def _subscribe_events(self) -> None:
+        """Subscribe to service state-change events."""
+
+        @self._svc.on_track_changed
+        async def _on_track(track: dict[str, str], is_playing: bool) -> None:
+            self._card.set_many(
+                artist=track["artist"],
+                title=track["title"],
+                album=track["album"],
+                state="Playing" if is_playing else "Paused",
+            )
+            cover_path = self._pkg_dir / track["cover"]
+            if cover_path.exists():
+                self._card.set("cover", Image.open(cover_path))
+            await self._card.request_refresh()
+
+        @self._svc.on_volume_changed
+        async def _on_volume(volume_level: float, volume_text: str) -> None:
+            self._card.set_range(
+                "volume", volume_level * 100, min_val=0, max_val=100
+            )
+            self._card.set("value_text", volume_text)
+            await self._card.request_refresh()
+
+    def _bind_dui_events(self) -> None:
+        """Register DUI event handlers -- these only call service methods."""
         card = self._card
 
         @card.on("toggle_play_pause")
         async def _toggle() -> None:
-            await self.play_pause()
+            await self._svc.play_pause()
 
         @card.on("volume_up")
         async def _vol_up(steps: int) -> None:
-            # adjust_range clamps and returns the new domain value, so we
-            # don't have to re-compute the percentage ourselves.
             new = card.adjust_range("volume", steps, min_val=0, max_val=100)
-            await self.set_volume(new / 100.0)
+            await self._svc.set_volume(new / 100.0)
 
         @card.on("volume_down")
         async def _vol_down(steps: int) -> None:
             new = card.adjust_range("volume", -abs(steps), min_val=0, max_val=100)
-            await self.set_volume(new / 100.0)
+            await self._svc.set_volume(new / 100.0)
 
         @card.on("mute_toggle")
         async def _mute() -> None:
-            await self.toggle_mute()
+            await self._svc.toggle_mute()
 
         @card.on("next")
         async def _next(_steps: int) -> None:
-            await self.next_track()
+            await self._svc.next_track()
 
         @card.on("previous")
         async def _prev(_steps: int) -> None:
-            await self.previous_track()
+            await self._svc.previous_track()
 
 
 class LightsController:
@@ -306,7 +280,8 @@ class LightsController:
         )
 
         self._sync_card()
-        self._bind_events()
+        self._subscribe_events()
+        self._bind_dui_events()
 
     @property
     def card(self) -> DuiCard:
@@ -328,35 +303,8 @@ class LightsController:
         """Current colour temperature in Kelvin."""
         return self._svc.kelvin
 
-    async def toggle(self) -> None:
-        """Toggle lights on/off."""
-        self._svc.toggle()
-        self._card.set("lights", self._svc.is_on)
-
-    async def set_brightness(self, value: int) -> None:
-        """Set brightness percentage (clamped to 0 -- 100)."""
-        self._svc.set_brightness(value)
-        self._card.set("brightness_value_text", f"{self._svc.brightness}%")
-        self._card.set_range(
-            "brightness",
-            self._svc.brightness,
-            min_val=MockLightsService.BRIGHTNESS_MIN,
-            max_val=MockLightsService.BRIGHTNESS_MAX,
-        )
-
-    async def set_kelvin(self, value: int) -> None:
-        """Set colour temperature (clamped to 2000 -- 6500 K)."""
-        self._svc.set_kelvin(value)
-        self._card.set("kelvin_value_text", f"{self._svc.kelvin}K")
-        self._card.set_range(
-            "kelvin",
-            self._svc.kelvin,
-            min_val=MockLightsService.KELVIN_MIN,
-            max_val=MockLightsService.KELVIN_MAX,
-        )
-
     def _sync_card(self) -> None:
-        """Push the full light state into card bindings."""
+        """Push the full light state into card bindings (initial load only)."""
         self._card.set("lights", self._svc.is_on)
         self._card.set("brightness_value_text", f"{self._svc.brightness}%")
         self._card.set_range(
@@ -373,28 +321,58 @@ class LightsController:
             max_val=MockLightsService.KELVIN_MAX,
         )
 
-    def _bind_events(self) -> None:
-        """Register card event handlers."""
+    def _subscribe_events(self) -> None:
+        """Subscribe to service state-change events."""
+
+        @self._svc.on_toggled
+        async def _on_toggled(is_on: bool) -> None:
+            self._card.set("lights", is_on)
+            await self._card.request_refresh()
+
+        @self._svc.on_brightness_changed
+        async def _on_brightness(brightness: int) -> None:
+            self._card.set("brightness_value_text", f"{brightness}%")
+            self._card.set_range(
+                "brightness",
+                brightness,
+                min_val=MockLightsService.BRIGHTNESS_MIN,
+                max_val=MockLightsService.BRIGHTNESS_MAX,
+            )
+            await self._card.request_refresh()
+
+        @self._svc.on_kelvin_changed
+        async def _on_kelvin(kelvin: int) -> None:
+            self._card.set("kelvin_value_text", f"{kelvin}K")
+            self._card.set_range(
+                "kelvin",
+                kelvin,
+                min_val=MockLightsService.KELVIN_MIN,
+                max_val=MockLightsService.KELVIN_MAX,
+            )
+            await self._card.request_refresh()
+
+    def _bind_dui_events(self) -> None:
+        """Register DUI event handlers -- these only call service methods."""
 
         @self._card.on("toggle")
         async def _toggle() -> None:
-            await self.toggle()
+            await self._svc.toggle()
 
         @self._card.on("brightness_up")
         async def _bright_up(steps: int) -> None:
-            await self.set_brightness(self._svc.brightness + steps * 5)
+            await self._svc.set_brightness(self._svc.brightness + steps * 5)
 
         @self._card.on("brightness_down")
         async def _bright_down(steps: int) -> None:
-            await self.set_brightness(self._svc.brightness - abs(steps) * 5)
+            await self._svc.set_brightness(self._svc.brightness - abs(steps) * 5)
 
         @self._card.on("kelvin_up")
         async def _kelvin_up(steps: int) -> None:
-            await self.set_kelvin(self._svc.kelvin + steps * 100)
+            await self._svc.set_kelvin(self._svc.kelvin + steps * 100)
 
         @self._card.on("kelvin_down")
         async def _kelvin_down(steps: int) -> None:
-            await self.set_kelvin(self._svc.kelvin - abs(steps) * 100)
+            await self._svc.set_kelvin(self._svc.kelvin - abs(steps) * 100)
 
 
 class TimerController:
@@ -458,8 +436,8 @@ class TimerController:
         self._default_background: str = self._card.get("background")
         self._default_foreground: str = self._card.get("foreground")
 
-        self._sync_card()
-        self._bind_events()
+        self._subscribe_events()
+        self._bind_dui_events()
 
     @property
     def card(self) -> DuiCard:
@@ -522,36 +500,20 @@ class TimerController:
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 
-    async def toggle(self) -> None:
-        """Start or pause the countdown."""
-        self._svc.toggle()
-        self._sync_card()
-        await self._card.request_refresh()
+    def _subscribe_events(self) -> None:
+        """Subscribe to service state-change events."""
 
-    async def reset(self) -> None:
-        """Stop the countdown and reload the current default duration."""
-        self._svc.reset()
-        self._sync_card()
-        await self._card.request_refresh()
+        @self._svc.on_timer_changed
+        async def _on_timer(formatted_time: str) -> None:
+            self._card.set("timer", formatted_time)
+            await self._card.request_refresh()
 
-    async def adjust_duration(self, delta_seconds: int) -> None:
-        """Add (or subtract) seconds to/from the configured duration.
+        @self._svc.on_finished
+        async def _on_finished() -> None:
+            await self._flash_notification()
 
-        Parameters
-        ----------
-        delta_seconds : int
-            Seconds to add (positive) or subtract (negative).
-        """
-        self._svc.adjust_duration(delta_seconds)
-        self._sync_card()
-        await self._card.request_refresh()
-
-    def _sync_card(self) -> None:
-        """Push the timer display into the card binding."""
-        self._card.set("timer", self._svc.format_time())
-
-    def _bind_events(self) -> None:
-        """Register card event handlers.
+    def _bind_dui_events(self) -> None:
+        """Register DUI event handlers -- these only call service methods.
 
         Events wired here correspond to the ``events`` section in the
         ``TimerCard.dui`` manifest:
@@ -568,31 +530,31 @@ class TimerController:
 
         @self._card.on("toggle")
         async def _toggle() -> None:
-            await self.toggle()
+            await self._svc.toggle()
 
         @self._card.on("reset")
         async def _reset() -> None:
-            await self.reset()
+            await self._svc.reset()
 
         # -- coarse: encoder turn (no hold) -- +/- 10 min per step ---
 
         @self._card.on("increase_duration")
         async def _increase(steps: int) -> None:
-            await self.adjust_duration(steps * MockTimerService.COARSE_STEP_S)
+            await self._svc.adjust_duration(steps * MockTimerService.COARSE_STEP_S)
 
         @self._card.on("decrease_duration")
         async def _decrease(steps: int) -> None:
-            await self.adjust_duration(-abs(steps) * MockTimerService.COARSE_STEP_S)
+            await self._svc.adjust_duration(-abs(steps) * MockTimerService.COARSE_STEP_S)
 
         # -- fine: encoder hold+turn -- +/- 30 s per step ------------
 
         @self._card.on("increase_duration_alt")
         async def _increase_alt(steps: int) -> None:
-            await self.adjust_duration(steps * MockTimerService.FINE_STEP_S)
+            await self._svc.adjust_duration(steps * MockTimerService.FINE_STEP_S)
 
         @self._card.on("decrease_duration_alt")
         async def _decrease_alt(steps: int) -> None:
-            await self.adjust_duration(-abs(steps) * MockTimerService.FINE_STEP_S)
+            await self._svc.adjust_duration(-abs(steps) * MockTimerService.FINE_STEP_S)
 
     async def _flash_notification(self) -> None:
         """Flash foreground/background colors to signal timer completion.
@@ -626,16 +588,16 @@ class TimerController:
         await self._card.request_refresh()
 
     async def _tick_loop(self) -> None:
-        """Decrement *remaining* once per second while running."""
+        """Call the service's tick once per second.
+
+        The service emits ``on_timer_changed`` and ``on_finished``
+        events as needed -- the controller's subscribers handle the
+        card updates.
+        """
         try:
             while True:
                 await asyncio.sleep(self.TICK_INTERVAL_S)
-                finished = self._svc.tick()
-                if self._svc.is_running or finished:
-                    self._sync_card()
-                    await self._card.request_refresh()
-                if finished:
-                    await self._flash_notification()
+                await self._svc.tick()
         except asyncio.CancelledError:
             pass
 
@@ -676,7 +638,8 @@ class DashboardController:
         self._svc = MockDashboardService(deck_brightness=deck_brightness)
 
         self._sync_card()
-        self._bind_events()
+        self._subscribe_events()
+        self._bind_dui_events()
 
     @property
     def card(self) -> DuiCard:
@@ -712,22 +675,6 @@ class DashboardController:
         """Attach the deck handle so brightness changes reach the hardware."""
         self._deck = deck
 
-    async def set_brightness(self, value: int) -> None:
-        """Set the deck brightness (clamped to 0 -- 100).
-
-        Updates internal state, the bound physical deck, and the slider
-        binding on the card.
-        """
-        self._svc.set_brightness(value)
-        self._card.set_range(
-            "deck_brightness",
-            self._svc.deck_brightness,
-            min_val=0,
-            max_val=100,
-        )
-        if self._deck is not None:
-            await self._deck.set_brightness(self._svc.deck_brightness)
-
     async def start_runtime(self) -> None:
         """Start the background clock-tick task (idempotent)."""
         if self._clock_task is None or self._clock_task.done():
@@ -745,7 +692,7 @@ class DashboardController:
                 await task
 
     def _sync_card(self) -> None:
-        """Push the full dashboard state into card bindings."""
+        """Push the full dashboard state into card bindings (initial load only)."""
         self._card.set_many(
             date=self._svc.get_date(),
             time=self._svc.get_time(),
@@ -759,21 +706,36 @@ class DashboardController:
             max_val=100,
         )
 
-    def _bind_events(self) -> None:
-        """Register card event handlers."""
+    def _subscribe_events(self) -> None:
+        """Subscribe to service state-change events."""
+
+        @self._svc.on_brightness_changed
+        async def _on_brightness(deck_brightness: int) -> None:
+            self._card.set_range(
+                "deck_brightness",
+                deck_brightness,
+                min_val=0,
+                max_val=100,
+            )
+            if self._deck is not None:
+                await self._deck.set_brightness(deck_brightness)
+            await self._card.request_refresh()
+
+    def _bind_dui_events(self) -> None:
+        """Register DUI event handlers -- these only call service methods."""
         card = self._card
 
         @card.on("brightness_up")
         async def _bright_up(steps: int) -> None:
             new = card.adjust_range("deck_brightness", steps, min_val=0, max_val=100)
-            await self.set_brightness(int(new))
+            await self._svc.set_brightness(int(new))
 
         @card.on("brightness_down")
         async def _bright_down(steps: int) -> None:
             new = card.adjust_range(
                 "deck_brightness", -abs(steps), min_val=0, max_val=100
             )
-            await self.set_brightness(int(new))
+            await self._svc.set_brightness(int(new))
 
     async def _clock_loop(self) -> None:
         """Refresh the clock display every second.
@@ -801,17 +763,16 @@ class FavoritesController:
     """Favourite-media keys -- one :class:`DuiKey` per catalog entry.
 
     Loads ``PictureKey.dui`` once and instantiates a key per favourite.
-    Clicking a key calls :meth:`AudioController.play` with the matching
-    track.  The audio controller refreshes the AudioCard automatically
-    via ``card.request_refresh()`` -- which now works from key handlers
-    too thanks to the deck wiring callbacks on every key/card.
+    Clicking a key calls :meth:`MockAudioService.play` on the audio
+    service.  The audio service emits ``on_track_changed`` which the
+    :class:`AudioController` subscriber picks up to refresh the card.
 
     Parameters
     ----------
     catalog : list[dict[str, str]]
         Media entries used as favourites.
     audio : AudioController
-        The audio controller that handles playback.
+        The audio controller whose service handles playback.
     packages_dir : Path | None
         Directory containing ``PictureKey.dui``.
     """
@@ -823,7 +784,7 @@ class FavoritesController:
         packages_dir: Path | None = None,
     ) -> None:
         self._catalog = catalog
-        self._audio = audio
+        self._audio_svc = audio.svc
         pkg_dir = packages_dir or EXAMPLES_DIR
         self._spec = load_package(pkg_dir / "PictureKey.dui")
         self._keys: list[DuiKey] = []
@@ -840,7 +801,7 @@ class FavoritesController:
             @key.on_event("click")
             async def _click(m: dict[str, str] = media) -> None:
                 log.info("Favourite pressed: %s -- %s", m["artist"], m["title"])
-                await self._audio.play(m)
+                await self._audio_svc.play(m)
 
             self._keys.append(key)
 

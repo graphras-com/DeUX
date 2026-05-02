@@ -410,54 +410,54 @@ class TestAudioController:
         assert ctrl.current_track is MEDIA_CATALOG[0]
 
     async def test_play(self, ctrl: AudioController) -> None:
-        await ctrl.play()
+        await ctrl.svc.play()
         assert ctrl.is_playing is True
         assert ctrl.card.get("state") == "Playing"
 
     async def test_play_specific_track(self, ctrl: AudioController) -> None:
-        await ctrl.play(MEDIA_CATALOG[2])
+        await ctrl.svc.play(MEDIA_CATALOG[2])
         assert ctrl.is_playing is True
         assert ctrl.current_track is MEDIA_CATALOG[2]
         assert ctrl.card.get("artist") == MEDIA_CATALOG[2]["artist"]
 
     async def test_pause(self, ctrl: AudioController) -> None:
-        await ctrl.play()
-        await ctrl.pause()
+        await ctrl.svc.play()
+        await ctrl.svc.pause()
         assert ctrl.is_playing is False
         assert ctrl.card.get("state") == "Paused"
 
     async def test_play_pause_toggle(self, ctrl: AudioController) -> None:
-        await ctrl.play_pause()
+        await ctrl.svc.play_pause()
         assert ctrl.is_playing is True
-        await ctrl.play_pause()
+        await ctrl.svc.play_pause()
         assert ctrl.is_playing is False
 
     async def test_next_track_wraps(self, ctrl: AudioController) -> None:
         for i in range(len(MEDIA_CATALOG)):
-            t = await ctrl.next_track()
+            t = await ctrl.svc.next_track()
             assert t is MEDIA_CATALOG[(i + 1) % len(MEDIA_CATALOG)]
         assert ctrl.card.get("artist") == ctrl.current_track["artist"]
 
     async def test_previous_track_wraps(self, ctrl: AudioController) -> None:
-        t = await ctrl.previous_track()
+        t = await ctrl.svc.previous_track()
         assert t is MEDIA_CATALOG[-1]
         assert ctrl.card.get("artist") == MEDIA_CATALOG[-1]["artist"]
 
     async def test_set_volume_clamps(self, ctrl: AudioController) -> None:
-        await ctrl.set_volume(1.5)
+        await ctrl.svc.set_volume(1.5)
         assert ctrl.volume_level == 1.0
-        await ctrl.set_volume(-0.5)
+        await ctrl.svc.set_volume(-0.5)
         assert ctrl.volume_level == 0.0
 
     async def test_set_volume_updates_card(self, ctrl: AudioController) -> None:
-        await ctrl.set_volume(0.75)
+        await ctrl.svc.set_volume(0.75)
         assert ctrl.card.get("value_text") == "75%"
 
     async def test_toggle_mute(self, ctrl: AudioController) -> None:
-        await ctrl.toggle_mute()
+        await ctrl.svc.toggle_mute()
         assert ctrl.is_muted is True
         assert ctrl.card.get("value_text") == "Muted"
-        await ctrl.toggle_mute()
+        await ctrl.svc.toggle_mute()
         assert ctrl.is_muted is False
         assert ctrl.card.get("value_text") == "50%"
 
@@ -492,27 +492,27 @@ class TestLightsController:
         assert ctrl.card.get("kelvin") == pytest.approx(0.0)
 
     async def test_toggle(self, ctrl: LightsController) -> None:
-        await ctrl.toggle()
+        await ctrl._svc.toggle()
         assert ctrl.is_on is True
         assert ctrl.card.get("lights") is True
-        await ctrl.toggle()
+        await ctrl._svc.toggle()
         assert ctrl.is_on is False
 
     async def test_set_brightness_clamps(self, ctrl: LightsController) -> None:
-        await ctrl.set_brightness(150)
+        await ctrl._svc.set_brightness(150)
         assert ctrl.brightness == 100
         assert ctrl.card.get("brightness_value_text") == "100%"
         assert ctrl.card.get("brightness") == pytest.approx(1.0)
-        await ctrl.set_brightness(-10)
+        await ctrl._svc.set_brightness(-10)
         assert ctrl.brightness == 0
         assert ctrl.card.get("brightness") == pytest.approx(0.0)
 
     async def test_set_kelvin_clamps(self, ctrl: LightsController) -> None:
-        await ctrl.set_kelvin(1000)
+        await ctrl._svc.set_kelvin(1000)
         assert ctrl.kelvin == 2000
         assert ctrl.card.get("kelvin_value_text") == "2000K"
         assert ctrl.card.get("kelvin") == pytest.approx(0.0)
-        await ctrl.set_kelvin(9000)
+        await ctrl._svc.set_kelvin(9000)
         assert ctrl.kelvin == 6500
         assert ctrl.card.get("kelvin") == pytest.approx(1.0)
 
@@ -540,19 +540,19 @@ class TestTimerController:
         assert ctrl.card.get("timer") == "00:30:00"
 
     async def test_toggle_starts_and_pauses(self, ctrl: TimerController) -> None:
-        await ctrl.toggle()
+        await ctrl._svc.toggle()
         assert ctrl.is_running is True
-        await ctrl.toggle()
+        await ctrl._svc.toggle()
         assert ctrl.is_running is False
 
     async def test_reset(self, ctrl: TimerController) -> None:
-        await ctrl.toggle()
-        await ctrl.reset()
+        await ctrl._svc.toggle()
+        await ctrl._svc.reset()
         assert ctrl.is_running is False
         assert ctrl.remaining == 1800
 
     async def test_adjust_duration(self, ctrl: TimerController) -> None:
-        await ctrl.adjust_duration(60)
+        await ctrl._svc.adjust_duration(60)
         assert ctrl.duration == 1860
         assert ctrl.remaining == 1860
         assert ctrl.card.get("timer") == "00:31:00"
@@ -564,7 +564,7 @@ class TestTimerController:
             "streamdeck.load_package", lambda _path: _timer_spec()
         )
         ctrl = TimerController()
-        await ctrl.adjust_duration(-10000)
+        await ctrl._svc.adjust_duration(-10000)
         assert ctrl.duration == 0
         assert ctrl.card.get("timer") == "00:00:00"
 
@@ -572,10 +572,10 @@ class TestTimerController:
         self, ctrl: TimerController
     ) -> None:
         """Starting the timer captures remaining as new default."""
-        await ctrl.adjust_duration(60)  # 1860 s
-        await ctrl.toggle()  # start -> snapshots 1860 as default
-        await ctrl.toggle()  # pause
-        await ctrl.reset()
+        await ctrl._svc.adjust_duration(60)  # 1860 s
+        await ctrl._svc.toggle()  # start -> snapshots 1860 as default
+        await ctrl._svc.toggle()  # pause
+        await ctrl._svc.reset()
         assert ctrl.remaining == 1860
 
     async def test_coarse_step(self, ctrl: TimerController) -> None:
@@ -621,20 +621,20 @@ class TestDashboardController:
         assert ":" in ctrl.get_time()
 
     async def test_set_brightness_clamps(self, ctrl: DashboardController) -> None:
-        await ctrl.set_brightness(200)
+        await ctrl._svc.set_brightness(200)
         assert ctrl.deck_brightness == 100
-        await ctrl.set_brightness(-50)
+        await ctrl._svc.set_brightness(-50)
         assert ctrl.deck_brightness == 0
 
     async def test_set_brightness_calls_deck(self, ctrl: DashboardController) -> None:
         mock_deck = MagicMock()
         mock_deck.set_brightness = AsyncMock()
         ctrl.bind_deck(mock_deck)
-        await ctrl.set_brightness(75)
+        await ctrl._svc.set_brightness(75)
         mock_deck.set_brightness.assert_awaited_once_with(75)
 
     async def test_set_brightness_without_deck(self, ctrl: DashboardController) -> None:
-        await ctrl.set_brightness(50)
+        await ctrl._svc.set_brightness(50)
         assert ctrl.deck_brightness == 50
 
 
