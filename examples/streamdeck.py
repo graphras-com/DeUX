@@ -605,10 +605,15 @@ class TimerController:
 class DashboardController:
     """Dashboard card -- live clock, mock weather, deck-brightness control.
 
-    Loads ``DashboardCard.dui``.  Brightness encoder events update both
-    the internal state and the physical deck via the *deck* handle
-    passed to :meth:`bind_deck`.  An asyncio task ticks every second to
-    keep the displayed clock accurate.
+    Loads ``DashboardCard.dui``.  The backend service
+    (:class:`MockDashboardService`) provides read-only telemetry (date,
+    time, temperature, humidity).  Deck brightness is pure application
+    logic: the controller owns the state, clamps it, updates the card
+    bindings, and pushes the value to the hardware via the *deck* handle
+    passed to :meth:`bind_deck`.
+
+    An asyncio task ticks every second to keep the displayed clock
+    accurate.
 
     Use :meth:`start_runtime` once the deck is connected and
     :meth:`stop_runtime` to clean up on disconnect.
@@ -620,6 +625,8 @@ class DashboardController:
     """
 
     CLOCK_INTERVAL_S = 1.0
+    BRIGHTNESS_MIN = 0
+    BRIGHTNESS_MAX = 100
 
     def __init__(
         self,
@@ -634,11 +641,12 @@ class DashboardController:
         # Read initial brightness from the .dui package's range binding
         # default (normalised 0.0-1.0) and convert to 0-100 domain.
         bright_norm: float = self._card.get("deck_brightness")
-        deck_brightness = int(bright_norm * 100)
-        self._svc = MockDashboardService(deck_brightness=deck_brightness)
+        self._deck_brightness: int = int(bright_norm * 100)
+
+        # The backend service only provides telemetry (weather, clock).
+        self._svc = MockDashboardService()
 
         self._sync_card()
-        self._subscribe_events()
         self._bind_dui_events()
 
     @property
@@ -648,8 +656,8 @@ class DashboardController:
 
     @property
     def deck_brightness(self) -> int:
-        """Current deck brightness percentage."""
-        return self._svc.deck_brightness
+        """Current deck brightness percentage (0 -- 100)."""
+        return self._deck_brightness
 
     @property
     def temperature(self) -> str:
@@ -691,6 +699,29 @@ class DashboardController:
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 
+    async def _set_brightness(self, value: int) -> None:
+        """Clamp and apply deck brightness.
+
+        Updates the local state, the card binding, the physical deck
+        (if connected), and requests a card refresh.
+
+        Parameters
+        ----------
+        value : int
+            Target brightness (0 -- 100, clamped).
+        """
+        self._deck_brightness = max(self.BRIGHTNESS_MIN, min(self.BRIGHTNESS_MAX, value))
+        self._card.set_range(
+            "deck_brightness",
+            self._deck_brightness,
+            min_val=self.BRIGHTNESS_MIN,
+            max_val=self.BRIGHTNESS_MAX,
+        )
+        log.info("Deck brightness: %d%%", self._deck_brightness)
+        if self._deck is not None:
+            await self._deck.set_brightness(self._deck_brightness)
+        await self._card.request_refresh()
+
     def _sync_card(self) -> None:
         """Push the full dashboard state into card bindings (initial load only)."""
         self._card.set_many(
@@ -701,41 +732,30 @@ class DashboardController:
         )
         self._card.set_range(
             "deck_brightness",
-            self._svc.deck_brightness,
-            min_val=0,
-            max_val=100,
+            self._deck_brightness,
+            min_val=self.BRIGHTNESS_MIN,
+            max_val=self.BRIGHTNESS_MAX,
         )
 
-    def _subscribe_events(self) -> None:
-        """Subscribe to service state-change events."""
-
-        @self._svc.on_brightness_changed
-        async def _on_brightness(deck_brightness: int) -> None:
-            self._card.set_range(
-                "deck_brightness",
-                deck_brightness,
-                min_val=0,
-                max_val=100,
-            )
-            if self._deck is not None:
-                await self._deck.set_brightness(deck_brightness)
-            await self._card.request_refresh()
-
     def _bind_dui_events(self) -> None:
-        """Register DUI event handlers -- these only call service methods."""
+        """Register DUI event handlers for deck brightness control."""
         card = self._card
 
         @card.on("brightness_up")
         async def _bright_up(steps: int) -> None:
-            new = card.adjust_range("deck_brightness", steps, min_val=0, max_val=100)
-            await self._svc.set_brightness(int(new))
+            new = card.adjust_range(
+                "deck_brightness", steps,
+                min_val=self.BRIGHTNESS_MIN, max_val=self.BRIGHTNESS_MAX,
+            )
+            await self._set_brightness(int(new))
 
         @card.on("brightness_down")
         async def _bright_down(steps: int) -> None:
             new = card.adjust_range(
-                "deck_brightness", -abs(steps), min_val=0, max_val=100
+                "deck_brightness", -abs(steps),
+                min_val=self.BRIGHTNESS_MIN, max_val=self.BRIGHTNESS_MAX,
             )
-            await self._svc.set_brightness(int(new))
+            await self._set_brightness(int(new))
 
     async def _clock_loop(self) -> None:
         """Refresh the clock display every second.

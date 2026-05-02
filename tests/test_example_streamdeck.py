@@ -621,20 +621,20 @@ class TestDashboardController:
         assert ":" in ctrl.get_time()
 
     async def test_set_brightness_clamps(self, ctrl: DashboardController) -> None:
-        await ctrl._svc.set_brightness(200)
+        await ctrl._set_brightness(200)
         assert ctrl.deck_brightness == 100
-        await ctrl._svc.set_brightness(-50)
+        await ctrl._set_brightness(-50)
         assert ctrl.deck_brightness == 0
 
     async def test_set_brightness_calls_deck(self, ctrl: DashboardController) -> None:
         mock_deck = MagicMock()
         mock_deck.set_brightness = AsyncMock()
         ctrl.bind_deck(mock_deck)
-        await ctrl._svc.set_brightness(75)
+        await ctrl._set_brightness(75)
         mock_deck.set_brightness.assert_awaited_once_with(75)
 
     async def test_set_brightness_without_deck(self, ctrl: DashboardController) -> None:
-        await ctrl._svc.set_brightness(50)
+        await ctrl._set_brightness(50)
         assert ctrl.deck_brightness == 50
 
 
