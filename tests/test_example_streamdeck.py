@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -393,7 +394,7 @@ class TestAudioController:
         return AudioController(MEDIA_CATALOG, packages_dir=tmp_path)
 
     def test_initial_state(self, ctrl: AudioController) -> None:
-        assert ctrl.volume_level == 0.5
+        assert ctrl.volume == 50
         assert ctrl.is_muted is False
         assert ctrl.is_playing is False
 
@@ -444,14 +445,22 @@ class TestAudioController:
         assert ctrl.card.get("artist") == MEDIA_CATALOG[-1]["artist"]
 
     async def test_set_volume_clamps(self, ctrl: AudioController) -> None:
-        await ctrl.svc.set_volume(1.5)
-        assert ctrl.volume_level == 1.0
-        await ctrl.svc.set_volume(-0.5)
-        assert ctrl.volume_level == 0.0
+        await ctrl.svc.set_volume(150)
+        assert ctrl.volume == 100
+        await ctrl.svc.set_volume(-50)
+        assert ctrl.volume == 0
 
     async def test_set_volume_updates_card(self, ctrl: AudioController) -> None:
-        await ctrl.svc.set_volume(0.75)
+        await ctrl.svc.set_volume(75)
         assert ctrl.card.get("value_text") == "75%"
+        # Volume slider binding tracks domain value normalised 0..1.
+        assert ctrl.card.get("volume") == pytest.approx(0.75)
+
+    async def test_set_volume_idempotent(self, ctrl: AudioController) -> None:
+        """A same-value set neither emits nor mutates the card."""
+        await ctrl.svc.set_volume(50)  # equal to default
+        # value_text was set during initial render; still shows 50%.
+        assert ctrl.card.get("value_text") == "50%"
 
     async def test_toggle_mute(self, ctrl: AudioController) -> None:
         await ctrl.svc.toggle_mute()
@@ -460,6 +469,22 @@ class TestAudioController:
         await ctrl.svc.toggle_mute()
         assert ctrl.is_muted is False
         assert ctrl.card.get("value_text") == "50%"
+
+    async def test_volume_handler_does_not_pre_mutate_card(
+        self, ctrl: AudioController
+    ) -> None:
+        """volume_up handler routes through the service, not the card.
+
+        The card's volume slider must reflect the *post-service* value,
+        not a pre-emptive UI guess.  We pin the service so it ignores
+        the request -- the card binding must remain unchanged.
+        """
+        before = ctrl.card.get("volume")
+        ctrl.svc.set_volume = AsyncMock()  # type: ignore[method-assign]
+        handler = ctrl.card._events._handlers["volume_up"]
+        await handler(1)
+        assert ctrl.card.get("volume") == before
+        ctrl.svc.set_volume.assert_awaited_once_with(51)
 
 
 # ===================================================================
@@ -593,7 +618,19 @@ class TestTimerController:
 
 
 class TestDashboardController:
-    """Tests for DashboardController state and card bindings."""
+    """Tests for DashboardController.
+
+    Deck brightness is *deck-owned* state -- the controller observes
+    :attr:`Deck.on_brightness_changed` rather than holding its own
+    value.  The tests verify that:
+
+    * Telemetry pushes from the service drive the temperature/humidity
+      bindings.
+    * Brightness handlers route through ``deck.set_brightness``, never
+      the card directly.
+    * ``bind_deck`` replays the controller's last-known brightness onto
+      the freshly-connected deck (the reconnect contract).
+    """
 
     @pytest.fixture
     def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> DashboardController:
@@ -603,13 +640,20 @@ class TestDashboardController:
         )
         return DashboardController()
 
+    def _real_deck(self, brightness: int = 50) -> Any:
+        """Build a real Deck so the AsyncEvents are wired correctly."""
+        from deckui.runtime.deck import Deck
+
+        return Deck(serial_number="TEST_DASH", brightness=brightness)
+
     def test_initial_state(self, ctrl: DashboardController) -> None:
+        # 0.5 default -> 50% in domain units.
         assert ctrl.deck_brightness == 50
-        assert ctrl.temperature == "22C"
-        assert ctrl.humidity == "45%"
+        assert ctrl.temperature_c == pytest.approx(22.0)
+        assert ctrl.humidity_pct == 45
 
     def test_card_initial_bindings(self, ctrl: DashboardController) -> None:
-        assert ctrl.card.get("temperature") == "22C"
+        assert ctrl.card.get("temperature") == "22.0C"
         assert ctrl.card.get("humidity") == "45%"
 
     def test_get_date_format(self, ctrl: DashboardController) -> None:
@@ -620,22 +664,68 @@ class TestDashboardController:
     def test_get_time_format(self, ctrl: DashboardController) -> None:
         assert ":" in ctrl.get_time()
 
-    async def test_set_brightness_clamps(self, ctrl: DashboardController) -> None:
-        await ctrl._set_brightness(200)
-        assert ctrl.deck_brightness == 100
-        await ctrl._set_brightness(-50)
-        assert ctrl.deck_brightness == 0
+    async def test_telemetry_event_updates_card(
+        self, ctrl: DashboardController
+    ) -> None:
+        await ctrl._svc.set_telemetry(18.4, 60)
+        assert ctrl.card.get("temperature") == "18.4C"
+        assert ctrl.card.get("humidity") == "60%"
 
-    async def test_set_brightness_calls_deck(self, ctrl: DashboardController) -> None:
-        mock_deck = MagicMock()
-        mock_deck.set_brightness = AsyncMock()
-        ctrl.bind_deck(mock_deck)
-        await ctrl._set_brightness(75)
-        mock_deck.set_brightness.assert_awaited_once_with(75)
+    async def test_brightness_handler_routes_through_deck(
+        self, ctrl: DashboardController
+    ) -> None:
+        """brightness_up only calls deck.set_brightness; no direct card mutation."""
+        deck = self._real_deck(brightness=50)
+        await ctrl.bind_deck(deck)
+        before = ctrl.card.get("deck_brightness")
 
-    async def test_set_brightness_without_deck(self, ctrl: DashboardController) -> None:
-        await ctrl._set_brightness(50)
-        assert ctrl.deck_brightness == 50
+        # Pin the deck so the event never fires; the card must stay put.
+        deck.set_brightness = AsyncMock()  # type: ignore[method-assign]
+        handler = ctrl.card._events._handlers["brightness_up"]
+        await handler(1)
+        assert ctrl.card.get("deck_brightness") == before
+        deck.set_brightness.assert_awaited_once_with(51)
+
+    async def test_brightness_event_updates_card_and_last_known(
+        self, ctrl: DashboardController
+    ) -> None:
+        """deck.set_brightness fires the event; subscriber updates UI + memory."""
+        deck = self._real_deck(brightness=50)
+        await ctrl.bind_deck(deck)
+
+        await deck.set_brightness(73)
+        assert ctrl.deck_brightness == 73
+        assert ctrl.card.get("deck_brightness") == pytest.approx(0.73)
+
+    async def test_bind_deck_replays_last_known(
+        self, ctrl: DashboardController
+    ) -> None:
+        """Reconnect: a fresh deck gets the user's last value replayed."""
+        first = self._real_deck(brightness=50)
+        await ctrl.bind_deck(first)
+        await first.set_brightness(80)
+        assert ctrl.deck_brightness == 80
+
+        # Simulate disconnect + reconnect: a brand-new Deck instance.
+        second = self._real_deck(brightness=50)
+        await ctrl.bind_deck(second)
+        # The replay must have driven the new deck to 80.
+        assert second.brightness == 80
+
+    async def test_bind_deck_no_replay_when_already_matching(
+        self, ctrl: DashboardController
+    ) -> None:
+        """If the new deck already matches, replay is a silent no-op."""
+        deck = self._real_deck(brightness=50)
+        # 50 matches the manifest default the controller is holding.
+        events: list[int] = []
+
+        @deck.on_brightness_changed
+        async def _on(value: int) -> None:
+            events.append(value)
+
+        await ctrl.bind_deck(deck)
+        assert events == []
 
 
 # ===================================================================
@@ -784,6 +874,25 @@ class TestFavoritesController:
 class TestScreenCycler:
     """Tests for the ScreenCycler controller."""
 
+    def _stub_deck(self) -> Any:
+        """Build a minimal deck stub with a real ``on_screen_changed``.
+
+        The cycler subscribes to the deck's ``on_screen_changed`` event
+        in ``bind_deck``; pure ``MagicMock`` doesn't expose AsyncEvent
+        semantics, so we wire one in by hand and have ``set_screen``
+        emit it.
+        """
+        from deckui import AsyncEvent
+
+        deck = MagicMock()
+        deck.on_screen_changed = AsyncEvent()
+
+        async def _set_screen(name: str) -> None:
+            await deck.on_screen_changed.emit(name)
+
+        deck.set_screen = AsyncMock(side_effect=_set_screen)
+        return deck
+
     def test_rejects_empty_screen_list(self) -> None:
         with pytest.raises(ValueError):
             ScreenCycler([])
@@ -794,8 +903,7 @@ class TestScreenCycler:
 
     async def test_advance_wraps_around(self) -> None:
         cycler = ScreenCycler(["a", "b", "c"])
-        deck = MagicMock()
-        deck.set_screen = AsyncMock()
+        deck = self._stub_deck()
         cycler.bind_deck(deck)
 
         await cycler.advance()
@@ -807,13 +915,25 @@ class TestScreenCycler:
 
         await cycler.advance()
         assert cycler.current == "a"
-        # Three calls in total, in order.
         targets = [c.args[0] for c in deck.set_screen.await_args_list]
         assert targets == ["b", "c", "a"]
 
+    async def test_current_tracks_external_screen_change(self) -> None:
+        """Cycler observes deck.on_screen_changed even from external callers."""
+        cycler = ScreenCycler(["a", "b", "c"])
+        deck = self._stub_deck()
+        cycler.bind_deck(deck)
+
+        # External code (not the cycler) drives the deck to "c".
+        await deck.set_screen("c")
+        assert cycler.current == "c"
+
+        # The cycler then advances from "c" -- next is "a".
+        await cycler.advance()
+        assert cycler.current == "a"
+
     async def test_advance_without_deck_is_noop(self) -> None:
         cycler = ScreenCycler(["a", "b"])
-        # No bind_deck() -- must not raise and must not advance index.
         await cycler.advance()
         assert cycler.current == "a"
 
@@ -821,20 +941,16 @@ class TestScreenCycler:
         spec = _dash_spec()
         card = DuiCard(spec)
         cycler = ScreenCycler(["a", "b"])
-        deck = MagicMock()
-        deck.set_screen = AsyncMock()
+        deck = self._stub_deck()
         cycler.bind_deck(deck)
 
         cycler.attach(card)
-        # The cycler registers a handler against the manifest event;
-        # invoke it the same way the deck would.
         handler = card._events._handlers["next_screen"]
         await handler()
         assert cycler.current == "b"
         deck.set_screen.assert_awaited_with("b")
 
     async def test_attach_custom_event_name(self) -> None:
-        # Build a dashboard-shaped spec but with a differently-named event.
         spec = PackageSpec(
             name="DashboardCard",
             type=PackageType.TOUCH_STRIP_CARD,
@@ -851,8 +967,7 @@ class TestScreenCycler:
         )
         card = DuiCard(spec)
         cycler = ScreenCycler(["x", "y"])
-        deck = MagicMock()
-        deck.set_screen = AsyncMock()
+        deck = self._stub_deck()
         cycler.bind_deck(deck)
 
         cycler.attach(card, event="rotate_screen")
