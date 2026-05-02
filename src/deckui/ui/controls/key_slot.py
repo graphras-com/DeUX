@@ -33,7 +33,14 @@ class KeySlot:
 
     @property
     def index(self) -> int:
-        """The key index on the device."""
+        """The index this key slot was constructed with.
+
+        Informational only — this is **not** updated when the key is
+        installed on a screen via :meth:`Screen.set_key`.  A single
+        ``KeySlot`` (or :class:`~deckui.dui.DuiKey`) may live on multiple
+        screens at different slot indices; the screen's slot map is the
+        authoritative source of truth.
+        """
         return self._index
 
     def set_refresh_callback(self, callback: AsyncHandler) -> None:

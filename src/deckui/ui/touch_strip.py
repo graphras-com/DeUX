@@ -62,6 +62,11 @@ class TouchStrip:
     def set_card(self, index: int, card: Card) -> None:
         """Replace the card at *index* with a custom card.
 
+        The same ``Card`` instance may be installed on multiple screens
+        (and, on a single screen, in different slots across screens) —
+        the strip's slot list is the single source of truth for routing,
+        so no state is mutated on *card* itself.
+
         Parameters
         ----------
         index
@@ -83,7 +88,6 @@ class TouchStrip:
         if not isinstance(card, Card):
             msg = f"Expected a Card instance, got {type(card).__name__}"
             raise TypeError(msg)
-        card._index = index
         self._cards[index] = card
 
     @property
