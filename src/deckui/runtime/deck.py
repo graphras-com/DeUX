@@ -283,8 +283,17 @@ class Deck:
         -------
         Screen
             The Screen instance.
+
+        Raises
+        ------
+        DeckError
+            If the device is not opened — capabilities are required to
+            size the screen, and they are only known after :meth:`start`.
         """
         from ..ui.screen import Screen
+
+        if self._caps is None:
+            raise DeckError("Device not opened")
 
         if name not in self._screens:
             self._screens[name] = Screen(name, self._caps)

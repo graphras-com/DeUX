@@ -19,6 +19,7 @@ from deckui.dui.schema import (
     PackageType,
     TextBinding,
 )
+from deckui.runtime.capabilities import STREAM_DECK_PLUS
 from deckui.ui.controls.key_slot import KeySlot
 from deckui.ui.screen import Screen
 
@@ -60,13 +61,13 @@ def _card_spec() -> PackageSpec:
 
 class TestScreenSetKey:
     def test_set_key_installs_dui_key(self):
-        screen = Screen("test")
+        screen = Screen("test", STREAM_DECK_PLUS)
         key = DuiKey(_key_spec())
         screen.set_key(0, key)
         assert screen.keys[0] is key
 
     def test_set_key_validates_index(self):
-        screen = Screen("test")
+        screen = Screen("test", STREAM_DECK_PLUS)
         key = DuiKey(_key_spec())
         with pytest.raises(IndexError):
             screen.set_key(8, key)
@@ -74,12 +75,12 @@ class TestScreenSetKey:
             screen.set_key(-1, key)
 
     def test_set_key_validates_type(self):
-        screen = Screen("test")
+        screen = Screen("test", STREAM_DECK_PLUS)
         with pytest.raises(TypeError):
             screen.set_key(0, "not a key")
 
     def test_set_key_replaces_existing(self):
-        screen = Screen("test")
+        screen = Screen("test", STREAM_DECK_PLUS)
         old = screen.key(0)
         new = DuiKey(_key_spec())
         screen.set_key(0, new)
@@ -87,7 +88,7 @@ class TestScreenSetKey:
         assert screen.keys[0] is not old
 
     def test_set_key_accepts_regular_key_slot(self):
-        screen = Screen("test")
+        screen = Screen("test", STREAM_DECK_PLUS)
         key = KeySlot()
         screen.set_key(0, key)
         assert screen.keys[0] is key
@@ -95,7 +96,7 @@ class TestScreenSetKey:
 
 class TestScreenSetCard:
     def test_set_card_with_dui_card(self):
-        screen = Screen("test")
+        screen = Screen("test", STREAM_DECK_PLUS)
         card = DuiCard(_card_spec())
         screen.set_card(0, card)
         assert screen.card(0) is card
@@ -246,7 +247,7 @@ class TestEndToEnd:
         packages = load_all_packages(dui_packages_dir)
         assert len(packages) == 2
 
-        screen = Screen("test")
+        screen = Screen("test", STREAM_DECK_PLUS)
         card = DuiCard(packages["TestCard"])
         screen.set_card(0, card)
 

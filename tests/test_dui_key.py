@@ -16,6 +16,7 @@ from deckui.dui.schema import (
     TextBinding,
     ToggleBinding,
 )
+from deckui.runtime.capabilities import STREAM_DECK_PLUS
 from deckui.ui.controls.key_slot import KeySlot
 from deckui.ui.screen import Screen
 
@@ -55,7 +56,7 @@ class TestDuiKeyIsKeySlot:
         """
         spec = _make_key_spec()
         key = DuiKey(spec)
-        screen = Screen("test")
+        screen = Screen("test", STREAM_DECK_PLUS)
         screen.set_key(3, key)
         assert screen.keys[3] is key
 

@@ -40,11 +40,9 @@ class Screen:
             await deck.set_screen("settings")
     """
 
-    def __init__(self, name: str, caps: DeviceCapabilities | None = None) -> None:
-        from ..runtime.capabilities import STREAM_DECK_PLUS
-
+    def __init__(self, name: str, caps: DeviceCapabilities) -> None:
         self._name = name
-        self._caps = caps or STREAM_DECK_PLUS
+        self._caps = caps
         self._keys: dict[int, KeySlot] = {}
         self._encoders: dict[int, EncoderSlot] = {}
 
@@ -188,7 +186,7 @@ class Screen:
 
     @property
     def touchstrip_background(self) -> str:
-        """The fill colour for the touchscreen canvas (margins and gaps)."""
+        """The fill colour for the touchscreen canvas behind cards."""
         if self._touch_strip is None:
             return "black"
         return self._touch_strip.background_color
