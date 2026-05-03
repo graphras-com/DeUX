@@ -16,6 +16,7 @@ class TestPublicAPI:
             "AsyncEvent",
             "BlankCard",
             "Card",
+            "CardController",
             "Deck",
             "DeckError",
             "DeckEvent",
@@ -30,6 +31,7 @@ class TestPublicAPI:
             "EventType",
             "ImageFetchError",
             "InfoScreen",
+            "KeyController",
             "KeyEvent",
             "KeySlot",
             "PackageError",
@@ -147,3 +149,9 @@ class TestPublicAPI:
         from deckui import Deck
 
         assert Deck is not None
+
+    def test_controllers_importable(self):
+        from deckui import CardController, KeyController
+
+        assert CardController is not None
+        assert KeyController is not None

@@ -18,6 +18,7 @@ from .svg_renderer import SvgRenderer
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from ..runtime.async_event import AsyncEvent
     from ..runtime.events import AsyncHandler
     from .schema import PackageSpec
 
@@ -286,6 +287,171 @@ class DuiKey(KeySlot):
             The async callable to invoke.
         """
         self._events.on(event_name, self._wrap_handler(handler))
+
+    def bind(
+        self,
+        name: str,
+        event: AsyncEvent,
+        *,
+        transform: Callable[..., Any] | None = None,
+    ) -> DuiKey:
+        """Subscribe to *event*; on emit, write binding *name* and refresh.
+
+        Mirror of :meth:`DuiCard.bind`.  Subscribes to a service
+        ``AsyncEvent``, optionally transforms the emitted value, calls
+        :meth:`set`, and requests a refresh if the binding changed.
+
+        Without *transform*, the binding receives the first positional
+        argument from the event.  With *transform*, the callable is
+        invoked with all event ``args``/``kwargs`` and its return
+        value becomes the binding value.
+
+        Parameters
+        ----------
+        name
+            Binding name as defined in the manifest.
+        event
+            The :class:`~deckui.runtime.async_event.AsyncEvent` to
+            subscribe to.
+        transform
+            Optional sync callable that maps event args to the binding
+            value.  If ``None``, ``args[0]`` is used.
+
+        Returns
+        -------
+        DuiKey
+            self, for method chaining.
+        """
+
+        async def _on_event(*args: Any, **kwargs: Any) -> None:
+            value = (
+                (args[0] if args else None)
+                if transform is None
+                else transform(*args, **kwargs)
+            )
+            self.set(name, value)
+            if self.is_dirty:
+                await self.request_refresh()
+
+        event.subscribe(_on_event)
+        return self
+
+    def bind_range(
+        self,
+        name: str,
+        event: AsyncEvent,
+        *,
+        min_val: float = 0,
+        max_val: float = 1,
+        transform: Callable[..., float] | None = None,
+    ) -> DuiKey:
+        """Subscribe to *event*; on emit, write binding *name* via :meth:`set_range`.
+
+        Mirror of :meth:`DuiCard.bind_range`.
+
+        Parameters
+        ----------
+        name
+            Binding name (must be a ``range`` or ``slider`` binding).
+        event
+            The :class:`~deckui.runtime.async_event.AsyncEvent` to
+            subscribe to.
+        min_val
+            Lower bound of the domain range.
+        max_val
+            Upper bound of the domain range.
+        transform
+            Optional sync callable that maps event args to a numeric
+            value in domain units.  If ``None``, ``args[0]`` is used.
+
+        Returns
+        -------
+        DuiKey
+            self, for method chaining.
+
+        Raises
+        ------
+        ValueError
+            If *min_val* equals *max_val*.
+        """
+        if min_val == max_val:
+            raise ValueError("min_val and max_val must not be equal")
+
+        async def _on_event(*args: Any, **kwargs: Any) -> None:
+            value = (
+                float(args[0])
+                if transform is None
+                else float(transform(*args, **kwargs))
+            )
+            self.set_range(name, value, min_val=min_val, max_val=max_val)
+            if self.is_dirty:
+                await self.request_refresh()
+
+        event.subscribe(_on_event)
+        return self
+
+    def bind_many(
+        self,
+        event: AsyncEvent,
+        transform: Callable[..., dict[str, Any]],
+    ) -> DuiKey:
+        """Subscribe to *event*; transform args into a dict and :meth:`set_many` it.
+
+        Mirror of :meth:`DuiCard.bind_many`.
+
+        Parameters
+        ----------
+        event
+            The :class:`~deckui.runtime.async_event.AsyncEvent` to
+            subscribe to.
+        transform
+            Required sync callable that maps event args to a dict of
+            binding names to values.
+
+        Returns
+        -------
+        DuiKey
+            self, for method chaining.
+        """
+
+        async def _on_event(*args: Any, **kwargs: Any) -> None:
+            values = transform(*args, **kwargs)
+            self.set_many(**values)
+            if self.is_dirty:
+                await self.request_refresh()
+
+        event.subscribe(_on_event)
+        return self
+
+    def forward(
+        self,
+        event_name: str,
+        target: Callable[..., Any],
+    ) -> DuiKey:
+        """Register *target* as the handler for manifest event *event_name*.
+
+        Mirror of :meth:`DuiCard.forward`.  Sugar for forwarding a DUI
+        event directly to a service method or callable.
+
+        Parameters
+        ----------
+        event_name
+            Semantic event name from the manifest.
+        target
+            Async-callable forwarding target (async function or sync
+            callable returning an awaitable).
+
+        Returns
+        -------
+        DuiKey
+            self, for method chaining.
+        """
+
+        async def _handler(*args: Any, **kwargs: Any) -> None:
+            await target(*args, **kwargs)
+
+        self._events.on(event_name, self._wrap_handler(_handler))
+        return self
 
     def _wrap_handler(self, fn: AsyncHandler) -> AsyncHandler:
         """Wrap *fn* so any state changes trigger a refresh after it runs.
