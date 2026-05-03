@@ -38,6 +38,8 @@ from .dui import (
 )
 from .render import ImageFetchError, RenderMetrics, clear_image_cache, fetch_image
 from .runtime import (
+    AsyncEvent,
+    Deck,
     DeckError,
     DeckEvent,
     DeckManager,
@@ -61,8 +63,10 @@ from .ui import (
 )
 
 __all__ = [
+    "AsyncEvent",
     "BlankCard",
     "Card",
+    "Deck",
     "DeckError",
     "DeckEvent",
     "DeckManager",

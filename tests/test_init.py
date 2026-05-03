@@ -11,8 +11,10 @@ class TestPublicAPI:
 
     def test_all_exports(self):
         expected = {
+            "AsyncEvent",
             "BlankCard",
             "Card",
+            "Deck",
             "DeckError",
             "DeckEvent",
             "DeckManager",
@@ -133,3 +135,13 @@ class TestPublicAPI:
         assert DeviceCapabilities is not None
         assert InfoScreen is not None
         assert RenderMetrics is not None
+
+    def test_async_event_importable(self):
+        from deckui import AsyncEvent
+
+        assert AsyncEvent is not None
+
+    def test_deck_importable(self):
+        from deckui import Deck
+
+        assert Deck is not None

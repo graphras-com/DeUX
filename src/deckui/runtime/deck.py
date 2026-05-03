@@ -13,6 +13,7 @@ from StreamDeck.DeviceManager import DeviceManager
 from ..render.key_renderer import render_blank_key
 from ..render.metrics import RenderMetrics
 from ..render.touch_renderer import compose_touchstrip
+from .async_event import AsyncEvent
 from .capabilities import DeviceCapabilities
 from .device_info import DeviceInfo
 from .events import (
@@ -47,6 +48,18 @@ class Deck:
 
     The ``Deck`` object provides the per-device API for screens, keys,
     encoders, touchscreen cards, brightness, and rendering.
+
+    Attributes
+    ----------
+    on_brightness_changed : AsyncEvent
+        Fires after :meth:`set_brightness` confirms a change to a *new*
+        value (the hardware push has returned).  Subscribers receive
+        the new brightness percentage as an ``int`` in ``[0, 100]``.
+        Idempotent calls (same value) do not emit.
+    on_screen_changed : AsyncEvent
+        Fires after :meth:`set_screen` finishes rendering a new active
+        screen.  Subscribers receive the new screen name (``str``).
+        Idempotent calls (same screen) do not emit.
     """
 
     def __init__(
@@ -76,6 +89,9 @@ class Deck:
 
         self._screens: dict[str, Screen] = {}
         self._active_screen: Screen | None = None
+
+        self.on_brightness_changed = AsyncEvent()
+        self.on_screen_changed = AsyncEvent()
 
     async def start(self) -> None:
         """Discover the device by serial, open it, and start the event loop."""
@@ -232,18 +248,28 @@ class Deck:
     async def set_brightness(self, percent: int) -> None:
         """Set screen brightness.
 
+        Pushes the value to the hardware (if connected) and emits
+        :attr:`on_brightness_changed` with the clamped result.  If the
+        clamped value equals the current brightness, no event fires —
+        observers see only confirmed transitions.
+
         Parameters
         ----------
         percent
-            Brightness level (0-100).
+            Brightness level (0-100).  Values outside the range are
+            clamped.
         """
-        self._brightness = max(0, min(100, percent))
-        if self._device:
+        clamped = max(0, min(100, percent))
+        if clamped == self._brightness:
+            return
+        if self._device is not None:
             loop = asyncio.get_running_loop()
             async with self._device_lock:
                 await loop.run_in_executor(
-                    self._executor, self._device.set_brightness, self._brightness
+                    self._executor, self._device.set_brightness, clamped
                 )
+        self._brightness = clamped
+        await self.on_brightness_changed.emit(clamped)
 
     def screen(self, name: str) -> Screen:
         """Get or create a screen by name.
@@ -270,17 +296,28 @@ class Deck:
         Wires up refresh callbacks on every key and card so that any
         handler or background task can call ``request_refresh()`` to
         trigger a re-render without needing a direct reference to the
-        deck.
+        deck.  After the new screen has finished rendering, fires
+        :attr:`on_screen_changed` with the new name.  No event fires
+        if the requested screen is already active.
 
         Parameters
         ----------
         name
             Screen name (must already exist via ``deck.screen(name)``).
+
+        Raises
+        ------
+        DeckError
+            If *name* does not match a previously-created screen.
         """
         if name not in self._screens:
             raise DeckError(f"Screen '{name}' does not exist")
 
-        self._active_screen = self._screens[name]
+        target = self._screens[name]
+        if target is self._active_screen:
+            return
+
+        self._active_screen = target
         logger.info("Switching to screen: %s", name)
 
         self._wire_refresh_callbacks()
@@ -290,6 +327,8 @@ class Deck:
             await self._render_touchscreen()
         if self._active_screen.info_screen is not None:
             await self._render_info_screen()
+
+        await self.on_screen_changed.emit(name)
 
     def _wire_refresh_callbacks(self) -> None:
         """Register ``self.refresh`` on every key and card of the active screen.
