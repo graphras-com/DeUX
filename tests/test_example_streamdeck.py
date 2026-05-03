@@ -628,7 +628,7 @@ class TestDashboardController:
       bindings.
     * Brightness handlers route through ``deck.set_brightness``, never
       the card directly.
-    * ``bind_deck`` replays the controller's last-known brightness onto
+    * ``on_attach`` replays the controller's last-known brightness onto
       the freshly-connected deck (the reconnect contract).
     """
 
@@ -676,7 +676,7 @@ class TestDashboardController:
     ) -> None:
         """brightness_up only calls deck.set_brightness; no direct card mutation."""
         deck = self._real_deck(brightness=50)
-        await ctrl.bind_deck(deck)
+        await ctrl.on_attach(deck)
         before = ctrl.card.get("deck_brightness")
 
         # Pin the deck so the event never fires; the card must stay put.
@@ -691,28 +691,28 @@ class TestDashboardController:
     ) -> None:
         """deck.set_brightness fires the event; subscriber updates UI + memory."""
         deck = self._real_deck(brightness=50)
-        await ctrl.bind_deck(deck)
+        await ctrl.on_attach(deck)
 
         await deck.set_brightness(73)
         assert ctrl.deck_brightness == 73
         assert ctrl.card.get("deck_brightness") == pytest.approx(0.73)
 
-    async def test_bind_deck_replays_last_known(
+    async def test_on_attach_replays_last_known(
         self, ctrl: DashboardController
     ) -> None:
         """Reconnect: a fresh deck gets the user's last value replayed."""
         first = self._real_deck(brightness=50)
-        await ctrl.bind_deck(first)
+        await ctrl.on_attach(first)
         await first.set_brightness(80)
         assert ctrl.deck_brightness == 80
 
         # Simulate disconnect + reconnect: a brand-new Deck instance.
         second = self._real_deck(brightness=50)
-        await ctrl.bind_deck(second)
+        await ctrl.on_attach(second)
         # The replay must have driven the new deck to 80.
         assert second.brightness == 80
 
-    async def test_bind_deck_no_replay_when_already_matching(
+    async def test_on_attach_no_replay_when_already_matching(
         self, ctrl: DashboardController
     ) -> None:
         """If the new deck already matches, replay is a silent no-op."""
@@ -724,7 +724,7 @@ class TestDashboardController:
         async def _on(value: int) -> None:
             events.append(value)
 
-        await ctrl.bind_deck(deck)
+        await ctrl.on_attach(deck)
         assert events == []
 
 
@@ -878,7 +878,7 @@ class TestScreenCycler:
         """Build a minimal deck stub with a real ``on_screen_changed``.
 
         The cycler subscribes to the deck's ``on_screen_changed`` event
-        in ``bind_deck``; pure ``MagicMock`` doesn't expose AsyncEvent
+        in ``on_attach``; pure ``MagicMock`` doesn't expose AsyncEvent
         semantics, so we wire one in by hand and have ``set_screen``
         emit it.
         """
@@ -904,7 +904,7 @@ class TestScreenCycler:
     async def test_advance_wraps_around(self) -> None:
         cycler = ScreenCycler(["a", "b", "c"])
         deck = self._stub_deck()
-        cycler.bind_deck(deck)
+        cycler.on_attach(deck)
 
         await cycler.advance()
         assert cycler.current == "b"
@@ -922,7 +922,7 @@ class TestScreenCycler:
         """Cycler observes deck.on_screen_changed even from external callers."""
         cycler = ScreenCycler(["a", "b", "c"])
         deck = self._stub_deck()
-        cycler.bind_deck(deck)
+        cycler.on_attach(deck)
 
         # External code (not the cycler) drives the deck to "c".
         await deck.set_screen("c")
@@ -942,7 +942,7 @@ class TestScreenCycler:
         card = DuiCard(spec)
         cycler = ScreenCycler(["a", "b"])
         deck = self._stub_deck()
-        cycler.bind_deck(deck)
+        cycler.on_attach(deck)
 
         cycler.attach(card)
         handler = card._events._handlers["next_screen"]
@@ -968,7 +968,7 @@ class TestScreenCycler:
         card = DuiCard(spec)
         cycler = ScreenCycler(["x", "y"])
         deck = self._stub_deck()
-        cycler.bind_deck(deck)
+        cycler.on_attach(deck)
 
         cycler.attach(card, event="rotate_screen")
         handler = card._events._handlers["rotate_screen"]
