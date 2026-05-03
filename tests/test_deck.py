@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from PIL import Image
 
-from deckui.render.metrics import PANEL_HEIGHT, PANEL_WIDTH, RenderMetrics
+from deckui.render.metrics import RenderMetrics
 from deckui.runtime.capabilities import STREAM_DECK_PLUS
 from deckui.runtime.deck import Deck, DeckError
 from deckui.runtime.events import (
@@ -20,6 +20,7 @@ from deckui.runtime.events import (
 )
 from deckui.ui.cards.base import Card
 from deckui.ui.screen import Screen
+from tests.conftest import PANEL_HEIGHT, PANEL_WIDTH
 
 
 class _TestCard(Card):
@@ -1004,9 +1005,7 @@ class TestDeckRenderCrossScreen:
         screen_b.set_card(3, shared_card)
 
         def expected_x(slot: int) -> int:
-            return metrics.margin_left + slot * (
-                metrics.panel_width + metrics.panel_gap
-            )
+            return slot * metrics.panel_width
 
         deck._active_screen = screen_a
         await deck._render_touchscreen()

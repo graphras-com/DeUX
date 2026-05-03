@@ -6,29 +6,28 @@ import io
 
 from PIL import Image
 
-from .metrics import (
-    ICON_SIZE,
-    KEY_SIZE,
-)
-
 
 def render_key_image(
+    key_size: tuple[int, int],
     icon: Image.Image | None = None,
     background: str = "black",
-    key_size: tuple[int, int] | None = None,
     image_format: str = "JPEG",
 ) -> bytes:
     """Render an image for a Stream Deck key.
 
+    The icon (if any) is resized to fill the entire key, edge-to-edge —
+    the library does not impose margins or padding. Callers that want
+    spacing should bake it into the source icon.
+
     Parameters
     ----------
-    icon
-        Optional icon image to render on the key.
-    background
-        Background colour name.
     key_size
-        Key dimensions ``(width, height)``.  Defaults to
-        the Stream Deck+ size ``(120, 120)``.
+        Key dimensions ``(width, height)`` in pixels.
+    icon
+        Optional icon image to render on the key. Resized to ``key_size``
+        if it does not already match.
+    background
+        Background colour name (used when *icon* is ``None`` or has alpha).
     image_format
         Image encoding format (``"JPEG"`` or ``"BMP"``).
 
@@ -37,38 +36,31 @@ def render_key_image(
     bytes
         Encoded image bytes ready to send to the device.
     """
-    size = key_size or KEY_SIZE
-    icon_px = min(size[0], size[1]) * ICON_SIZE // KEY_SIZE[0]
-
-    img = Image.new("RGB", size, background)
+    img = Image.new("RGB", key_size, background)
 
     if icon is not None:
-        if icon.size != (icon_px, icon_px):
-            icon = icon.resize((icon_px, icon_px), Image.Resampling.LANCZOS)
-
-        x_offset = (size[0] - icon_px) // 2
-        y_offset = (size[1] - icon_px) // 2
+        if icon.size != key_size:
+            icon = icon.resize(key_size, Image.Resampling.LANCZOS)
 
         if icon.mode == "RGBA":
-            img.paste(icon, (x_offset, y_offset), icon)
+            img.paste(icon, (0, 0), icon)
         else:
-            img.paste(icon, (x_offset, y_offset))
+            img.paste(icon, (0, 0))
 
     return _encode_image(img, image_format)
 
 
 def render_blank_key(
-    key_size: tuple[int, int] | None = None,
+    key_size: tuple[int, int],
     image_format: str = "JPEG",
 ) -> bytes:
-    """Render a blank key image.
+    """Render a blank key image at the given size.
 
     Parameters
     ----------
-    key_size : tuple of int, optional
-        Key dimensions ``(width, height)``.  Defaults to the
-        Stream Deck+ size ``(120, 120)``.
-    image_format : str, default="JPEG"
+    key_size
+        Key dimensions ``(width, height)`` in pixels.
+    image_format
         Image encoding format (``"JPEG"`` or ``"BMP"``).
 
     Returns

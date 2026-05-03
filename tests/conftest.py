@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 
-from deckui.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
+from deckui.render.metrics import RenderMetrics
 from deckui.runtime.capabilities import (
     STREAM_DECK_PLUS,
     DeviceCapabilities,
@@ -20,6 +20,11 @@ from deckui.ui.touch_strip import TouchStrip
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+_PLUS_METRICS = RenderMetrics(STREAM_DECK_PLUS)
+PANEL_WIDTH = _PLUS_METRICS.panel_width
+PANEL_HEIGHT = _PLUS_METRICS.panel_height
 
 
 STREAM_DECK_MINI = DeviceCapabilities(

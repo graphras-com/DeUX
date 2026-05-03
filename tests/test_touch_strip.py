@@ -5,10 +5,10 @@ from __future__ import annotations
 import pytest
 from PIL import Image
 
-from deckui.render.metrics import PANEL_HEIGHT, PANEL_WIDTH
 from deckui.ui.cards.base import Card
 from deckui.ui.cards.blank import BlankCard
 from deckui.ui.touch_strip import TouchStrip
+from tests.conftest import PANEL_HEIGHT, PANEL_WIDTH
 
 
 class _ConcreteWidget(Card):

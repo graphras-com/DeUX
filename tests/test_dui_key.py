@@ -135,7 +135,7 @@ class TestDuiKeyRender:
             bindings={"label": TextBinding(node="label", default="Test")}
         )
         key = DuiKey(spec)
-        data = key.render_image()
+        data = key.render_image(key_size=(120, 120))
         assert isinstance(data, bytes)
         assert len(data) > 0
         assert data[:2] == b"\xff\xd8"
@@ -143,7 +143,7 @@ class TestDuiKeyRender:
     def test_render_image_is_120x120(self):
         spec = _make_key_spec()
         key = DuiKey(spec)
-        data = key.render_image()
+        data = key.render_image(key_size=(120, 120))
         import io
 
         img = Image.open(io.BytesIO(data))
@@ -165,7 +165,7 @@ class TestDuiKeyRender:
             bindings={"label": TextBinding(node="label", default="Hi")},
         )
         key = DuiKey(spec)
-        data = key.render_image()
+        data = key.render_image(key_size=(120, 120))
         import io
 
         img = Image.open(io.BytesIO(data))
@@ -218,10 +218,10 @@ class TestDuiKeyToggleBinding:
     def test_toggle_renders_different_images(self):
         spec = self._make_toggle_spec()
         key = DuiKey(spec)
-        data_off = key.render_image()
+        data_off = key.render_image(key_size=(120, 120))
 
         key.set("state", True)
-        data_on = key.render_image()
+        data_on = key.render_image(key_size=(120, 120))
 
         assert data_off != data_on
 

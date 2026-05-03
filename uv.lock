@@ -374,7 +374,6 @@ wheels = [
 
 [[package]]
 name = "deckui"
-version = "1.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "cairosvg" },
@@ -414,7 +413,7 @@ requires-dist = [
     { name = "streamdeck", specifier = ">=0.9.8" },
     { name = "types-pyyaml", marker = "extra == 'test'", specifier = ">=6.0" },
 ]
-provides-extras = ["test", "docs"]
+provides-extras = ["docs", "test"]
 
 [[package]]
 name = "defusedxml"

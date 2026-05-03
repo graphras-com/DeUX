@@ -213,7 +213,7 @@ class TestEndToEnd:
         spec = load_package(key_dui_path)
         key = DuiKey(spec)
         key.set("label", "Power")
-        data = key.render_image()
+        data = key.render_image(key_size=(120, 120))
         assert isinstance(data, bytes)
         assert data[:2] == b"\xff\xd8"
 

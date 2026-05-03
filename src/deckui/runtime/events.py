@@ -70,14 +70,10 @@ class TouchEvent:
         int
             Zone index (0 to panel_count-1).
         """
-        if metrics.panel_count == 0:
+        if metrics.panel_count == 0 or metrics.panel_width <= 0:
             return 0
 
-        rel = self.x - metrics.margin_left
-        stride = metrics.panel_width + metrics.panel_gap
-        if stride <= 0:
-            return 0
-        zone = rel // stride
+        zone = self.x // metrics.panel_width
         return max(0, min(zone, metrics.panel_count - 1))
 
 DeckEvent = KeyEvent | EncoderTurnEvent | EncoderPressEvent | TouchEvent
