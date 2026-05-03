@@ -17,6 +17,7 @@ from deckui.dui.schema import (
     TextBinding,
     ToggleBinding,
 )
+from deckui.runtime.capabilities import STREAM_DECK_PLUS
 from deckui.runtime.events import EventType, TouchEvent
 from deckui.ui.cards.base import Card
 from deckui.ui.screen import Screen
@@ -58,7 +59,7 @@ class TestDuiCardIsCard:
         list is the authoritative source of truth.
         """
         card = DuiCard(card_package_spec)
-        screen = Screen("test")
+        screen = Screen("test", STREAM_DECK_PLUS)
         screen.set_card(2, card)
         assert screen.touch_strip is not None
         assert screen.touch_strip.cards[2] is card

@@ -32,8 +32,15 @@ class _TestCard(Card):
 
 @pytest.fixture
 def deck(tmp_path):
-    """A Deck instance with required serial_number."""
-    return Deck(serial_number="TEST123")
+    """A Deck instance with required serial_number.
+
+    Capabilities are pre-populated so tests can call ``deck.screen()``
+    without going through the real device-discovery path.
+    """
+    d = Deck(serial_number="TEST123")
+    d._caps = STREAM_DECK_PLUS
+    d._metrics = RenderMetrics(STREAM_DECK_PLUS)
+    return d
 
 
 class TestDeckInit:
@@ -656,21 +663,25 @@ class TestDeckInfo:
 
 
 class TestDeckCapabilities:
-    def test_capabilities_not_opened(self, deck):
+    def test_capabilities_not_opened(self):
+        d = Deck(serial_number="TEST123")
         with pytest.raises(DeckError, match="Device not opened"):
-            _ = deck.capabilities
+            _ = d.capabilities
 
-    def test_metrics_not_opened(self, deck):
+    def test_metrics_not_opened(self):
+        d = Deck(serial_number="TEST123")
         with pytest.raises(DeckError, match="Device not opened"):
-            _ = deck.metrics
+            _ = d.metrics
+
+    def test_screen_not_opened(self):
+        d = Deck(serial_number="TEST123")
+        with pytest.raises(DeckError, match="Device not opened"):
+            d.screen("main")
 
     def test_capabilities_after_set(self, deck):
-        deck._caps = STREAM_DECK_PLUS
         assert deck.capabilities is STREAM_DECK_PLUS
 
     def test_metrics_after_set(self, deck):
-        deck._caps = STREAM_DECK_PLUS
-        deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
         assert deck.metrics.key_count == 8
 
 
