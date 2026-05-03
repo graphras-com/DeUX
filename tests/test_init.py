@@ -7,10 +7,12 @@ import deckui
 
 class TestPublicAPI:
     def test_version(self):
-        assert deckui.__version__ == "0.1.0"
+        assert isinstance(deckui.__version__, str)
+        assert len(deckui.__version__) > 0
 
     def test_all_exports(self):
         expected = {
+            "__version__",
             "AsyncEvent",
             "BlankCard",
             "Card",

@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "deckui"
-version = "1.2.1"
+dynamic = ["version"]
 description = "A high-level, asyncio-native Python library for Elgato Stream Deck devices."
 readme = "README.md"
 license = "Apache-2.0"
@@ -38,6 +38,12 @@ dependencies = [
 Homepage = "https://github.com/Graphras-com/DeckUI"
 Repository = "https://github.com/Graphras-com/DeckUI"
 Issues = "https://github.com/Graphras-com/DeckUI/issues"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/deckui/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/deckui"]
