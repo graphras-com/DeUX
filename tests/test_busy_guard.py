@@ -141,7 +141,7 @@ class TestCardBusyState:
         card = DuiCard(spec)
 
         push_fn = AsyncMock()
-        card.set_push_fn(push_fn)
+        card.set_push_fn(push_fn, panel_size=(200, 100))
 
         await card.start_busy()
         assert card.is_animating is True
@@ -164,7 +164,7 @@ class TestCardBusyState:
         card.set("title", "Updated")
 
         push_fn = AsyncMock()
-        card.set_push_fn(push_fn)
+        card.set_push_fn(push_fn, panel_size=(200, 100))
 
         await card.start_busy()
 
@@ -248,7 +248,7 @@ class TestKeyBusyState:
         key = DuiKey(spec)
 
         push_fn = AsyncMock()
-        key.set_push_fn(push_fn)
+        key.set_push_fn(push_fn, key_size=(120, 120))
 
         await key.start_busy()
         assert key.is_animating is True
@@ -271,7 +271,7 @@ class TestKeyBusyState:
         key.set("label", "Playing")
 
         push_fn = AsyncMock()
-        key.set_push_fn(push_fn)
+        key.set_push_fn(push_fn, key_size=(120, 120))
 
         await key.start_busy()
 

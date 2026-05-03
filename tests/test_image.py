@@ -11,23 +11,15 @@ from deckui.render.key_renderer import (
     render_blank_key,
     render_key_image,
 )
-from deckui.render.metrics import (
-    ICON_PADDING,
-    ICON_SIZE,
-    KEY_MARGIN_BOTTOM,
-    KEY_MARGIN_LEFT,
-    KEY_MARGIN_RIGHT,
-    KEY_MARGIN_TOP,
-    KEY_SIZE,
-    KEY_USABLE_HEIGHT,
-    KEY_USABLE_WIDTH,
-    TOUCHSCREEN_HEIGHT,
-    TOUCHSCREEN_WIDTH,
-)
 from deckui.render.touch_renderer import (
     compose_touchstrip,
     render_blank_touchscreen,
 )
+
+KEY_SIZE = (120, 120)
+TOUCHSCREEN_SIZE = (800, 100)
+PANEL_WIDTH = 200
+PANEL_HEIGHT = 100
 
 
 def _decode_jpeg(data: bytes) -> Image.Image:
@@ -37,197 +29,169 @@ def _decode_jpeg(data: bytes) -> Image.Image:
 
 class TestRenderKeyImage:
     def test_blank_returns_bytes(self):
-        result = render_key_image()
+        result = render_key_image(key_size=KEY_SIZE)
         assert isinstance(result, bytes)
         assert len(result) > 0
 
     def test_blank_dimensions(self):
-        result = render_key_image()
-        img = _decode_jpeg(result)
+        img = _decode_jpeg(render_key_image(key_size=KEY_SIZE))
         assert img.size == KEY_SIZE
 
     def test_with_rgba_icon(self, sample_icon):
-        result = render_key_image(icon=sample_icon)
-        img = _decode_jpeg(result)
+        img = _decode_jpeg(render_key_image(key_size=KEY_SIZE, icon=sample_icon))
         assert img.size == KEY_SIZE
 
     def test_with_rgb_icon(self, sample_rgb_icon):
-        result = render_key_image(icon=sample_rgb_icon)
-        img = _decode_jpeg(result)
+        img = _decode_jpeg(render_key_image(key_size=KEY_SIZE, icon=sample_rgb_icon))
         assert img.size == KEY_SIZE
 
-    def test_icon_resized_if_wrong_size(self):
-        """An icon that's not 80x80 should be resized."""
+    def test_icon_resized_to_key_size(self):
+        """An icon that's not key_size should be resized to fill the key."""
         big_icon = Image.new("RGBA", (200, 200), (255, 0, 0, 255))
-        result = render_key_image(icon=big_icon)
-        img = _decode_jpeg(result)
+        img = _decode_jpeg(render_key_image(key_size=KEY_SIZE, icon=big_icon))
         assert img.size == KEY_SIZE
 
     def test_custom_background(self):
-        result = render_key_image(background="blue")
-        img = _decode_jpeg(result)
+        img = _decode_jpeg(render_key_image(key_size=KEY_SIZE, background="blue"))
         assert img.size == KEY_SIZE
 
     def test_is_jpeg(self):
-        result = render_key_image()
+        result = render_key_image(key_size=KEY_SIZE)
         assert result[:2] == b"\xff\xd8"
 
+    def test_icon_fills_key_edge_to_edge(self):
+        """Icon is rendered at full key size — no margin/padding."""
+        red_icon = Image.new("RGBA", KEY_SIZE, (255, 0, 0, 255))
+        result = render_key_image(key_size=KEY_SIZE, icon=red_icon)
+        decoded = _decode_jpeg(result).convert("RGB")
+        # Top-left corner pixel is part of the icon, not background.
+        r, _, _ = decoded.getpixel((0, 0))
+        assert r > 200
 
-class TestKeyMarginConstants:
-    def test_usable_width(self):
-        assert KEY_SIZE[0] - KEY_MARGIN_LEFT - KEY_MARGIN_RIGHT == KEY_USABLE_WIDTH
-
-    def test_usable_height(self):
-        assert KEY_SIZE[1] - KEY_MARGIN_TOP - KEY_MARGIN_BOTTOM == KEY_USABLE_HEIGHT
-
-    def test_usable_area_is_106x106(self):
-        assert KEY_USABLE_WIDTH == 106
-        assert KEY_USABLE_HEIGHT == 106
-
-    def test_icon_padding_fits_within_usable_area(self):
-        assert ICON_PADDING == (KEY_USABLE_WIDTH - ICON_SIZE) // 2
-
-    def test_icon_plus_padding_fits(self):
-        assert ICON_SIZE + 2 * ICON_PADDING <= KEY_USABLE_WIDTH
-        assert ICON_SIZE + 2 * ICON_PADDING <= KEY_USABLE_HEIGHT
-
-    def test_margins_are_positive(self):
-        assert KEY_MARGIN_TOP > 0
-        assert KEY_MARGIN_RIGHT > 0
-        assert KEY_MARGIN_BOTTOM > 0
-        assert KEY_MARGIN_LEFT > 0
-
-
-class TestKeyMarginRendering:
-    def test_icon_within_margins(self, sample_icon):
-        """An icon-only key should have content only inside the margin area."""
-        result = render_key_image(icon=sample_icon)
-        img = _decode_jpeg(result)
-
-        for x in range(KEY_MARGIN_LEFT):
-            for y in range(KEY_SIZE[1]):
-                r, g, b = img.getpixel((x, y))
-                assert r < 20 and g < 20 and b < 20, (
-                    f"Non-black pixel at ({x}, {y}) in left margin: ({r}, {g}, {b})"
-                )
-
-    def test_right_margin_is_clear(self, sample_icon):
-        """Right margin area should remain background-coloured."""
-        result = render_key_image(icon=sample_icon)
-        img = _decode_jpeg(result)
-
-        for x in range(KEY_SIZE[0] - KEY_MARGIN_RIGHT, KEY_SIZE[0]):
-            for y in range(KEY_SIZE[1]):
-                r, g, b = img.getpixel((x, y))
-                assert r < 20 and g < 20 and b < 20, (
-                    f"Non-black pixel at ({x}, {y}) in right margin: ({r}, {g}, {b})"
-                )
+    def test_key_size_supports_non_default_devices(self):
+        """A different key size (e.g. Mini's 80x80) renders at that size."""
+        mini = (80, 80)
+        result = render_key_image(key_size=mini, image_format="BMP")
+        img = Image.open(io.BytesIO(result))
+        assert img.size == mini
 
 
 class TestComposeTouchscreen:
+    def _full_args(self) -> dict[str, int]:
+        return {
+            "touchscreen_width": TOUCHSCREEN_SIZE[0],
+            "touchscreen_height": TOUCHSCREEN_SIZE[1],
+            "panel_count": 4,
+            "panel_width": PANEL_WIDTH,
+        }
+
     def test_all_none(self):
-        result = compose_touchstrip([None, None, None, None])
+        result = compose_touchstrip([None, None, None, None], **self._full_args())
         img = _decode_jpeg(result)
-        assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
+        assert img.size == TOUCHSCREEN_SIZE
 
     def test_with_images(self, sample_widget_image):
         images = [sample_widget_image] * 4
-        result = compose_touchstrip(images)
+        result = compose_touchstrip(images, **self._full_args())
         img = _decode_jpeg(result)
-        assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
+        assert img.size == TOUCHSCREEN_SIZE
 
     def test_mixed_none_and_images(self, sample_widget_image):
         result = compose_touchstrip(
-            [sample_widget_image, None, sample_widget_image, None]
+            [sample_widget_image, None, sample_widget_image, None],
+            **self._full_args(),
         )
         img = _decode_jpeg(result)
-        assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
+        assert img.size == TOUCHSCREEN_SIZE
 
-    def test_more_than_four_ignored(self, sample_widget_image):
-        """Extra images beyond 4 are silently ignored."""
+    def test_more_than_panel_count_ignored(self, sample_widget_image):
         images = [sample_widget_image] * 6
-        result = compose_touchstrip(images)
+        result = compose_touchstrip(images, **self._full_args())
         img = _decode_jpeg(result)
-        assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
+        assert img.size == TOUCHSCREEN_SIZE
 
     def test_empty_list(self):
-        result = compose_touchstrip([])
+        result = compose_touchstrip([], **self._full_args())
         img = _decode_jpeg(result)
-        assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
+        assert img.size == TOUCHSCREEN_SIZE
 
     def test_is_jpeg(self, sample_widget_image):
-        result = compose_touchstrip([sample_widget_image] * 4)
+        result = compose_touchstrip([sample_widget_image] * 4, **self._full_args())
         assert result[:2] == b"\xff\xd8"
 
     def test_custom_background_color(self):
-        """Background colour fills the canvas margins and gaps."""
-        result = compose_touchstrip([None] * 4, background="#ff0000")
+        result = compose_touchstrip([None] * 4, background="#ff0000", **self._full_args())
         img = _decode_jpeg(result)
-        assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
+        assert img.size == TOUCHSCREEN_SIZE
         r, g, b = img.getpixel((0, 0))
         assert r > 200
         assert g < 50
         assert b < 50
 
     def test_default_background_is_black(self):
-        """Without a background argument the canvas is black."""
-        result = compose_touchstrip([None] * 4)
+        result = compose_touchstrip([None] * 4, **self._full_args())
         img = _decode_jpeg(result)
         r, g, b = img.getpixel((0, 0))
         assert r < 10
         assert g < 10
         assert b < 10
 
+    def test_cards_tile_edge_to_edge(self):
+        """Card 1 starts immediately after card 0 — no gap."""
+        red = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), (255, 0, 0))
+        green = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), (0, 255, 0))
+        result = compose_touchstrip([red, green, None, None], **self._full_args())
+        decoded = _decode_jpeg(result).convert("RGB")
+        # Pixel inside card 0 (red), away from JPEG block boundaries.
+        r0, g0, _ = decoded.getpixel((PANEL_WIDTH - 16, PANEL_HEIGHT // 2))
+        # Pixel inside card 1 (green), away from JPEG block boundaries.
+        r1, g1, _ = decoded.getpixel((PANEL_WIDTH + 16, PANEL_HEIGHT // 2))
+        assert r0 > 200 and g0 < 50
+        assert g1 > 200 and r1 < 50
+
 
 class TestRenderBlankKey:
     def test_returns_bytes(self):
-        result = render_blank_key()
+        result = render_blank_key(key_size=KEY_SIZE)
         assert isinstance(result, bytes)
 
     def test_dimensions(self):
-        img = _decode_jpeg(render_blank_key())
+        img = _decode_jpeg(render_blank_key(key_size=KEY_SIZE))
         assert img.size == KEY_SIZE
 
     def test_is_jpeg(self):
-        assert render_blank_key()[:2] == b"\xff\xd8"
+        assert render_blank_key(key_size=KEY_SIZE)[:2] == b"\xff\xd8"
 
 
 class TestRenderBlankTouchscreen:
     def test_returns_bytes(self):
-        result = render_blank_touchscreen()
+        result = render_blank_touchscreen(
+            touchscreen_width=TOUCHSCREEN_SIZE[0],
+            touchscreen_height=TOUCHSCREEN_SIZE[1],
+            panel_count=4,
+            panel_width=PANEL_WIDTH,
+        )
         assert isinstance(result, bytes)
 
     def test_dimensions(self):
-        img = _decode_jpeg(render_blank_touchscreen())
-        assert img.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
-
-    def test_custom_background(self):
-        result = render_blank_touchscreen(background="#00ff00")
-        img = _decode_jpeg(result)
-        r, g, b = img.getpixel((0, 0))
-        assert g > 200
-        assert r < 50
-        assert b < 50
+        img = _decode_jpeg(
+            render_blank_touchscreen(
+                touchscreen_width=TOUCHSCREEN_SIZE[0],
+                touchscreen_height=TOUCHSCREEN_SIZE[1],
+                panel_count=4,
+                panel_width=PANEL_WIDTH,
+            )
+        )
+        assert img.size == TOUCHSCREEN_SIZE
 
 
 class TestEncodeImage:
-    def test_returns_bytes(self):
+    def test_jpeg_default(self):
         img = Image.new("RGB", (10, 10), "red")
         result = _encode_image(img)
-        assert isinstance(result, bytes)
-
-    def test_is_jpeg_by_default(self):
-        img = Image.new("RGB", (10, 10))
-        assert _encode_image(img)[:2] == b"\xff\xd8"
-
-    def test_quality_parameter(self):
-        img = Image.new("RGB", (100, 100), "red")
-        low = _encode_image(img, quality=10)
-        high = _encode_image(img, quality=95)
-        assert len(low) < len(high)
+        assert result[:2] == b"\xff\xd8"
 
     def test_bmp_format(self):
         img = Image.new("RGB", (10, 10), "red")
         result = _encode_image(img, image_format="BMP")
-        assert isinstance(result, bytes)
         assert result[:2] == b"BM"

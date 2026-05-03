@@ -63,6 +63,7 @@ class DuiCard(Card):
         self._animator: SpinnerAnimator | None = None
         self._spinner_frames: SpinnerFrames | None = None
         self._push_fn: PushFn | None = None
+        self._panel_size: tuple[int, int] | None = None
 
     @property
     def spec(self) -> PackageSpec:
@@ -79,7 +80,7 @@ class DuiCard(Card):
         """Whether a spinner animation is currently running."""
         return self._animator is not None and self._animator.is_running
 
-    def set_push_fn(self, push_fn: PushFn) -> None:
+    def set_push_fn(self, push_fn: PushFn, panel_size: tuple[int, int]) -> None:
         """Set the async function used to push animation frames to the device.
 
         This must be called before spinner animations can play.
@@ -89,8 +90,12 @@ class DuiCard(Card):
         ----------
         push_fn
             Async callable ``(frame_bytes) -> None``.
+        panel_size
+            ``(width, height)`` of the touchscreen panel this card occupies,
+            used to size spinner frames.
         """
         self._push_fn = push_fn
+        self._panel_size = panel_size
 
     def set(self, name: str, value: Any) -> DuiCard:
         """Set a binding value.  Marks the card dirty if changed.
@@ -516,7 +521,8 @@ class DuiCard(Card):
         Returns
         -------
         Image.Image
-            A PANEL_WIDTH x PANEL_HEIGHT RGB :class:`~PIL.Image.Image`.
+            A panel-sized RGB :class:`~PIL.Image.Image` (sized from the
+            ``.dui`` SVG's intrinsic dimensions).
         """
         return self._renderer.render()
 
@@ -582,16 +588,19 @@ class DuiCard(Card):
 
     async def _start_spinner(self) -> None:
         """Start the spinner animation if configured."""
-        if self._spec.spinner is None or self._push_fn is None:
+        if (
+            self._spec.spinner is None
+            or self._push_fn is None
+            or self._panel_size is None
+        ):
             return
 
-        from ..render.metrics import PANEL_HEIGHT, PANEL_WIDTH
-
+        width, height = self._panel_size
         rendered_svg = self._renderer.render_svg()
         self._spinner_frames = SpinnerFrames(
             self._spec,
-            width=PANEL_WIDTH,
-            height=PANEL_HEIGHT,
+            width=width,
+            height=height,
             rendered_svg=rendered_svg,
         )
 

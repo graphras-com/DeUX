@@ -13,12 +13,12 @@ Examples
         --card0 my_card.svg --key0 my_key.svg --watch
 
 Only the specified slots are updated; unspecified keys and cards are
-left blank (black unless ``--background`` is given).  SVGs are scaled to
-fit the target area while preserving aspect ratio and centred on the
-background colour.
+left blank (black unless ``--background`` is given).  SVGs are scaled
+edge-to-edge to the connected device's native key/panel size — the tool
+does not impose any margins, padding, or gaps.
 
-The tool auto-detects the first connected visual Stream Deck device
-and adapts key/card counts and dimensions to the hardware.
+The tool auto-detects the first connected visual Stream Deck device and
+adapts key/card counts and dimensions to the hardware.
 
 With ``--watch``, the tool monitors all specified SVG files and
 automatically re-renders and re-pushes images when any file changes.
@@ -43,27 +43,16 @@ from typing import Protocol, cast
 from PIL import Image
 
 from deckui.render.key_renderer import _encode_image
-from deckui.render.metrics import (
-    KEY_MARGIN_LEFT,
-    KEY_MARGIN_TOP,
-    KEY_SIZE,
-    KEY_USABLE_HEIGHT,
-    KEY_USABLE_WIDTH,
-    MARGIN_LEFT,
-    MARGIN_TOP,
-    PANEL_COUNT,
-    PANEL_GAP,
-    PANEL_HEIGHT,
-    PANEL_WIDTH,
-    TOUCHSCREEN_HEIGHT,
-    TOUCHSCREEN_WIDTH,
-)
 from deckui.render.svg_rasterize import RasterizeError
-from deckui.runtime.capabilities import STREAM_DECK_PLUS
+from deckui.runtime.capabilities import DeviceCapabilities
 
 logger = logging.getLogger(__name__)
 
-_KEY_COUNT = STREAM_DECK_PLUS.key_count
+# Upper-bound slot counts used only to generate ``--keyN`` / ``--cardN``
+# CLI flags. The tool ignores flags that don't correspond to an actual
+# slot on the connected device, so generous bounds are harmless.
+_MAX_KEY_SLOTS = 32
+_MAX_CARD_SLOTS = 8
 
 _HEX_RE = re.compile(r"^#?([0-9a-fA-F]{6})$")
 
@@ -186,28 +175,33 @@ def load_svg(path: Path, max_width: int, max_height: int) -> Image.Image:
     return img
 
 
+def compose_key_image(
+    svg_img: Image.Image,
+    key_size: tuple[int, int],
+    background: str = "black",
+) -> bytes:
+    """Place *svg_img* edge-to-edge on a key-sized canvas.
 
-
-def compose_key_image(svg_img: Image.Image) -> bytes:
-    """Place *svg_img* centred within the usable area of a key canvas.
-
-    The SVG is centred within the margin-bounded usable area
-    (``KEY_USABLE_WIDTH`` x ``KEY_USABLE_HEIGHT``) so the design
-    respects the key margins defined in ``render.metrics``.
+    The image is centred only when its intrinsic aspect ratio differs
+    from the key — there are no margins or padding around it.
 
     Parameters
     ----------
-    svg_img : Image.Image
+    svg_img
         Pre-rasterised SVG image to composite onto the key canvas.
+    key_size
+        ``(width, height)`` of the target key canvas.
+    background
+        Canvas fill colour (any PIL-compatible colour string).
 
     Returns
     -------
     bytes
         JPEG-encoded image bytes ready for ``set_key_image``.
     """
-    canvas = Image.new("RGB", KEY_SIZE, "black")
-    x = KEY_MARGIN_LEFT + (KEY_USABLE_WIDTH - svg_img.width) // 2
-    y = KEY_MARGIN_TOP + (KEY_USABLE_HEIGHT - svg_img.height) // 2
+    canvas = Image.new("RGB", key_size, background)
+    x = (key_size[0] - svg_img.width) // 2
+    y = (key_size[1] - svg_img.height) // 2
     if svg_img.mode == "RGBA":
         canvas.paste(svg_img, (x, y), svg_img)
     else:
@@ -217,26 +211,28 @@ def compose_key_image(svg_img: Image.Image) -> bytes:
 
 def compose_card_image(
     svg_img: Image.Image,
+    panel_size: tuple[int, int],
     background: str = "black",
 ) -> Image.Image:
-    """Place *svg_img* centred on a panel-sized card canvas.
+    """Place *svg_img* edge-to-edge on a panel-sized card canvas.
 
     Parameters
     ----------
-    svg_img : Image.Image
+    svg_img
         Pre-rasterised SVG image to composite onto the card canvas.
-    background : str, default="black"
-        Canvas fill colour (any PIL-compatible colour string,
-        e.g. ``"black"`` or ``"#1a2b3c"``).
+    panel_size
+        ``(width, height)`` of the target panel.
+    background
+        Canvas fill colour (any PIL-compatible colour string).
 
     Returns
     -------
     Image.Image
-        Composited card image at ``PANEL_WIDTH`` x ``PANEL_HEIGHT``.
+        Composited card image at *panel_size*.
     """
-    canvas = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), background)
-    x = (PANEL_WIDTH - svg_img.width) // 2
-    y = (PANEL_HEIGHT - svg_img.height) // 2
+    canvas = Image.new("RGB", panel_size, background)
+    x = (panel_size[0] - svg_img.width) // 2
+    y = (panel_size[1] - svg_img.height) // 2
     if svg_img.mode == "RGBA":
         canvas.paste(svg_img, (x, y), svg_img)
     else:
@@ -246,56 +242,56 @@ def compose_card_image(
 
 def compose_touchstrip(
     card_images: list[Image.Image | None],
+    *,
+    touchscreen_width: int,
+    touchscreen_height: int,
+    panel_count: int,
+    panel_width: int,
     background: str = "black",
 ) -> bytes:
-    """Compose up to 4 card images into a single 800x100 touchscreen JPEG.
+    """Compose card images into a single touchscreen JPEG.
 
-    Parameters
-    ----------
-    card_images : list[Image.Image | None]
-        Up to 4 card images (or ``None`` for empty slots).
-    background : str, default="black"
-        Fill colour for the entire 800x100 canvas, including margin
-        and gap areas outside card panels.
-
-    Returns
-    -------
-    bytes
-        JPEG-encoded 800x100 touchscreen image bytes.
+    Cards are tiled edge-to-edge starting at ``(i * panel_width, 0)``.
+    The *background* colour shows wherever a slot is ``None`` or a
+    card image leaves pixels uncovered.
     """
-    img = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), background)
+    img = Image.new("RGB", (touchscreen_width, touchscreen_height), background)
     for index, card_image in enumerate(card_images):
-        if index >= PANEL_COUNT:
+        if index >= panel_count:
             break
         if card_image is not None:
-            x = MARGIN_LEFT + index * (PANEL_WIDTH + PANEL_GAP)
-            img.paste(card_image, (x, MARGIN_TOP))
+            img.paste(card_image, (index * panel_width, 0))
     return _encode_image(img)
 
 
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the ``argparse`` parser for the preview tool."""
+    """Build the ``argparse`` parser for the preview tool.
+
+    The parser declares ``--keyN`` / ``--cardN`` flags up to a generous
+    upper bound; flags that don't correspond to an actual slot on the
+    connected device are ignored at render time.
+    """
     parser = argparse.ArgumentParser(
         prog="python -m deckui.tools.preview",
-        description="Preview SVG designs on a Stream Deck+ device.",
+        description="Preview SVG designs on a Stream Deck device.",
     )
-    for i in range(_KEY_COUNT):
+    for i in range(_MAX_KEY_SLOTS):
         parser.add_argument(
             f"--key{i}",
             type=Path,
             default=None,
             metavar="SVG",
-            help=f"SVG file for key slot {i}",
+            help=argparse.SUPPRESS if i >= 8 else f"SVG file for key slot {i}",
         )
-    for i in range(PANEL_COUNT):
+    for i in range(_MAX_CARD_SLOTS):
         parser.add_argument(
             f"--card{i}",
             type=Path,
             default=None,
             metavar="SVG",
-            help=f"SVG file for card slot {i}",
+            help=argparse.SUPPRESS if i >= 4 else f"SVG file for card slot {i}",
         )
     parser.add_argument(
         "-b",
@@ -376,36 +372,39 @@ def _find_and_open_device() -> PreviewDeckDevice:
 
 
 async def push_to_device(
-    key_images: dict[int, bytes],
-    touchstrip_bytes: bytes,
-    brightness: int = 80,
+    args: argparse.Namespace,
     *,
-    watch_args: argparse.Namespace | None = None,
     poll_interval: float = 0.5,
 ) -> None:
-    """Push rendered images to the physical Stream Deck+.
+    """Open the deck, render images for *args*, and push them.
 
-    *key_images* maps key indices to JPEG bytes.  *touchstrip_bytes* is
-    the full 800x100 touchscreen JPEG.  *brightness* sets the screen
-    brightness (0-100).
+    Sized to the connected device's capabilities — key images are
+    rendered at ``caps.key_size`` and the touchstrip at
+    ``caps.touchscreen_width × caps.touchscreen_height``.
 
-    When *watch_args* is provided, the tool watches the SVG files
-    specified in those args and automatically re-renders and re-pushes
-    when changes are detected.  *poll_interval* controls how often files
+    When ``args.watch`` is true the tool polls the referenced SVG files
+    and re-pushes on change.  *poll_interval* controls how often files
     are polled (in seconds).
     """
     loop = asyncio.get_running_loop()
     deck = await loop.run_in_executor(None, _find_and_open_device)
 
     try:
-        brightness = max(0, min(100, brightness))
+        caps = DeviceCapabilities.from_device(cast("object", deck))
+        panel_width = (
+            caps.touchscreen_width // caps.panel_count if caps.panel_count > 0 else 0
+        )
+
+        brightness = max(0, min(100, args.brightness))
         await loop.run_in_executor(
             None,
             deck.set_brightness,
             brightness,
         )
 
-        for key_index in range(_KEY_COUNT):
+        key_images, touchstrip_bytes = render_preview(args, caps)
+
+        for key_index in range(caps.key_count):
             jpeg = key_images.get(key_index)
             if jpeg is not None:
                 await loop.run_in_executor(
@@ -415,22 +414,23 @@ async def push_to_device(
                     jpeg,
                 )
 
-        await loop.run_in_executor(
-            None,
-            deck.set_touchscreen_image,
-            touchstrip_bytes,
-            0,
-            0,
-            TOUCHSCREEN_WIDTH,
-            TOUCHSCREEN_HEIGHT,
-        )
+        if caps.has_touchscreen:
+            await loop.run_in_executor(
+                None,
+                deck.set_touchscreen_image,
+                touchstrip_bytes,
+                0,
+                0,
+                caps.touchscreen_width,
+                caps.touchscreen_height,
+            )
 
-        if watch_args is not None:
+        if args.watch:
             print(  # noqa: T201
                 "Preview pushed — watching for changes (Ctrl+C to exit)",
                 file=sys.stderr,
             )
-            await _watch_and_reload(watch_args, deck, poll_interval)
+            await _watch_and_reload(args, deck, caps, panel_width, poll_interval)
         else:
             print("Preview pushed — press Ctrl+C to exit", file=sys.stderr)  # noqa: T201
             await _wait_for_interrupt()
@@ -457,23 +457,17 @@ async def _wait_for_interrupt() -> None:
 def collect_svg_paths(args: argparse.Namespace) -> list[Path]:
     """Return the list of SVG file paths specified in *args*.
 
-    Parameters
-    ----------
-    args : argparse.Namespace
-        Parsed CLI arguments containing ``key0``–``keyN`` and
-        ``card0``–``cardN`` attributes.
-
     Returns
     -------
     list[Path]
         Ordered list of SVG paths (keys first, then cards).
     """
     paths: list[Path] = []
-    for i in range(_KEY_COUNT):
+    for i in range(_MAX_KEY_SLOTS):
         p: Path | None = getattr(args, f"key{i}", None)
         if p is not None:
             paths.append(p)
-    for i in range(PANEL_COUNT):
+    for i in range(_MAX_CARD_SLOTS):
         p = getattr(args, f"card{i}", None)
         if p is not None:
             paths.append(p)
@@ -497,6 +491,8 @@ def get_mtimes(paths: list[Path]) -> dict[Path, float]:
 async def _watch_and_reload(
     args: argparse.Namespace,
     deck: PreviewDeckDevice,
+    caps: DeviceCapabilities,
+    panel_width: int,
     poll_interval: float,
 ) -> None:
     """Poll SVG files for changes and re-push to *deck* on modification.
@@ -530,12 +526,12 @@ async def _watch_and_reload(
                 )
                 last_mtimes = current_mtimes
                 try:
-                    key_images, touchstrip_bytes = render_preview(args)
+                    key_images, touchstrip_bytes = render_preview(args, caps)
                 except Exception as exc:
                     print(f"Render error: {exc}", file=sys.stderr)  # noqa: T201
                     continue
 
-                for key_index in range(_KEY_COUNT):
+                for key_index in range(caps.key_count):
                     jpeg = key_images.get(key_index)
                     if jpeg is not None:
                         await loop.run_in_executor(
@@ -545,15 +541,17 @@ async def _watch_and_reload(
                             jpeg,
                         )
 
-                await loop.run_in_executor(
-                    None,
-                    deck.set_touchscreen_image,
-                    touchstrip_bytes,
-                    0,
-                    0,
-                    TOUCHSCREEN_WIDTH,
-                    TOUCHSCREEN_HEIGHT,
-                )
+                if caps.has_touchscreen:
+                    await loop.run_in_executor(
+                        None,
+                        deck.set_touchscreen_image,
+                        touchstrip_bytes,
+                        0,
+                        0,
+                        caps.touchscreen_width,
+                        caps.touchscreen_height,
+                    )
+                _ = panel_width  # carried for symmetry; geometry comes from caps
                 print("Preview updated", file=sys.stderr)  # noqa: T201
     finally:
         loop.remove_signal_handler(signal.SIGINT)
@@ -563,50 +561,67 @@ async def _watch_and_reload(
 
 def render_preview(
     args: argparse.Namespace,
+    caps: DeviceCapabilities,
 ) -> tuple[dict[int, bytes], bytes]:
-    """Render all specified SVGs and return key images + touchstrip JPEG.
+    """Render all specified SVGs at *caps* sizes.
 
     Parameters
     ----------
-    args : argparse.Namespace
-        Parsed CLI arguments with ``key0``–``keyN``, ``card0``–``cardN``,
-        and ``background`` attributes.
+    args
+        Parsed CLI arguments.
+    caps
+        Capabilities of the connected device — drives key and panel sizing.
 
     Returns
     -------
     tuple[dict[int, bytes], bytes]
-        A ``(key_images, touchstrip_bytes)`` tuple where *key_images*
-        maps key indices to JPEG bytes.
+        ``(key_images, touchstrip_bytes)`` where *key_images* maps key
+        index → JPEG bytes. *touchstrip_bytes* is empty when the device
+        has no touchscreen.
     """
     background: str = getattr(args, "background", None) or "black"
     key_images: dict[int, bytes] = {}
-    card_images: list[Image.Image | None] = [None] * PANEL_COUNT
 
-    for i in range(_KEY_COUNT):
+    key_size = (caps.key_pixel_width, caps.key_pixel_height)
+    for i in range(caps.key_count):
         svg_path: Path | None = getattr(args, f"key{i}", None)
         if svg_path is not None:
             if not svg_path.exists():
                 print(f"ERROR: Key SVG not found: {svg_path}", file=sys.stderr)  # noqa: T201
                 sys.exit(1)
-            img = load_svg(svg_path, KEY_USABLE_WIDTH, KEY_USABLE_HEIGHT)
-            key_images[i] = compose_key_image(img)
+            img = load_svg(svg_path, *key_size)
+            key_images[i] = compose_key_image(img, key_size, background=background)
             logger.info(
                 "Rendered key %d from %s (%dx%d)", i, svg_path, img.width, img.height
             )
 
-    for i in range(PANEL_COUNT):
+    if not caps.has_touchscreen or caps.panel_count == 0:
+        return key_images, b""
+
+    panel_width = caps.touchscreen_width // caps.panel_count
+    panel_size = (panel_width, caps.touchscreen_height)
+    card_images: list[Image.Image | None] = [None] * caps.panel_count
+
+    for i in range(caps.panel_count):
         svg_path = getattr(args, f"card{i}", None)
         if svg_path is not None:
             if not svg_path.exists():
                 print(f"ERROR: Card SVG not found: {svg_path}", file=sys.stderr)  # noqa: T201
                 sys.exit(1)
-            img = load_svg(svg_path, PANEL_WIDTH, PANEL_HEIGHT)
-            card_images[i] = compose_card_image(img, background=background)
+            img = load_svg(svg_path, *panel_size)
+            card_images[i] = compose_card_image(img, panel_size, background=background)
             logger.info(
                 "Rendered card %d from %s (%dx%d)", i, svg_path, img.width, img.height
             )
 
-    touchstrip_bytes = compose_touchstrip(card_images, background=background)
+    touchstrip_bytes = compose_touchstrip(
+        card_images,
+        touchscreen_width=caps.touchscreen_width,
+        touchscreen_height=caps.touchscreen_height,
+        panel_count=caps.panel_count,
+        panel_width=panel_width,
+        background=background,
+    )
     return key_images, touchstrip_bytes
 
 
@@ -623,18 +638,7 @@ def main(argv: list[str] | None = None) -> None:
     level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
 
-    key_images, touchstrip_bytes = render_preview(args)
-    watch_args = args if args.watch else None
-    poll_interval: float = args.poll_interval
-    asyncio.run(
-        push_to_device(
-            key_images,
-            touchstrip_bytes,
-            args.brightness,
-            watch_args=watch_args,
-            poll_interval=poll_interval,
-        )
-    )
+    asyncio.run(push_to_device(args, poll_interval=args.poll_interval))
 
 
 if __name__ == "__main__":  # pragma: no cover

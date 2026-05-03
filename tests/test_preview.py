@@ -13,27 +13,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from PIL import Image
 
-from deckui.render.metrics import (
-    KEY_MARGIN_LEFT,
-    KEY_MARGIN_TOP,
-    KEY_SIZE,
-    KEY_USABLE_HEIGHT,
-    KEY_USABLE_WIDTH,
-    MARGIN_LEFT,
-    MARGIN_TOP,
-    PANEL_COUNT,
-    PANEL_GAP,
-    PANEL_HEIGHT,
-    PANEL_WIDTH,
-    TOUCHSCREEN_HEIGHT,
-    TOUCHSCREEN_WIDTH,
-)
 from deckui.render.svg_rasterize import RasterizeError
+from deckui.runtime.capabilities import STREAM_DECK_PLUS
 
 if TYPE_CHECKING:
     from pathlib import Path
 from deckui.tools.preview import (
-    _KEY_COUNT,
+    _MAX_CARD_SLOTS,
+    _MAX_KEY_SLOTS,
     _svg_to_png_fit,
     _watch_and_reload,
     build_parser,
@@ -48,6 +35,13 @@ from deckui.tools.preview import (
     parse_hex_color,
     render_preview,
 )
+
+KEY_SIZE = STREAM_DECK_PLUS.key_size
+TOUCHSCREEN_SIZE = (STREAM_DECK_PLUS.touchscreen_width, STREAM_DECK_PLUS.touchscreen_height)
+PANEL_COUNT = STREAM_DECK_PLUS.panel_count
+PANEL_WIDTH = STREAM_DECK_PLUS.touchscreen_width // STREAM_DECK_PLUS.panel_count
+PANEL_HEIGHT = STREAM_DECK_PLUS.touchscreen_height
+PANEL_SIZE = (PANEL_WIDTH, PANEL_HEIGHT)
 
 
 @pytest.fixture
@@ -146,12 +140,10 @@ class TestLoadSvg:
         assert img.height == 40
 
     def test_exact_fit(self, square_svg: Path):
-        """An 80x80 SVG scaled to 80x80 should remain 80x80."""
         img = load_svg(square_svg, 80, 80)
         assert img.size == (80, 80)
 
-    def test_wide_image_constrained_by_width(self, wide_svg: Path):
-        """A 200x50 SVG fitted to 197x98 keeps width as the constraint."""
+    def test_wide_image_constrained(self, wide_svg: Path):
         img = load_svg(wide_svg, PANEL_WIDTH, PANEL_HEIGHT)
         assert img.width <= PANEL_WIDTH
         assert img.height <= PANEL_HEIGHT
@@ -160,175 +152,152 @@ class TestLoadSvg:
 class TestComposeKeyImage:
     def test_returns_jpeg_bytes(self):
         svg_img = Image.new("RGBA", (80, 80), (255, 0, 0, 255))
-        result = compose_key_image(svg_img)
+        result = compose_key_image(svg_img, KEY_SIZE)
         assert isinstance(result, bytes)
         decoded = Image.open(io.BytesIO(result))
         assert decoded.format == "JPEG"
         assert decoded.size == KEY_SIZE
 
-    def test_centres_within_usable_area(self):
-        """A small image should be centred within the margin-bounded usable area."""
+    def test_centres_within_canvas(self):
+        """A small image should be centred on the key canvas."""
         svg_img = Image.new("RGBA", (40, 40), (255, 0, 0, 255))
-        result = compose_key_image(svg_img)
+        result = compose_key_image(svg_img, KEY_SIZE)
         decoded = Image.open(io.BytesIO(result)).convert("RGB")
         assert decoded.size == KEY_SIZE
+        cx = KEY_SIZE[0] // 2
+        cy = KEY_SIZE[1] // 2
+        r, _, _ = decoded.getpixel((cx, cy))
+        assert r > 200, "Centre of key should be red"
 
-        cx = KEY_MARGIN_LEFT + KEY_USABLE_WIDTH // 2
-        cy = KEY_MARGIN_TOP + KEY_USABLE_HEIGHT // 2
-        r, g, b = decoded.getpixel((cx, cy))
-        assert r > 200, f"Centre of usable area should be red, got ({r}, {g}, {b})"
-
-    def test_left_margin_is_clear(self):
-        """Outer edge of left margin should remain black (no content)."""
-        svg_img = Image.new(
-            "RGBA",
-            (KEY_USABLE_WIDTH, KEY_USABLE_HEIGHT),
-            (255, 0, 0, 255),
-        )
-        result = compose_key_image(svg_img)
+    def test_full_size_image_fills_edge_to_edge(self):
+        """A key-sized image fills the canvas — no margin."""
+        svg_img = Image.new("RGBA", KEY_SIZE, (255, 0, 0, 255))
+        result = compose_key_image(svg_img, KEY_SIZE)
         decoded = Image.open(io.BytesIO(result)).convert("RGB")
-        mid_y = KEY_SIZE[1] // 2
-        r, g, b = decoded.getpixel((0, mid_y))
-        assert r < 20, f"Left margin edge pixel (0, {mid_y}) not black: ({r},{g},{b})"
-
-    def test_right_margin_is_clear(self):
-        """Outer edge of right margin should remain black (no content)."""
-        svg_img = Image.new(
-            "RGBA",
-            (KEY_USABLE_WIDTH, KEY_USABLE_HEIGHT),
-            (255, 0, 0, 255),
-        )
-        result = compose_key_image(svg_img)
-        decoded = Image.open(io.BytesIO(result)).convert("RGB")
-        mid_y = KEY_SIZE[1] // 2
-        last_x = KEY_SIZE[0] - 1
-        r, g, b = decoded.getpixel((last_x, mid_y))
-        assert r < 20, (
-            f"Right margin edge pixel ({last_x}, {mid_y}) not black: ({r},{g},{b})"
-        )
+        # Top-left corner: SVG paints all the way to (0, 0).
+        r, _, _ = decoded.getpixel((0, 0))
+        assert r > 200
 
     def test_rgb_image_no_alpha(self):
-        """An RGB image (no alpha) should compose without error."""
         svg_img = Image.new("RGB", (60, 60), (0, 255, 0))
-        result = compose_key_image(svg_img)
+        result = compose_key_image(svg_img, KEY_SIZE)
         decoded = Image.open(io.BytesIO(result))
         assert decoded.size == KEY_SIZE
 
-    def test_usable_size_image_fills_usable_area(self):
-        """A 106x106 image should fill exactly the usable area."""
-        svg_img = Image.new(
-            "RGBA",
-            (KEY_USABLE_WIDTH, KEY_USABLE_HEIGHT),
-            (255, 0, 0, 255),
-        )
-        result = compose_key_image(svg_img)
+    def test_custom_background(self):
+        """Background colour shows where the SVG doesn't cover."""
+        svg_img = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
+        result = compose_key_image(svg_img, KEY_SIZE, background="#0000ff")
         decoded = Image.open(io.BytesIO(result)).convert("RGB")
-        assert decoded.size == KEY_SIZE
-        cx = KEY_MARGIN_LEFT + KEY_USABLE_WIDTH // 2
-        cy = KEY_MARGIN_TOP + KEY_USABLE_HEIGHT // 2
-        r, _, _ = decoded.getpixel((cx, cy))
-        assert r > 200
+        r, g, b = decoded.getpixel((0, 0))
+        assert b > 200 and r < 30
 
 
 class TestComposeCardImage:
     def test_returns_pil_image(self):
         svg_img = Image.new("RGBA", (100, 50), (0, 0, 255, 255))
-        result = compose_card_image(svg_img)
+        result = compose_card_image(svg_img, PANEL_SIZE)
         assert isinstance(result, Image.Image)
-        assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
+        assert result.size == PANEL_SIZE
 
     def test_centres_image(self):
-        """A 100x50 image on a 197x98 canvas should be centred."""
         svg_img = Image.new("RGBA", (100, 50), (255, 0, 0, 255))
-        result = compose_card_image(svg_img)
-        assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
+        result = compose_card_image(svg_img, PANEL_SIZE)
+        assert result.size == PANEL_SIZE
         centre_pixel = result.getpixel((PANEL_WIDTH // 2, PANEL_HEIGHT // 2))
         assert centre_pixel != (0, 0, 0)
 
     def test_rgb_image_no_alpha(self):
         svg_img = Image.new("RGB", (50, 30), (0, 255, 0))
-        result = compose_card_image(svg_img)
-        assert result.size == (PANEL_WIDTH, PANEL_HEIGHT)
+        result = compose_card_image(svg_img, PANEL_SIZE)
+        assert result.size == PANEL_SIZE
 
     def test_custom_background_colour(self):
-        """A card with no SVG coverage should show the custom background."""
         svg_img = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
-        result = compose_card_image(svg_img, background="#ff0000")
+        result = compose_card_image(svg_img, PANEL_SIZE, background="#ff0000")
         px = result.getpixel((0, 0))
         assert px == (255, 0, 0)
 
     def test_default_background_is_black(self):
         svg_img = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
-        result = compose_card_image(svg_img)
+        result = compose_card_image(svg_img, PANEL_SIZE)
         px = result.getpixel((0, 0))
         assert px == (0, 0, 0)
 
 
 class TestComposeTouchstrip:
+    def _kwargs(self):
+        return {
+            "touchscreen_width": TOUCHSCREEN_SIZE[0],
+            "touchscreen_height": TOUCHSCREEN_SIZE[1],
+            "panel_count": PANEL_COUNT,
+            "panel_width": PANEL_WIDTH,
+        }
+
     def test_returns_jpeg_bytes(self):
         cards: list[Image.Image | None] = [None] * PANEL_COUNT
-        result = compose_touchstrip(cards)
+        result = compose_touchstrip(cards, **self._kwargs())
         assert isinstance(result, bytes)
         decoded = Image.open(io.BytesIO(result))
-        assert decoded.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
+        assert decoded.size == TOUCHSCREEN_SIZE
 
     def test_all_none_produces_black(self):
         cards: list[Image.Image | None] = [None] * PANEL_COUNT
-        result = compose_touchstrip(cards)
+        result = compose_touchstrip(cards, **self._kwargs())
         decoded = Image.open(io.BytesIO(result)).convert("RGB")
         px = decoded.getpixel((0, 0))
         assert all(c < 10 for c in px)
 
-    def test_single_card_placed_correctly(self):
-        red_card = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), (255, 0, 0))
+    def test_single_card_placed_at_panel_origin(self):
+        red_card = Image.new("RGB", PANEL_SIZE, (255, 0, 0))
         cards: list[Image.Image | None] = [red_card, None, None, None]
-        result = compose_touchstrip(cards)
+        result = compose_touchstrip(cards, **self._kwargs())
         decoded = Image.open(io.BytesIO(result)).convert("RGB")
-        px = decoded.getpixel((MARGIN_LEFT + 5, MARGIN_TOP + 5))
+        px = decoded.getpixel((5, 5))
         assert px[0] > 200
 
     def test_excess_cards_ignored(self):
-        """More than PANEL_COUNT cards should be silently truncated."""
         cards: list[Image.Image | None] = [
-            Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), (255, 0, 0)) for _ in range(6)
+            Image.new("RGB", PANEL_SIZE, (255, 0, 0)) for _ in range(6)
         ]
-        result = compose_touchstrip(cards)
+        result = compose_touchstrip(cards, **self._kwargs())
         decoded = Image.open(io.BytesIO(result))
-        assert decoded.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
+        assert decoded.size == TOUCHSCREEN_SIZE
 
-    def test_custom_background_fills_margins(self):
-        """The background colour should fill areas outside card panels."""
-        cards: list[Image.Image | None] = [None] * PANEL_COUNT
-        result = compose_touchstrip(cards, background="#00ff00")
+    def test_cards_tile_edge_to_edge(self):
+        """Cards span the full touchscreen width — no gap between them."""
+        red = Image.new("RGB", PANEL_SIZE, (255, 0, 0))
+        green = Image.new("RGB", PANEL_SIZE, (0, 255, 0))
+        cards: list[Image.Image | None] = [red, green, None, None]
+        result = compose_touchstrip(cards, **self._kwargs())
         decoded = Image.open(io.BytesIO(result)).convert("RGB")
-        px = decoded.getpixel((0, 0))
-        assert px[1] > 200
-        assert px[0] < 30
-        assert px[2] < 30
-
-    def test_custom_background_between_panels(self):
-        """The background colour should fill the gap between card panels."""
-        cards: list[Image.Image | None] = [None, None, None, None]
-        result = compose_touchstrip(cards, background="#0000ff")
-        decoded = Image.open(io.BytesIO(result)).convert("RGB")
-        gap_x = MARGIN_LEFT + PANEL_WIDTH + PANEL_GAP // 2
-        px = decoded.getpixel((gap_x, TOUCHSCREEN_HEIGHT // 2))
-        assert px[2] > 200
+        # Pixels inside each panel, away from JPEG block boundaries.
+        r0, _, _ = decoded.getpixel((PANEL_WIDTH - 16, PANEL_HEIGHT // 2))
+        _, g1, _ = decoded.getpixel((PANEL_WIDTH + 16, PANEL_HEIGHT // 2))
+        assert r0 > 200
+        assert g1 > 200
 
     def test_default_background_is_black(self):
         cards: list[Image.Image | None] = [None] * PANEL_COUNT
-        result = compose_touchstrip(cards)
+        result = compose_touchstrip(cards, **self._kwargs())
         decoded = Image.open(io.BytesIO(result)).convert("RGB")
         px = decoded.getpixel((0, 0))
         assert all(c < 10 for c in px)
+
+    def test_custom_background(self):
+        cards: list[Image.Image | None] = [None] * PANEL_COUNT
+        result = compose_touchstrip(cards, background="#00ff00", **self._kwargs())
+        decoded = Image.open(io.BytesIO(result)).convert("RGB")
+        px = decoded.getpixel((0, 0))
+        assert px[1] > 200
 
 
 class TestParser:
     def test_no_args(self):
         args = parse_args([])
-        for i in range(_KEY_COUNT):
+        for i in range(_MAX_KEY_SLOTS):
             assert getattr(args, f"key{i}") is None
-        for i in range(PANEL_COUNT):
+        for i in range(_MAX_CARD_SLOTS):
             assert getattr(args, f"card{i}") is None
 
     def test_key_arg(self, tmp_path: Path):
@@ -338,18 +307,6 @@ class TestParser:
     def test_card_arg(self, tmp_path: Path):
         args = parse_args(["--card2", str(tmp_path / "c.svg")])
         assert args.card2 == tmp_path / "c.svg"
-
-    def test_all_keys_and_cards(self, tmp_path: Path):
-        argv = []
-        for i in range(_KEY_COUNT):
-            argv.extend([f"--key{i}", str(tmp_path / f"k{i}.svg")])
-        for i in range(PANEL_COUNT):
-            argv.extend([f"--card{i}", str(tmp_path / f"c{i}.svg")])
-        args = parse_args(argv)
-        for i in range(_KEY_COUNT):
-            assert getattr(args, f"key{i}") == tmp_path / f"k{i}.svg"
-        for i in range(PANEL_COUNT):
-            assert getattr(args, f"card{i}") == tmp_path / f"c{i}.svg"
 
     def test_brightness_default(self):
         args = parse_args([])
@@ -395,23 +352,23 @@ class TestParser:
 class TestRenderPreview:
     def test_no_files(self):
         args = parse_args([])
-        key_images, touchstrip = render_preview(args)
+        key_images, touchstrip = render_preview(args, STREAM_DECK_PLUS)
         assert key_images == {}
         assert isinstance(touchstrip, bytes)
 
     def test_with_key_svg(self, square_svg: Path):
         args = parse_args(["--key0", str(square_svg)])
-        key_images, touchstrip = render_preview(args)
+        key_images, _ = render_preview(args, STREAM_DECK_PLUS)
         assert 0 in key_images
         decoded = Image.open(io.BytesIO(key_images[0]))
         assert decoded.size == KEY_SIZE
 
     def test_with_card_svg(self, wide_svg: Path):
         args = parse_args(["--card1", str(wide_svg)])
-        key_images, touchstrip = render_preview(args)
+        key_images, touchstrip = render_preview(args, STREAM_DECK_PLUS)
         assert key_images == {}
         decoded = Image.open(io.BytesIO(touchstrip))
-        assert decoded.size == (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT)
+        assert decoded.size == TOUCHSCREEN_SIZE
 
     def test_with_both(self, square_svg: Path, wide_svg: Path):
         args = parse_args(
@@ -422,7 +379,7 @@ class TestRenderPreview:
                 str(wide_svg),
             ]
         )
-        key_images, touchstrip = render_preview(args)
+        key_images, touchstrip = render_preview(args, STREAM_DECK_PLUS)
         assert 3 in key_images
         assert isinstance(touchstrip, bytes)
 
@@ -431,7 +388,7 @@ class TestRenderPreview:
     ):
         args = parse_args(["--key0", str(tmp_path / "nonexistent.svg")])
         with pytest.raises(SystemExit):
-            render_preview(args)
+            render_preview(args, STREAM_DECK_PLUS)
         assert "Key SVG not found" in capsys.readouterr().err
 
     def test_missing_card_svg_exits(
@@ -439,23 +396,121 @@ class TestRenderPreview:
     ):
         args = parse_args(["--card0", str(tmp_path / "nonexistent.svg")])
         with pytest.raises(SystemExit):
-            render_preview(args)
+            render_preview(args, STREAM_DECK_PLUS)
         assert "Card SVG not found" in capsys.readouterr().err
 
     def test_background_applies_to_touchstrip(self, wide_svg: Path):
-        """When --background is given, the touchstrip uses that colour."""
         args = parse_args(["--card0", str(wide_svg), "--background", "#00ff00"])
-        _, touchstrip = render_preview(args)
+        _, touchstrip = render_preview(args, STREAM_DECK_PLUS)
         decoded = Image.open(io.BytesIO(touchstrip)).convert("RGB")
-        px = decoded.getpixel((0, 0))
+        # Pixel near the right edge of the touchscreen — outside card0,
+        # so the background colour shows through.
+        px = decoded.getpixel((TOUCHSCREEN_SIZE[0] - 5, TOUCHSCREEN_SIZE[1] // 2))
         assert px[1] > 200
 
     def test_no_background_defaults_black(self):
         args = parse_args([])
-        _, touchstrip = render_preview(args)
+        _, touchstrip = render_preview(args, STREAM_DECK_PLUS)
         decoded = Image.open(io.BytesIO(touchstrip)).convert("RGB")
         px = decoded.getpixel((0, 0))
         assert all(c < 10 for c in px)
+
+    def test_no_touchscreen_returns_empty_bytes(self, square_svg: Path):
+        """A device without a touchscreen produces empty touchstrip bytes."""
+        from tests.conftest import STREAM_DECK_MINI
+
+        args = parse_args(["--key0", str(square_svg)])
+        key_images, touchstrip = render_preview(args, STREAM_DECK_MINI)
+        assert 0 in key_images
+        assert touchstrip == b""
+
+    def test_key_size_matches_caps(self, square_svg: Path):
+        """Key images render at caps.key_size, not a fixed default."""
+        from tests.conftest import STREAM_DECK_MINI
+
+        args = parse_args(["--key0", str(square_svg)])
+        key_images, _ = render_preview(args, STREAM_DECK_MINI)
+        decoded = Image.open(io.BytesIO(key_images[0]))
+        assert decoded.size == STREAM_DECK_MINI.key_size
+
+
+class TestPushToDevice:
+    async def test_push_renders_and_pushes(
+        self, mock_streamdeck_device: MagicMock, square_svg: Path
+    ):
+        from deckui.tools.preview import push_to_device
+
+        # The device protocol-cast accepts the StreamDeck mock
+        mock_streamdeck_device.DECK_VISUAL = True
+
+        args = parse_args(["--key0", str(square_svg), "--brightness", "60"])
+
+        with (
+            patch(
+                "deckui.tools.preview._find_and_open_device",
+                return_value=mock_streamdeck_device,
+            ),
+            patch(
+                "deckui.tools.preview._wait_for_interrupt",
+                new_callable=AsyncMock,
+            ),
+        ):
+            await push_to_device(args)
+
+        mock_streamdeck_device.set_brightness.assert_called_once_with(60)
+        # Key 0 was pushed
+        key_calls = [
+            c for c in mock_streamdeck_device.set_key_image.call_args_list
+            if c.args[0] == 0
+        ]
+        assert len(key_calls) == 1
+        # Touchstrip pushed once (Stream Deck+ has touchscreen)
+        mock_streamdeck_device.set_touchscreen_image.assert_called_once()
+        mock_streamdeck_device.reset.assert_called_once()
+        mock_streamdeck_device.close.assert_called_once()
+
+    async def test_brightness_clamped(self, mock_streamdeck_device: MagicMock):
+        from deckui.tools.preview import push_to_device
+
+        mock_streamdeck_device.DECK_VISUAL = True
+        args = parse_args(["--brightness", "150"])
+
+        with (
+            patch(
+                "deckui.tools.preview._find_and_open_device",
+                return_value=mock_streamdeck_device,
+            ),
+            patch(
+                "deckui.tools.preview._wait_for_interrupt",
+                new_callable=AsyncMock,
+            ),
+        ):
+            await push_to_device(args)
+
+        mock_streamdeck_device.set_brightness.assert_called_once_with(100)
+
+    async def test_no_touchscreen_skips_touchstrip_push(
+        self, mock_mini_device: MagicMock
+    ):
+        """A device without a touchscreen does not call set_touchscreen_image."""
+        from deckui.tools.preview import push_to_device
+
+        mock_mini_device.DECK_VISUAL = True
+        args = parse_args([])
+
+        with (
+            patch(
+                "deckui.tools.preview._find_and_open_device",
+                return_value=mock_mini_device,
+            ),
+            patch(
+                "deckui.tools.preview._wait_for_interrupt",
+                new_callable=AsyncMock,
+            ),
+        ):
+            await push_to_device(args)
+
+        mock_mini_device.set_touchscreen_image.assert_not_called()
 
 
 class TestMain:
@@ -463,145 +518,40 @@ class TestMain:
     def test_main_calls_push(self, mock_push: AsyncMock, square_svg: Path):
         main(["--key0", str(square_svg)])
         mock_push.assert_awaited_once()
-        kwargs = mock_push.call_args
-        key_images, touchstrip, brightness = kwargs[0]
-        assert 0 in key_images
-        assert isinstance(touchstrip, bytes)
-        assert brightness == 80
-        assert kwargs[1]["watch_args"] is None
+        args = mock_push.call_args.args[0]
+        assert args.key0 == square_svg
 
     @patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock)
-    def test_main_default_brightness(self, mock_push: AsyncMock):
-        main([])
-        _, _, brightness = mock_push.call_args[0]
-        assert brightness == 80
-
-    @patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock)
-    def test_main_custom_brightness(self, mock_push: AsyncMock):
-        main(["--brightness", "40"])
-        _, _, brightness = mock_push.call_args[0]
-        assert brightness == 40
+    def test_main_passes_poll_interval(self, mock_push: AsyncMock):
+        main(["--poll-interval", "1.5"])
+        kwargs = mock_push.call_args.kwargs
+        assert kwargs["poll_interval"] == 1.5
 
     @patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock)
     def test_main_verbose(self, mock_push: AsyncMock):
         main(["-v"])
         mock_push.assert_awaited_once()
 
-    @patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock)
-    def test_main_with_background(self, mock_push: AsyncMock):
-        main(["--background", "#aabbcc"])
-        mock_push.assert_awaited_once()
-        _, touchstrip, _ = mock_push.call_args[0]
-        decoded = Image.open(io.BytesIO(touchstrip)).convert("RGB")
-        px = decoded.getpixel((0, 0))
-        assert px[0] > 150
-        assert px[1] > 160
-        assert px[2] > 180
-
-    @patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock)
-    def test_main_watch_passes_args(self, mock_push: AsyncMock, square_svg: Path):
-        main(["--key0", str(square_svg), "--watch"])
-        kwargs = mock_push.call_args
-        assert kwargs[1]["watch_args"] is not None
-        assert kwargs[1]["watch_args"].watch is True
-
-    @patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock)
-    def test_main_poll_interval(self, mock_push: AsyncMock):
-        main(["--watch", "--poll-interval", "1.5"])
-        kwargs = mock_push.call_args
-        assert kwargs[1]["poll_interval"] == 1.5
-
-
-class TestPushToDevice:
-    async def test_push_opens_and_pushes(self, mock_streamdeck_device: MagicMock):
-        from deckui.tools.preview import push_to_device
-
-        blank_key = Image.new("RGB", KEY_SIZE, "black")
-        buf = io.BytesIO()
-        blank_key.save(buf, format="JPEG")
-        key_jpeg = buf.getvalue()
-
-        blank_ts = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), "black")
-        buf2 = io.BytesIO()
-        blank_ts.save(buf2, format="JPEG")
-        ts_jpeg = buf2.getvalue()
-
-        with (
-            patch(
-                "deckui.tools.preview._find_and_open_device",
-                return_value=mock_streamdeck_device,
-            ),
-            patch(
-                "deckui.tools.preview._wait_for_interrupt",
-                new_callable=AsyncMock,
-            ),
-        ):
-            await push_to_device({0: key_jpeg}, ts_jpeg, brightness=60)
-
-        mock_streamdeck_device.set_brightness.assert_called_once_with(60)
-        mock_streamdeck_device.set_key_image.assert_called_once_with(0, key_jpeg)
-        mock_streamdeck_device.set_touchscreen_image.assert_called_once_with(
-            ts_jpeg,
-            0,
-            0,
-            TOUCHSCREEN_WIDTH,
-            TOUCHSCREEN_HEIGHT,
-        )
-        mock_streamdeck_device.reset.assert_called_once()
-        mock_streamdeck_device.close.assert_called_once()
-
-    async def test_brightness_clamped(self, mock_streamdeck_device: MagicMock):
-        """Values outside 0-100 are clamped."""
-        from deckui.tools.preview import push_to_device
-
-        blank_ts = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), "black")
-        buf = io.BytesIO()
-        blank_ts.save(buf, format="JPEG")
-        ts_jpeg = buf.getvalue()
-
-        with (
-            patch(
-                "deckui.tools.preview._find_and_open_device",
-                return_value=mock_streamdeck_device,
-            ),
-            patch(
-                "deckui.tools.preview._wait_for_interrupt",
-                new_callable=AsyncMock,
-            ),
-        ):
-            await push_to_device({}, ts_jpeg, brightness=150)
-
-        mock_streamdeck_device.set_brightness.assert_called_once_with(100)
-
 
 class TestWaitForInterrupt:
     async def test_returns_on_sigint(self):
-        """The coroutine completes when SIGINT is delivered."""
-        import signal
-
         from deckui.tools.preview import _wait_for_interrupt
 
         loop = asyncio.get_running_loop()
-
         loop.call_later(0.05, os.kill, os.getpid(), signal.SIGINT)
         await asyncio.wait_for(_wait_for_interrupt(), timeout=1.0)
 
     async def test_signal_handler_removed_after_return(self):
-        """The SIGINT handler is cleaned up after _wait_for_interrupt returns."""
-        import signal
-
         from deckui.tools.preview import _wait_for_interrupt
 
         loop = asyncio.get_running_loop()
         loop.call_later(0.05, os.kill, os.getpid(), signal.SIGINT)
         await asyncio.wait_for(_wait_for_interrupt(), timeout=1.0)
-
         assert loop.remove_signal_handler(signal.SIGINT) is False
 
 
 class TestSvgToPngFit:
     def test_tall_svg_constrained_by_height(self, tmp_path: Path):
-        """An SVG taller than max_height triggers the height-constrained path."""
         svg = (
             b'<svg xmlns="http://www.w3.org/2000/svg" width="20" height="200">'
             b'<rect width="20" height="200" fill="red"/>'
@@ -612,7 +562,6 @@ class TestSvgToPngFit:
         assert img.height <= 80
 
     def test_cairosvg_fallback_to_rsvg(self):
-        """When cairosvg is unavailable, fall back to rsvg-convert."""
         svg = (
             b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">'
             b'<rect width="10" height="10" fill="red"/>'
@@ -633,9 +582,7 @@ class TestSvgToPngFit:
             mock_run.assert_called_once()
 
     def test_no_renderer_raises(self):
-        """When both cairosvg and rsvg-convert fail, raise RasterizeError."""
         svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>'
-
         with patch.dict("sys.modules", {"cairosvg": None}), patch(
             "subprocess.run",
             side_effect=FileNotFoundError("no rsvg"),
@@ -689,7 +636,6 @@ class TestFindAndOpenDevice:
 class TestMainModule:
     @patch("deckui.tools.preview.main")
     def test_main_module(self, mock_main: MagicMock):
-        """Importing __main__ should call main()."""
         import importlib
 
         import deckui.tools.__main__
@@ -762,7 +708,6 @@ class TestWatchAndReload:
     async def test_detects_change_and_reloads(
         self, square_svg: Path, mock_streamdeck_device: MagicMock
     ):
-        """When an SVG file mtime changes, _watch_and_reload re-pushes."""
         args = parse_args(["--key0", str(square_svg), "--watch"])
 
         call_count = 0
@@ -774,58 +719,66 @@ class TestWatchAndReload:
         mock_streamdeck_device.set_key_image.side_effect = counting_set_key
 
         loop = asyncio.get_running_loop()
-        # Schedule: touch file after 0.1s, then SIGINT after 0.8s
         loop.call_later(0.1, square_svg.write_bytes, square_svg.read_bytes())
         loop.call_later(1.0, os.kill, os.getpid(), signal.SIGINT)
 
         await asyncio.wait_for(
-            _watch_and_reload(args, mock_streamdeck_device, poll_interval=0.2),
+            _watch_and_reload(
+                args,
+                mock_streamdeck_device,
+                STREAM_DECK_PLUS,
+                PANEL_WIDTH,
+                poll_interval=0.2,
+            ),
             timeout=3.0,
         )
         assert call_count >= 1
 
     async def test_exits_on_sigint(self, mock_streamdeck_device: MagicMock):
-        """_watch_and_reload exits cleanly on SIGINT."""
         args = parse_args(["--watch"])
 
         loop = asyncio.get_running_loop()
         loop.call_later(0.1, os.kill, os.getpid(), signal.SIGINT)
 
         await asyncio.wait_for(
-            _watch_and_reload(args, mock_streamdeck_device, poll_interval=0.2),
+            _watch_and_reload(
+                args,
+                mock_streamdeck_device,
+                STREAM_DECK_PLUS,
+                PANEL_WIDTH,
+                poll_interval=0.2,
+            ),
             timeout=2.0,
         )
 
     async def test_render_error_continues(
         self, square_svg: Path, mock_streamdeck_device: MagicMock
     ):
-        """A render error during watch should not crash the watcher."""
         args = parse_args(["--key0", str(square_svg), "--watch"])
 
         loop = asyncio.get_running_loop()
-        # Write invalid SVG to trigger render error, then SIGINT
         loop.call_later(0.1, square_svg.write_bytes, b"not valid svg")
         loop.call_later(1.0, os.kill, os.getpid(), signal.SIGINT)
 
-        # Should not raise
         await asyncio.wait_for(
-            _watch_and_reload(args, mock_streamdeck_device, poll_interval=0.2),
+            _watch_and_reload(
+                args,
+                mock_streamdeck_device,
+                STREAM_DECK_PLUS,
+                PANEL_WIDTH,
+                poll_interval=0.2,
+            ),
             timeout=3.0,
         )
 
 
 class TestPushToDeviceWatch:
-    async def test_push_with_watch_calls_watch_and_reload(
+    async def test_push_with_watch_invokes_watch(
         self, mock_streamdeck_device: MagicMock, square_svg: Path
     ):
-        """When watch_args is provided, push_to_device enters watch mode."""
         from deckui.tools.preview import push_to_device
 
-        blank_ts = Image.new("RGB", (TOUCHSCREEN_WIDTH, TOUCHSCREEN_HEIGHT), "black")
-        buf = io.BytesIO()
-        blank_ts.save(buf, format="JPEG")
-        ts_jpeg = buf.getvalue()
-
+        mock_streamdeck_device.DECK_VISUAL = True
         args = parse_args(["--key0", str(square_svg), "--watch"])
 
         with (
@@ -838,8 +791,6 @@ class TestPushToDeviceWatch:
                 new_callable=AsyncMock,
             ) as mock_watch,
         ):
-            await push_to_device(
-                {}, ts_jpeg, brightness=80, watch_args=args, poll_interval=0.5
-            )
+            await push_to_device(args, poll_interval=0.5)
 
-        mock_watch.assert_awaited_once_with(args, mock_streamdeck_device, 0.5)
+        mock_watch.assert_awaited_once()

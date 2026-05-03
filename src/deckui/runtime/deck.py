@@ -368,13 +368,16 @@ class Deck:
         loop = asyncio.get_running_loop()
         metrics = self._metrics
 
+        if metrics is None:
+            return
+
         for key_index in range(caps.key_count):
             key_slot = screen.keys.get(key_index)
             if key_slot and self._is_dui_key(key_slot):
                 await self._render_dui_key(key_slot, key_index)
             else:
                 image_bytes = render_blank_key(
-                    key_size=metrics.key_size if metrics else (120, 120),
+                    key_size=metrics.key_size,
                     image_format=caps.key_image_format,
                 )
                 async with self._device_lock:
@@ -430,11 +433,14 @@ class Deck:
                     frame_bytes,
                 )
 
-        dui_key.set_push_fn(_push_key_frame)
+        if self._caps is None:
+            return
+
+        dui_key.set_push_fn(_push_key_frame, key_size=self._caps.key_size)
 
         image_bytes = dui_key.render_image(
-            key_size=self._caps.key_size if self._caps else (120, 120),
-            image_format=self._caps.key_image_format if self._caps else "JPEG",
+            key_size=self._caps.key_size,
+            image_format=self._caps.key_image_format,
         )
         dui_key.set_rendered_image(image_bytes)
 
@@ -466,10 +472,8 @@ class Deck:
         for card_idx, card in enumerate(screen.cards):
             if not isinstance(card, DuiCard):
                 continue
-            x_pos = metrics.margin_left + card_idx * (
-                metrics.panel_width + metrics.panel_gap
-            )
-            y_pos = metrics.margin_top
+            x_pos = card_idx * metrics.panel_width
+            y_pos = 0
 
             async def _make_push(x: int, y: int, w: int, h: int) -> PushFn:
                 async def _push_card_frame(frame_bytes: bytes) -> None:
@@ -493,7 +497,9 @@ class Deck:
                 metrics.panel_width,
                 metrics.panel_height,
             )
-            card.set_push_fn(push_fn)
+            card.set_push_fn(
+                push_fn, panel_size=(metrics.panel_width, metrics.panel_height)
+            )
 
         card_images = []
         for card in screen.cards:
@@ -514,9 +520,6 @@ class Deck:
             touchscreen_height=metrics.touchscreen_height,
             panel_count=metrics.panel_count,
             panel_width=metrics.panel_width,
-            margin_left=metrics.margin_left,
-            margin_top=metrics.margin_top,
-            panel_gap=metrics.panel_gap,
             image_format=self._caps.touchscreen_image_format if self._caps else "JPEG",
         )
 

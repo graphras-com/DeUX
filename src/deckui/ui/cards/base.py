@@ -18,9 +18,10 @@ class Card(ABC):
     """Abstract base for a single touch-strip zone under an encoder.
 
     The touchscreen is divided into zones aligned with the device's
-    encoders.  A margin is applied around the usable area and cards
-    are separated by a gap.  The exact dimensions depend on the
-    connected device (e.g. 197x98 per zone on Stream Deck+).
+    encoders.  Cards are tiled edge-to-edge — the library imposes no
+    margins or gaps. Each zone is ``touchscreen_width // panel_count``
+    wide and ``touchscreen_height`` tall (e.g. 200x100 per zone on
+    Stream Deck+).
 
     Subclass this to build custom widgets.  At minimum, implement
     :meth:`render`.  Override the ``handle_encoder_*`` and
@@ -32,7 +33,7 @@ class Card(ABC):
 
         class MyCard(Card):
             def render(self) -> Image.Image:
-                img = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), "black")
+                img = Image.new("RGB", (panel_width, panel_height), "black")
                 # ... draw custom content ...
                 return img
 
@@ -260,7 +261,7 @@ class Card(ABC):
 
     @abstractmethod
     def render(self) -> Image.Image | None:
-        """Render this card as a PANEL_WIDTH x PANEL_HEIGHT PIL Image.
+        """Render this card as a panel-sized PIL Image.
 
         Return ``None`` to let the touchstrip background colour show
         through (used by :class:`~deckui.ui.cards.blank.BlankCard`).
@@ -268,8 +269,9 @@ class Card(ABC):
         Returns
         -------
         Image.Image or None
-            A PANEL_WIDTH x PANEL_HEIGHT RGB :class:`~PIL.Image.Image`,
-            or ``None`` for a transparent/empty slot.
+            A panel-sized RGB :class:`~PIL.Image.Image` (the panel size
+            depends on the connected device), or ``None`` for an empty
+            slot.
         """
 
     def handle_encoder_turn(self, direction: int) -> None:

@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 from PIL import Image
 
 from ..render.key_renderer import _encode_image
-from ..render.metrics import KEY_SIZE
 from ..ui.controls.key_slot import KeySlot
 from .animator import PushFn, SpinnerAnimator
 from .event_map import EventMap
@@ -66,6 +65,7 @@ class DuiKey(KeySlot):
         self._animator: SpinnerAnimator | None = None
         self._spinner_frames: SpinnerFrames | None = None
         self._push_fn: PushFn | None = None
+        self._key_size: tuple[int, int] | None = None
 
     @property
     def spec(self) -> PackageSpec:
@@ -82,15 +82,19 @@ class DuiKey(KeySlot):
         """Whether a spinner animation is currently running."""
         return self._animator is not None and self._animator.is_running
 
-    def set_push_fn(self, push_fn: PushFn) -> None:
+    def set_push_fn(self, push_fn: PushFn, key_size: tuple[int, int]) -> None:
         """Set the async function used to push animation frames to the device.
 
         Parameters
         ----------
         push_fn
             Async callable ``(frame_bytes) -> None``.
+        key_size
+            ``(width, height)`` of the device's key — used to size
+            spinner frames.
         """
         self._push_fn = push_fn
+        self._key_size = key_size
 
     def set(self, name: str, value: Any) -> DuiKey:
         """Set a binding value.  Marks the key dirty if changed.
@@ -473,19 +477,18 @@ class DuiKey(KeySlot):
 
     def render_image(
         self,
-        key_size: tuple[int, int] | None = None,
+        key_size: tuple[int, int],
         image_format: str = "JPEG",
     ) -> bytes:
         """Render the SVG layout to image bytes for the key.
 
-        The SVG is rasterised and scaled to the device's key size,
-        then encoded in the device's image format.
+        The SVG is rasterised and scaled edge-to-edge to *key_size*
+        (no margins or padding) and encoded in *image_format*.
 
         Parameters
         ----------
         key_size
-            Target key dimensions ``(width, height)``.
-            Defaults to ``KEY_SIZE`` (120x120 for Stream Deck+).
+            Target key dimensions ``(width, height)`` in pixels.
         image_format
             Image encoding format (``"JPEG"`` or ``"BMP"``).
 
@@ -494,10 +497,9 @@ class DuiKey(KeySlot):
         bytes
             Encoded image bytes.
         """
-        size = key_size or KEY_SIZE
         img = self._renderer.render()
-        if img.size != size:
-            img = img.resize(size, Image.Resampling.LANCZOS)
+        if img.size != key_size:
+            img = img.resize(key_size, Image.Resampling.LANCZOS)
         if img.mode != "RGB":
             img = img.convert("RGB")
         return _encode_image(img, image_format)
@@ -557,14 +559,19 @@ class DuiKey(KeySlot):
 
     async def _start_spinner(self) -> None:
         """Start the spinner animation if configured."""
-        if self._spec.spinner is None or self._push_fn is None:
+        if (
+            self._spec.spinner is None
+            or self._push_fn is None
+            or self._key_size is None
+        ):
             return
 
+        width, height = self._key_size
         rendered_svg = self._renderer.render_svg()
         self._spinner_frames = SpinnerFrames(
             self._spec,
-            width=KEY_SIZE[0],
-            height=KEY_SIZE[1],
+            width=width,
+            height=height,
             rendered_svg=rendered_svg,
         )
 
