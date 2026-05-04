@@ -132,6 +132,13 @@ class MockAudioService:
             self._index = self._catalog.index(track)
         self.is_playing = True
         t = self.current_track
+
+        delay = random.uniform(0, 5)
+
+        log.info(f"Artificial random delay for {delay:.2f} seconds")
+
+        await asyncio.sleep(delay)
+
         log.info("Playing: %s -- %s", t["artist"], t["title"])
         await self.on_track_changed.emit(t, self.is_playing)
 

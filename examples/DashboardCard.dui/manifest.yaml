@@ -39,7 +39,7 @@ bindings:
   deck_brightness:
     type: range
     node: deck_brightness
-    default: 0.5
+    default: 0.8
     direction: horizontal
 
 events:
