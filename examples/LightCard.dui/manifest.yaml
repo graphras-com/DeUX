@@ -48,26 +48,26 @@ events:
     source: encoder_turn
     direction: right
     accumulate: true
-    accumulate_delay: 0.1
+    accumulate_delay: 0.05
 
   - name: brightness_down
     source: encoder_turn
     direction: left
     accumulate: true
-    accumulate_delay: 0.1
+    accumulate_delay: 0.05
 
   - name: kelvin_up
     source: encoder_press_turn
     direction: right
     accumulate: true
-    accumulate_delay: 0.1
+    accumulate_delay: 0.05
     accumulate_max_steps: 10
 
   - name: kelvin_down
     source: encoder_press_turn
     direction: left
     accumulate: true
-    accumulate_delay: 0.1
+    accumulate_delay: 0.05
     accumulate_max_steps: 10
 
 regions:

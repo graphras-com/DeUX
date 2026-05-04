@@ -770,10 +770,12 @@ class FavoritesController:
     intentionally 1:1).  Instead it manages its own list of keys and
     provides :meth:`install` to slot them onto a screen.
 
-    Clicking a favourite calls :meth:`MockAudioService.play`.  The
-    audio service then emits ``on_track_changed``; the
+    Clicking a favourite sets :meth:`DuiKey.start_busy` and then calls
+    :meth:`MockAudioService.play`.  A random artificial delay is added
+    to the audo service which then emits ``on_track_changed``; the
     :class:`AudioController`'s :meth:`bind_many` subscriber refreshes
-    the audio card.
+    the audio card. Additionally self.finish_busy subscribes to same event
+    and and calls :meth:`DuiKey.finish_busy`.
 
     Parameters
     ----------
@@ -806,14 +808,27 @@ class FavoritesController:
 
             # Late-bind *media* per iteration so each forward target
             # captures its own dict instead of the shared loop variable.
-            key.forward("click", lambda m=media: self._audio_svc.play(m))
-
+            #key.forward("click", lambda m=media: self._audio_svc.play(m))
+            #key.forward("click", lambda m=media, k=key: self.start_busy(m, k))
+            @key.on_event("click")
+            async def _click( k=key, m=media):
+                k.set("show_spinner_background", True)
+                await k.start_busy()
+                await self._audio_svc.play(m)
+ 
             self._keys.append(key)
+        self._audio_svc.on_track_changed.subscribe(self.finish_busy)        
 
     @property
     def keys(self) -> list[DuiKey]:
         """The created favourite keys (same order as *catalog*)."""
         return list(self._keys)
+
+    async def finish_busy(self, *args, **kwargs) -> None:
+        log.info(f"Finish busy on all keys")
+        for k in self._keys:
+            k.set("show_spinner_background", False)
+            await k.finish_busy()
 
     def install(self, screen: Any, positions: list[int]) -> None:
         """Place favourite keys onto *screen* at the given *positions*."""

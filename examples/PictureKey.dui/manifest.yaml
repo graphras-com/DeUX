@@ -1,7 +1,7 @@
 name: PictureKey
 type: Key
 version: 1
-description: Button with image
+description: Button with image, optional label and busy spinner
 author: Graphras.com
 license: Apache-2.0
 category: utilities
@@ -11,6 +11,36 @@ bindings:
   picture:
     type: image
     node: picture
+
+  label:
+    type: text
+    node: label
+    default: "Picture Key"
+    max_width: 110
+    overflow: ellipsis
+    wrap: false
+
+  background:
+    type: color
+    node: background
+    attribute: color
+    default: "#1c1c1c"
+
+  foreground:
+    type: color
+    node: foreground
+    attribute: color
+    default: "#dedede"
+
+  show_label:
+    type: visibility
+    node: foreground
+    default: false
+
+  show_spinner_background:
+    type: visibility
+    node: spinner_background
+    default: false
 
 spinner:
   type: rotation

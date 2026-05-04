@@ -1,7 +1,7 @@
 name: IconKey
 type: Key
 version: 1
-description: Button with Iconify icon and a label below
+description: Button with Iconify icon and label and busy spinner
 author: Graphras.com
 license: Apache-2.0
 category: utilities
@@ -17,8 +17,8 @@ bindings:
   label:
     type: text
     node: label
-    default: "Label"
-    max_width: 100
+    default: "Icon Key"
+    max_width: 110
   
   background:
     type: color
@@ -30,7 +30,12 @@ bindings:
     type: color
     node: foreground
     attribute: color
-    default: "#dedede"    
+    default: "#dedede"
+
+  enable_spinner_background:
+    type: visibility
+    node: spinner_background
+    default: false    
 
 spinner:
   type: rotation
