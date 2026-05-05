@@ -705,6 +705,12 @@ class DashboardController(CardController):
         async def _track_last_known(value: int) -> None:
             self._last_known_brightness = value
 
+        @deck.on_screen_changed
+        async def _screen_changed(name: str, screens:dict) -> None:
+            _screens = list(screens)
+            self.card.set("screens", f"{_screens.index(name)+1}/{len(_screens)}")
+            await self.card.request_refresh()
+
         # Replay onto the freshly-connected deck.  Idempotent: if the
         # values match, ``set_brightness`` silently no-ops.
         await deck.set_brightness(self._last_known_brightness)
@@ -967,7 +973,7 @@ class ScreenCycler:
         self._deck = deck
 
         @deck.on_screen_changed
-        async def _on_screen(name: str) -> None:
+        async def _on_screen(name: str, screens:dict) -> None:
             self._last_known = name
 
     def attach(self, card: DuiCard, event: str = "next_screen") -> None:
@@ -1068,7 +1074,7 @@ class StreamDeckApp:
 
         # Demonstrate Deck.on_screen_changed: log every screen switch.
         @deck.on_screen_changed
-        async def _log_screen(name: str) -> None:
+        async def _log_screen(name: str, screens:dict) -> None:
             log.info("Active screen confirmed: %s", name)
 
         # Drive the uniform lifecycle on every controller.
