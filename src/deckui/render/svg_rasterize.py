@@ -123,6 +123,8 @@ class CairoRasterizer:
             return result
         except (OSError, ImportError) as exc:
             raise RasterizeError(f"cairosvg unavailable: {exc}") from exc
+        except Exception as exc:
+            raise RasterizeError(f"cairosvg rasterisation failed: {exc}") from exc
 
 
 class PyvipsRasterizer:

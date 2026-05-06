@@ -33,7 +33,11 @@ def _fake_png(width: int = 10, height: int = 10) -> bytes:
 
 @pytest.fixture(autouse=True)
 def _reset_backend():
-    """Reset backend state before/after each test."""
+    """Reset backend state before/after each test.
+
+    Overrides the global conftest fixture so that tests in this module
+    that modify the registry see a clean slate.
+    """
     original_active = svg_mod._active_backend
     original_registry = svg_mod._registry.copy()
     yield

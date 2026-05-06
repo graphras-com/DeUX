@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 
+import deckui.render.svg_rasterize as _svg_mod
 from deckui.render.metrics import RenderMetrics
 from deckui.runtime.capabilities import (
     STREAM_DECK_PLUS,
@@ -18,8 +19,28 @@ from deckui.ui.controls.key_slot import KeySlot
 from deckui.ui.screen import Screen
 from deckui.ui.touch_strip import TouchStrip
 
+# Capture pristine state BEFORE any test modules are imported
+# (some examples set the backend at module level during collection).
+_PRISTINE_ACTIVE_BACKEND: str | None = _svg_mod._active_backend
+_PRISTINE_REGISTRY: dict[str, object] = _svg_mod._registry.copy()
+
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+@pytest.fixture(autouse=True)
+def _reset_svg_backend():
+    """Reset SVG backend state before and after every test.
+
+    Restores the pristine state captured at conftest import time
+    (before any test module imports that may call ``set_svg_backend``
+    at module level).
+    """
+    _svg_mod._active_backend = _PRISTINE_ACTIVE_BACKEND
+    _svg_mod._registry = _PRISTINE_REGISTRY.copy()
+    yield
+    _svg_mod._active_backend = _PRISTINE_ACTIVE_BACKEND
+    _svg_mod._registry = _PRISTINE_REGISTRY.copy()
 
 
 _PLUS_METRICS = RenderMetrics(STREAM_DECK_PLUS)
