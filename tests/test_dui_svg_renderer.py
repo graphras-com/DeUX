@@ -18,6 +18,8 @@ from deckui.dui.schema import (
     RangeBinding,
     RangeDirection,
     SliderBinding,
+    SpinnerSpec,
+    SpinnerType,
     TextBinding,
     ToggleBinding,
     VisibilityBinding,
@@ -1780,3 +1782,93 @@ class TestIconifyBindingRendering:
         renderer = SvgRenderer(spec)
         assert renderer.set("icon", "line-md:home") is False
         assert renderer.set("icon", "line-md:settings") is True
+
+
+_SPINNER_VISIBLE_SVG = (
+    '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="100" height="50">'
+    '<rect id="bg" width="100" height="50" fill="#000000"/>'
+    '<text id="label" x="10" y="30" font-size="12" fill="#ffffff">Hello</text>'
+    '<rect id="spinner" x="70" y="10" width="20" height="20" fill="#ff0000"/>'
+    "</svg>"
+)
+
+_SPINNER_HIDDEN_SVG = (
+    '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="100" height="50">'
+    '<rect id="bg" width="100" height="50" fill="#000000"/>'
+    '<text id="label" x="10" y="30" font-size="12" fill="#ffffff">Hello</text>'
+    '<rect id="spinner" x="70" y="10" width="20" height="20" '
+    'display="none" fill="#ff0000"/>'
+    "</svg>"
+)
+
+
+class TestSpinnerNodeHidden:
+    """Spinner SVG node must be hidden in non-busy renders."""
+
+    def test_render_hides_visible_spinner_node(self):
+        """render() sets display='none' even if the author omitted it."""
+        spec = PackageSpec(
+            name="Test",
+            type=PackageType.KEY,
+            version=1,
+            svg_source=_SPINNER_VISIBLE_SVG,
+            spinner=SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=8),
+        )
+        renderer = SvgRenderer(spec)
+        svg = renderer.render_svg()
+        assert 'display="none"' in svg
+
+    def test_render_keeps_already_hidden_spinner(self):
+        """render() still works when author already set display='none'."""
+        spec = PackageSpec(
+            name="Test",
+            type=PackageType.KEY,
+            version=1,
+            svg_source=_SPINNER_HIDDEN_SVG,
+            spinner=SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=8),
+        )
+        renderer = SvgRenderer(spec)
+        svg = renderer.render_svg()
+        assert 'display="none"' in svg
+
+    def test_render_svg_hides_visible_spinner_node(self):
+        """render_svg() also hides the spinner node."""
+        spec = PackageSpec(
+            name="Test",
+            type=PackageType.KEY,
+            version=1,
+            svg_source=_SPINNER_VISIBLE_SVG,
+            spinner=SpinnerSpec(type=SpinnerType.PULSE, node="spinner", frames=6),
+        )
+        renderer = SvgRenderer(spec)
+        svg = renderer.render_svg()
+        assert 'display="none"' in svg
+
+    def test_no_spinner_spec_no_error(self):
+        """Without a spinner spec, render proceeds normally."""
+        spec = PackageSpec(
+            name="Test",
+            type=PackageType.KEY,
+            version=1,
+            svg_source=_SPINNER_VISIBLE_SVG,
+        )
+        renderer = SvgRenderer(spec)
+        svg = renderer.render_svg()
+        # No display="none" should be forced on the rect
+        assert 'display="none"' not in svg
+
+    def test_spinner_node_not_in_svg_no_error(self):
+        """If spinner.node references a missing element, no crash occurs."""
+        spec = PackageSpec(
+            name="Test",
+            type=PackageType.KEY,
+            version=1,
+            svg_source=_SPINNER_VISIBLE_SVG,
+            spinner=SpinnerSpec(
+                type=SpinnerType.ROTATION, node="nonexistent", frames=8
+            ),
+        )
+        renderer = SvgRenderer(spec)
+        # Should not raise
+        svg = renderer.render_svg()
+        assert svg
