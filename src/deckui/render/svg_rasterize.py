@@ -249,19 +249,27 @@ def register_svg_backend(name: str, backend: SvgRasterizer) -> None:
     logger.debug("Registered SVG backend %r", name)
 
 
-def set_svg_backend(name: str) -> None:
+def set_svg_backend(name: str, *, verify: bool = True) -> None:
     """Select the active SVG rasterisation backend by name.
+
+    By default, performs a smoke test to verify the backend can
+    rasterise a trivial SVG.  Pass ``verify=False`` to skip.
 
     Parameters
     ----------
     name : str
         Name of a previously registered backend, or ``"auto"`` to use
         automatic fallback ordering.
+    verify : bool, default=True
+        When *True*, render a tiny SVG to confirm the backend works.
+        Raises :class:`RasterizeError` immediately if it does not.
 
     Raises
     ------
     ValueError
         If *name* is not ``"auto"`` and has not been registered.
+    RasterizeError
+        If *verify* is True and the backend cannot rasterise.
     """
     global _active_backend  # noqa: PLW0603
     if name != "auto" and name not in _registry:
@@ -269,6 +277,12 @@ def set_svg_backend(name: str) -> None:
             f"Unknown SVG backend {name!r}. "
             f"Registered backends: {', '.join(sorted(_registry)) or '(none)'}"
         )
+    if verify and name != "auto":
+        _test_svg = (
+            b'<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1">'
+            b'<rect width="1" height="1"/></svg>'
+        )
+        _registry[name].rasterize(_test_svg, 1, 1)
     _active_backend = name
     logger.debug("Active SVG backend set to %r", name)
 

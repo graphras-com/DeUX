@@ -62,7 +62,7 @@ class TestRegistry:
 
     def test_set_and_get_backend(self):
         """set_svg_backend changes the active backend."""
-        set_svg_backend("cairo")
+        set_svg_backend("cairo", verify=False)
         assert get_svg_backend() == "cairo"
 
     def test_set_auto_backend(self):
@@ -104,6 +104,28 @@ class TestRegistry:
 
         assert isinstance(Good(), SvgRasterizer)
         assert not isinstance("string", SvgRasterizer)
+
+    def test_set_backend_verify_catches_broken(self):
+        """set_svg_backend raises RasterizeError when verify detects a broken backend."""
+
+        class BrokenBackend:
+            def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
+                raise RasterizeError("broken")
+
+        register_svg_backend("broken", BrokenBackend())
+        with pytest.raises(RasterizeError, match="broken"):
+            set_svg_backend("broken")
+
+    def test_set_backend_verify_false_skips_check(self):
+        """set_svg_backend with verify=False skips the smoke test."""
+
+        class BrokenBackend:
+            def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
+                raise RasterizeError("broken")
+
+        register_svg_backend("broken", BrokenBackend())
+        set_svg_backend("broken", verify=False)
+        assert get_svg_backend() == "broken"
 
 
 class TestCairoRasterizer:

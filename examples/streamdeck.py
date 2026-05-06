@@ -94,6 +94,7 @@ from deckui import (
     DuiCard,
     DuiKey,
     load_package,
+    set_svg_backend
 )
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -103,6 +104,10 @@ log = logging.getLogger(__name__)
 # below.  Adjust if you move them elsewhere.
 EXAMPLES_DIR = Path(__file__).resolve().parent
 
+try:
+    set_svg_backend("pyvips")
+except Exception:
+    log.info("pyvips backend unavailable, using default (auto)")
 
 # ===========================================================================
 # Time helpers (used by TimerController)
