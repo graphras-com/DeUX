@@ -9,18 +9,6 @@ import pytest
 from PIL import Image
 
 import deckui.render.svg_rasterize as svg_mod
-from deckui.render.svg_rasterize import (
-    CairoRasterizer,
-    PyvipsRasterizer,
-    RasterizeError,
-    RsvgCliRasterizer,
-    SvgRasterizer,
-    _svg_to_png,
-    get_svg_backend,
-    list_svg_backends,
-    register_svg_backend,
-    set_svg_backend,
-)
 
 
 def _fake_png(width: int = 10, height: int = 10) -> bytes:
@@ -50,7 +38,7 @@ class TestRegistry:
 
     def test_builtin_backends_registered(self):
         """Built-in backends are registered at import time."""
-        names = list_svg_backends()
+        names = svg_mod.list_svg_backends()
         assert "cairo" in names
         assert "pyvips" in names
         assert "rsvg-cli" in names
