@@ -71,6 +71,10 @@ ignore = ["B008"]
 "tests/*" = ["B011"]
 
 [project.optional-dependencies]
+pyvips = [
+    "pyvips>=2.2.0",
+]
+
 test = [
     "pytest>=9.0.3",
     "pytest-asyncio>=0.24",
@@ -98,5 +102,6 @@ strict = true
 module = [
     "StreamDeck.*",
     "cairosvg",
+    "pyvips",
 ]
 ignore_missing_imports = true

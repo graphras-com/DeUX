@@ -31,11 +31,8 @@ import argparse
 import asyncio
 import io
 import logging
-import os
-import platform
 import re
 import signal
-import subprocess
 import sys
 from pathlib import Path
 from typing import Protocol, cast
@@ -43,7 +40,7 @@ from typing import Protocol, cast
 from PIL import Image
 
 from deckui.render.key_renderer import _encode_image
-from deckui.render.svg_rasterize import RasterizeError
+from deckui.render.svg_rasterize import _svg_to_png
 from deckui.runtime.capabilities import DeviceCapabilities
 
 logger = logging.getLogger(__name__)
@@ -98,67 +95,54 @@ def parse_hex_color(value: str) -> str:
 def _svg_to_png_fit(svg_data: bytes, max_width: int, max_height: int) -> bytes:
     """Rasterise SVG bytes to PNG, fitting within a bounding box.
 
-    Unlike ``icons._svg_to_png`` (which forces exact dimensions), this
-    function preserves the SVG's intrinsic aspect ratio by only
-    constraining the output width, then scaling down if the height
-    exceeds *max_height*.
+    Parses the SVG's intrinsic ``width`` and ``height`` attributes to
+    compute the correct output size that preserves aspect ratio within
+    the *max_width* x *max_height* bounding box, then delegates to
+    the active SVG backend.
+
+    Parameters
+    ----------
+    svg_data : bytes
+        Raw SVG content.
+    max_width : int
+        Maximum output width in pixels.
+    max_height : int
+        Maximum output height in pixels.
+
+    Returns
+    -------
+    bytes
+        PNG image bytes fitting within the bounding box.
+
+    Raises
+    ------
+    RasterizeError
+        If no SVG renderer backend is available.
     """
+    import re as _re
+    import xml.etree.ElementTree as ET
+
+    # Try to extract intrinsic dimensions to preserve aspect ratio.
     try:
-        if platform.system() == "Darwin":
-            brew_lib = Path("/opt/homebrew/lib")
-            if brew_lib.exists():
-                os.environ.setdefault("DYLD_FALLBACK_LIBRARY_PATH", str(brew_lib))
+        root = ET.fromstring(svg_data)
+        w_attr = root.get("width", "")
+        h_attr = root.get("height", "")
+        # Strip unit suffixes like "px", "pt", etc.
+        w_match = _re.match(r"([\d.]+)", w_attr)
+        h_match = _re.match(r"([\d.]+)", h_attr)
+        if w_match and h_match:
+            svg_w = float(w_match.group(1))
+            svg_h = float(h_match.group(1))
+            if svg_w > 0 and svg_h > 0:
+                scale = min(max_width / svg_w, max_height / svg_h)
+                out_w = max(1, int(svg_w * scale))
+                out_h = max(1, int(svg_h * scale))
+                return _svg_to_png(svg_data, out_w, out_h)
+    except ET.ParseError:
+        pass
 
-        import cairosvg
-
-        png_bytes = cast(
-            "bytes",
-            cairosvg.svg2png(
-                bytestring=svg_data,
-                output_width=max_width,
-            ),
-        )
-        img = Image.open(io.BytesIO(png_bytes))
-        if img.height > max_height:
-            png_bytes = cast(
-                "bytes",
-                cairosvg.svg2png(
-                    bytestring=svg_data,
-                    output_height=max_height,
-                ),
-            )
-        return png_bytes
-    except (OSError, ImportError) as exc:
-        logger.debug("cairosvg unavailable (%s), trying rsvg-convert", exc)
-
-    try:
-        result = subprocess.run(
-            [
-                "rsvg-convert",
-                "--keep-aspect-ratio",
-                "--width",
-                str(max_width),
-                "--height",
-                str(max_height),
-                "--format",
-                "png",
-            ],
-            input=svg_data,
-            capture_output=True,
-            check=True,
-            timeout=10,
-        )
-        return result.stdout
-    except (FileNotFoundError, subprocess.SubprocessError) as exc:
-        logger.debug("rsvg-convert unavailable (%s)", exc)
-
-    raise RasterizeError(
-        "No SVG renderer available. Install one of:\n"
-        "  - System library: brew install cairo  (macOS) or apt install libcairo2 "
-        "(Linux)\n"
-        "  - CLI tool: apt install librsvg2-bin\n"
-        "  - Python package: pip install cairosvg"
-    )
+    # Fallback: force exact dimensions.
+    return _svg_to_png(svg_data, max_width, max_height)
 
 
 def load_svg(path: Path, max_width: int, max_height: int) -> Image.Image:
