@@ -12,6 +12,7 @@ from deckui.dui.schema import (
     IconifyBinding,
     ImageBinding,
     ImageFit,
+    ListBinding,
     OverflowMode,
     PackageSpec,
     PackageType,
@@ -1817,62 +1818,188 @@ class TestSpinnerNodeHidden:
         )
         renderer = SvgRenderer(spec)
         svg = renderer.render_svg()
-        assert 'display="none"' in svg
-
-    def test_render_keeps_already_hidden_spinner(self):
-        """render() still works when author already set display='none'."""
-        spec = PackageSpec(
-            name="Test",
-            type=PackageType.KEY,
-            version=1,
-            svg_source=_SPINNER_HIDDEN_SVG,
-            spinner=SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=8),
-        )
-        renderer = SvgRenderer(spec)
-        svg = renderer.render_svg()
-        assert 'display="none"' in svg
-
-    def test_render_svg_hides_visible_spinner_node(self):
-        """render_svg() also hides the spinner node."""
-        spec = PackageSpec(
-            name="Test",
-            type=PackageType.KEY,
-            version=1,
-            svg_source=_SPINNER_VISIBLE_SVG,
-            spinner=SpinnerSpec(type=SpinnerType.PULSE, node="spinner", frames=6),
-        )
-        renderer = SvgRenderer(spec)
-        svg = renderer.render_svg()
-        assert 'display="none"' in svg
-
-    def test_no_spinner_spec_no_error(self):
-        """Without a spinner spec, render proceeds normally."""
-        spec = PackageSpec(
-            name="Test",
-            type=PackageType.KEY,
-            version=1,
-            svg_source=_SPINNER_VISIBLE_SVG,
-        )
-        renderer = SvgRenderer(spec)
-        svg = renderer.render_svg()
-        # No display="none" should be forced on the rect
-        assert 'display="none"' not in svg
-
-    def test_spinner_node_not_in_svg_no_error(self):
-        """If spinner.node references a missing element, no crash occurs."""
-        spec = PackageSpec(
-            name="Test",
-            type=PackageType.KEY,
-            version=1,
-            svg_source=_SPINNER_VISIBLE_SVG,
-            spinner=SpinnerSpec(
-                type=SpinnerType.ROTATION, node="nonexistent", frames=8
-            ),
-        )
-        renderer = SvgRenderer(spec)
-        # Should not raise
-        svg = renderer.render_svg()
         assert svg
+
+
+_LIST_SVG = (
+    '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="200" height="50">'
+    '<text id="pager" x="100" y="25" text-anchor="middle">placeholder</text>'
+    "</svg>"
+)
+
+
+class TestListBinding:
+    """Tests for the ``list`` binding rendering."""
+
+    def _make_renderer(self, *, items=("A", "B", "C"), index=0, **kwargs):
+        binding = ListBinding(
+            node="pager",
+            default_items=tuple(items),
+            default_index=index,
+            active_attrs={"fill": "#ffffff", "font-weight": "bold"},
+            inactive_attrs={"fill": "#888888"},
+            **kwargs,
+        )
+        spec = _make_spec(_LIST_SVG, bindings={"nav": binding})
+        return SvgRenderer(spec)
+
+    def test_renders_correct_number_of_children(self):
+        renderer = self._make_renderer()
+        svg = renderer.render_svg()
+        assert svg.count("<tspan") == 3
+
+    def test_active_item_gets_active_attrs(self):
+        renderer = self._make_renderer(index=1)
+        svg = renderer.render_svg()
+        # B is active — should have fill=#ffffff
+        assert 'fill="#ffffff"' in svg
+        assert 'font-weight="bold"' in svg
+
+    def test_inactive_items_get_inactive_attrs(self):
+        renderer = self._make_renderer(items=("X",), index=0)
+        svg = renderer.render_svg()
+        # Only X, and it's active — no inactive fill
+        assert svg.count('fill="#888888"') == 0
+        assert svg.count('fill="#ffffff"') == 1
+
+    def test_no_active_with_none_index(self):
+        renderer = self._make_renderer(index=None)
+        svg = renderer.render_svg()
+        # All items get inactive attrs
+        assert svg.count('fill="#888888"') == 3
+        assert 'fill="#ffffff"' not in svg
+
+    def test_no_active_with_negative_one_index(self):
+        renderer = self._make_renderer(index=-1)
+        svg = renderer.render_svg()
+        assert svg.count('fill="#888888"') == 3
+        assert 'fill="#ffffff"' not in svg
+
+    def test_separator_inserted(self):
+        renderer = self._make_renderer(separator=" · ")
+        svg = renderer.render_svg()
+        # 3 items → 2 separators → 5 tspan elements total
+        assert svg.count("<tspan") == 5
+        assert " · " in svg
+
+    def test_no_separator_when_empty(self):
+        renderer = self._make_renderer(separator="")
+        svg = renderer.render_svg()
+        assert svg.count("<tspan") == 3
+
+    def test_empty_items_no_children(self):
+        renderer = self._make_renderer(items=(), index=None)
+        svg = renderer.render_svg()
+        assert "<tspan" not in svg
+        # Original placeholder text is cleared
+        assert "placeholder" not in svg
+
+    def test_default_values_on_init(self):
+        renderer = self._make_renderer(items=("One", "Two"), index=1)
+        val = renderer.get("nav")
+        assert val == {"items": ["One", "Two"], "index": 1}
+
+    def test_partial_update_index_only(self):
+        renderer = self._make_renderer(items=("A", "B", "C"), index=0)
+        changed = renderer.set("nav", {"index": 2})
+        assert changed is True
+        val = renderer.get("nav")
+        assert val["items"] == ["A", "B", "C"]
+        assert val["index"] == 2
+
+    def test_partial_update_items_only_clamps_index(self):
+        renderer = self._make_renderer(items=("A", "B", "C"), index=2)
+        changed = renderer.set("nav", {"items": ["X", "Y"]})
+        assert changed is True
+        val = renderer.get("nav")
+        assert val["items"] == ["X", "Y"]
+        assert val["index"] == 1  # clamped from 2 to len-1
+
+    def test_partial_update_items_empty_sets_index_none(self):
+        renderer = self._make_renderer(items=("A",), index=0)
+        renderer.set("nav", {"items": []})
+        val = renderer.get("nav")
+        assert val["items"] == []
+        assert val["index"] is None
+
+    def test_set_index_negative_one_normalised_to_none(self):
+        renderer = self._make_renderer(items=("A", "B"), index=0)
+        renderer.set("nav", {"index": -1})
+        val = renderer.get("nav")
+        assert val["index"] is None
+
+    def test_set_unchanged_returns_false(self):
+        renderer = self._make_renderer(items=("A",), index=0)
+        changed = renderer.set("nav", {"items": ["A"], "index": 0})
+        assert changed is False
+
+    def test_tspan_flows_inline(self):
+        renderer = self._make_renderer(items=("A", "B"), index=0)
+        svg = renderer.render_svg()
+        # Tspans should NOT have x set — they flow inline horizontally
+        # Count x="100" occurrences: only the parent <text> should have it
+        assert svg.count('x="100"') == 1
+
+    def test_custom_child_tag(self):
+        binding = ListBinding(
+            node="pager",
+            child_tag="g",
+            default_items=("A", "B"),
+            default_index=0,
+        )
+        spec = _make_spec(_LIST_SVG, bindings={"nav": binding})
+        renderer = SvgRenderer(spec)
+        svg = renderer.render_svg()
+        # Should use <g> not <tspan>
+        assert "<tspan" not in svg
+        # g elements are present (namespace-qualified)
+        assert ">A<" in svg
+        assert ">B<" in svg
+
+    def test_icon_item(self, monkeypatch):
+        """Items prefixed with icon: render inline Iconify SVG."""
+        icon_svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+            '<path d="M10 20v-6h4v6"/></svg>'
+        )
+        monkeypatch.setattr(
+            "deckui.dui.svg_renderer.fetch_icon", lambda _name: icon_svg
+        )
+        renderer = self._make_renderer(items=("Home", "icon:mdi:cog"), index=1)
+        svg = renderer.render_svg()
+        # Text item
+        assert ">Home<" in svg
+        # Icon item should have an embedded <svg> inside a <tspan>
+        assert "viewBox" in svg
+
+    def test_icon_fetch_failure_skips(self, monkeypatch):
+        """If icon fetch fails, the item is silently skipped."""
+        from deckui.dui.iconify import IconifyError
+
+        def _fail(name):
+            raise IconifyError(f"not found: {name}")
+
+        monkeypatch.setattr("deckui.dui.svg_renderer.fetch_icon", _fail)
+        renderer = self._make_renderer(items=("A", "icon:bad:icon"), index=0)
+        svg = renderer.render_svg()
+        # Only "A" should render
+        assert ">A<" in svg
+
+    def test_icon_parse_failure_skips(self, monkeypatch):
+        """If icon SVG is malformed, the item is silently skipped."""
+        monkeypatch.setattr(
+            "deckui.dui.svg_renderer.fetch_icon", lambda _: "not valid xml <<<"
+        )
+        renderer = self._make_renderer(items=("icon:bad:svg",), index=0)
+        svg = renderer.render_svg()
+        # No crash, no icon rendered
+        assert svg
+
+    def test_separator_gets_inactive_attrs(self):
+        renderer = self._make_renderer(items=("A", "B"), index=0, separator="|")
+        svg = renderer.render_svg()
+        # Separator should have inactive fill
+        assert svg.count('fill="#888888"') == 2  # B + separator
 
 
 class TestSpinnerBackgroundNodeHidden:

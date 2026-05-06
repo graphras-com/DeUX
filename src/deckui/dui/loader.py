@@ -28,6 +28,7 @@ from .schema import (
     IconifyBinding,
     ImageBinding,
     ImageFit,
+    ListBinding,
     OverflowMode,
     PackageSpec,
     PackageType,
@@ -282,11 +283,155 @@ def _parse_binding(name: str, raw: dict[str, Any]) -> Binding:
             default=str(default_raw) if default_raw is not None else "",
         )
 
+    if binding_type == BindingType.LIST:
+        return _parse_list_binding(name, node, raw)
+
     return ColorBinding(
         node=node,
         attribute=str(raw.get("attribute", "fill")),
         default=str(raw.get("default", "#ffffff")),
     )
+
+
+def _parse_list_binding(name: str, node: str, raw: dict[str, Any]) -> ListBinding:
+    """Parse a ``list`` binding entry from the manifest.
+
+    Parameters
+    ----------
+    name : str
+        Binding name for error messages.
+    node : str
+        SVG element ID (already extracted by the caller).
+    raw : dict[str, Any]
+        Raw YAML mapping for this binding.
+
+    Returns
+    -------
+    ListBinding
+        A validated list binding dataclass.
+
+    Raises
+    ------
+    PackageError
+        If any field is missing or has an invalid value.
+    """
+    child_tag_raw = raw.get("child_tag", "tspan")
+    if not isinstance(child_tag_raw, str) or not child_tag_raw.strip():
+        raise PackageError(
+            f"Binding '{name}': child_tag must be a non-empty string, "
+            f"got {child_tag_raw!r}"
+        )
+
+    default_items: tuple[str, ...] = ()
+    raw_items = raw.get("default_items")
+    if raw_items is not None:
+        if not isinstance(raw_items, list):
+            raise PackageError(f"Binding '{name}': default_items must be a list")
+        for i, item in enumerate(raw_items):
+            if not isinstance(item, str):
+                raise PackageError(
+                    f"Binding '{name}': default_items[{i}] must be a string, "
+                    f"got {item!r}"
+                )
+        default_items = tuple(raw_items)
+
+    default_index_raw = raw.get("default_index", 0)
+    default_index: int | None
+    if default_index_raw is None:
+        default_index = None
+    elif not isinstance(default_index_raw, int) or isinstance(default_index_raw, bool):
+        raise PackageError(
+            f"Binding '{name}': default_index must be an integer or null, "
+            f"got {default_index_raw!r}"
+        )
+    else:
+        default_index = default_index_raw
+
+    if (
+        default_index is not None
+        and default_index != -1
+        and default_items
+        and default_index >= len(default_items)
+    ):
+        raise PackageError(
+            f"Binding '{name}': default_index {default_index} is out of range "
+            f"for {len(default_items)} default_items"
+        )
+
+    active_attrs = _parse_attr_dict(name, raw, "active_attrs")
+    inactive_attrs = _parse_attr_dict(name, raw, "inactive_attrs")
+
+    separator_raw = raw.get("separator", "")
+    if not isinstance(separator_raw, str):
+        raise PackageError(
+            f"Binding '{name}': separator must be a string, got {separator_raw!r}"
+        )
+
+    icon_size_raw = raw.get("icon_size", 16)
+    if (
+        not isinstance(icon_size_raw, int)
+        or isinstance(icon_size_raw, bool)
+        or icon_size_raw <= 0
+    ):
+        raise PackageError(
+            f"Binding '{name}': icon_size must be a positive integer, "
+            f"got {icon_size_raw!r}"
+        )
+
+    return ListBinding(
+        node=node,
+        child_tag=child_tag_raw,
+        default_items=default_items,
+        default_index=default_index,
+        active_attrs=active_attrs,
+        inactive_attrs=inactive_attrs,
+        separator=separator_raw,
+        icon_size=icon_size_raw,
+    )
+
+
+def _parse_attr_dict(
+    binding_name: str, raw: dict[str, Any], field_name: str
+) -> dict[str, str]:
+    """Parse and validate an attribute dictionary from a binding entry.
+
+    Parameters
+    ----------
+    binding_name : str
+        Binding name for error messages.
+    raw : dict[str, Any]
+        Raw YAML mapping for the binding.
+    field_name : str
+        Key within *raw* to parse (e.g. ``"active_attrs"``).
+
+    Returns
+    -------
+    dict[str, str]
+        Validated attribute dictionary with string keys and values.
+
+    Raises
+    ------
+    PackageError
+        If the value is not a dict or contains non-string keys/values.
+    """
+    attrs_raw = raw.get(field_name)
+    if attrs_raw is None:
+        return {}
+    if not isinstance(attrs_raw, dict):
+        raise PackageError(
+            f"Binding '{binding_name}': {field_name} must be a mapping"
+        )
+    for k, v in attrs_raw.items():
+        if not isinstance(k, str):
+            raise PackageError(
+                f"Binding '{binding_name}': {field_name} key {k!r} must be a string"
+            )
+        if not isinstance(v, str):
+            raise PackageError(
+                f"Binding '{binding_name}': {field_name}[{k!r}] must be a string, "
+                f"got {v!r}"
+            )
+    return dict(attrs_raw)
 
 
 def _parse_event(raw: dict[str, Any], index: int) -> EventMapping:

@@ -16,6 +16,7 @@ from deckui.dui.schema import (
     EventMapping,
     IconifyBinding,
     ImageBinding,
+    ListBinding,
     PackageSpec,
     PackageType,
     RangeBinding,
@@ -79,9 +80,9 @@ _DASH_SVG = (
     '<svg id="DashboardCard" xmlns="http://www.w3.org/2000/svg" width="197" height="98">'
     '<text id="date" x="4" y="20" font-size="10" fill="#fff"></text>'
     '<text id="time" x="4" y="35" font-size="10" fill="#fff"></text>'
-    '<text id="temperature" x="4" y="50" font-size="10" fill="#fff"></text>'
-    '<text id="humidity" x="4" y="65" font-size="10" fill="#fff"></text>'
-    '<rect id="deck_brightness" x="4" y="80" width="189" height="4" fill="#00ff00"/>'
+    '<text id="pager" x="100" y="80" font-size="13" fill="#8F8F8F"'
+    ' text-anchor="middle"></text>'
+    '<rect id="brightness" x="4" y="90" width="189" height="4" fill="#00ff00"/>'
     "</svg>"
 )
 
@@ -289,10 +290,17 @@ def _dash_spec() -> PackageSpec:
         bindings={
             "date": TextBinding(node="date", default=""),
             "time": TextBinding(node="time", default=""),
-            "temperature": TextBinding(node="temperature", default=""),
-            "humidity": TextBinding(node="humidity", default=""),
-            "deck_brightness": RangeBinding(
-                node="deck_brightness", default=0.5, direction="horizontal"
+            "nav": ListBinding(
+                node="pager",
+                child_tag="tspan",
+                default_items=("Main", "Livingroom", "Settings"),
+                default_index=0,
+                active_attrs={"fill": "#DEDEDE"},
+                inactive_attrs={"fill": "#8F8F8F"},
+                separator=" · ",
+            ),
+            "brightness": RangeBinding(
+                node="brightness", default=0.5, direction="horizontal"
             ),
         },
         events=(
@@ -648,13 +656,12 @@ class TestDashboardController:
 
     def test_initial_state(self, ctrl: DashboardController) -> None:
         # 0.5 default -> 50% in domain units.
-        assert ctrl.deck_brightness == 50
-        assert ctrl.temperature_c == pytest.approx(22.0)
-        assert ctrl.humidity_pct == 45
+        assert ctrl.brightness == 50
 
     def test_card_initial_bindings(self, ctrl: DashboardController) -> None:
-        assert ctrl.card.get("temperature") == "22.0C"
-        assert ctrl.card.get("humidity") == "45%"
+        # date and time are set in __init__
+        assert ctrl.card.get("date") != ""
+        assert ctrl.card.get("time") != ""
 
     def test_get_date_format(self, ctrl: DashboardController) -> None:
         date = ctrl.get_date()
@@ -664,26 +671,19 @@ class TestDashboardController:
     def test_get_time_format(self, ctrl: DashboardController) -> None:
         assert ":" in ctrl.get_time()
 
-    async def test_telemetry_event_updates_card(
-        self, ctrl: DashboardController
-    ) -> None:
-        await ctrl._svc.set_telemetry(18.4, 60)
-        assert ctrl.card.get("temperature") == "18.4C"
-        assert ctrl.card.get("humidity") == "60%"
-
     async def test_brightness_handler_routes_through_deck(
         self, ctrl: DashboardController
     ) -> None:
         """brightness_up only calls deck.set_brightness; no direct card mutation."""
         deck = self._real_deck(brightness=50)
         await ctrl.on_attach(deck)
-        before = ctrl.card.get("deck_brightness")
+        before = ctrl.card.get("brightness")
 
         # Pin the deck so the event never fires; the card must stay put.
         deck.set_brightness = AsyncMock()  # type: ignore[method-assign]
         handler = ctrl.card._events._handlers["brightness_up"]
         await handler(1)
-        assert ctrl.card.get("deck_brightness") == before
+        assert ctrl.card.get("brightness") == before
         deck.set_brightness.assert_awaited_once_with(51)
 
     async def test_brightness_event_updates_card_and_last_known(
@@ -694,8 +694,8 @@ class TestDashboardController:
         await ctrl.on_attach(deck)
 
         await deck.set_brightness(73)
-        assert ctrl.deck_brightness == 73
-        assert ctrl.card.get("deck_brightness") == pytest.approx(0.73)
+        assert ctrl.brightness == 73
+        assert ctrl.card.get("brightness") == pytest.approx(0.73)
 
     async def test_on_attach_replays_last_known(
         self, ctrl: DashboardController
@@ -704,7 +704,7 @@ class TestDashboardController:
         first = self._real_deck(brightness=50)
         await ctrl.on_attach(first)
         await first.set_brightness(80)
-        assert ctrl.deck_brightness == 80
+        assert ctrl.brightness == 80
 
         # Simulate disconnect + reconnect: a brand-new Deck instance.
         second = self._real_deck(brightness=50)

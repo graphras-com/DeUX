@@ -21,6 +21,7 @@ from .schema import (
     IconifyBinding,
     ImageBinding,
     ImageFit,
+    ListBinding,
     OverflowMode,
     PackageSpec,
     RangeBinding,
@@ -344,6 +345,11 @@ class SvgRenderer:
                     self._range_extents[name] = float(elem.get(attr, "0"))
             elif isinstance(binding, (SliderBinding, ToggleBinding, IconifyBinding)):
                 self._values[name] = binding.default
+            elif isinstance(binding, ListBinding):
+                self._values[name] = {
+                    "items": list(binding.default_items),
+                    "index": binding.default_index,
+                }
 
     def set(self, name: str, value: Any) -> bool:
         """Set a binding value.
@@ -376,6 +382,29 @@ class SvgRenderer:
         binding = self._spec.bindings[name]
         if isinstance(binding, ImageBinding):
             self._values[name] = value
+            return True
+
+        if isinstance(binding, ListBinding) and isinstance(value, dict):
+            current = self._values.get(name, {"items": [], "index": None})
+            merged = dict(current)
+            if "items" in value:
+                merged["items"] = list(value["items"])
+            if "index" in value:
+                merged["index"] = value["index"]
+            # Clamp index when items changed but index wasn't explicitly set.
+            if "items" in value and "index" not in value:
+                items = merged["items"]
+                idx = merged["index"]
+                if idx is not None and idx != -1 and items and idx >= len(items):
+                    merged["index"] = len(items) - 1
+                elif not items:
+                    merged["index"] = None
+            # Normalise -1 → None.
+            if merged.get("index") == -1:
+                merged["index"] = None
+            if old == merged:
+                return False
+            self._values[name] = merged
             return True
 
         if old == value:
@@ -430,6 +459,7 @@ class SvgRenderer:
         self._hide_spinner_node(root)
 
         svg_bytes = ET.tostring(root, encoding="unicode", xml_declaration=True)
+        logger.debug("Rendered SVG before rasterisation:\n%s", svg_bytes)
         return self._rasterise(svg_bytes.encode("utf-8"))
 
     def render_svg(self) -> str:
@@ -525,6 +555,8 @@ class SvgRenderer:
             self._apply_slider(elem, binding, value)
         elif isinstance(binding, IconifyBinding):
             self._apply_iconify(elem, binding, value)
+        elif isinstance(binding, ListBinding):
+            self._apply_list(root, elem, binding, value)
 
     def _apply_text(
         self,
@@ -803,6 +835,115 @@ class SvgRenderer:
         icon_root.set("height", size)
 
         elem.append(icon_root)
+
+    def _apply_list(
+        self,
+        root: ET.Element,
+        elem: ET.Element,
+        binding: ListBinding,
+        value: Any,
+    ) -> None:
+        """Render a list of items as repeated child elements.
+
+        Each item becomes a ``<child_tag>`` child of *elem*.  The item
+        at *index* receives *active_attrs*; all others receive
+        *inactive_attrs*.  An index of ``None`` (or ``-1``, normalised
+        earlier) means every item is styled as inactive.
+
+        Items prefixed with ``icon:`` are rendered as inline Iconify
+        icons via :meth:`_apply_list_icon`.
+
+        Parameters
+        ----------
+        root : ET.Element
+            The SVG document root (needed for font resolution on icon
+            items).
+        elem : ET.Element
+            The parent SVG element whose children are rebuilt.
+        binding : ListBinding
+            The list binding definition from the manifest.
+        value : Any
+            A dict with ``"items"`` (list of str) and ``"index"``
+            (int or None).
+        """
+        if not isinstance(value, dict):
+            value = {"items": list(binding.default_items), "index": binding.default_index}
+
+        items: list[str] = value.get("items", [])
+        index: int | None = value.get("index")
+        if index == -1:
+            index = None
+
+        # Clear existing children.
+        elem.text = None
+        for child in list(elem):
+            elem.remove(child)
+
+        for i, item in enumerate(items):
+            # Separator between items.
+            if binding.separator and i > 0:
+                sep = ET.SubElement(elem, f"{{{_SVG_NS}}}{binding.child_tag}")
+                sep.text = binding.separator
+                for attr_k, attr_v in binding.inactive_attrs.items():
+                    sep.set(attr_k, attr_v)
+
+            is_active = index is not None and i == index
+            attrs = binding.active_attrs if is_active else binding.inactive_attrs
+
+            if item.startswith("icon:"):
+                self._apply_list_icon(elem, binding, item[5:], attrs)
+            else:
+                child_elem = ET.SubElement(elem, f"{{{_SVG_NS}}}{binding.child_tag}")
+                child_elem.text = item
+                for attr_k, attr_v in attrs.items():
+                    child_elem.set(attr_k, attr_v)
+
+    def _apply_list_icon(
+        self,
+        parent: ET.Element,
+        binding: ListBinding,
+        icon_name: str,
+        attrs: dict[str, str],
+    ) -> None:
+        """Render a single Iconify icon as a child of *parent*.
+
+        Fetches the icon SVG via the Iconify API, wraps it in a
+        ``<child_tag>`` element, and applies the given attributes.
+
+        Parameters
+        ----------
+        parent : ET.Element
+            The parent SVG element to append the icon child to.
+        binding : ListBinding
+            The list binding definition (provides ``child_tag`` and
+            ``icon_size``).
+        icon_name : str
+            Iconify icon identifier (e.g. ``"mdi:home"``).
+        attrs : dict[str, str]
+            SVG attributes to apply to the wrapper element.
+        """
+        try:
+            svg_source = fetch_icon(icon_name)
+        except IconifyError as exc:
+            logger.warning("List binding icon '%s': %s", icon_name, exc)
+            return
+
+        try:
+            icon_root = ET.fromstring(svg_source)  # noqa: S314 — trusted API
+        except ET.ParseError as exc:
+            logger.warning(
+                "List binding icon '%s': failed to parse SVG: %s", icon_name, exc
+            )
+            return
+
+        size = str(binding.icon_size)
+        icon_root.set("width", size)
+        icon_root.set("height", size)
+
+        wrapper = ET.SubElement(parent, f"{{{_SVG_NS}}}{binding.child_tag}")
+        for attr_k, attr_v in attrs.items():
+            wrapper.set(attr_k, attr_v)
+        wrapper.append(icon_root)
 
     def _inline_assets(self, root: ET.Element) -> None:
         """Replace relative asset ``href`` references with data URIs.

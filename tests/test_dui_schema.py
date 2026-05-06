@@ -15,6 +15,7 @@ from deckui.dui.schema import (
     IconifyBinding,
     ImageBinding,
     ImageFit,
+    ListBinding,
     OverflowMode,
     PackageSpec,
     PackageType,
@@ -50,6 +51,7 @@ class TestBindingType:
         assert BindingType("slider") == BindingType.SLIDER
         assert BindingType("toggle") == BindingType.TOGGLE
         assert BindingType("iconify") == BindingType.ICONIFY
+        assert BindingType("list") == BindingType.LIST
 
 
 class TestOverflowMode:
@@ -330,3 +332,47 @@ class TestValidSets:
 
     def test_valid_region_events(self):
         assert frozenset({"tap", "long_press"}) == VALID_REGION_EVENTS
+
+
+class TestListBinding:
+    def test_defaults(self):
+        b = ListBinding(node="pager")
+        assert b.node == "pager"
+        assert b.child_tag == "tspan"
+        assert b.default_items == ()
+        assert b.default_index == 0
+        assert b.active_attrs == {}
+        assert b.inactive_attrs == {}
+        assert b.separator == ""
+        assert b.icon_size == 16
+
+    def test_custom(self):
+        b = ListBinding(
+            node="nav",
+            child_tag="g",
+            default_items=("Main", "Settings"),
+            default_index=1,
+            active_attrs={"fill": "#fff"},
+            inactive_attrs={"fill": "#888"},
+            separator=" · ",
+            icon_size=14,
+        )
+        assert b.child_tag == "g"
+        assert b.default_items == ("Main", "Settings")
+        assert b.default_index == 1
+        assert b.active_attrs == {"fill": "#fff"}
+        assert b.separator == " · "
+        assert b.icon_size == 14
+
+    def test_no_active_index(self):
+        b = ListBinding(node="pager", default_index=None)
+        assert b.default_index is None
+
+    def test_negative_one_index(self):
+        b = ListBinding(node="pager", default_index=-1)
+        assert b.default_index == -1
+
+    def test_frozen(self):
+        b = ListBinding(node="pager")
+        with pytest.raises(AttributeError):
+            b.node = "other"  # type: ignore[misc]

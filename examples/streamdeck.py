@@ -53,7 +53,7 @@ What it demonstrates
   :meth:`~deckui.DuiCard.request_refresh`.
 * A live, asyncio-driven countdown ``TimerCard`` and a dashboard clock
   that ticks every second; weather telemetry pushed by a simulator.
-* Multi-screen navigation -- a ``main`` screen and a ``settings``
+* Multi-screen navigation -- a ``Main`` screen and a ``Settings``
   screen, cycled by an encoder press-release on the dashboard card.
 
 Running
@@ -627,7 +627,7 @@ class DashboardController(CardController):
         self._last_known_brightness: int = int(
             round(
                 self.card.get_range(
-                    "deck_brightness",
+                    "brightness",
                     min_val=self.BRIGHTNESS_MIN,
                     max_val=self.BRIGHTNESS_MAX,
                 )
@@ -636,20 +636,9 @@ class DashboardController(CardController):
 
         self._svc = MockDashboardService()
 
-        # ----- service-driven bindings -----
-        self.card.bind_many(
-            self._svc.on_telemetry_changed,
-            lambda t, h: {
-                "temperature": f"{t:.1f}C",
-                "humidity": f"{h}%",
-            },
-        )
-
         # Initial telemetry/clock population (no manifest defaults for
         # these readings).
         self.card.set_many(
-            temperature=f"{self._svc.temperature_c:.1f}C",
-            humidity=f"{self._svc.humidity_pct}%",
             date=self.get_date(),
             time=self.get_time(),
         )
@@ -659,19 +648,9 @@ class DashboardController(CardController):
         self.card.forward("brightness_down", self._brightness_down)
 
     @property
-    def deck_brightness(self) -> int:
+    def brightness(self) -> int:
         """Last confirmed deck brightness (0 -- 100)."""
         return self._last_known_brightness
-
-    @property
-    def temperature_c(self) -> float:
-        """Current temperature reading in degrees Celsius."""
-        return self._svc.temperature_c
-
-    @property
-    def humidity_pct(self) -> int:
-        """Current humidity reading in percent."""
-        return self._svc.humidity_pct
 
     @staticmethod
     def get_date() -> str:
@@ -699,7 +678,7 @@ class DashboardController(CardController):
 
         # Reflect the deck's confirmed brightness on the slider.
         self.card.bind_range(
-            "deck_brightness",
+            "brightness",
             deck.on_brightness_changed,
             min_val=self.BRIGHTNESS_MIN,
             max_val=self.BRIGHTNESS_MAX,
@@ -713,7 +692,8 @@ class DashboardController(CardController):
         @deck.on_screen_changed
         async def _screen_changed(name: str, screens:dict) -> None:
             _screens = list(screens)
-            self.card.set("screens", f"{_screens.index(name)+1}/{len(_screens)}")
+            # self.card.set("screens", f"{_screens.index(name)+1}/{len(_screens)}")
+            self.card.set("nav", {"items": _screens, "index": _screens.index(name)})
             await self.card.request_refresh()
 
         # Replay onto the freshly-connected deck.  Idempotent: if the
@@ -1041,7 +1021,7 @@ class StreamDeckApp:
         self.scenes = SceneController(
             scene_defs, packages_dir=self._packages_dir
         )
-        self.nav = ScreenCycler(["main", "settings"])
+        self.nav = ScreenCycler(["Main", "Settings"])
         self.nav.attach(self.dashboard.card)
 
         # Every CardController-derived object gets a uniform lifecycle
@@ -1089,7 +1069,7 @@ class StreamDeckApp:
         self._build_settings_screen(deck)
 
         # Resume on the user's last screen (cold start: first screen
-        # in the cycler -- "main").  set_screen wires every key/card's
+        # in the cycler -- "Main").  set_screen wires every key/card's
         # request_refresh() to deck.refresh() under the hood.
         await deck.set_screen(self.nav.current)
 
@@ -1111,7 +1091,7 @@ class StreamDeckApp:
     def _build_main_screen(self, deck: Deck) -> None:
         """Layout: favourites + scenes on keys, all four cards on the strip."""
         caps = deck.capabilities
-        screen = deck.screen("main")
+        screen = deck.screen("Main")
 
         if screen.touch_strip is not None:
             screen.touch_strip.background_color = "#1c1c1c"
@@ -1131,7 +1111,7 @@ class StreamDeckApp:
 
     def _build_settings_screen(self, deck: Deck) -> None:
         """Layout: dashboard pinned, otherwise template ``IconKey``s."""
-        screen = deck.screen("settings")
+        screen = deck.screen("Settings")
         caps = deck.capabilities
 
         if screen.touch_strip is not None:
@@ -1161,7 +1141,7 @@ async def run() -> None:
     """
     app = StreamDeckApp(MEDIA_CATALOG, SCENE_DEFS)
     manager = DeckManager(
-        brightness=app.dashboard.deck_brightness, auto_reconnect=True
+        brightness=app.dashboard.brightness, auto_reconnect=True
     )
 
     @manager.on_connect()
