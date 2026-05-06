@@ -277,12 +277,19 @@ class SpinnerSpec:
         Number of frames per animation cycle.
     interval_ms
         Milliseconds between frames.
+    background_node
+        Optional SVG element ID shown behind the spinner during busy
+        state.  The node is made visible when the spinner is active and
+        hidden at rest, but it is **not** animated (no rotation, pulse,
+        or opacity changes are applied to it).  Ignored for ``custom``
+        type spinners.
     """
 
     type: SpinnerType
     node: str | None = None
     frames: int = DEFAULT_SPINNER_FRAMES
     interval_ms: int = DEFAULT_SPINNER_INTERVAL_MS
+    background_node: str | None = None
 
 
 VALID_CATEGORIES = frozenset(

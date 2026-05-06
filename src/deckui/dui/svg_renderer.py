@@ -455,12 +455,13 @@ class SvgRenderer:
         return ET.tostring(root, encoding="unicode", xml_declaration=True)
 
     def _hide_spinner_node(self, root: ET.Element) -> None:
-        """Hide the spinner SVG node so it is invisible at rest.
+        """Hide the spinner and its background node so they are invisible at rest.
 
         DUI package authors may not set ``display="none"`` on the spinner
-        element, which would make it visible in every non-busy render.
-        This method forces the node hidden; the spinner frame generators
-        remove ``display="none"`` when producing animation frames.
+        element or its background, which would make them visible in every
+        non-busy render.  This method forces both nodes hidden; the spinner
+        frame generators remove ``display="none"`` when producing animation
+        frames.
 
         Parameters
         ----------
@@ -472,6 +473,10 @@ class SvgRenderer:
             elem = _find_element_by_id(root, spinner.node)
             if elem is not None:
                 elem.set("display", "none")
+        if spinner is not None and spinner.background_node is not None:
+            bg_elem = _find_element_by_id(root, spinner.background_node)
+            if bg_elem is not None:
+                bg_elem.set("display", "none")
 
     def _apply_binding(
         self,

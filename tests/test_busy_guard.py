@@ -344,3 +344,41 @@ class TestSpinnerManifestValidation:
 
         with pytest.raises(PackageError, match="does not exist in the SVG"):
             load_package(pkg_dir)
+
+    def test_background_node_not_string_raises(self):
+        """background_node must be a string if provided."""
+        with pytest.raises(PackageError, match="background_node.*must be a string"):
+            _parse_spinner({
+                "type": "rotation",
+                "node": "spinner",
+                "background_node": 123,
+            })
+
+    def test_background_node_valid_string(self):
+        """background_node as a valid string should parse without error."""
+        spec = _parse_spinner({
+            "type": "rotation",
+            "node": "spinner",
+            "background_node": "spinner_bg",
+        })
+        assert spec.background_node == "spinner_bg"
+
+    def test_background_node_none_by_default(self):
+        """background_node defaults to None when not specified."""
+        spec = _parse_spinner({"type": "rotation", "node": "spinner"})
+        assert spec.background_node is None
+
+    def test_background_node_not_in_svg_raises(self, tmp_path):
+        """Spinner referencing a background_node not present in SVG should fail."""
+        pkg_dir = tmp_path / "Test.dui"
+        pkg_dir.mkdir()
+        (pkg_dir / "layout.svg").write_text(_CARD_SVG, encoding="utf-8")
+        manifest = (
+            "name: Test\ntype: TouchStripCard\nversion: 1\nlayout: layout.svg\n"
+            "spinner:\n  type: rotation\n  node: spinner\n"
+            "  background_node: nonexistent_bg\n"
+        )
+        (pkg_dir / "manifest.yaml").write_text(manifest, encoding="utf-8")
+
+        with pytest.raises(PackageError, match="background_node.*does not exist in the SVG"):
+            load_package(pkg_dir)

@@ -378,6 +378,7 @@ source = { editable = "." }
 dependencies = [
     { name = "cairosvg" },
     { name = "pillow" },
+    { name = "platformdirs" },
     { name = "pyyaml" },
     { name = "streamdeck" },
 ]
@@ -405,6 +406,7 @@ requires-dist = [
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.25" },
     { name = "pillow", specifier = ">=12.0.0" },
+    { name = "platformdirs", specifier = ">=4.0" },
     { name = "pylint", marker = "extra == 'docs'", specifier = ">=3.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=9.0.3" },
     { name = "pytest-asyncio", marker = "extra == 'test'", specifier = ">=0.24" },
