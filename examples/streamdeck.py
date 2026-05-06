@@ -53,7 +53,7 @@ What it demonstrates
   :meth:`~deckui.DuiCard.request_refresh`.
 * A live, asyncio-driven countdown ``TimerCard`` and a dashboard clock
   that ticks every second; weather telemetry pushed by a simulator.
-* Multi-screen navigation -- a ``main`` screen and a ``settings``
+* Multi-screen navigation -- a ``Main`` screen and a ``Settings``
   screen, cycled by an encoder press-release on the dashboard card.
 
 Running
@@ -692,7 +692,8 @@ class DashboardController(CardController):
         @deck.on_screen_changed
         async def _screen_changed(name: str, screens:dict) -> None:
             _screens = list(screens)
-           # self.card.set("screens", f"{_screens.index(name)+1}/{len(_screens)}")
+            # self.card.set("screens", f"{_screens.index(name)+1}/{len(_screens)}")
+            self.card.set("nav", {"items": _screens, "index": _screens.index(name)})
             await self.card.request_refresh()
 
         # Replay onto the freshly-connected deck.  Idempotent: if the
@@ -1020,7 +1021,7 @@ class StreamDeckApp:
         self.scenes = SceneController(
             scene_defs, packages_dir=self._packages_dir
         )
-        self.nav = ScreenCycler(["main", "settings"])
+        self.nav = ScreenCycler(["Main", "Settings"])
         self.nav.attach(self.dashboard.card)
 
         # Every CardController-derived object gets a uniform lifecycle
@@ -1068,7 +1069,7 @@ class StreamDeckApp:
         self._build_settings_screen(deck)
 
         # Resume on the user's last screen (cold start: first screen
-        # in the cycler -- "main").  set_screen wires every key/card's
+        # in the cycler -- "Main").  set_screen wires every key/card's
         # request_refresh() to deck.refresh() under the hood.
         await deck.set_screen(self.nav.current)
 
@@ -1090,7 +1091,7 @@ class StreamDeckApp:
     def _build_main_screen(self, deck: Deck) -> None:
         """Layout: favourites + scenes on keys, all four cards on the strip."""
         caps = deck.capabilities
-        screen = deck.screen("main")
+        screen = deck.screen("Main")
 
         if screen.touch_strip is not None:
             screen.touch_strip.background_color = "#1c1c1c"
@@ -1110,7 +1111,7 @@ class StreamDeckApp:
 
     def _build_settings_screen(self, deck: Deck) -> None:
         """Layout: dashboard pinned, otherwise template ``IconKey``s."""
-        screen = deck.screen("settings")
+        screen = deck.screen("Settings")
         caps = deck.capabilities
 
         if screen.touch_strip is not None:

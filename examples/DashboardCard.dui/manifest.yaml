@@ -30,10 +30,9 @@ bindings:
     default_index: 0
     active_attrs:
       fill: "#DEDEDE"
-      font-weight: bold
     inactive_attrs:
       fill: "#8F8F8F"
-    separator: " "
+    separator: " · "
 
   brightness:
     type: range
