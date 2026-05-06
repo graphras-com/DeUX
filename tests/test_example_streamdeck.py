@@ -888,7 +888,7 @@ class TestScreenCycler:
         deck.on_screen_changed = AsyncEvent()
 
         async def _set_screen(name: str) -> None:
-            await deck.on_screen_changed.emit(name)
+            await deck.on_screen_changed.emit(name, {})
 
         deck.set_screen = AsyncMock(side_effect=_set_screen)
         return deck

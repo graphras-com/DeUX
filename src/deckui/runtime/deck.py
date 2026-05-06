@@ -337,7 +337,7 @@ class Deck:
         if self._active_screen.info_screen is not None:
             await self._render_info_screen()
 
-        await self.on_screen_changed.emit(name)
+        await self.on_screen_changed.emit(name, self._screens)
 
     def _wire_refresh_callbacks(self) -> None:
         """Register ``self.refresh`` on every key and card of the active screen.
