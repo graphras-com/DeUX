@@ -171,6 +171,10 @@ class PyvipsRasterizer:
             _ensure_macos_lib_path()
             import pyvips
 
+            # Suppress noisy libvips GLib messages (e.g. "threadpool completed")
+            # by raising the pyvips logger threshold to WARNING.
+            logging.getLogger("pyvips").setLevel(logging.WARNING)
+
             image = pyvips.Image.svgload_buffer(svg_data)
             # Scale to fit the requested dimensions.
             h_scale = width / image.width
