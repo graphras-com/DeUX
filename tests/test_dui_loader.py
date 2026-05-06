@@ -12,6 +12,7 @@ from deckui.dui.schema import (
     IconifyBinding,
     ImageBinding,
     ImageFit,
+    ListBinding,
     OverflowMode,
     PackageType,
     RangeBinding,
@@ -1532,3 +1533,206 @@ class TestLoadPackageMetadata:
         with caplog.at_level(logging.WARNING):
             load_package(self._make_pkg(tmp_path, "desciption: typo"))
         assert "unknown manifest keys" in caplog.text
+
+
+class TestListBindingLoader:
+    """Tests for loading the ``list`` binding type."""
+
+    _SVG = '<svg xmlns="http://www.w3.org/2000/svg"><text id="pager" x="50"/></svg>'
+
+    def _make_pkg(self, tmp_path, bindings_yaml: str, *, name: str = "L"):
+        pkg = tmp_path / f"{name}.dui"
+        pkg.mkdir(exist_ok=True)
+        (pkg / "layout.svg").write_text(self._SVG, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            f"name: {name}\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            f"bindings:\n{bindings_yaml}",
+            encoding="utf-8",
+        )
+        return pkg
+
+    def test_valid_full(self, tmp_path):
+        spec = load_package(
+            self._make_pkg(
+                tmp_path,
+                "  nav:\n    type: list\n    node: pager\n    child_tag: tspan\n"
+                "    default_items:\n      - Main\n      - Settings\n"
+                "    default_index: 1\n"
+                "    active_attrs:\n      fill: '#ffffff'\n      font-weight: bold\n"
+                "    inactive_attrs:\n      fill: '#888888'\n"
+                "    separator: ' · '\n    icon_size: 14\n",
+            )
+        )
+        b = spec.bindings["nav"]
+        assert isinstance(b, ListBinding)
+        assert b.node == "pager"
+        assert b.child_tag == "tspan"
+        assert b.default_items == ("Main", "Settings")
+        assert b.default_index == 1
+        assert b.active_attrs == {"fill": "#ffffff", "font-weight": "bold"}
+        assert b.inactive_attrs == {"fill": "#888888"}
+        assert b.separator == " · "
+        assert b.icon_size == 14
+
+    def test_valid_minimal(self, tmp_path):
+        spec = load_package(
+            self._make_pkg(tmp_path, "  nav:\n    type: list\n    node: pager\n")
+        )
+        b = spec.bindings["nav"]
+        assert isinstance(b, ListBinding)
+        assert b.default_items == ()
+        assert b.default_index == 0
+        assert b.separator == ""
+        assert b.icon_size == 16
+
+    def test_default_index_none(self, tmp_path):
+        spec = load_package(
+            self._make_pkg(
+                tmp_path,
+                "  nav:\n    type: list\n    node: pager\n    default_index: null\n",
+            )
+        )
+        b = spec.bindings["nav"]
+        assert isinstance(b, ListBinding)
+        assert b.default_index is None
+
+    def test_default_index_negative_one(self, tmp_path):
+        spec = load_package(
+            self._make_pkg(
+                tmp_path,
+                "  nav:\n    type: list\n    node: pager\n    default_index: -1\n",
+            )
+        )
+        b = spec.bindings["nav"]
+        assert isinstance(b, ListBinding)
+        assert b.default_index == -1
+
+    def test_default_index_out_of_range(self, tmp_path):
+        with pytest.raises(PackageError, match="default_index 5 is out of range"):
+            load_package(
+                self._make_pkg(
+                    tmp_path,
+                    "  nav:\n    type: list\n    node: pager\n"
+                    "    default_items:\n      - A\n      - B\n"
+                    "    default_index: 5\n",
+                )
+            )
+
+    def test_default_index_not_int(self, tmp_path):
+        with pytest.raises(PackageError, match="default_index must be an integer"):
+            load_package(
+                self._make_pkg(
+                    tmp_path,
+                    "  nav:\n    type: list\n    node: pager\n"
+                    "    default_index: 'abc'\n",
+                )
+            )
+
+    def test_default_index_bool_rejected(self, tmp_path):
+        with pytest.raises(PackageError, match="default_index must be an integer"):
+            load_package(
+                self._make_pkg(
+                    tmp_path,
+                    "  nav:\n    type: list\n    node: pager\n"
+                    "    default_index: true\n",
+                )
+            )
+
+    def test_child_tag_empty(self, tmp_path):
+        with pytest.raises(PackageError, match="child_tag must be a non-empty string"):
+            load_package(
+                self._make_pkg(
+                    tmp_path,
+                    "  nav:\n    type: list\n    node: pager\n    child_tag: ''\n",
+                )
+            )
+
+    def test_default_items_not_list(self, tmp_path):
+        with pytest.raises(PackageError, match="default_items must be a list"):
+            load_package(
+                self._make_pkg(
+                    tmp_path,
+                    "  nav:\n    type: list\n    node: pager\n"
+                    "    default_items: notalist\n",
+                )
+            )
+
+    def test_default_items_non_string_element(self, tmp_path):
+        with pytest.raises(PackageError, match="default_items\\[1\\] must be a string"):
+            load_package(
+                self._make_pkg(
+                    tmp_path,
+                    "  nav:\n    type: list\n    node: pager\n"
+                    "    default_items:\n      - ok\n      - 123\n",
+                )
+            )
+
+    def test_active_attrs_not_dict(self, tmp_path):
+        with pytest.raises(PackageError, match="active_attrs must be a mapping"):
+            load_package(
+                self._make_pkg(
+                    tmp_path,
+                    "  nav:\n    type: list\n    node: pager\n"
+                    "    active_attrs: notadict\n",
+                )
+            )
+
+    def test_active_attrs_non_string_value(self, tmp_path):
+        with pytest.raises(PackageError, match="active_attrs\\['fill'\\] must be a string"):
+            load_package(
+                self._make_pkg(
+                    tmp_path,
+                    "  nav:\n    type: list\n    node: pager\n"
+                    "    active_attrs:\n      fill: 123\n",
+                )
+            )
+
+    def test_icon_size_not_positive(self, tmp_path):
+        with pytest.raises(PackageError, match="icon_size must be a positive integer"):
+            load_package(
+                self._make_pkg(
+                    tmp_path,
+                    "  nav:\n    type: list\n    node: pager\n    icon_size: 0\n",
+                )
+            )
+
+    def test_icon_size_bool_rejected(self, tmp_path):
+        with pytest.raises(PackageError, match="icon_size must be a positive integer"):
+            load_package(
+                self._make_pkg(
+                    tmp_path,
+                    "  nav:\n    type: list\n    node: pager\n    icon_size: true\n",
+                )
+            )
+
+    def test_separator_not_string(self, tmp_path):
+        with pytest.raises(PackageError, match="separator must be a string"):
+            load_package(
+                self._make_pkg(
+                    tmp_path,
+                    "  nav:\n    type: list\n    node: pager\n    separator: 123\n",
+                )
+            )
+
+    def test_node_not_in_svg(self, tmp_path):
+        with pytest.raises(PackageError, match="does not exist in the SVG"):
+            load_package(
+                self._make_pkg(
+                    tmp_path,
+                    "  nav:\n    type: list\n    node: missing\n",
+                )
+            )
+
+    def test_icon_items(self, tmp_path):
+        """Items with icon: prefix are valid strings."""
+        spec = load_package(
+            self._make_pkg(
+                tmp_path,
+                "  nav:\n    type: list\n    node: pager\n"
+                "    default_items:\n      - Main\n      - 'icon:mdi:cog'\n"
+                "    default_index: 0\n",
+            )
+        )
+        b = spec.bindings["nav"]
+        assert isinstance(b, ListBinding)
+        assert b.default_items == ("Main", "icon:mdi:cog")

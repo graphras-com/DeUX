@@ -32,6 +32,7 @@ class BindingType(Enum):
     SLIDER = "slider"
     TOGGLE = "toggle"
     ICONIFY = "iconify"
+    LIST = "list"
 
 
 class OverflowMode(Enum):
@@ -165,6 +166,54 @@ class IconifyBinding:
     default: str = ""
 
 
+@dataclass(frozen=True, slots=True)
+class ListBinding:
+    """Render a dynamic list of items as repeated SVG child elements.
+
+    Each item is either a plain text label or an Iconify icon reference
+    (prefixed with ``icon:``).  The item at *default_index* receives
+    *active_attrs*; all others receive *inactive_attrs*.  Setting the
+    index to ``-1`` or ``None`` means no item is active — every item
+    gets *inactive_attrs*.
+
+    An optional *separator* string is inserted between items as an
+    additional child element styled with *inactive_attrs*.
+
+    Parameters
+    ----------
+    node : str
+        ID of the parent SVG element (e.g. a ``<text>`` element).
+    child_tag : str
+        SVG element name generated for each item (default ``"tspan"``).
+    default_items : tuple[str, ...]
+        Initial list of item labels.  Prefix a label with ``"icon:"``
+        to render an Iconify icon instead of text (e.g.
+        ``"icon:mdi:home"``).
+    default_index : int | None
+        Initially active item index.  ``-1`` or ``None`` means no item
+        is active.
+    active_attrs : dict[str, str]
+        SVG attributes applied to the active item (e.g.
+        ``{"fill": "#ffffff", "font-weight": "bold"}``).
+    inactive_attrs : dict[str, str]
+        SVG attributes applied to every inactive item.
+    separator : str
+        Text inserted between consecutive items.  An empty string
+        disables separators.
+    icon_size : int
+        Pixel size for Iconify icon items.
+    """
+
+    node: str
+    child_tag: str = "tspan"
+    default_items: tuple[str, ...] = ()
+    default_index: int | None = 0
+    active_attrs: dict[str, str] = field(default_factory=dict)
+    inactive_attrs: dict[str, str] = field(default_factory=dict)
+    separator: str = ""
+    icon_size: int = 16
+
+
 Binding = (
     TextBinding
     | ImageBinding
@@ -174,6 +223,7 @@ Binding = (
     | SliderBinding
     | ToggleBinding
     | IconifyBinding
+    | ListBinding
 )
 
 VALID_SOURCES = frozenset(
