@@ -1933,11 +1933,12 @@ class TestListBinding:
         changed = renderer.set("nav", {"items": ["A"], "index": 0})
         assert changed is False
 
-    def test_tspan_inherits_x(self):
-        renderer = self._make_renderer(items=("A",), index=0)
+    def test_tspan_flows_inline(self):
+        renderer = self._make_renderer(items=("A", "B"), index=0)
         svg = renderer.render_svg()
-        # The tspan should inherit x="100" from the parent <text>
-        assert 'x="100"' in svg
+        # Tspans should NOT have x set — they flow inline horizontally
+        # Count x="100" occurrences: only the parent <text> should have it
+        assert svg.count('x="100"') == 1
 
     def test_custom_child_tag(self):
         binding = ListBinding(

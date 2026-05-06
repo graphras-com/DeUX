@@ -459,6 +459,7 @@ class SvgRenderer:
         self._hide_spinner_node(root)
 
         svg_bytes = ET.tostring(root, encoding="unicode", xml_declaration=True)
+        logger.debug("Rendered SVG before rasterisation:\n%s", svg_bytes)
         return self._rasterise(svg_bytes.encode("utf-8"))
 
     def render_svg(self) -> str:
@@ -878,9 +879,6 @@ class SvgRenderer:
         for child in list(elem):
             elem.remove(child)
 
-        # Inherit positional attributes for tspan layout.
-        x_attr = elem.get("x", "0")
-
         for i, item in enumerate(items):
             # Separator between items.
             if binding.separator and i > 0:
@@ -888,8 +886,6 @@ class SvgRenderer:
                 sep.text = binding.separator
                 for attr_k, attr_v in binding.inactive_attrs.items():
                     sep.set(attr_k, attr_v)
-                if binding.child_tag == "tspan":
-                    sep.set("x", x_attr)
 
             is_active = index is not None and i == index
             attrs = binding.active_attrs if is_active else binding.inactive_attrs
@@ -901,8 +897,6 @@ class SvgRenderer:
                 child_elem.text = item
                 for attr_k, attr_v in attrs.items():
                     child_elem.set(attr_k, attr_v)
-                if binding.child_tag == "tspan":
-                    child_elem.set("x", x_attr)
 
     def _apply_list_icon(
         self,
