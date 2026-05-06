@@ -21,6 +21,8 @@ _SPINNER_SVG = (
     '<svg id="TestCard" xmlns="http://www.w3.org/2000/svg" '
     'width="120" height="120">'
     '<rect id="bg" width="120" height="120" fill="#1c1c1c"/>'
+    '<rect id="spinner_background" x="0" y="0" width="55" height="55" '
+    'display="none" fill="#333"/>'
     '<rect id="spinner" x="80" y="30" width="30" height="30" '
     'display="none" fill="#fff"/>'
     '<circle id="spinner_circle" cx="60" cy="60" r="20" '
@@ -215,3 +217,104 @@ class TestErrors:
         assert len(frames) == 4
         # All frames should be identical (blank)
         assert all(f == frames[0] for f in frames)
+
+
+class TestBackgroundNode:
+    """Background node is shown (not animated) during spinner frames."""
+
+    @patch("deckui.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    def test_rotation_shows_background_node(self, mock_raster):
+        """Rotation frames should unhide the background_node."""
+        spec = _make_spec(
+            spinner=SpinnerSpec(
+                type=SpinnerType.ROTATION,
+                node="spinner",
+                frames=2,
+                background_node="spinner_background",
+            )
+        )
+        sf = SpinnerFrames(spec, width=120, height=120)
+        assert len(sf.frames) == 2
+
+        # Inspect the SVG passed to rasteriser — background should be visible
+        first_svg: bytes = mock_raster.call_args_list[0][0][0]
+        assert b'id="spinner_background"' in first_svg
+        # display="none" should have been removed from the background node
+        root = ET.fromstring(first_svg)  # noqa: S314
+        bg = root.find('.//{http://www.w3.org/2000/svg}rect[@id="spinner_background"]')
+        if bg is None:
+            bg = root.find('.//rect[@id="spinner_background"]')
+        assert bg is not None
+        assert bg.get("display") is None
+
+    @patch("deckui.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    def test_rotation_background_node_not_rotated(self, mock_raster):
+        """Background node must not receive a rotation transform."""
+        spec = _make_spec(
+            spinner=SpinnerSpec(
+                type=SpinnerType.ROTATION,
+                node="spinner",
+                frames=4,
+                background_node="spinner_background",
+            )
+        )
+        sf = SpinnerFrames(spec, width=120, height=120)
+        assert len(sf.frames) == 4
+
+        # Check last frame (non-zero rotation) — background should have no transform
+        last_svg: bytes = mock_raster.call_args_list[3][0][0]
+        root = ET.fromstring(last_svg)  # noqa: S314
+        bg = root.find('.//{http://www.w3.org/2000/svg}rect[@id="spinner_background"]')
+        if bg is None:
+            bg = root.find('.//rect[@id="spinner_background"]')
+        assert bg is not None
+        assert "rotate" not in (bg.get("transform") or "")
+
+    @patch("deckui.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    def test_pulse_shows_background_node(self, mock_raster):
+        """Pulse frames should unhide the background_node."""
+        spec = _make_spec(
+            spinner=SpinnerSpec(
+                type=SpinnerType.PULSE,
+                node="spinner",
+                frames=2,
+                background_node="spinner_background",
+            )
+        )
+        sf = SpinnerFrames(spec, width=120, height=120)
+        assert len(sf.frames) == 2
+
+        first_svg: bytes = mock_raster.call_args_list[0][0][0]
+        root = ET.fromstring(first_svg)  # noqa: S314
+        bg = root.find('.//{http://www.w3.org/2000/svg}rect[@id="spinner_background"]')
+        if bg is None:
+            bg = root.find('.//rect[@id="spinner_background"]')
+        assert bg is not None
+        assert bg.get("display") is None
+        # Background should not have opacity set
+        assert bg.get("opacity") is None
+
+    @patch("deckui.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    def test_missing_background_node_no_error(self, mock_raster):
+        """If background_node references a missing element, no crash occurs."""
+        spec = _make_spec(
+            spinner=SpinnerSpec(
+                type=SpinnerType.ROTATION,
+                node="spinner",
+                frames=2,
+                background_node="nonexistent_bg",
+            )
+        )
+        sf = SpinnerFrames(spec, width=120, height=120)
+        assert len(sf.frames) == 2
+
+    @patch("deckui.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    def test_no_background_node_works(self, mock_raster):
+        """Spinner without background_node still works normally."""
+        spec = _make_spec(
+            spinner=SpinnerSpec(
+                type=SpinnerType.ROTATION, node="spinner", frames=2
+            )
+        )
+        sf = SpinnerFrames(spec, width=120, height=120)
+        assert len(sf.frames) == 2

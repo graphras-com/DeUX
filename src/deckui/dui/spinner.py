@@ -118,6 +118,7 @@ class SpinnerFrames:
                 rotation = f"rotate({angle:.1f},{cx:.1f},{cy:.1f})"
                 el.set("transform", f"{existing} {rotation}".strip())
 
+            self._show_background_node(root)
             frames.append(self._rasterise(root))
         return frames
 
@@ -147,8 +148,28 @@ class SpinnerFrames:
                 opacity = max(0.2, min(1.0, 0.2 + 0.8 * opacity))
                 el.set("opacity", f"{opacity:.2f}")
 
+            self._show_background_node(root)
             frames.append(self._rasterise(root))
         return frames
+
+    def _show_background_node(self, root: ET.Element) -> None:
+        """Make the background node visible in the given SVG tree.
+
+        If ``background_node`` is configured on the spinner spec, this
+        removes ``display="none"`` from it so the background appears
+        behind the animated spinner.  No transform or opacity changes
+        are applied — the node is shown as-is.
+
+        Parameters
+        ----------
+        root
+            The parsed SVG element tree (will be mutated in place).
+        """
+        bg_id = self._spinner.background_node
+        if bg_id is not None:
+            bg_el = _find_element_by_id(root, bg_id)
+            if bg_el is not None:
+                bg_el.attrib.pop("display", None)
 
     def _generate_custom(self) -> list[bytes]:
         """Load custom frames from package assets.

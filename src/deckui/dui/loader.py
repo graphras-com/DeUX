@@ -446,11 +446,16 @@ def _parse_spinner(raw: dict[str, Any]) -> SpinnerSpec:
     if not isinstance(interval_ms, int) or isinstance(interval_ms, bool) or interval_ms < 10:
         raise PackageError("Spinner 'interval_ms' must be an integer >= 10")
 
+    background_node = raw.get("background_node")
+    if background_node is not None and not isinstance(background_node, str):
+        raise PackageError("Spinner 'background_node' must be a string if provided")
+
     return SpinnerSpec(
         type=spinner_type,
         node=node,
         frames=frames,
         interval_ms=interval_ms,
+        background_node=background_node,
     )
 
 
@@ -711,6 +716,14 @@ def load_package(path: str | Path) -> PackageSpec:
         if spinner.node is not None and spinner.node not in svg_ids:
             raise PackageError(
                 f"Spinner references node '{spinner.node}' "
+                f"which does not exist in the SVG. "
+                f"Available ids: {sorted(svg_ids)}"
+            )
+
+        # Validate background_node exists in SVG if specified
+        if spinner.background_node is not None and spinner.background_node not in svg_ids:
+            raise PackageError(
+                f"Spinner references background_node '{spinner.background_node}' "
                 f"which does not exist in the SVG. "
                 f"Available ids: {sorted(svg_ids)}"
             )
