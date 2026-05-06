@@ -818,7 +818,6 @@ class FavoritesController:
             #key.forward("click", lambda m=media, k=key: self.start_busy(m, k))
             @key.on_event("click")
             async def _click( k=key, m=media):
-                k.set("show_spinner_background", True)
                 await k.start_busy()
                 await self._audio_svc.play(m)
  
@@ -833,7 +832,6 @@ class FavoritesController:
     async def finish_busy(self, *args, **kwargs) -> None:
         log.info(f"Finish busy on all keys")
         for k in self._keys:
-            k.set("show_spinner_background", False)
             await k.finish_busy()
 
     def install(self, screen: Any, positions: list[int]) -> None:

@@ -37,16 +37,12 @@ bindings:
     node: foreground
     default: false
 
-  show_spinner_background:
-    type: visibility
-    node: spinner_background
-    default: false
-
 spinner:
   type: rotation
   node: spinner
   frames: 8
   interval_ms: 100
+  background_node: spinner_background
 
 events:
   - name: click
