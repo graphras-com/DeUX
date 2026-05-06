@@ -36,7 +36,17 @@ from .dui import (
     load_all_packages,
     load_package,
 )
-from .render import ImageFetchError, RenderMetrics, clear_image_cache, fetch_image
+from .render import (
+    ImageFetchError,
+    RenderMetrics,
+    SvgRasterizer,
+    clear_image_cache,
+    fetch_image,
+    get_svg_backend,
+    list_svg_backends,
+    register_svg_backend,
+    set_svg_backend,
+)
 from .runtime import (
     AsyncEvent,
     Deck,
@@ -90,13 +100,18 @@ __all__ = [
     "PackageSpec",
     "RenderMetrics",
     "Screen",
+    "SvgRasterizer",
     "TouchEvent",
     "TouchStrip",
     "clear_image_cache",
     "fetch_image",
+    "get_svg_backend",
     "list_devices",
+    "list_svg_backends",
     "load_all_packages",
     "load_package",
+    "register_svg_backend",
+    "set_svg_backend",
 ]
 
 from deckui._version import __version__

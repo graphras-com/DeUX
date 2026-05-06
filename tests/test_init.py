@@ -38,13 +38,18 @@ class TestPublicAPI:
             "PackageSpec",
             "RenderMetrics",
             "Screen",
+            "SvgRasterizer",
             "TouchEvent",
             "TouchStrip",
             "clear_image_cache",
             "fetch_image",
+            "get_svg_backend",
             "list_devices",
+            "list_svg_backends",
             "load_all_packages",
             "load_package",
+            "register_svg_backend",
+            "set_svg_backend",
         }
         assert set(deckui.__all__) == expected
 

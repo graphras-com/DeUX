@@ -391,6 +391,9 @@ docs = [
     { name = "mkdocstrings", extra = ["python"] },
     { name = "pylint" },
 ]
+pyvips = [
+    { name = "pyvips" },
+]
 test = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -411,11 +414,12 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'test'", specifier = ">=9.0.3" },
     { name = "pytest-asyncio", marker = "extra == 'test'", specifier = ">=0.24" },
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=6.0" },
+    { name = "pyvips", marker = "extra == 'pyvips'", specifier = ">=2.2.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "streamdeck", specifier = ">=0.9.8" },
     { name = "types-pyyaml", marker = "extra == 'test'", specifier = ">=6.0" },
 ]
-provides-extras = ["docs", "test"]
+provides-extras = ["docs", "pyvips", "test"]
 
 [[package]]
 name = "defusedxml"
@@ -999,6 +1003,15 @@ sdist = { url = "https://files.pythonhosted.org/packages/66/c0/0c8b6ad9f17a802ee
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427", size = 229892, upload-time = "2024-03-01T18:36:18.57Z" },
 ]
+
+[[package]]
+name = "pyvips"
+version = "3.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cffi" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2d/6a/282936de9faac6addf6bc8792c18e006489d0023ffd8856b8643f54d0558/pyvips-3.1.1.tar.gz", hash = "sha256:84fe744d023b1084ac2516bb17064cacd41c7f8aabf8e524dd383534941b9301", size = 56951, upload-time = "2025-12-09T18:38:06.355Z" }
 
 [[package]]
 name = "pyyaml"
