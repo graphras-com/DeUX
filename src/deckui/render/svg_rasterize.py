@@ -35,6 +35,20 @@ from typing import Protocol, runtime_checkable
 logger = logging.getLogger(__name__)
 
 
+def _ensure_macos_lib_path() -> None:
+    """Set ``DYLD_FALLBACK_LIBRARY_PATH`` on macOS if Homebrew libs exist.
+
+    macOS SIP strips ``DYLD_*`` variables from child processes, so
+    Homebrew-installed C libraries (libcairo, libvips, etc.) are not
+    found by default.  This sets the fallback path once so that
+    ``cffi``/``ctypes`` can locate them.
+    """
+    if platform.system() == "Darwin":
+        brew_lib = Path("/opt/homebrew/lib")
+        if brew_lib.exists():
+            os.environ.setdefault("DYLD_FALLBACK_LIBRARY_PATH", str(brew_lib))
+
+
 class RasterizeError(Exception):
     """Raised when SVG rasterisation fails."""
 
@@ -108,10 +122,7 @@ class CairoRasterizer:
             cannot be loaded.
         """
         try:
-            if platform.system() == "Darwin":
-                brew_lib = Path("/opt/homebrew/lib")
-                if brew_lib.exists():
-                    os.environ.setdefault("DYLD_FALLBACK_LIBRARY_PATH", str(brew_lib))
+            _ensure_macos_lib_path()
 
             import cairosvg
 
@@ -157,6 +168,7 @@ class PyvipsRasterizer:
             If pyvips is not installed or SVG loading fails.
         """
         try:
+            _ensure_macos_lib_path()
             import pyvips
 
             image = pyvips.Image.svgload_buffer(svg_data)

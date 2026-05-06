@@ -562,6 +562,7 @@ class TestSvgToPngFit:
         assert img.height <= 80
 
     def test_cairosvg_fallback_to_rsvg(self):
+        """When the first backend fails, auto mode falls through to the next."""
         svg = (
             b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">'
             b'<rect width="10" height="10" fill="red"/>'
@@ -572,22 +573,49 @@ class TestSvgToPngFit:
         fake_png.save(buf, format="PNG")
         fake_png_bytes = buf.getvalue()
 
-        with (
-            patch.dict("sys.modules", {"cairosvg": None}),
-            patch("subprocess.run") as mock_run,
-        ):
-            mock_run.return_value = MagicMock(stdout=fake_png_bytes)
+        import deckui.render.svg_rasterize as svg_mod
+
+        class FailBackend:
+            def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
+                raise RasterizeError("fail")
+
+        class SuccessBackend:
+            def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
+                return fake_png_bytes
+
+        old_registry = svg_mod._registry.copy()
+        old_active = svg_mod._active_backend
+        try:
+            svg_mod._registry["cairo"] = FailBackend()  # type: ignore[assignment]
+            svg_mod._registry["pyvips"] = SuccessBackend()  # type: ignore[assignment]
+            svg_mod._active_backend = None  # auto mode
             result = _svg_to_png_fit(svg, 80, 80)
             assert result == fake_png_bytes
-            mock_run.assert_called_once()
+        finally:
+            svg_mod._registry = old_registry
+            svg_mod._active_backend = old_active
 
     def test_no_renderer_raises(self):
+        """When all backends fail in auto mode, RasterizeError is raised."""
         svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>'
-        with patch.dict("sys.modules", {"cairosvg": None}), patch(
-            "subprocess.run",
-            side_effect=FileNotFoundError("no rsvg"),
-        ), pytest.raises(RasterizeError, match="No SVG renderer"):
-            _svg_to_png_fit(svg, 80, 80)
+
+        import deckui.render.svg_rasterize as svg_mod
+
+        class FailBackend:
+            def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
+                raise RasterizeError("fail")
+
+        old_registry = svg_mod._registry.copy()
+        old_active = svg_mod._active_backend
+        try:
+            for name in list(svg_mod._registry):
+                svg_mod._registry[name] = FailBackend()  # type: ignore[assignment]
+            svg_mod._active_backend = None  # auto mode
+            with pytest.raises(RasterizeError):
+                _svg_to_png_fit(svg, 80, 80)
+        finally:
+            svg_mod._registry = old_registry
+            svg_mod._active_backend = old_active
 
 
 class TestFindAndOpenDevice:
