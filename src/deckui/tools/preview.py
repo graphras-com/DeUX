@@ -139,7 +139,11 @@ def _svg_to_png_fit(svg_data: bytes, max_width: int, max_height: int) -> bytes:
                 out_h = max(1, int(svg_h * scale))
                 return _svg_to_png(svg_data, out_w, out_h)
     except ET.ParseError:
-        pass
+        logger.debug(
+            "Failed to parse SVG intrinsic dimensions; using fallback raster size %dx%d.",
+            max_width,
+            max_height,
+        )
 
     # Fallback: force exact dimensions.
     return _svg_to_png(svg_data, max_width, max_height)
