@@ -40,7 +40,7 @@ from typing import Protocol, cast
 from PIL import Image
 
 from deckui.render.key_renderer import _encode_image
-from deckui.render.svg_rasterize import _svg_to_png
+from deckui.render.svg_rasterize import _svg_to_png, list_svg_backends, set_svg_backend
 from deckui.runtime.capabilities import DeviceCapabilities
 
 logger = logging.getLogger(__name__)
@@ -304,6 +304,17 @@ def build_parser() -> argparse.ArgumentParser:
         default=0.5,
         metavar="SECS",
         help="File poll interval in seconds when --watch is active (default: 0.5)",
+    )
+    parser.add_argument(
+        "-r",
+        "--renderer",
+        type=str,
+        default="auto",
+        metavar="NAME",
+        help=(
+            "SVG renderer backend to use "
+            f"(choices: {', '.join(['auto', *list_svg_backends()])}; default: auto)"
+        ),
     )
     parser.add_argument(
         "-v",
@@ -621,6 +632,9 @@ def main(argv: list[str] | None = None) -> None:
 
     level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
+
+    if args.renderer != "auto":
+        set_svg_backend(args.renderer)
 
     asyncio.run(push_to_device(args, poll_interval=args.poll_interval))
 

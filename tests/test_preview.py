@@ -328,6 +328,18 @@ class TestParser:
         args = parse_args(["--verbose"])
         assert args.verbose is True
 
+    def test_renderer_default_auto(self):
+        args = parse_args([])
+        assert args.renderer == "auto"
+
+    def test_renderer_short_flag(self):
+        args = parse_args(["-r", "cairo"])
+        assert args.renderer == "cairo"
+
+    def test_renderer_long_flag(self):
+        args = parse_args(["--renderer", "pyvips"])
+        assert args.renderer == "pyvips"
+
     def test_build_parser_returns_parser(self):
         parser = build_parser()
         assert isinstance(parser, argparse.ArgumentParser)
@@ -822,3 +834,25 @@ class TestPushToDeviceWatch:
             await push_to_device(args, poll_interval=0.5)
 
         mock_watch.assert_awaited_once()
+
+
+class TestMainRendererFlag:
+    """Tests that ``main()`` applies the ``--renderer`` flag."""
+
+    def test_main_sets_renderer(self):
+        """``--renderer`` flag calls ``set_svg_backend`` before running."""
+        with (
+            patch("deckui.tools.preview.set_svg_backend") as mock_set,
+            patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock),
+        ):
+            main(["--renderer", "cairo"])
+            mock_set.assert_called_once_with("cairo")
+
+    def test_main_auto_skips_set(self):
+        """``--renderer auto`` (default) does not call ``set_svg_backend``."""
+        with (
+            patch("deckui.tools.preview.set_svg_backend") as mock_set,
+            patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock),
+        ):
+            main([])
+            mock_set.assert_not_called()
