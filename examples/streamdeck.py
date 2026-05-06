@@ -627,7 +627,7 @@ class DashboardController(CardController):
         self._last_known_brightness: int = int(
             round(
                 self.card.get_range(
-                    "deck_brightness",
+                    "brightness",
                     min_val=self.BRIGHTNESS_MIN,
                     max_val=self.BRIGHTNESS_MAX,
                 )
@@ -636,20 +636,9 @@ class DashboardController(CardController):
 
         self._svc = MockDashboardService()
 
-        # ----- service-driven bindings -----
-        self.card.bind_many(
-            self._svc.on_telemetry_changed,
-            lambda t, h: {
-                "temperature": f"{t:.1f}C",
-                "humidity": f"{h}%",
-            },
-        )
-
         # Initial telemetry/clock population (no manifest defaults for
         # these readings).
         self.card.set_many(
-            temperature=f"{self._svc.temperature_c:.1f}C",
-            humidity=f"{self._svc.humidity_pct}%",
             date=self.get_date(),
             time=self.get_time(),
         )
@@ -659,19 +648,9 @@ class DashboardController(CardController):
         self.card.forward("brightness_down", self._brightness_down)
 
     @property
-    def deck_brightness(self) -> int:
+    def brightness(self) -> int:
         """Last confirmed deck brightness (0 -- 100)."""
         return self._last_known_brightness
-
-    @property
-    def temperature_c(self) -> float:
-        """Current temperature reading in degrees Celsius."""
-        return self._svc.temperature_c
-
-    @property
-    def humidity_pct(self) -> int:
-        """Current humidity reading in percent."""
-        return self._svc.humidity_pct
 
     @staticmethod
     def get_date() -> str:
@@ -699,7 +678,7 @@ class DashboardController(CardController):
 
         # Reflect the deck's confirmed brightness on the slider.
         self.card.bind_range(
-            "deck_brightness",
+            "brightness",
             deck.on_brightness_changed,
             min_val=self.BRIGHTNESS_MIN,
             max_val=self.BRIGHTNESS_MAX,
@@ -713,7 +692,7 @@ class DashboardController(CardController):
         @deck.on_screen_changed
         async def _screen_changed(name: str, screens:dict) -> None:
             _screens = list(screens)
-            self.card.set("screens", f"{_screens.index(name)+1}/{len(_screens)}")
+           # self.card.set("screens", f"{_screens.index(name)+1}/{len(_screens)}")
             await self.card.request_refresh()
 
         # Replay onto the freshly-connected deck.  Idempotent: if the
@@ -1161,7 +1140,7 @@ async def run() -> None:
     """
     app = StreamDeckApp(MEDIA_CATALOG, SCENE_DEFS)
     manager = DeckManager(
-        brightness=app.dashboard.deck_brightness, auto_reconnect=True
+        brightness=app.dashboard.brightness, auto_reconnect=True
     )
 
     @manager.on_connect()

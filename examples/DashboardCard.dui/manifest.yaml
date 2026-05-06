@@ -1,7 +1,7 @@
 name: DashboardCard
 type: TouchStripCard
 version: 1
-description: Deck brightness control, Screen cycler and displays date, time, temperature and humidity
+description: Deck brightness control, Screen cycler and displays date, time
 author: Graphras.com
 license: Apache-2.0
 category: utilities
@@ -22,42 +22,24 @@ bindings:
     max_width: 190
     overflow: clip
 
-  temperature:
-    type: text
-    node: temperature
-    default: ""
-    max_width: 50
-    overflow: clip
+  nav:
+    type: list
+    node: pager
+    child_tag: tspan
+    default_items: [Main, Livingroom, Settings]
+    default_index: 0
+    active_attrs:
+      fill: "#DEDEDE"
+      font-weight: bold
+    inactive_attrs:
+      fill: "#8F8F8F"
+    separator: " "
 
-  humidity:
-    type: text
-    node: humidity
-    default: ""
-    max_width: 50
-    overflow: clip
-
-  screens:
-    type: text
-    node: screens
-    default: "1/1"
-    max_width: 35
-    overflow: clip
-
-  deck_brightness:
+  brightness:
     type: range
-    node: deck_brightness
+    node: brightness
     default: 0.8
     direction: horizontal
-
-  background:
-    type: color
-    node: background
-    default: "#1C1C1C"
-
-  foreground:
-    type: color
-    node: foreground
-    default: "#DEDEDE"
 
 events:
   - name: brightness_down
