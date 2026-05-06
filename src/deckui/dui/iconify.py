@@ -1,18 +1,28 @@
-"""Iconify icon fetching and in-process caching.
+"""Iconify icon fetching with in-memory and persistent disk caching.
 
 Icons are downloaded from the public Iconify HTTP API
-(https://api.iconify.design) on first use and cached in memory so
-subsequent renders hit no network.  The cache is process-local and
-lives for the lifetime of the interpreter.
+(https://api.iconify.design) on first use and cached both in memory
+and on disk so subsequent runs avoid network requests entirely.
+
+The disk cache uses ``platformdirs`` to resolve a platform-appropriate
+cache directory (``~/.cache/deckui/iconify`` on Linux,
+``~/Library/Caches/deckui/iconify`` on macOS, etc.).
+
+Negative lookups (404 / network failure) are cached in memory only so
+a process restart retries previously-failed icons.
 """
 
 from __future__ import annotations
 
 import logging
+import shutil
 import threading
 import urllib.error
 import urllib.request
+from pathlib import Path
 from typing import cast
+
+import platformdirs
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +35,96 @@ USER_AGENT = "deckui/0.1.0 (+https://github.com/graphras-com/DeckUI)"
 _cache: dict[str, str | None] = {}
 _cache_lock = threading.Lock()
 
+_disk_cache_dir: Path | None = None
+_disk_cache_dir_lock = threading.Lock()
+
 
 class IconifyError(Exception):
     """Raised when an Iconify icon cannot be resolved."""
+
+
+def _get_disk_cache_dir() -> Path:
+    """Return the persistent cache directory, creating it lazily.
+
+    Returns
+    -------
+    Path
+        Platform-appropriate cache directory for Iconify SVGs.
+    """
+    global _disk_cache_dir  # noqa: PLW0603
+    if _disk_cache_dir is not None:
+        return _disk_cache_dir
+    with _disk_cache_dir_lock:
+        # Double-check after acquiring the lock.
+        if _disk_cache_dir is not None:
+            return _disk_cache_dir
+        cache_root = Path(platformdirs.user_cache_dir("deckui")) / "iconify"
+        cache_root.mkdir(parents=True, exist_ok=True)
+        _disk_cache_dir = cache_root
+        return _disk_cache_dir
+
+
+def _disk_cache_path(prefix: str, icon: str) -> Path:
+    """Return the on-disk path for a given icon.
+
+    Parameters
+    ----------
+    prefix : str
+        Icon-set prefix (e.g. ``"mdi"``).
+    icon : str
+        Icon name within the set (e.g. ``"home"``).
+
+    Returns
+    -------
+    Path
+        File path where the cached SVG is (or would be) stored.
+    """
+    return _get_disk_cache_dir() / prefix / f"{icon}.svg"
+
+
+def _read_disk_cache(prefix: str, icon: str) -> str | None:
+    """Read an icon from the disk cache.
+
+    Parameters
+    ----------
+    prefix : str
+        Icon-set prefix.
+    icon : str
+        Icon name.
+
+    Returns
+    -------
+    str or None
+        The cached SVG text, or ``None`` if not present or unreadable.
+    """
+    path = _disk_cache_path(prefix, icon)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    if not text.strip():
+        return None
+    return text
+
+
+def _write_disk_cache(prefix: str, icon: str, svg: str) -> None:
+    """Write an icon SVG to the disk cache.
+
+    Parameters
+    ----------
+    prefix : str
+        Icon-set prefix.
+    icon : str
+        Icon name.
+    svg : str
+        SVG source text to persist.
+    """
+    path = _disk_cache_path(prefix, icon)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(svg, encoding="utf-8")
+    except OSError:
+        logger.debug("Failed to write icon cache file %s", path, exc_info=True)
 
 
 def _parse_name(name: str) -> tuple[str, str]:
@@ -68,14 +165,14 @@ def _http_get(url: str) -> str:
 def fetch_icon(name: str) -> str:
     """Fetch an Iconify icon by ``prefix:icon`` name.
 
-    The result is cached in-process; subsequent calls return the
-    cached SVG source immediately.  Negative lookups (404 / network
-    failure) are also cached so we do not retry broken references on
-    every render.
+    The lookup order is: in-memory cache, disk cache, network.
+    Successful fetches are stored in both caches.  Negative lookups
+    (404 / network failure) are cached in memory only so a restart
+    retries previously-failed icons.
 
     Parameters
     ----------
-    name
+    name : str
         Icon identifier in ``"prefix:icon"`` form, e.g.
         ``"line-md:home"``.
 
@@ -93,6 +190,7 @@ def fetch_icon(name: str) -> str:
     prefix, icon = _parse_name(name)
     key = f"{prefix}:{icon}"
 
+    # 1. In-memory cache
     with _cache_lock:
         if key in _cache:
             cached = _cache[key]
@@ -100,6 +198,15 @@ def fetch_icon(name: str) -> str:
                 raise IconifyError(f"Iconify icon '{key}' previously failed to load")
             return cached
 
+    # 2. Disk cache
+    disk_hit = _read_disk_cache(prefix, icon)
+    if disk_hit is not None:
+        with _cache_lock:
+            _cache[key] = disk_hit
+        logger.debug("Loaded Iconify icon '%s' from disk cache", key)
+        return disk_hit
+
+    # 3. Network fetch
     url = f"{ICONIFY_API_URL}/{prefix}/{icon}.svg"
     try:
         body = _http_get(url)
@@ -117,11 +224,26 @@ def fetch_icon(name: str) -> str:
     with _cache_lock:
         _cache[key] = body
 
+    _write_disk_cache(prefix, icon, body)
+
     logger.debug("Fetched Iconify icon '%s' (%d bytes)", key, len(body))
     return body
 
 
-def clear_cache() -> None:
-    """Drop all cached Iconify icons.  Primarily intended for tests."""
+def clear_cache(*, persistent: bool = False) -> None:
+    """Drop all cached Iconify icons.
+
+    Parameters
+    ----------
+    persistent : bool, default=False
+        When ``True``, also remove the on-disk cache directory.
+        By default only the in-memory cache is cleared.
+    """
+    global _disk_cache_dir  # noqa: PLW0603
     with _cache_lock:
         _cache.clear()
+    if persistent:
+        with _disk_cache_dir_lock:
+            if _disk_cache_dir is not None:
+                shutil.rmtree(_disk_cache_dir, ignore_errors=True)
+                _disk_cache_dir = None

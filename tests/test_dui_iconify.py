@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import urllib.error
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -12,6 +13,8 @@ from deckui.dui.iconify import (
     USER_AGENT,
     IconifyError,
     _parse_name,
+    _read_disk_cache,
+    _write_disk_cache,
     clear_cache,
     fetch_icon,
 )
@@ -23,11 +26,20 @@ _SAMPLE_SVG = (
 
 
 @pytest.fixture(autouse=True)
-def _isolate_cache():
-    """Reset the iconify cache around every test."""
-    clear_cache()
+def _isolate_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Reset the iconify cache and redirect disk cache to tmp_path."""
+    clear_cache(persistent=True)
+    fake_dir = tmp_path / "iconify"
+    fake_dir.mkdir()
+
+    def _fake_get_dir() -> Path:
+        fake_dir.mkdir(parents=True, exist_ok=True)
+        return fake_dir
+
+    monkeypatch.setattr(iconify_mod, "_get_disk_cache_dir", _fake_get_dir)
+    monkeypatch.setattr(iconify_mod, "_disk_cache_dir", fake_dir)
     yield
-    clear_cache()
+    clear_cache(persistent=True)
 
 
 class TestParseName:
@@ -134,7 +146,7 @@ class TestFetchIcon:
     def test_clear_cache_forces_refetch(self):
         with patch.object(iconify_mod, "_http_get", return_value=_SAMPLE_SVG) as mock:
             fetch_icon("line-md:home")
-            clear_cache()
+            clear_cache(persistent=True)
             fetch_icon("line-md:home")
         assert mock.call_count == 2
 
@@ -155,6 +167,83 @@ class TestFetchIcon:
                 fetch_icon("line-md:home")
             url_arg = mock.call_args.args[0]
             assert url_arg == "https://example.test/line-md/home.svg"
+
+
+class TestDiskCache:
+    """Tests for persistent disk caching behaviour."""
+
+    def test_disk_cache_written_on_fetch(self):
+        """A successful network fetch writes the SVG to disk."""
+        with patch.object(iconify_mod, "_http_get", return_value=_SAMPLE_SVG):
+            fetch_icon("mdi:check")
+        assert _read_disk_cache("mdi", "check") == _SAMPLE_SVG
+
+    def test_disk_cache_hit_avoids_network(self):
+        """If the SVG is already on disk, no HTTP request is made."""
+        _write_disk_cache("mdi", "cached", _SAMPLE_SVG)
+        with patch.object(iconify_mod, "_http_get") as mock:
+            result = fetch_icon("mdi:cached")
+        mock.assert_not_called()
+        assert result == _SAMPLE_SVG
+
+    def test_negative_lookup_not_written_to_disk(self):
+        """Failed fetches must NOT be persisted to disk."""
+        with (
+            patch.object(iconify_mod, "_http_get", return_value="404"),
+            pytest.raises(IconifyError),
+        ):
+            fetch_icon("fake:nope")
+        assert _read_disk_cache("fake", "nope") is None
+
+    def test_network_error_not_written_to_disk(self):
+        """Network errors must NOT be persisted to disk."""
+        with patch.object(
+            iconify_mod, "_http_get", side_effect=urllib.error.URLError("fail")
+        ), pytest.raises(IconifyError):
+            fetch_icon("fake:err")
+        assert _read_disk_cache("fake", "err") is None
+
+    def test_clear_cache_memory_only_preserves_disk(self):
+        """clear_cache() without persistent=True keeps disk files."""
+        with patch.object(iconify_mod, "_http_get", return_value=_SAMPLE_SVG):
+            fetch_icon("mdi:keep")
+        clear_cache()
+        assert _read_disk_cache("mdi", "keep") == _SAMPLE_SVG
+
+    def test_clear_cache_persistent_removes_disk(self, tmp_path: Path):
+        """clear_cache(persistent=True) wipes the disk cache directory."""
+        with patch.object(iconify_mod, "_http_get", return_value=_SAMPLE_SVG):
+            fetch_icon("mdi:wipe")
+        clear_cache(persistent=True)
+        assert _read_disk_cache("mdi", "wipe") is None
+
+    def test_corrupt_disk_file_treated_as_miss(self):
+        """An empty file on disk is treated as a cache miss."""
+        _write_disk_cache("mdi", "empty", "valid")
+        # Overwrite with empty content to simulate corruption.
+        from deckui.dui.iconify import _disk_cache_path
+
+        path = _disk_cache_path("mdi", "empty")
+        path.write_text("", encoding="utf-8")
+        assert _read_disk_cache("mdi", "empty") is None
+
+    def test_disk_cache_survives_memory_clear(self):
+        """After clearing only memory, disk cache still serves the icon."""
+        with patch.object(iconify_mod, "_http_get", return_value=_SAMPLE_SVG) as mock:
+            fetch_icon("mdi:persist")
+            clear_cache()  # memory only
+            result = fetch_icon("mdi:persist")
+        # Only one HTTP call — second fetch came from disk.
+        assert mock.call_count == 1
+        assert result == _SAMPLE_SVG
+
+    def test_write_disk_cache_handles_oserror(self, tmp_path: Path):
+        """_write_disk_cache gracefully handles write failures."""
+        with patch.object(
+            iconify_mod, "_disk_cache_dir", tmp_path / "nonexistent" / "deep"
+        ):
+            # Should not raise — just logs.
+            _write_disk_cache("x", "y", _SAMPLE_SVG)
 
 
 class TestHttpGet:
