@@ -83,7 +83,7 @@ class SvgRasterizer(Protocol):
         RasterizeError
             If rasterisation fails.
         """
-        ...  # pragma: no cover
+        pass  # pragma: no cover
 
 
 # ---------------------------------------------------------------------------
