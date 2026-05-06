@@ -178,7 +178,7 @@ class TestDeckSetPage:
         deck._render_all_keys.side_effect = lambda: order.append("rendered")
 
         @deck.on_screen_changed
-        async def _on(name: str) -> None:
+        async def _on(name: str, screens: dict) -> None:
             order.append(f"event:{name}")
 
         await deck.set_screen("main")
@@ -194,7 +194,7 @@ class TestDeckSetPage:
         seen: list[str] = []
 
         @deck.on_screen_changed
-        async def _on(name: str) -> None:  # pragma: no cover - never invoked
+        async def _on(name: str, screens: dict) -> None:  # pragma: no cover - never invoked
             seen.append(name)
 
         deck._render_all_keys.reset_mock()
@@ -214,7 +214,7 @@ class TestDeckSetPage:
         seen: list[str] = []
 
         @deck.on_screen_changed
-        async def _on(name: str) -> None:
+        async def _on(name: str, screens: dict) -> None:
             seen.append(name)
 
         await deck.set_screen("main")
