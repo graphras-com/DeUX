@@ -62,6 +62,7 @@ spinner:
   node: spinner
   frames: 8
   interval_ms: 100
+  background_node: spinner_background
 
 events:
   - name: toggle_play_pause
@@ -98,6 +99,6 @@ regions:
   card:
     x: 0
     y: 0
-    width: 197
-    height: 98
+    width: 200
+    height: 100
     events: [tap, long_press]
