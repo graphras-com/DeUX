@@ -1,7 +1,7 @@
 name: IconKey
 type: Key
 version: 1
-description: Button with Iconify icon and label and busy spinner
+description: Button with Iconify icon, label and busy spinner
 author: Graphras.com
 license: Apache-2.0
 category: utilities
