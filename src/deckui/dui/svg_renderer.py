@@ -345,9 +345,9 @@ class SvgRenderer:
                         else "height"
                     )
                     self._range_extents[name] = float(elem.get(attr, "0"))
-            elif isinstance(binding, (SliderBinding, ToggleBinding, IconifyBinding)):
-                self._values[name] = binding.default
-            elif isinstance(binding, TransformBinding):
+            elif isinstance(
+                binding, (SliderBinding, ToggleBinding, IconifyBinding, TransformBinding)
+            ):
                 self._values[name] = binding.default
             elif isinstance(binding, ListBinding):
                 self._values[name] = {

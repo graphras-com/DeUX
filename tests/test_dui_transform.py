@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +14,6 @@ from deckui.dui.schema import (
     TransformKind,
 )
 from deckui.dui.svg_renderer import SvgRenderer
-
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -243,7 +241,7 @@ class TestTransformRenderer:
         )
         renderer = SvgRenderer(spec)
         svg_out = renderer.render_svg()
-        # The needle should have rotate(-50,...) 
+        # The needle should have rotate(-50,...)
         assert "rotate(-50" in svg_out
 
     def test_render_at_one(self, tmp_path: Path):
