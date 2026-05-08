@@ -492,6 +492,103 @@ class MockDashboardService:
             pass
 
 
+class MockGaugeService:
+    """Simulated gauge backend -- a single normalised value in ``[0.0, 1.0]``.
+
+    Represents a generic metric (CPU load, fuel level, signal strength,
+    etc.) that can be adjusted up or down in small increments.  A
+    background task nudges the value randomly to simulate live sensor
+    data; manual adjustments via :meth:`adjust` are additive.
+
+    Events
+    ------
+    on_value_changed : AsyncEvent
+        Emitted whenever ``value`` changes.
+        Signature: ``(value: float) -> None`` -- normalised ``[0.0, 1.0]``.
+
+    Parameters
+    ----------
+    initial_value : float, default=0.5
+        Starting gauge value (clamped to ``[0.0, 1.0]``).
+    step : float, default=0.01
+        Default adjustment per encoder step.
+    simulate : bool, default=True
+        When ``True``, a background task drifts the value randomly.
+    """
+
+    UPDATE_INTERVAL_S = 2.0
+    DRIFT_RANGE = 0.02
+
+    def __init__(
+        self,
+        initial_value: float = 0.5,
+        step: float = 0.01,
+        simulate: bool = True,
+    ) -> None:
+        self.value: float = max(0.0, min(1.0, initial_value))
+        self.step: float = step
+        self._simulate: bool = simulate
+
+        self.on_value_changed: AsyncEvent = AsyncEvent()
+        self._task: asyncio.Task[None] | None = None
+
+    async def adjust(self, delta: float) -> None:
+        """Add *delta* to the current value (clamped to ``[0.0, 1.0]``).
+
+        Idempotent: emits nothing if the clamped result equals the
+        current value.
+
+        Parameters
+        ----------
+        delta : float
+            Amount to add (positive) or subtract (negative).
+        """
+        clamped = max(0.0, min(1.0, self.value + delta))
+        if clamped == self.value:
+            return
+        self.value = clamped
+        log.info("Gauge: %.2f", self.value)
+        await self.on_value_changed.emit(self.value)
+
+    async def set_value(self, value: float) -> None:
+        """Set the gauge to an absolute value (clamped to ``[0.0, 1.0]``).
+
+        Parameters
+        ----------
+        value : float
+            Target gauge value.
+        """
+        await self.adjust(value - self.value)
+
+    async def start(self) -> None:
+        """Start the background drift simulator (idempotent)."""
+        if not self._simulate:
+            return
+        if self._task is None or self._task.done():
+            self._task = asyncio.create_task(
+                self._drift_loop(), name="gauge-drift"
+            )
+
+    async def stop(self) -> None:
+        """Cancel the drift simulator and wait for it to exit."""
+        task = self._task
+        self._task = None
+        if task is not None and not task.done():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+    async def _drift_loop(self) -> None:
+        """Nudge the gauge value periodically to simulate sensor data."""
+        try:
+            while True:
+                await asyncio.sleep(self.UPDATE_INTERVAL_S)
+                drift = random.uniform(-self.DRIFT_RANGE, self.DRIFT_RANGE)
+                await self.adjust(drift)
+        except asyncio.CancelledError:
+            pass
+
+
 class MockScenesService:
     """Simulated scene activator -- "set the room to Cinema mode".
 
