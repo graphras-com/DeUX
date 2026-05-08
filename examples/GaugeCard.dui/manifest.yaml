@@ -1,0 +1,19 @@
+name: GaugeCard
+type: TouchStripCard
+version: 1
+description: Gauge control
+author: Graphras.com
+license: Apache-2.0
+category: utilities
+layout: layout.svg
+
+bindings:
+  gauge:
+    type: transform
+    node: needle
+    default: 0.4
+    transforms:
+      - kind: rotate
+        from: -50
+        to: 50
+        origin: center

@@ -35,11 +35,14 @@ from .schema import (
     RangeBinding,
     RangeDirection,
     Region,
+    RotateTransform,
     SliderBinding,
     SpinnerSpec,
     SpinnerType,
     TextBinding,
     ToggleBinding,
+    TransformBinding,
+    TransformKind,
     VisibilityBinding,
 )
 
@@ -286,6 +289,9 @@ def _parse_binding(name: str, raw: dict[str, Any]) -> Binding:
     if binding_type == BindingType.LIST:
         return _parse_list_binding(name, node, raw)
 
+    if binding_type == BindingType.TRANSFORM:
+        return _parse_transform_binding(name, node, raw)
+
     return ColorBinding(
         node=node,
         attribute=str(raw.get("attribute", "fill")),
@@ -387,6 +393,113 @@ def _parse_list_binding(name: str, node: str, raw: dict[str, Any]) -> ListBindin
         inactive_attrs=inactive_attrs,
         separator=separator_raw,
         icon_size=icon_size_raw,
+    )
+
+
+def _parse_transform_binding(name: str, node: str, raw: dict[str, Any]) -> TransformBinding:
+    """Parse a ``transform`` binding entry from the manifest.
+
+    Parameters
+    ----------
+    name : str
+        Binding name for error messages.
+    node : str
+        SVG element ID (already extracted by the caller).
+    raw : dict[str, Any]
+        Raw YAML mapping for this binding.
+
+    Returns
+    -------
+    TransformBinding
+        A validated transform binding dataclass.
+
+    Raises
+    ------
+    PackageError
+        If any field is missing or has an invalid value.
+    """
+    default_val = raw.get("default", 0.0)
+    if not isinstance(default_val, (int, float)):
+        raise PackageError(f"Binding '{name}': default must be a number")
+    default_float = float(default_val)
+    if not 0.0 <= default_float <= 1.0:
+        raise PackageError(f"Binding '{name}': default must be between 0.0 and 1.0")
+
+    raw_transforms = raw.get("transforms")
+    if raw_transforms is None:
+        raise PackageError(f"Binding '{name}' missing 'transforms'")
+    if not isinstance(raw_transforms, list) or len(raw_transforms) == 0:
+        raise PackageError(f"Binding '{name}': transforms must be a non-empty list")
+
+    transforms: list[RotateTransform] = []
+    for i, t_raw in enumerate(raw_transforms):
+        if not isinstance(t_raw, dict):
+            raise PackageError(
+                f"Binding '{name}': transforms[{i}] must be a mapping"
+            )
+        kind_raw = t_raw.get("kind")
+        if kind_raw is None:
+            raise PackageError(f"Binding '{name}': transforms[{i}] missing 'kind'")
+        try:
+            kind = TransformKind(kind_raw)
+        except ValueError:
+            valid_kinds = [k.value for k in TransformKind]
+            raise PackageError(
+                f"Binding '{name}': transforms[{i}] invalid kind '{kind_raw}'. "
+                f"Valid kinds: {valid_kinds}"
+            ) from None
+
+        if kind == TransformKind.ROTATE:
+            transforms.append(_parse_rotate_transform(name, i, t_raw))
+
+    return TransformBinding(
+        node=node,
+        default=default_float,
+        transforms=tuple(transforms),
+    )
+
+
+def _parse_rotate_transform(name: str, index: int, raw: dict[str, Any]) -> RotateTransform:
+    """Parse a single rotate transform specification.
+
+    Parameters
+    ----------
+    name : str
+        Binding name for error messages.
+    index : int
+        Transform index within the list for error messages.
+    raw : dict[str, Any]
+        Raw YAML mapping for this transform entry.
+
+    Returns
+    -------
+    RotateTransform
+        A validated rotate transform dataclass.
+
+    Raises
+    ------
+    PackageError
+        If required fields are missing or invalid.
+    """
+    from_raw = raw.get("from", 0.0)
+    if not isinstance(from_raw, (int, float)):
+        raise PackageError(
+            f"Binding '{name}': transforms[{index}] 'from' must be a number"
+        )
+    to_raw = raw.get("to", 360.0)
+    if not isinstance(to_raw, (int, float)):
+        raise PackageError(
+            f"Binding '{name}': transforms[{index}] 'to' must be a number"
+        )
+    origin = raw.get("origin", "center")
+    if not isinstance(origin, str):
+        raise PackageError(
+            f"Binding '{name}': transforms[{index}] 'origin' must be a string"
+        )
+    return RotateTransform(
+        from_angle=float(from_raw),
+        to_angle=float(to_raw),
+        origin=origin,
     )
 
 

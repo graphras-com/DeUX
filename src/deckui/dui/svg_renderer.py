@@ -26,9 +26,11 @@ from .schema import (
     PackageSpec,
     RangeBinding,
     RangeDirection,
+    RotateTransform,
     SliderBinding,
     TextBinding,
     ToggleBinding,
+    TransformBinding,
     VisibilityBinding,
 )
 
@@ -345,6 +347,8 @@ class SvgRenderer:
                     self._range_extents[name] = float(elem.get(attr, "0"))
             elif isinstance(binding, (SliderBinding, ToggleBinding, IconifyBinding)):
                 self._values[name] = binding.default
+            elif isinstance(binding, TransformBinding):
+                self._values[name] = binding.default
             elif isinstance(binding, ListBinding):
                 self._values[name] = {
                     "items": list(binding.default_items),
@@ -557,6 +561,8 @@ class SvgRenderer:
             self._apply_iconify(elem, binding, value)
         elif isinstance(binding, ListBinding):
             self._apply_list(root, elem, binding, value)
+        elif isinstance(binding, TransformBinding):
+            self._apply_transform(elem, binding, value)
 
     def _apply_text(
         self,
@@ -793,6 +799,73 @@ class SvgRenderer:
         pos = binding.min_pos + ratio * (binding.max_pos - binding.min_pos)
         attr = "x" if binding.direction == RangeDirection.HORIZONTAL else "y"
         elem.set(attr, str(pos))
+
+    def _apply_transform(
+        self,
+        elem: ET.Element,
+        binding: TransformBinding,
+        value: Any,
+    ) -> None:
+        """Apply composed SVG transforms to an element proportional to a 0–1 value.
+
+        Parameters
+        ----------
+        elem : ET.Element
+            The SVG element to transform.
+        binding : TransformBinding
+            The transform binding definition from the manifest.
+        value : Any
+            A float in ``[0.0, 1.0]``; clamped if out of range.
+        """
+        ratio = max(
+            0.0, min(1.0, float(value if value is not None else binding.default))
+        )
+
+        parts: list[str] = []
+        for spec in binding.transforms:
+            if isinstance(spec, RotateTransform):
+                angle = spec.from_angle + (spec.to_angle - spec.from_angle) * ratio
+                cx, cy = self._resolve_transform_origin(elem, spec.origin)
+                parts.append(f"rotate({angle:.4g},{cx:.4g},{cy:.4g})")
+
+        if parts:
+            elem.set("transform", " ".join(parts))
+
+    @staticmethod
+    def _resolve_transform_origin(
+        elem: ET.Element, origin: str
+    ) -> tuple[float, float]:
+        """Resolve a transform origin string to x, y coordinates.
+
+        Parameters
+        ----------
+        elem : ET.Element
+            The target SVG element (used for ``"center"`` resolution).
+        origin : str
+            Either ``"center"`` (computes from element geometry) or an
+            explicit ``"x y"`` coordinate pair.
+
+        Returns
+        -------
+        tuple[float, float]
+            The resolved (cx, cy) origin coordinates.
+        """
+        if origin == "center":
+            x = float(elem.get("x", "0"))
+            y = float(elem.get("y", "0"))
+            w = float(elem.get("width", "0"))
+            h = float(elem.get("height", "0"))
+            return (x + w / 2.0, y + h / 2.0)
+
+        # Explicit "x y" format.
+        parts = origin.split()
+        if len(parts) == 2:
+            try:
+                return (float(parts[0]), float(parts[1]))
+            except ValueError:
+                pass
+        # Fallback to 0,0 if unparseable.
+        return (0.0, 0.0)
 
     def _apply_iconify(
         self,
