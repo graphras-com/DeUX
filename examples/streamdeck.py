@@ -827,13 +827,6 @@ class FavoritesController:
 
 
 class GaugeController(CardController):
-
-
-
-
-
-
-class GaugeController(CardController):
     """Gauge card -- a needle indicator driven by a simulated sensor.
 
     Loads ``GaugeCard.dui`` and binds a single normalised value
