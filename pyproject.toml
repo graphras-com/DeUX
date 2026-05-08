@@ -33,6 +33,7 @@ dependencies = [
     "cairosvg>=2.7.0",
     "pyyaml>=6.0",
     "platformdirs>=4.0",
+    "pyvips>=2.2.0",
 ]
 
 [project.urls]
@@ -71,10 +72,6 @@ ignore = ["B008"]
 "tests/*" = ["B011"]
 
 [project.optional-dependencies]
-pyvips = [
-    "pyvips>=2.2.0",
-]
-
 test = [
     "pytest>=9.0.3",
     "pytest-asyncio>=0.24",

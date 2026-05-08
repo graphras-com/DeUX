@@ -33,6 +33,7 @@ class BindingType(Enum):
     TOGGLE = "toggle"
     ICONIFY = "iconify"
     LIST = "list"
+    TRANSFORM = "transform"
 
 
 class OverflowMode(Enum):
@@ -214,6 +215,66 @@ class ListBinding:
     icon_size: int = 16
 
 
+class TransformKind(Enum):
+    """Supported transform operations for SVG nodes."""
+
+    ROTATE = "rotate"
+
+
+@dataclass(frozen=True, slots=True)
+class RotateTransform:
+    """Rotate an SVG element between two angles proportional to a 0–1 value.
+
+    The element is rotated by interpolating linearly between *from_angle*
+    and *to_angle* based on the binding's current value.
+
+    Parameters
+    ----------
+    from_angle : float
+        Rotation angle (degrees) when the value is 0.0.
+    to_angle : float
+        Rotation angle (degrees) when the value is 1.0.
+    origin : str
+        Rotation origin.  ``"center"`` resolves to the element's bounding
+        box center at render time.  An explicit ``"x y"`` string sets a
+        fixed origin in SVG user-space coordinates.
+    """
+
+    from_angle: float = 0.0
+    to_angle: float = 360.0
+    origin: str = "center"
+
+
+TransformSpec = RotateTransform
+"""Union of all supported transform specifications.
+
+Expand this type alias as new transform kinds are added (e.g.
+``RotateTransform | ScaleTransform``).
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class TransformBinding:
+    """Apply one or more SVG transforms to a node proportional to a 0–1 value.
+
+    Each entry in *transforms* produces an SVG ``transform`` attribute
+    fragment; multiple transforms are composed (space-separated) in order.
+
+    Parameters
+    ----------
+    node : str
+        ID of the SVG element to transform.
+    default : float
+        Initial normalised value (0.0–1.0).
+    transforms : tuple[TransformSpec, ...]
+        Ordered sequence of transform specifications applied to the node.
+    """
+
+    node: str
+    default: float = 0.0
+    transforms: tuple[TransformSpec, ...] = ()
+
+
 Binding = (
     TextBinding
     | ImageBinding
@@ -224,6 +285,7 @@ Binding = (
     | ToggleBinding
     | IconifyBinding
     | ListBinding
+    | TransformBinding
 )
 
 VALID_SOURCES = frozenset(
