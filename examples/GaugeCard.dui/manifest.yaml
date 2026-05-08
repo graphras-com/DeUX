@@ -11,9 +11,19 @@ bindings:
   gauge:
     type: transform
     node: needle
-    default: 0.4
+    default: 0.8
     transforms:
       - kind: rotate
         from: -50
         to: 50
-        origin: center
+        origin: 0 0
+events:
+  - name: value_down
+    source: encoder_turn
+    direction: left
+    accumulate: false
+
+  - name: value_up
+    source: encoder_turn
+    direction: right
+    accumulate: false

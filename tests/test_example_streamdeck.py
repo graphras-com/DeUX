@@ -20,9 +20,11 @@ from deckui.dui.schema import (
     PackageSpec,
     PackageType,
     RangeBinding,
+    RotateTransform,
     SliderBinding,
     TextBinding,
     ToggleBinding,
+    TransformBinding,
 )
 
 # Make examples importable
@@ -34,6 +36,7 @@ from streamdeck import (
     AudioController,
     DashboardController,
     FavoritesController,
+    GaugeController,
     LightsController,
     SceneController,
     ScreenCycler,
@@ -100,6 +103,12 @@ _KEY_SVG = (
 _PICTURE_KEY_SVG = (
     '<svg id="PictureKey" xmlns="http://www.w3.org/2000/svg" width="120" height="120">'
     '<image id="picture" x="0" y="0" width="120" height="120" href=""/>'
+    "</svg>"
+)
+
+_GAUGE_SVG = (
+    '<svg id="GaugeCard" xmlns="http://www.w3.org/2000/svg" width="200" height="100">'
+    '<polyline id="needle" points="0,0 2,-2 0,-80 -2,-2" fill="#DEDEDE"/>'
     "</svg>"
 )
 
@@ -376,6 +385,46 @@ def _picturekey_spec() -> PackageSpec:
         },
         events=(
             EventMapping(name="click", source="key_press_release", max_duration_ms=300),
+        ),
+    )
+
+
+def _gauge_spec() -> PackageSpec:
+    """Build a minimal GaugeCard PackageSpec for testing.
+
+    Returns
+    -------
+    PackageSpec
+        Spec with a transform binding and encoder turn events matching
+        GaugeController.
+    """
+    return PackageSpec(
+        name="GaugeCard",
+        type=PackageType.TOUCH_STRIP_CARD,
+        version=1,
+        svg_source=_GAUGE_SVG,
+        bindings={
+            "gauge": TransformBinding(
+                node="needle",
+                default=0.8,
+                transforms=(
+                    RotateTransform(from_angle=-50, to_angle=50, origin="0 0"),
+                ),
+            ),
+        },
+        events=(
+            EventMapping(
+                name="value_down",
+                source="encoder_turn",
+                direction="left",
+                accumulate=False,
+            ),
+            EventMapping(
+                name="value_up",
+                source="encoder_turn",
+                direction="right",
+                accumulate=False,
+            ),
         ),
     )
 
@@ -864,6 +913,104 @@ class TestFavoritesController:
         screen = MagicMock()
         ctrl.install(screen, [0, 1])
         assert screen.set_key.call_count == 2
+
+
+# ===================================================================
+# GaugeController tests
+# ===================================================================
+
+
+class TestGaugeController:
+    """Tests for GaugeController state and card bindings."""
+
+    @pytest.fixture
+    def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> GaugeController:
+        """A GaugeController with a mocked load_package."""
+        monkeypatch.setattr(
+            "streamdeck.load_package", lambda _path: _gauge_spec()
+        )
+        return GaugeController(simulate=False)
+
+    def test_initial_value(self, ctrl: GaugeController) -> None:
+        """Gauge starts at the manifest default (0.8)."""
+        assert ctrl.value == pytest.approx(0.8)
+
+    def test_card_is_dui_card(self, ctrl: GaugeController) -> None:
+        assert isinstance(ctrl.card, DuiCard)
+
+    def test_card_initial_binding(self, ctrl: GaugeController) -> None:
+        """Card gauge binding matches the initial service value."""
+        assert ctrl.card.get("gauge") == pytest.approx(0.8)
+
+    async def test_adjust_up(self, ctrl: GaugeController) -> None:
+        """Adjusting up increases the value and updates the card."""
+        await ctrl._svc.adjust(0.05)
+        assert ctrl.value == pytest.approx(0.85)
+        assert ctrl.card.get("gauge") == pytest.approx(0.85)
+
+    async def test_adjust_down(self, ctrl: GaugeController) -> None:
+        """Adjusting down decreases the value and updates the card."""
+        await ctrl._svc.adjust(-0.1)
+        assert ctrl.value == pytest.approx(0.7)
+        assert ctrl.card.get("gauge") == pytest.approx(0.7)
+
+    async def test_clamps_to_max(self, ctrl: GaugeController) -> None:
+        """Value is clamped to 1.0."""
+        await ctrl._svc.adjust(1.0)
+        assert ctrl.value == pytest.approx(1.0)
+
+    async def test_clamps_to_min(self, ctrl: GaugeController) -> None:
+        """Value is clamped to 0.0."""
+        await ctrl._svc.adjust(-2.0)
+        assert ctrl.value == pytest.approx(0.0)
+
+    async def test_idempotent_at_boundary(self, ctrl: GaugeController) -> None:
+        """Adjusting past a boundary emits nothing on repeated calls."""
+        await ctrl._svc.adjust(1.0)  # clamp to 1.0
+        events: list[float] = []
+        ctrl._svc.on_value_changed.subscribe(lambda v: events.append(v))
+        await ctrl._svc.adjust(0.1)  # already at max
+        assert events == []
+
+    async def test_set_value(self, ctrl: GaugeController) -> None:
+        """set_value sets an absolute value."""
+        await ctrl._svc.set_value(0.5)
+        assert ctrl.value == pytest.approx(0.5)
+        assert ctrl.card.get("gauge") == pytest.approx(0.5)
+
+    async def test_forward_value_up(self, ctrl: GaugeController) -> None:
+        """value_up event handler routes through the service."""
+        handler = ctrl.card._events._handlers["value_up"]
+        await handler(1)
+        assert ctrl.value == pytest.approx(0.81)
+
+    async def test_forward_value_down(self, ctrl: GaugeController) -> None:
+        """value_down event handler routes through the service."""
+        handler = ctrl.card._events._handlers["value_down"]
+        await handler(1)
+        assert ctrl.value == pytest.approx(0.79)
+
+    async def test_on_attach_starts_simulator(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """on_attach starts the drift task when simulate=True."""
+        monkeypatch.setattr(
+            "streamdeck.load_package", lambda _path: _gauge_spec()
+        )
+        ctrl = GaugeController(simulate=True)
+        deck = MagicMock()
+        await ctrl.on_attach(deck)
+        assert ctrl._svc._task is not None
+        await ctrl.on_detach()
+        assert ctrl._svc._task is None
+
+    async def test_on_attach_no_task_when_disabled(
+        self, ctrl: GaugeController
+    ) -> None:
+        """on_attach does not start a task when simulate=False."""
+        deck = MagicMock()
+        await ctrl.on_attach(deck)
+        assert ctrl._svc._task is None
 
 
 # ===================================================================

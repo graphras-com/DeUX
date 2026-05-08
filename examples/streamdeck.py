@@ -80,6 +80,7 @@ from mock_backend import (
     SCENE_DEFS,
     MockAudioService,
     MockDashboardService,
+    MockGaugeService,
     MockLightsService,
     MockScenesService,
     MockTimerService,
@@ -825,6 +826,82 @@ class FavoritesController:
             screen.set_key(pos, key)
 
 
+class GaugeController(CardController):
+    """Gauge card -- a needle indicator driven by a simulated sensor.
+
+    Loads ``GaugeCard.dui`` and binds a single normalised value
+    (``0.0`` -- ``1.0``) to a rotating needle transform.  The
+    underlying :class:`MockGaugeService` simulates a drifting sensor
+    reading; manual encoder turns adjust the value through the service.
+
+    Encoder bindings
+    ~~~~~~~~~~~~~~~~
+    * **encoder turn left**  -- decrease gauge value by one step.
+    * **encoder turn right** -- increase gauge value by one step.
+
+    The controller follows the same event-driven pattern as the other
+    controllers: encoder input is forwarded to the service, the service
+    clamps and emits ``on_value_changed``, and a reactive binding
+    pushes the confirmed value back to the card.
+
+    Parameters
+    ----------
+    packages_dir : Path | None
+        Directory containing ``GaugeCard.dui``.  Defaults to ``examples/``.
+    simulate : bool, default=True
+        When ``True``, the service drifts the gauge value randomly in
+        the background.
+    """
+
+    def __init__(
+        self,
+        packages_dir: Path | None = None,
+        simulate: bool = True,
+    ) -> None:
+        pkg_dir = packages_dir or EXAMPLES_DIR
+        self.card = DuiCard(load_package(pkg_dir / "GaugeCard.dui"))
+
+        initial_value: float = self.card.get("gauge")
+        self._svc = MockGaugeService(
+            initial_value=initial_value,
+            simulate=simulate,
+        )
+
+        # ----- bindings (service event -> card binding) -----
+        self.card.bind("gauge", self._svc.on_value_changed)
+
+        # ----- forwards (DUI event -> service method) -----
+        self.card.forward(
+            "value_down",
+            lambda steps: self._svc.adjust(-abs(steps) * self._svc.step),
+        )
+        self.card.forward(
+            "value_up",
+            lambda steps: self._svc.adjust(steps * self._svc.step),
+        )
+
+    @property
+    def value(self) -> float:
+        """Current gauge value (0.0 -- 1.0)."""
+        return self._svc.value
+
+    async def on_attach(self, deck: Deck) -> None:
+        """Start the background drift simulator.
+
+        Parameters
+        ----------
+        deck
+            The :class:`~deckui.Deck` instance (unused -- the gauge is
+            independent of deck state).
+        """
+        del deck
+        await self._svc.start()
+
+    async def on_detach(self) -> None:
+        """Stop the background drift simulator."""
+        await self._svc.stop()
+
+
 class SceneController:
     """Scene-activation keys -- one :class:`DuiKey` per scene definition.
 
@@ -1014,6 +1091,7 @@ class StreamDeckApp:
         self.audio = AudioController(catalog, packages_dir=self._packages_dir)
         self.lights = LightsController(packages_dir=self._packages_dir)
         self.timer = TimerController(packages_dir=self._packages_dir)
+        self.gauge = GaugeController(packages_dir=self._packages_dir)
         self.dashboard = DashboardController(packages_dir=self._packages_dir)
         self.favorites = FavoritesController(
             catalog, self.audio, packages_dir=self._packages_dir
@@ -1032,6 +1110,7 @@ class StreamDeckApp:
             self.audio,
             self.lights,
             self.timer,
+            self.gauge,
             self.dashboard,
         ]
 
@@ -1116,6 +1195,7 @@ class StreamDeckApp:
 
         if screen.touch_strip is not None:
             screen.touch_strip.background_color = "#1c1c1c"
+            screen.set_card(2, self.gauge.card)
             screen.set_card(3, self.dashboard.card)
 
         pkg_dir = self._packages_dir or EXAMPLES_DIR

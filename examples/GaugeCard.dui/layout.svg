@@ -1,91 +1,41 @@
-<svg xmlns="http://www.w3.org/2000/svg" id="GaugeCard" width="400" height="200" viewBox="0 0 400 200" font-family="ArialMT,Arial,sans-serif">
-    <rect id="background" x="0" y="0" width="400" height="200"  stroke="none" stroke-width="0" fill="#1C1C1C"/>
-    <g id="layer" transform="translate(3.5 0)">
-        <g id="ticks" stroke="#DEDEDE" stroke-width="2" fill="#DEDEDE">
-            <path id="tick00" d="m32.269 112.179 13.545 12.907"/>
-            <path id="tick02" d="m43.569 112.463 6.498 6.818"/>
-            <path id="tick04" d="m48.472 106.56 6.219 7.161"/>
-            <path id="tick06" d="m53.51 100.909 5.931 7.483"/>
-            <path id="tick08" d="m58.822 95.527 5.638 7.785"/>
-            <path id="tick10" d="m58.958 82.348 10.68 16.125"/>
-            <path id="tick12" d="m69.989 85.599 5.034 8.32"/>
-            <path id="tick14" d="m75.846 81.054 4.728 8.554"/>
-            <path id="tick16" d="m81.839 76.794 4.427 8.769"/>
-            <path id="tick18" d="m87.966 72.816 4.128 8.964"/>
-            <path id="tick20" d="m90.281 59.967 7.667 18.279"/>
-            <path id="tick22" d="m100.63 65.68 3.543 9.299"/>
-            <path id="tick24" d="m107.031 62.524 3.254 9.438"/>
-            <path id="tick26" d="m113.567 59.636 2.973 9.559"/>
-            <path id="tick28" d="m120.241 57 2.697 9.662"/>
-            <path id="tick30" d="m124.599 44.863 4.854 19.512"/>
-            <path id="tick32" d="m133.72 52.487 2.161 9.841"/>
-            <path id="tick34" d="m140.666 50.593 1.898 9.915"/>
-            <path id="tick36" d="m147.474 48.952 1.639 9.979"/>
-            <path id="tick38" d="m154.419 47.548 1.383 10.036"/>
-            <path id="tick40" d="m160.274 36.295 2.265 20.167"/>
-            <path id="tick42" d="m168.444 45.433 0.886 10.116"/>
-            <path id="tick44" d="m175.39 44.723 0.643 10.144"/>
-            <path id="tick46" d="m182.47 44.249 0.403 10.16"/>
-            <path id="tick48" d="m189.415 43.981 0.168 10.168"/>
-            <path id="tick50" d="m196.632 33.769 -0.129 20.34"/>
-            <path id="tick52" d="m203.578 44.092 -0.293 10.157"/>
-            <path id="tick45" d="m210.523 44.471 -0.519 10.149"/>
-            <path id="tick56" d="m217.603 45.07 -0.748 10.132"/>
-            <path id="tick58" d="m224.548 45.859 -0.981 10.107"/>
-            <path id="tick60" d="m232.855 36.815 -2.427 20.148"/>
-            <path id="tick62" d="m238.574 48.131 -1.452 10.027"/>
-            <path id="tick64" d="m245.519 49.583 -1.692 9.975"/>
-            <path id="tick66" d="m252.328 51.271 -1.935 9.912"/>
-            <path id="tick68" d="m259.138 53.181 -2.181 9.839"/>
-            <path id="tick70" d="m268.396 45.576 -4.86 19.518"/>
-            <path id="tick72" d="m272.753 57.712 -2.682 9.669"/>
-            <path id="tick74" d="m279.291 60.316 -2.937 9.569"/>
-            <path id="tick76" d="m285.963 63.172 -3.194 9.46"/>
-            <path id="tick78" d="m292.5 66.265 -3.458 9.34"/>
-            <path id="tick80" d="m302.574 60.41 -7.469 18.397"/>
-            <path id="tick82" d="m305.161 73.211 -4.018 9.037"/>
-            <path id="tick84" d="m311.425 77.077 -4.31 8.848"/>
-            <path id="tick86" d="m317.416 81.229 -4.613 8.638"/>
-            <path id="tick88" d="m323.272 85.663 -4.924 8.407"/>
-            <path id="tick90" d="m334.303 82.237 -10.49 16.298"/>
-            <path id="tick92" d="m334.575 95.415 -5.573 7.854"/>
-            <path id="tick94" d="m339.887 100.752 -5.903 7.515"/>
-            <path id="tick96" d="m344.925 106.402 -6.238 7.135"/>
-            <path id="tick98" d="m349.828 112.368 -6.576 6.71"/>
-            <path id="tick100" d="m361.128 112.399 -13.835 12.486"/>
+<svg xmlns="http://www.w3.org/2000/svg" id="GaugeCard" width="200" height="100" viewBox="0 0 200 100" font-family="ArialMT,Arial,sans-serif">
+    <defs>
+        <line id="short_tick" x1="0" y1="-85" x2="0" y2="-90"/>
+        <line id="long_tick" x1="0" y1="-85" x2="0" y2="-95"/>
+    </defs>
+    <rect id="background" x="0" y="0" width="200" height="100"  stroke="none" fill="#1C1C1C"/>
+    <g transform="translate(100,114)">
+        <g id="ticks"  stroke="#DEDEDE" stroke-width="2">
+            <use href="#long_tick" transform="rotate(-50)" />
+            <use href="#short_tick" transform="rotate(-45)" />
+            <use href="#long_tick" transform="rotate(-40)" />
+            <use href="#short_tick" transform="rotate(-35)" />
+            <use href="#long_tick" transform="rotate(-30)" />
+            <use href="#short_tick" transform="rotate(-25)" />
+            <use href="#long_tick" transform="rotate(-20)" />
+            <use href="#short_tick" transform="rotate(-15)" />
+            <use href="#long_tick" transform="rotate(-10)" />
+            <use href="#short_tick" transform="rotate(-5)" />
+            <use href="#long_tick" transform="rotate(0)" />
+            <use href="#short_tick" transform="rotate(5)" />
+            <use href="#long_tick" transform="rotate(10)" />
+            <use href="#short_tick" transform="rotate(15)" />
+            <use href="#long_tick" transform="rotate(20)" />
+            <use href="#short_tick" transform="rotate(25)" />
+            <use href="#long_tick" transform="rotate(30)" />
+            <use href="#short_tick" transform="rotate(35)" />
+            <use href="#long_tick" transform="rotate(40)" />
+            <use href="#short_tick" transform="rotate(45)" />
+            <use href="#long_tick" transform="rotate(50)" />
         </g>
-        <g id="numbers" fill="#DEDEDE" font-size="25" text-anchor="middle" dominant-baseline="central">
-            <text id="number0" x="23.4" y="100.8">0</text>
-            <!--
-            <text id="number10" x="57.1" y="71.2">10</text>
-
-            <text id="number20" x="88.4" y="48.8">20</text>
-            <text id="number30" x="123.7" y="34.8">30</text>
-            <text id="number40" x="159.3" y="25.8">40</text>
-            -->
-            <text id="number50" x="197.7" y="23.7">50</text>
-            <!--
-            <text id="number60" x="233.6" y="25.8">60</text>
-            <text id="number70" x="270.2" y="34.8">70</text>
-            <text id="number80" x="303.6" y="50.5">80</text>
-            <text id="number90" x="336.6" y="70.7">90</text>
-            -->
-            <text id="number100" x="369" y="99.3">100</text>
+        <g id="value">
+            <text id="min_value" x="-73" y="-66" font-size="16" fill="#DEDEDE" text-anchor="end" dominant-baseline="middle">-50</text>
+            <text id="mid_value" x="0" y="-103" font-size="16" fill="#DEDEDE" text-anchor="middle" dominant-baseline="middle">0</text>
+            <text id="max_value" x="73" y="-66" font-size="16" fill="#DEDEDE" text-anchor="start" dominant-baseline="middle">50</text>
         </g>
+        <polyline id="needle" points="0,0 2,-2 0,-80 -2,-2" transform="rotate(-50)" fill="#DEDEDE" stroke="#DEDEDE" stroke-width="2" />
+        <circle cx="0" cy="0" r="20" stroke="none" fill="#DEDEDE" />
+        <circle cx="0" cy="0" r="30" stroke="none" fill="#1C1C1C" />
     </g>
-    <!--
-    <line x1="200" y1="0" x2="200" y2="200" stroke="white"/>
-    <line x1="360" y1="0" x2="360" y2="200" stroke="white"/>
-    <line x1="40" y1="0" x2="40" y2="200" stroke="white"/>
-    
-    <circle cx="200" cy="250" r="195" stroke="white" fill="none"/>
-    -->
-    <g transform="translate(200,250)rotate(-50)">
-        <!--
-            max 50
-            min -50
-        -->
-        <polyline id="needle" points="0,0 2,-2 0,-185 -2,-2" transform="rotate(85)" fill="#DEDEDE" stroke="#DEDEDE" />
-    </g>
-    <circle cx="200" cy="250" r="100" stroke="none" fill="#1C1C1C"/>
+        
 </svg>
