@@ -4,7 +4,7 @@
         <line id="long_tick" x1="0" y1="-85" x2="0" y2="-95"/>
     </defs>
     <rect id="background" x="0" y="0" width="200" height="100"  stroke="none" fill="#1C1C1C"/>
-    <g transform="translate(100,114)">
+    <g transform="translate(100,117)">
         <g id="ticks"  stroke="#DEDEDE" stroke-width="2">
             <use href="#long_tick" transform="rotate(-50)" />
             <use href="#short_tick" transform="rotate(-45)" />
@@ -41,7 +41,7 @@
         </text>
         <polyline id="needle" points="0,0 2,-2 0,-80 -2,-2" transform="rotate(-50)" fill="#DEDEDE" stroke="#DEDEDE" stroke-width="2" />
         <circle cx="0" cy="0" r="20" stroke="none" fill="#DEDEDE" />
-        <circle cx="0" cy="0" r="30" stroke="none" fill="#1C1C1C" />
+        <circle cx="0" cy="0" r="37" stroke="none" fill="#1C1C1C" />
     </g>
         
 </svg>
