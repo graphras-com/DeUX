@@ -17,7 +17,42 @@ bindings:
         from: -50
         to: 50
         origin: 0 0
+
+  label:
+    type: text
+    node: label
+    default: "Charge"
+    max_width: 100
+
+  min_label:
+    type: text
+    node: min_label
+    default: "-50"
+    max_width: 30
+
+  mid_label:
+    type: text
+    node: mid_label
+    default: "0"
+    max_width: 30
+
+  max_label:
+    type: text
+    node: max_label
+    default: "+50"
+    max_width: 30
+
+  icon:
+    type: iconify
+    node: icon
+    size: 24
+    default: "ph:car-battery-light"
+
 events:
+  - name: toggle_simulator
+    source: encoder_press_release
+    max_duration_ms: 300
+
   - name: value_down
     source: encoder_turn
     direction: left
