@@ -45,7 +45,7 @@ bindings:
   icon:
     type: iconify
     node: icon
-    size: 24
+    size: 32
     default: "ph:car-battery-light"
 
 events:
