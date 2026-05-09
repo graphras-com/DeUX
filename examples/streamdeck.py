@@ -107,11 +107,9 @@ log = logging.getLogger(__name__)
 EXAMPLES_DIR = Path(__file__).resolve().parent
 add_dui_path(EXAMPLES_DIR)
 
-
 # ===========================================================================
 # Time helpers (used by TimerController)
 # ===========================================================================
-
 
 def _parse_hhmmss(text: str) -> int:
     """Parse ``HH:MM:SS`` into seconds.
@@ -137,7 +135,6 @@ def _parse_hhmmss(text: str) -> int:
     hours, minutes, seconds = (int(p) for p in parts)
     return hours * 3600 + minutes * 60 + seconds
 
-
 def _format_hhmmss(seconds: int) -> str:
     """Format seconds as ``HH:MM:SS``.
 
@@ -155,11 +152,9 @@ def _format_hhmmss(seconds: int) -> str:
     m, s = divmod(rem, 60)
     return f"{h:02d}:{m:02d}:{s:02d}"
 
-
 # ===========================================================================
 # Controllers
 # ===========================================================================
-
 
 class AudioController(CardController):
     """Audio player card -- play/pause, mute, volume, track navigation.
@@ -295,7 +290,6 @@ class AudioController(CardController):
             out["cover"] = Image.open(cover_path)
         return out
 
-
 class LightsController(CardController):
     """Lights card -- on/off toggle, brightness, colour temperature.
 
@@ -408,7 +402,6 @@ class LightsController(CardController):
     def kelvin(self) -> int:
         """Current colour temperature in Kelvin."""
         return self._svc.kelvin
-
 
 class TimerController(CardController):
     """Live countdown timer -- a real ticking timer driven by an asyncio task.
@@ -568,7 +561,6 @@ class TimerController(CardController):
         except asyncio.CancelledError:
             pass
 
-
 class DashboardController(CardController):
     """Dashboard card -- live clock, simulated weather, deck-brightness.
 
@@ -724,7 +716,6 @@ class DashboardController(CardController):
         except asyncio.CancelledError:
             pass
 
-
 class FavoritesController:
     """Favourite-media keys -- one :class:`DuiKey` per catalog entry.
 
@@ -794,7 +785,6 @@ class FavoritesController:
         """Place favourite keys onto *screen* at the given *positions*."""
         for pos, key in zip(positions, self._keys, strict=False):
             screen.set_key(pos, key)
-
 
 class GaugeController(CardController):
     """Gauge card -- a needle indicator driven by a simulated sensor.
@@ -881,7 +871,6 @@ class GaugeController(CardController):
         """Stop the background drift simulator."""
         await self._svc.stop()
 
-
 class SceneController:
     """Scene-activation keys -- one :class:`DuiKey` per scene definition.
 
@@ -957,7 +946,6 @@ class SceneController:
 
         key.forward("click", lambda: self._svc.activate(label))
 
-
 class ScreenCycler:
     """Cycles the deck through a list of screens.
 
@@ -1029,11 +1017,9 @@ class ScreenCycler:
         log.info("Cycling to screen: %s", target)
         await self._deck.set_screen(target)
 
-
 # ===========================================================================
 # Application
 # ===========================================================================
-
 
 class StreamDeckApp:
     """Top-level demo app -- glues controllers to the deck.
@@ -1167,11 +1153,9 @@ class StreamDeckApp:
             key.set("label", "Unassigned")
             screen.set_key(key_index, key)
 
-
 # ===========================================================================
 # Entry point
 # ===========================================================================
-
 
 async def run() -> None:
     """Build the app, attach to :class:`DeckManager`, and run forever.
@@ -1197,14 +1181,12 @@ async def run() -> None:
     async with manager:
         await manager.wait_closed()
 
-
 def main() -> None:
     """Entry point for ``python examples/streamdeck.py``."""
     try:
         asyncio.run(run())
     except KeyboardInterrupt:
         log.info("Bye!")
-
 
 if __name__ == "__main__":
     main()
