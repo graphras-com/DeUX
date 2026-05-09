@@ -109,6 +109,11 @@ _PICTURE_KEY_SVG = (
 _GAUGE_SVG = (
     '<svg id="GaugeCard" xmlns="http://www.w3.org/2000/svg" width="200" height="100">'
     '<polyline id="needle" points="0,0 2,-2 0,-80 -2,-2" fill="#DEDEDE"/>'
+    '<text id="label">Charge</text>'
+    '<text id="min_label">-50</text>'
+    '<text id="mid_label">0</text>'
+    '<text id="max_label">+50</text>'
+    '<g id="icon"/>'
     "</svg>"
 )
 
@@ -411,8 +416,18 @@ def _gauge_spec() -> PackageSpec:
                     RotateTransform(from_angle=-50, to_angle=50, origin="0 0"),
                 ),
             ),
+            "label": TextBinding(node="label", default="Charge", max_width=100),
+            "min_label": TextBinding(node="min_label", default="-50", max_width=30),
+            "mid_label": TextBinding(node="mid_label", default="0", max_width=30),
+            "max_label": TextBinding(node="max_label", default="+50", max_width=30),
+            "icon": IconifyBinding(node="icon", size=24, default="ph:car-battery-light"),
         },
         events=(
+            EventMapping(
+                name="toggle_simulator",
+                source="encoder_press_release",
+                max_duration_ms=300,
+            ),
             EventMapping(
                 name="value_down",
                 source="encoder_turn",
@@ -1010,6 +1025,52 @@ class TestGaugeController:
         """on_attach does not start a task when simulate=False."""
         deck = MagicMock()
         await ctrl.on_attach(deck)
+        assert ctrl._svc._task is None
+
+    def test_label_binding_set(self, ctrl: GaugeController) -> None:
+        """Label binding is initialised from the manifest default."""
+        assert ctrl.card.get("label") == "Charge"
+
+    def test_min_label_binding_set(self, ctrl: GaugeController) -> None:
+        """min_label binding is initialised from the manifest default."""
+        assert ctrl.card.get("min_label") == "-50"
+
+    def test_mid_label_binding_set(self, ctrl: GaugeController) -> None:
+        """mid_label binding is initialised from the manifest default."""
+        assert ctrl.card.get("mid_label") == "0"
+
+    def test_max_label_binding_set(self, ctrl: GaugeController) -> None:
+        """max_label binding is initialised from the manifest default."""
+        assert ctrl.card.get("max_label") == "+50"
+
+    def test_icon_binding_set(self, ctrl: GaugeController) -> None:
+        """icon binding is initialised from the manifest default."""
+        assert ctrl.card.get("icon") == "ph:car-battery-light"
+
+    async def test_toggle_simulator_starts_when_stopped(
+        self, ctrl: GaugeController
+    ) -> None:
+        """toggle_simulator starts the drift task when it is stopped."""
+        assert ctrl._svc._task is None
+        await ctrl._toggle_simulator()
+        assert ctrl._svc._simulate is True
+        assert ctrl._svc._task is not None
+        # Clean up
+        await ctrl._svc.stop()
+
+    async def test_toggle_simulator_stops_when_running(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """toggle_simulator stops the drift task when it is running."""
+        monkeypatch.setattr(
+            "streamdeck.load_package", lambda _path: _gauge_spec()
+        )
+        ctrl = GaugeController(simulate=True)
+        deck = MagicMock()
+        await ctrl.on_attach(deck)
+        assert ctrl._svc._task is not None
+        await ctrl._toggle_simulator()
+        assert ctrl._svc._simulate is False
         assert ctrl._svc._task is None
 
 

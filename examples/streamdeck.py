@@ -867,6 +867,13 @@ class GaugeController(CardController):
             simulate=simulate,
         )
 
+        # ----- static bindings (text / icon defaults from manifest) -----
+        self.card.set("label", self.card.get("label"))
+        self.card.set("min_label", self.card.get("min_label"))
+        self.card.set("mid_label", self.card.get("mid_label"))
+        self.card.set("max_label", self.card.get("max_label"))
+        self.card.set("icon", self.card.get("icon"))
+
         # ----- bindings (service event -> card binding) -----
         self.card.bind("gauge", self._svc.on_value_changed)
 
@@ -879,11 +886,21 @@ class GaugeController(CardController):
             "value_up",
             lambda steps: self._svc.adjust(steps * self._svc.step),
         )
+        self.card.forward("toggle_simulator", self._toggle_simulator)
 
     @property
     def value(self) -> float:
         """Current gauge value (0.0 -- 1.0)."""
         return self._svc.value
+
+    async def _toggle_simulator(self) -> None:
+        """Toggle the background drift simulator on or off."""
+        if self._svc._task is not None and not self._svc._task.done():
+            await self._svc.stop()
+            self._svc._simulate = False
+        else:
+            self._svc._simulate = True
+            await self._svc.start()
 
     async def on_attach(self, deck: Deck) -> None:
         """Start the background drift simulator.

@@ -4,7 +4,7 @@
         <line id="long_tick" x1="0" y1="-85" x2="0" y2="-95"/>
     </defs>
     <rect id="background" x="0" y="0" width="200" height="100"  stroke="none" fill="#1C1C1C"/>
-    <g transform="translate(100,114)">
+    <g transform="translate(100,117)">
         <g id="ticks"  stroke="#DEDEDE" stroke-width="2">
             <use href="#long_tick" transform="rotate(-50)" />
             <use href="#short_tick" transform="rotate(-45)" />
@@ -29,13 +29,19 @@
             <use href="#long_tick" transform="rotate(50)" />
         </g>
         <g id="value">
-            <text id="min_value" x="-73" y="-66" font-size="16" fill="#DEDEDE" text-anchor="end" dominant-baseline="middle">-50</text>
-            <text id="mid_value" x="0" y="-103" font-size="16" fill="#DEDEDE" text-anchor="middle" dominant-baseline="middle">0</text>
-            <text id="max_value" x="73" y="-66" font-size="16" fill="#DEDEDE" text-anchor="start" dominant-baseline="middle">50</text>
+            <text id="min_label" x="-71" y="-68" font-size="16" fill="#DEDEDE" text-anchor="end" dominant-baseline="middle">-50</text>
+            <text id="mid_label" x="0" y="-103" font-size="16" fill="#DEDEDE" text-anchor="middle" dominant-baseline="middle">0</text>
+            <text id="max_label" x="71" y="-68" font-size="16" fill="#DEDEDE" text-anchor="start" dominant-baseline="middle">-50</text>
         </g>
+        <g id="icon" transform="translate(-12 -75)" color="#DEDEDE">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 256 256"><path fill="currentColor" d="M190 136a6 6 0 0 1-6 6h-10v10a6 6 0 0 1-12 0v-10h-10a6 6 0 0 1 0-12h10v-10a6 6 0 0 1 12 0v10h10a6 6 0 0 1 6 6m-86-6H72a6 6 0 0 0 0 12h32a6 6 0 0 0 0-12m134-42v96a14 14 0 0 1-14 14H32a14 14 0 0 1-14-14V88a14 14 0 0 1 14-14h18V56a14 14 0 0 1 14-14h32a14 14 0 0 1 14 14v18h36V56a14 14 0 0 1 14-14h32a14 14 0 0 1 14 14v18h18a14 14 0 0 1 14 14m-80-14h36V56a2 2 0 0 0-2-2h-32a2 2 0 0 0-2 2Zm-96 0h36V56a2 2 0 0 0-2-2H64a2 2 0 0 0-2 2Zm164 14a2 2 0 0 0-2-2H32a2 2 0 0 0-2 2v96a2 2 0 0 0 2 2h192a2 2 0 0 0 2-2Z"/></svg>
+        </g>
+        <text id="label" color="#DEDEDE" x="0" y="-45" font-size="16" text-anchor="middle" dominant-baseline="middle" fill="currentColor">
+            Charge
+        </text>
         <polyline id="needle" points="0,0 2,-2 0,-80 -2,-2" transform="rotate(-50)" fill="#DEDEDE" stroke="#DEDEDE" stroke-width="2" />
         <circle cx="0" cy="0" r="20" stroke="none" fill="#DEDEDE" />
-        <circle cx="0" cy="0" r="30" stroke="none" fill="#1C1C1C" />
+        <circle cx="0" cy="0" r="37" stroke="none" fill="#1C1C1C" />
     </g>
         
 </svg>
