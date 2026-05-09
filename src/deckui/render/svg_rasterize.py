@@ -330,7 +330,7 @@ def list_svg_backends() -> list[str]:
 # Auto-fallback ordering
 # ---------------------------------------------------------------------------
 
-_AUTO_ORDER: tuple[str, ...] = ("cairo", "pyvips", "rsvg-cli")
+_AUTO_ORDER: tuple[str, ...] = ("pyvips", "cairo", "rsvg-cli")
 
 
 def _svg_to_png(svg_data: bytes, width: int, height: int) -> bytes:
