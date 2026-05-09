@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from ..ui.cards.base import Card
 from .animator import PushFn, SpinnerAnimator
 from .event_map import EventMap
+from .schema import PackageSpec
 from .spinner import SpinnerFrames
 from .svg_renderer import SvgRenderer
 
@@ -18,7 +19,6 @@ if TYPE_CHECKING:
 
     from ..runtime.async_event import AsyncEvent
     from ..runtime.events import AsyncHandler, TouchEvent
-    from .schema import PackageSpec
 
 logger = logging.getLogger(__name__)
 
@@ -35,26 +35,40 @@ class DuiCard(Card):
     --------
     ::
 
-        from deckui.dui import load_package, DuiCard
+        from deckui import DuiCard
 
-        spec = load_package("./AudioCard.dui")
-        card = DuiCard(spec)
+        # Resolve by name from the DUI repository
+        card = DuiCard("AudioCard")
         card.set("artist", "Ash Walker")
 
         @card.on("toggle_play_pause")
         async def handle():
             ...
 
+    You can also pass a pre-loaded :class:`~deckui.dui.schema.PackageSpec`
+    directly::
+
+        from deckui.dui import load_package, DuiCard
+
+        spec = load_package("./AudioCard.dui")
+        card = DuiCard(spec)
+
     The card index is assigned automatically when you install the card
     on a screen with :meth:`~deckui.ui.screen.Screen.set_card`.
 
     Parameters
     ----------
-    spec
-        A validated :class:`~deckui.dui.schema.PackageSpec`.
+    spec : PackageSpec or str
+        A validated :class:`~deckui.dui.schema.PackageSpec`, or a
+        package name (e.g. ``"DashboardCard"``) to resolve from the
+        DUI repository.
     """
 
-    def __init__(self, spec: PackageSpec) -> None:
+    def __init__(self, spec: PackageSpec | str) -> None:
+        if isinstance(spec, str):
+            from .repository import resolve_dui
+
+            spec = resolve_dui(spec)
         super().__init__()
         self._spec = spec
         self._renderer = SvgRenderer(spec)

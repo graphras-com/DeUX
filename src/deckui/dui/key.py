@@ -11,6 +11,7 @@ from ..render.key_renderer import _encode_image
 from ..ui.controls.key_slot import KeySlot
 from .animator import PushFn, SpinnerAnimator
 from .event_map import EventMap
+from .schema import PackageSpec
 from .spinner import SpinnerFrames
 from .svg_renderer import SvgRenderer
 
@@ -19,7 +20,6 @@ if TYPE_CHECKING:
 
     from ..runtime.async_event import AsyncEvent
     from ..runtime.events import AsyncHandler
-    from .schema import PackageSpec
 
 logger = logging.getLogger(__name__)
 
@@ -36,26 +36,40 @@ class DuiKey(KeySlot):
     --------
     ::
 
-        from deckui.dui import load_package, DuiKey
+        from deckui import DuiKey
 
-        spec = load_package("./PowerKey.dui")
-        key = DuiKey(spec)
+        # Resolve by name from the DUI repository
+        key = DuiKey("IconKey")
         key.set("label", "Shutdown")
 
         @key.on_event("activate")
         async def handle():
             ...
 
+    You can also pass a pre-loaded :class:`~deckui.dui.schema.PackageSpec`
+    directly::
+
+        from deckui.dui import load_package, DuiKey
+
+        spec = load_package("./PowerKey.dui")
+        key = DuiKey(spec)
+
     The key index is assigned automatically when you install the key
     on a screen with :meth:`~deckui.ui.screen.Screen.set_key`.
 
     Parameters
     ----------
-    spec
-        A validated :class:`~deckui.dui.schema.PackageSpec`.
+    spec : PackageSpec or str
+        A validated :class:`~deckui.dui.schema.PackageSpec`, or a
+        package name (e.g. ``"IconKey"``) to resolve from the DUI
+        repository.
     """
 
-    def __init__(self, spec: PackageSpec) -> None:
+    def __init__(self, spec: PackageSpec | str) -> None:
+        if isinstance(spec, str):
+            from .repository import resolve_dui
+
+            spec = resolve_dui(spec)
         super().__init__()
         self._spec = spec
         self._renderer = SvgRenderer(spec)

@@ -45,8 +45,9 @@ What it demonstrates
 * :class:`~deckui.DeckManager` for auto-discovery and hot-plug.
 * :class:`~deckui.AsyncEvent` as the property-change-notification
   primitive both for backend services and for ``Deck`` itself.
-* Loading ``.dui`` packages via :func:`~deckui.load_package` and using
-  :class:`~deckui.DuiCard` / :class:`~deckui.DuiKey`.
+* Name-based DUI package resolution via the DUI repository.
+  ``DuiCard("AudioCard")`` and ``DuiKey("IconKey")`` resolve packages
+  from registered search paths — no manual ``load_package`` calls.
 * :class:`~deckui.CardController` lifecycle hooks (:meth:`on_attach` /
   :meth:`on_detach`) and reactive ``bind``/``forward`` wiring.
 * Triggering re-renders from background tasks via
@@ -94,16 +95,17 @@ from deckui import (
     DeviceInfo,
     DuiCard,
     DuiKey,
-    load_package,
-    set_svg_backend
+    add_dui_path,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 log = logging.getLogger(__name__)
 
-# Resolve the directory holding the .dui packages and image assets used
-# below.  Adjust if you move them elsewhere.
+# Resolve the directory holding example-specific .dui packages and image
+# assets.  Register it with the DUI repository so packages can be resolved
+# by name (e.g. ``DuiCard("AudioCard")``).
 EXAMPLES_DIR = Path(__file__).resolve().parent
+add_dui_path(EXAMPLES_DIR)
 
 
 # ===========================================================================
@@ -173,8 +175,9 @@ class AudioController(CardController):
     ----------
     catalog : list[dict[str, str]]
         Media entries with ``artist``, ``album``, ``title``, ``cover``.
-    packages_dir : Path | None
-        Directory containing ``AudioCard.dui``.  Defaults to ``examples/``.
+    assets_dir : Path | None
+        Directory containing cover-art images referenced by the catalog.
+        Defaults to ``examples/``.
     """
 
     VOLUME_MIN = 0
@@ -183,10 +186,10 @@ class AudioController(CardController):
     def __init__(
         self,
         catalog: list[dict[str, str]],
-        packages_dir: Path | None = None,
+        assets_dir: Path | None = None,
     ) -> None:
-        self._pkg_dir = packages_dir or EXAMPLES_DIR
-        self.card = DuiCard(load_package(self._pkg_dir / "AudioCard.dui"))
+        self._assets_dir = assets_dir or EXAMPLES_DIR
+        self.card = DuiCard("AudioCard")
 
         # The card's range default (0--1) is the source of truth for the
         # initial volume.  Convert to domain percent so the service and
@@ -287,7 +290,7 @@ class AudioController(CardController):
             "album": track["album"],
             "state": "Playing" if is_playing else "Paused",
         }
-        cover_path = self._pkg_dir / track["cover"]
+        cover_path = self._assets_dir / track["cover"]
         if cover_path.exists():
             out["cover"] = Image.open(cover_path)
         return out
@@ -304,11 +307,6 @@ class LightsController(CardController):
 
     Display ranges live on the controller because they are UI choices
     (a real Hue bridge clamps differently to the physical LEDs).
-
-    Parameters
-    ----------
-    packages_dir : Path | None
-        Directory containing ``LightCard.dui``.
     """
 
     BRIGHTNESS_MIN = 0
@@ -318,12 +316,8 @@ class LightsController(CardController):
     BRIGHTNESS_STEP = 5
     KELVIN_STEP = 100
 
-    def __init__(
-        self,
-        packages_dir: Path | None = None,
-    ) -> None:
-        pkg_dir = packages_dir or EXAMPLES_DIR
-        self.card = DuiCard(load_package(pkg_dir / "LightCard.dui"))
+    def __init__(self) -> None:
+        self.card = DuiCard("LightCard")
 
         # Card defaults bootstrap the service so they start in lock-step.
         initial_brightness = int(
@@ -433,11 +427,6 @@ class TimerController(CardController):
 
     Format conversion (``int seconds`` <-> ``"HH:MM:SS"``) is the
     controller's responsibility -- the service deals only in seconds.
-
-    Parameters
-    ----------
-    packages_dir : Path | None
-        Directory containing ``TimerCard.dui``.
     """
 
     TICK_INTERVAL_S = 1.0
@@ -446,12 +435,8 @@ class TimerController(CardController):
     COARSE_STEP_S = 600
     FINE_STEP_S = 30
 
-    def __init__(
-        self,
-        packages_dir: Path | None = None,
-    ) -> None:
-        pkg_dir = packages_dir or EXAMPLES_DIR
-        self.card = DuiCard(load_package(pkg_dir / "TimerCard.dui"))
+    def __init__(self) -> None:
+        self.card = DuiCard("TimerCard")
         self._tick_task: asyncio.Task[None] | None = None
 
         default_text: str = self.card.get("timer")
@@ -595,11 +580,6 @@ class DashboardController(CardController):
     :attr:`MockDashboardService.on_telemetry_changed`.  The clock is
     genuinely poll-driven (system time), so a small task ticks once a
     second.
-
-    Parameters
-    ----------
-    packages_dir : Path | None
-        Directory containing ``DashboardCard.dui``.
     """
 
     CLOCK_INTERVAL_S = 1.0
@@ -607,15 +587,11 @@ class DashboardController(CardController):
     BRIGHTNESS_MAX = 100
     BRIGHTNESS_STEP = 1
 
-    def __init__(
-        self,
-        packages_dir: Path | None = None,
-    ) -> None:
+    def __init__(self) -> None:
         self._deck: Deck | None = None
         self._clock_task: asyncio.Task[None] | None = None
 
-        pkg_dir = packages_dir or EXAMPLES_DIR
-        self.card = DuiCard(load_package(pkg_dir / "DashboardCard.dui"))
+        self.card = DuiCard("DashboardCard")
 
         # Manifest brightness default (normalised) is the cold-start
         # value; remembered across reconnects so the user's last value
@@ -687,9 +663,8 @@ class DashboardController(CardController):
             self._last_known_brightness = value
 
         @deck.on_screen_changed
-        async def _screen_changed(name: str, screens:dict) -> None:
+        async def _screen_changed(name: str, screens: dict) -> None:
             _screens = list(screens)
-            # self.card.set("screens", f"{_screens.index(name)+1}/{len(_screens)}")
             self.card.set("nav", {"items": _screens, "index": _screens.index(name)})
             await self.card.request_refresh()
 
@@ -771,40 +746,38 @@ class FavoritesController:
         Media entries used as favourites.
     audio : AudioController
         The audio controller whose service handles playback.
-    packages_dir : Path | None
-        Directory containing ``PictureKey.dui``.
+    assets_dir : Path | None
+        Directory containing cover-art images referenced by the catalog.
+        Defaults to ``examples/``.
     """
 
     def __init__(
         self,
         catalog: list[dict[str, str]],
         audio: AudioController,
-        packages_dir: Path | None = None,
+        assets_dir: Path | None = None,
     ) -> None:
         self._catalog = catalog
         self._audio_svc = audio.svc
-        pkg_dir = packages_dir or EXAMPLES_DIR
-        self._spec = load_package(pkg_dir / "PictureKey.dui")
+        self._assets_dir = assets_dir or EXAMPLES_DIR
         self._keys: list[DuiKey] = []
 
         for media in self._catalog:
-            key = DuiKey(self._spec)
+            key = DuiKey("PictureKey")
 
-            cover_path = pkg_dir / media["cover"]
+            cover_path = self._assets_dir / media["cover"]
             if cover_path.exists():
                 key.set("picture", Image.open(cover_path))
 
             # Late-bind *media* per iteration so each forward target
             # captures its own dict instead of the shared loop variable.
-            #key.forward("click", lambda m=media: self._audio_svc.play(m))
-            #key.forward("click", lambda m=media, k=key: self.start_busy(m, k))
             @key.on_event("click")
-            async def _click( k=key, m=media):
+            async def _click(k=key, m=media):
                 await k.start_busy()
                 await self._audio_svc.play(m)
- 
+
             self._keys.append(key)
-        self._audio_svc.on_track_changed.subscribe(self.finish_busy)        
+        self._audio_svc.on_track_changed.subscribe(self.finish_busy)
 
     @property
     def keys(self) -> list[DuiKey]:
@@ -812,7 +785,8 @@ class FavoritesController:
         return list(self._keys)
 
     async def finish_busy(self, *args, **kwargs) -> None:
-        log.info(f"Finish busy on all keys")
+        """Stop busy animation on all favourite keys."""
+        log.info("Finish busy on all keys")
         for k in self._keys:
             await k.finish_busy()
 
@@ -842,20 +816,13 @@ class GaugeController(CardController):
 
     Parameters
     ----------
-    packages_dir : Path | None
-        Directory containing ``GaugeCard.dui``.  Defaults to ``examples/``.
     simulate : bool, default=True
         When ``True``, the service drifts the gauge value randomly in
         the background.
     """
 
-    def __init__(
-        self,
-        packages_dir: Path | None = None,
-        simulate: bool = True,
-    ) -> None:
-        pkg_dir = packages_dir or EXAMPLES_DIR
-        self.card = DuiCard(load_package(pkg_dir / "GaugeCard.dui"))
+    def __init__(self, simulate: bool = True) -> None:
+        self.card = DuiCard("GaugeCard")
 
         initial_value: float = self.card.get("gauge")
         self._svc = MockGaugeService(
@@ -927,18 +894,10 @@ class SceneController:
     ----------
     scenes : list[dict[str, str]]
         Scene definitions, each with ``label`` and ``icon``.
-    packages_dir : Path | None
-        Directory containing ``IconKey.dui``.
     """
 
-    def __init__(
-        self,
-        scenes: list[dict[str, str]],
-        packages_dir: Path | None = None,
-    ) -> None:
+    def __init__(self, scenes: list[dict[str, str]]) -> None:
         self._scenes = scenes
-        pkg_dir = packages_dir or EXAMPLES_DIR
-        self._spec = load_package(pkg_dir / "IconKey.dui")
         self._svc = MockScenesService()
         self._keys: list[DuiKey] = []
 
@@ -950,7 +909,7 @@ class SceneController:
             log.info("Scene confirmed active: %s", label)
 
         for scene in self._scenes:
-            key = DuiKey(self._spec)
+            key = DuiKey("IconKey")
             key.set_many(label=scene["label"], icon=scene["icon"])
             self._wire_key(key, scene["label"])
             self._keys.append(key)
@@ -1046,7 +1005,7 @@ class ScreenCycler:
         self._deck = deck
 
         @deck.on_screen_changed
-        async def _on_screen(name: str, screens:dict) -> None:
+        async def _on_screen(name: str, screens: dict) -> None:
             self._last_known = name
 
     def attach(self, card: DuiCard, event: str = "next_screen") -> None:
@@ -1090,28 +1049,20 @@ class StreamDeckApp:
         Media catalog used by the audio + favourites controllers.
     scene_defs : list[dict[str, str]]
         Scene definitions used by the scene controller.
-    packages_dir : Path | None
-        Directory containing the ``.dui`` packages.
     """
 
     def __init__(
         self,
         catalog: list[dict[str, str]],
         scene_defs: list[dict[str, str]],
-        packages_dir: Path | None = None,
     ) -> None:
-        self._packages_dir = packages_dir or EXAMPLES_DIR
-        self.audio = AudioController(catalog, packages_dir=self._packages_dir)
-        self.lights = LightsController(packages_dir=self._packages_dir)
-        self.timer = TimerController(packages_dir=self._packages_dir)
-        self.gauge = GaugeController(packages_dir=self._packages_dir)
-        self.dashboard = DashboardController(packages_dir=self._packages_dir)
-        self.favorites = FavoritesController(
-            catalog, self.audio, packages_dir=self._packages_dir
-        )
-        self.scenes = SceneController(
-            scene_defs, packages_dir=self._packages_dir
-        )
+        self.audio = AudioController(catalog)
+        self.lights = LightsController()
+        self.timer = TimerController()
+        self.gauge = GaugeController()
+        self.dashboard = DashboardController()
+        self.favorites = FavoritesController(catalog, self.audio)
+        self.scenes = SceneController(scene_defs)
         self.nav = ScreenCycler(["Main", "Settings"])
         self.nav.attach(self.dashboard.card)
 
@@ -1149,7 +1100,7 @@ class StreamDeckApp:
 
         # Demonstrate Deck.on_screen_changed: log every screen switch.
         @deck.on_screen_changed
-        async def _log_screen(name: str, screens:dict) -> None:
+        async def _log_screen(name: str, screens: dict) -> None:
             log.info("Active screen confirmed: %s", name)
 
         # Drive the uniform lifecycle on every controller.
@@ -1211,10 +1162,8 @@ class StreamDeckApp:
             screen.set_card(2, self.timer.card)
             screen.set_card(3, self.dashboard.card)
 
-        pkg_dir = self._packages_dir or EXAMPLES_DIR
-        iconkey_spec = load_package(pkg_dir / "IconKey.dui")
         for key_index in range(caps.key_count):
-            key = DuiKey(iconkey_spec)
+            key = DuiKey("IconKey")
             key.set("label", "Unassigned")
             screen.set_key(key_index, key)
 

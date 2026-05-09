@@ -1,0 +1,60 @@
+name: PictureKey
+type: Key
+version: 1
+description: Button with image, optional label and busy spinner
+author: Graphras.com
+license: Apache-2.0
+category: utilities
+layout: layout.svg
+
+bindings:
+  picture:
+    type: image
+    node: picture
+
+  label:
+    type: text
+    node: label
+    default: "Picture Key"
+    max_width: 110
+    overflow: ellipsis
+    wrap: false
+
+  background:
+    type: color
+    node: background
+    attribute: color
+    default: "#1c1c1c"
+
+  foreground:
+    type: color
+    node: foreground
+    attribute: color
+    default: "#dedede"
+
+  show_label:
+    type: visibility
+    node: foreground
+    default: false
+
+spinner:
+  type: rotation
+  node: spinner
+  frames: 8
+  interval_ms: 100
+  background_node: spinner_background
+
+events:
+  - name: click
+    source: key_press_release
+    max_duration_ms: 300
+
+  - name: hold
+    source: key_hold
+    hold_ms: 350
+
+  - name: press
+    source: key_press
+
+  - name: release
+    source: key_release
