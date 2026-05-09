@@ -867,12 +867,12 @@ class GaugeController(CardController):
             simulate=simulate,
         )
 
-        # ----- static bindings (text / icon defaults from manifest) -----
-        self.card.set("label", self.card.get("label"))
-        self.card.set("min_label", self.card.get("min_label"))
-        self.card.set("mid_label", self.card.get("mid_label"))
-        self.card.set("max_label", self.card.get("max_label"))
-        self.card.set("icon", self.card.get("icon"))
+        # ----- static bindings (text / icon ) -----
+        self.card.set("label", "Charge")
+        self.card.set("min_label", "-50")
+        self.card.set("mid_label", "0")
+        self.card.set("max_label", "+50")
+        self.card.set("icon", "ph:car-battery-light")
 
         # ----- bindings (service event -> card binding) -----
         self.card.bind("gauge", self._svc.on_value_changed)
@@ -1193,7 +1193,7 @@ class StreamDeckApp:
             screen.touch_strip.background_color = "#1c1c1c"
             screen.set_card(0, self.audio.card)
             screen.set_card(1, self.lights.card)
-            screen.set_card(2, self.timer.card)
+            screen.set_card(2, self.gauge.card)
             screen.set_card(3, self.dashboard.card)
 
         num_favs = min(len(self.favorites.keys), caps.key_count)
@@ -1212,7 +1212,7 @@ class StreamDeckApp:
 
         if screen.touch_strip is not None:
             screen.touch_strip.background_color = "#1c1c1c"
-            screen.set_card(2, self.gauge.card)
+            screen.set_card(2, self.timer.card)
             screen.set_card(3, self.dashboard.card)
 
         pkg_dir = self._packages_dir or EXAMPLES_DIR
