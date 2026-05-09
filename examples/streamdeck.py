@@ -105,10 +105,6 @@ log = logging.getLogger(__name__)
 # below.  Adjust if you move them elsewhere.
 EXAMPLES_DIR = Path(__file__).resolve().parent
 
-try:
-    set_svg_backend("pyvips")
-except Exception:
-    log.info("pyvips backend unavailable, using default (auto)")
 
 # ===========================================================================
 # Time helpers (used by TimerController)

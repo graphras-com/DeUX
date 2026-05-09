@@ -228,16 +228,16 @@ class TestSvgToPngDispatch:
 
         class SuccessBackend:
             def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
-                calls.append("pyvips")
+                calls.append("cairo")
                 return fake
 
-        svg_mod._registry["cairo"] = FailBackend("cairo")  # type: ignore[assignment]
-        svg_mod._registry["pyvips"] = SuccessBackend()  # type: ignore[assignment]
+        svg_mod._registry["pyvips"] = FailBackend("pyvips")  # type: ignore[assignment]
+        svg_mod._registry["cairo"] = SuccessBackend()  # type: ignore[assignment]
         set_svg_backend("auto")
 
         result = _svg_to_png(b"<svg/>", 10, 10)
         assert result == fake
-        assert calls == ["cairo", "pyvips"]
+        assert calls == ["pyvips", "cairo"]
 
     def test_auto_all_fail_raises(self):
         """Auto mode raises RasterizeError when all backends fail."""
