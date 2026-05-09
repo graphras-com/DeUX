@@ -7,15 +7,20 @@ Examples
 --------
 ::
 
-    from deckui.dui import DuiCard, load_package
+    from deckui import DuiCard, DuiKey
 
-    spec = load_package("./AudioCard.dui")
-    card = DuiCard(spec)
-    card.set("artist", "Ash Walker")
+    # Resolve by name — uses the built-in DUI repository
+    card = DuiCard("DashboardCard")
+    key  = DuiKey("IconKey")
+    key.set("label", "Power")
 
     @card.on("toggle_play_pause")
     async def handle():
         ...
+
+    # Add a custom search path for your own packages
+    from deckui import add_dui_path
+    add_dui_path("~/my-dui-packages")
 """
 
 from __future__ import annotations
@@ -27,6 +32,14 @@ from .iconify import IconifyError, fetch_icon
 from .iconify import clear_cache as clear_iconify_cache
 from .key import DuiKey
 from .loader import PackageError, load_all_packages, load_package
+from .repository import (
+    DuiRepository,
+    add_dui_path,
+    clear_dui_cache,
+    list_dui_packages,
+    remove_dui_path,
+    resolve_dui,
+)
 from .schema import (
     VALID_CATEGORIES,
     Binding,
@@ -61,6 +74,7 @@ __all__ = [
     "ColorBinding",
     "DuiCard",
     "DuiKey",
+    "DuiRepository",
     "EventMap",
     "EventMapping",
     "IconifyBinding",
@@ -87,8 +101,13 @@ __all__ = [
     "TransformKind",
     "VALID_CATEGORIES",
     "VisibilityBinding",
+    "add_dui_path",
+    "clear_dui_cache",
     "clear_iconify_cache",
     "fetch_icon",
+    "list_dui_packages",
     "load_all_packages",
     "load_package",
+    "remove_dui_path",
+    "resolve_dui",
 ]

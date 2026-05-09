@@ -444,6 +444,39 @@ def _gauge_spec() -> PackageSpec:
     )
 
 
+def _mock_resolve(name: str) -> PackageSpec:
+    """Mock :func:`resolve_dui` that returns inline specs by package name.
+
+    Parameters
+    ----------
+    name : str
+        DUI package name (e.g. ``"AudioCard"``).
+
+    Returns
+    -------
+    PackageSpec
+        A freshly built spec matching *name*.
+
+    Raises
+    ------
+    KeyError
+        If no mock spec factory is registered for *name*.
+    """
+    _FACTORIES: dict[str, Any] = {
+        "AudioCard": _audio_spec,
+        "LightCard": _light_spec,
+        "TimerCard": _timer_spec,
+        "DashboardCard": _dash_spec,
+        "GaugeCard": _gauge_spec,
+        "IconKey": _iconkey_spec,
+        "PictureKey": _picturekey_spec,
+    }
+    factory = _FACTORIES.get(name)
+    if factory is None:
+        raise KeyError(f"No mock spec factory for {name!r}")
+    return factory()
+
+
 # ===================================================================
 # compute_key_layout tests
 # ===================================================================
@@ -459,11 +492,9 @@ class TestAudioController:
 
     @pytest.fixture
     def ctrl(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> AudioController:
-        """An AudioController with a mocked load_package."""
-        monkeypatch.setattr(
-            "streamdeck.load_package", lambda _path: _audio_spec()
-        )
-        return AudioController(MEDIA_CATALOG, packages_dir=tmp_path)
+        """An AudioController with mocked DUI resolution."""
+        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
+        return AudioController(MEDIA_CATALOG, assets_dir=tmp_path)
 
     def test_initial_state(self, ctrl: AudioController) -> None:
         assert ctrl.volume == 50
@@ -569,10 +600,8 @@ class TestLightsController:
 
     @pytest.fixture
     def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> LightsController:
-        """A LightsController with a mocked load_package."""
-        monkeypatch.setattr(
-            "streamdeck.load_package", lambda _path: _light_spec()
-        )
+        """A LightsController with mocked DUI resolution."""
+        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
         return LightsController()
 
     def test_initial_state(self, ctrl: LightsController) -> None:
@@ -624,10 +653,8 @@ class TestTimerController:
 
     @pytest.fixture
     def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> TimerController:
-        """A TimerController with a mocked load_package."""
-        monkeypatch.setattr(
-            "streamdeck.load_package", lambda _path: _timer_spec()
-        )
+        """A TimerController with mocked DUI resolution."""
+        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
         return TimerController()
 
     def test_initial_format(self, ctrl: TimerController) -> None:
@@ -657,9 +684,7 @@ class TestTimerController:
     async def test_adjust_duration_clamps_to_zero(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr(
-            "streamdeck.load_package", lambda _path: _timer_spec()
-        )
+        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
         ctrl = TimerController()
         await ctrl._svc.adjust_duration(-10000)
         assert ctrl.duration == 0
@@ -706,10 +731,8 @@ class TestDashboardController:
 
     @pytest.fixture
     def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> DashboardController:
-        """A DashboardController with a mocked load_package."""
-        monkeypatch.setattr(
-            "streamdeck.load_package", lambda _path: _dash_spec()
-        )
+        """A DashboardController with mocked DUI resolution."""
+        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
         return DashboardController()
 
     def _real_deck(self, brightness: int = 50) -> Any:
@@ -802,10 +825,8 @@ class TestSceneController:
 
     @pytest.fixture
     def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> SceneController:
-        """A SceneController with a mocked load_package."""
-        monkeypatch.setattr(
-            "streamdeck.load_package", lambda _path: _iconkey_spec()
-        )
+        """A SceneController with mocked DUI resolution."""
+        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
         return SceneController(SCENE_DEFS)
 
     def test_creates_correct_number_of_keys(self, ctrl: SceneController) -> None:
@@ -898,14 +919,10 @@ class TestFavoritesController:
 
     @pytest.fixture
     def ctrl(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> FavoritesController:
-        """A FavoritesController with mocked load_package calls."""
-        specs = {"AudioCard.dui": _audio_spec(), "PictureKey.dui": _picturekey_spec()}
-        monkeypatch.setattr(
-            "streamdeck.load_package",
-            lambda path: specs[Path(path).name],
-        )
-        audio = AudioController(MEDIA_CATALOG, packages_dir=tmp_path)
-        return FavoritesController(MEDIA_CATALOG, audio, packages_dir=tmp_path)
+        """A FavoritesController with mocked DUI resolution."""
+        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
+        audio = AudioController(MEDIA_CATALOG, assets_dir=tmp_path)
+        return FavoritesController(MEDIA_CATALOG, audio, assets_dir=tmp_path)
 
     def test_creates_correct_number_of_keys(self, ctrl: FavoritesController) -> None:
         assert len(ctrl.keys) == len(MEDIA_CATALOG)
@@ -940,10 +957,8 @@ class TestGaugeController:
 
     @pytest.fixture
     def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> GaugeController:
-        """A GaugeController with a mocked load_package."""
-        monkeypatch.setattr(
-            "streamdeck.load_package", lambda _path: _gauge_spec()
-        )
+        """A GaugeController with mocked DUI resolution."""
+        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
         return GaugeController(simulate=False)
 
     def test_initial_value(self, ctrl: GaugeController) -> None:
@@ -1009,9 +1024,7 @@ class TestGaugeController:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """on_attach starts the drift task when simulate=True."""
-        monkeypatch.setattr(
-            "streamdeck.load_package", lambda _path: _gauge_spec()
-        )
+        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
         ctrl = GaugeController(simulate=True)
         deck = MagicMock()
         await ctrl.on_attach(deck)
@@ -1062,9 +1075,7 @@ class TestGaugeController:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """toggle_simulator stops the drift task when it is running."""
-        monkeypatch.setattr(
-            "streamdeck.load_package", lambda _path: _gauge_spec()
-        )
+        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
         ctrl = GaugeController(simulate=True)
         deck = MagicMock()
         await ctrl.on_attach(deck)

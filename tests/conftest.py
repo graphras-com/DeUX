@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 
+import deckui.dui.repository as _repo_mod
 import deckui.render.svg_rasterize as _svg_mod
 from deckui.render.metrics import RenderMetrics
 from deckui.runtime.capabilities import (
@@ -41,6 +42,19 @@ def _reset_svg_backend():
     yield
     _svg_mod._active_backend = _PRISTINE_ACTIVE_BACKEND
     _svg_mod._registry = _PRISTINE_REGISTRY.copy()
+
+
+@pytest.fixture(autouse=True)
+def _reset_dui_repository():
+    """Reset the global DUI repository singleton between tests.
+
+    Ensures each test starts with a fresh repository so that
+    ``add_dui_path`` / ``remove_dui_path`` calls in one test do not
+    leak into subsequent tests.
+    """
+    _repo_mod._default_repository = None
+    yield
+    _repo_mod._default_repository = None
 
 
 _PLUS_METRICS = RenderMetrics(STREAM_DECK_PLUS)

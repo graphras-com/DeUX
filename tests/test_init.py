@@ -25,6 +25,7 @@ class TestPublicAPI:
             "DeviceInfo",
             "DuiCard",
             "DuiKey",
+            "DuiRepository",
             "EncoderPressEvent",
             "EncoderSlot",
             "EncoderTurnEvent",
@@ -41,14 +42,19 @@ class TestPublicAPI:
             "SvgRasterizer",
             "TouchEvent",
             "TouchStrip",
+            "add_dui_path",
+            "clear_dui_cache",
             "clear_image_cache",
             "fetch_image",
             "get_svg_backend",
             "list_devices",
+            "list_dui_packages",
             "list_svg_backends",
             "load_all_packages",
             "load_package",
             "register_svg_backend",
+            "remove_dui_path",
+            "resolve_dui",
             "set_svg_backend",
         }
         assert set(deckui.__all__) == expected
@@ -103,18 +109,30 @@ class TestPublicAPI:
         from deckui import (
             DuiCard,
             DuiKey,
+            DuiRepository,
             PackageError,
             PackageSpec,
+            add_dui_path,
+            clear_dui_cache,
+            list_dui_packages,
             load_all_packages,
             load_package,
+            remove_dui_path,
+            resolve_dui,
         )
 
         assert DuiCard is not None
         assert DuiKey is not None
+        assert DuiRepository is not None
         assert PackageError is not None
         assert PackageSpec is not None
+        assert add_dui_path is not None
+        assert clear_dui_cache is not None
+        assert list_dui_packages is not None
         assert load_all_packages is not None
         assert load_package is not None
+        assert remove_dui_path is not None
+        assert resolve_dui is not None
 
     def test_blank_card_importable(self):
         from deckui import BlankCard
