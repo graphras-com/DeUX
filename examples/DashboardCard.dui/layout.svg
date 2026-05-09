@@ -1,9 +1,0 @@
-<svg id="DashboardCard" xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100" font-family="ArialMT,Arial,sans-serif">
-    <rect id="background" class="background" x="0" y="0" width="200" height="100" fill="#1C1C1C"/>
-    <text id="date" class="secondary" x="100" y="15" font-size="18" fill="#8F8F8F" text-anchor="middle" dominant-baseline="middle">Friday, 24 April</text>
-    <text id="time" class="primary" x="100" y="50" font-size="30" fill="#DEDEDE" text-anchor="middle" dominant-baseline="middle">20:41</text>
-    <text id="pager" class="secondary" x="100" y="80" font-size="13" fill="#8F8F8F" text-anchor="middle" dominant-baseline="middle">
-        <tspan>Main</tspan><tspan>·</tspan><tspan fill="#DEDEDE">Livingroom</tspan><tspan>·</tspan><tspan>Study</tspan><tspan>·</tspan><tspan>Settings</tspan>
-    </text>
-    <rect id="brightness" x="0" y="95" width="200" height="5" stroke="none" fill="#DEDEDE" rx="0" ry="0"/>
-</svg>

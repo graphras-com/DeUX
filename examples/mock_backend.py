@@ -70,11 +70,9 @@ SCENE_DEFS: list[dict[str, str]] = [
     {"label": "Bedtime", "icon": "icon-park-outline:sleep-two"},
 ]
 
-
 # ===========================================================================
 # Mock services
 # ===========================================================================
-
 
 class MockAudioService:
     """Simulated audio player -- play/pause, volume, mute, track navigation.
@@ -206,7 +204,6 @@ class MockAudioService:
         log.info("Muted: %s", self.is_muted)
         await self.on_mute_changed.emit(self.is_muted)
 
-
 class MockLightsService:
     """Simulated smart-light backend -- on/off, brightness, colour temperature.
 
@@ -288,7 +285,6 @@ class MockLightsService:
         self.kelvin = clamped
         log.info("Kelvin: %dK", self.kelvin)
         await self.on_kelvin_changed.emit(self.kelvin)
-
 
 class MockTimerService:
     """Simulated countdown timer -- duration, remaining, start/pause/reset.
@@ -392,7 +388,6 @@ class MockTimerService:
             await self.on_running_changed.emit(False)
             await self.on_finished.emit()
 
-
 class MockDashboardService:
     """Simulated dashboard telemetry backend -- weather telemetry.
 
@@ -491,7 +486,6 @@ class MockDashboardService:
         except asyncio.CancelledError:
             pass
 
-
 class MockGaugeService:
     """Simulated gauge backend -- a single normalised value in ``[0.0, 1.0]``.
 
@@ -587,7 +581,6 @@ class MockGaugeService:
                 await self.adjust(drift)
         except asyncio.CancelledError:
             pass
-
 
 class MockScenesService:
     """Simulated scene activator -- "set the room to Cinema mode".
