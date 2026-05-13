@@ -17,6 +17,10 @@ left blank (black unless ``--background`` is given).  SVGs are scaled
 edge-to-edge to the connected device's native key/panel size — the tool
 does not impose any margins, padding, or gaps.
 
+Use ``--touchstrip`` to push a single full-width SVG across the entire
+touchstrip instead of specifying individual ``--cardN`` panels.  The
+``--touchstrip`` flag is mutually exclusive with ``--cardN`` flags.
+
 The tool auto-detects the first connected visual Stream Deck device and
 adapts key/card counts and dimensions to the hardware.
 
@@ -252,6 +256,39 @@ def compose_touchstrip(
     return _encode_image(img)
 
 
+def compose_full_touchstrip(
+    svg_img: Image.Image,
+    touchscreen_size: tuple[int, int],
+    background: str = "black",
+) -> bytes:
+    """Place *svg_img* edge-to-edge on a full touchstrip canvas.
+
+    Unlike :func:`compose_touchstrip`, which tiles individual card
+    images, this function composites a single SVG image covering the
+    entire touchstrip area.
+
+    Parameters
+    ----------
+    svg_img : Image.Image
+        Pre-rasterised SVG image to composite onto the touchstrip canvas.
+    touchscreen_size : tuple[int, int]
+        ``(width, height)`` of the target touchstrip canvas.
+    background : str, default="black"
+        Canvas fill colour (any PIL-compatible colour string).
+
+    Returns
+    -------
+    bytes
+        JPEG-encoded image bytes ready for ``set_touchscreen_image``.
+    """
+    canvas = Image.new("RGB", touchscreen_size, background)
+    x = (touchscreen_size[0] - svg_img.width) // 2
+    y = (touchscreen_size[1] - svg_img.height) // 2
+    if svg_img.mode == "RGBA":
+        canvas.paste(svg_img, (x, y), svg_img)
+    else:
+        canvas.paste(svg_img, (x, y))
+    return _encode_image(canvas)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -281,6 +318,13 @@ def build_parser() -> argparse.ArgumentParser:
             metavar="SVG",
             help=argparse.SUPPRESS if i >= 4 else f"SVG file for card slot {i}",
         )
+    parser.add_argument(
+        "--touchstrip",
+        type=Path,
+        default=None,
+        metavar="SVG",
+        help="SVG file for the full touchstrip (mutually exclusive with --cardN)",
+    )
     parser.add_argument(
         "-b",
         "--brightness",
@@ -342,7 +386,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     argparse.Namespace
         Parsed arguments with key/card paths, brightness, background, etc.
     """
-    return build_parser().parse_args(argv)
+    args = build_parser().parse_args(argv)
+
+    # --touchstrip is mutually exclusive with --cardN flags.
+    if args.touchstrip is not None:
+        card_flags = [
+            f"card{i}"
+            for i in range(_MAX_CARD_SLOTS)
+            if getattr(args, f"card{i}") is not None
+        ]
+        if card_flags:
+            build_parser().error(
+                f"--touchstrip cannot be used together with --{card_flags[0]}"
+            )
+
+    return args
 
 
 
@@ -470,6 +528,9 @@ def collect_svg_paths(args: argparse.Namespace) -> list[Path]:
         p = getattr(args, f"card{i}", None)
         if p is not None:
             paths.append(p)
+    ts: Path | None = getattr(args, "touchstrip", None)
+    if ts is not None:
+        paths.append(ts)
     return paths
 
 
@@ -596,6 +657,22 @@ def render_preview(
 
     if not caps.has_touchscreen or caps.panel_count == 0:
         return key_images, b""
+
+    touchstrip_svg: Path | None = getattr(args, "touchstrip", None)
+    if touchstrip_svg is not None:
+        if not touchstrip_svg.exists():
+            print(f"ERROR: Touchstrip SVG not found: {touchstrip_svg}", file=sys.stderr)  # noqa: T201
+            sys.exit(1)
+        ts_size = (caps.touchscreen_width, caps.touchscreen_height)
+        img = load_svg(touchstrip_svg, *ts_size)
+        touchstrip_bytes = compose_full_touchstrip(img, ts_size, background=background)
+        logger.info(
+            "Rendered full touchstrip from %s (%dx%d)",
+            touchstrip_svg,
+            img.width,
+            img.height,
+        )
+        return key_images, touchstrip_bytes
 
     panel_width = caps.touchscreen_width // caps.panel_count
     panel_size = (panel_width, caps.touchscreen_height)

@@ -26,6 +26,7 @@ from deckui.tools.preview import (
     build_parser,
     collect_svg_paths,
     compose_card_image,
+    compose_full_touchstrip,
     compose_key_image,
     compose_touchstrip,
     get_mtimes,
@@ -79,6 +80,19 @@ def wide_svg(tmp_path: Path) -> Path:
         b"</svg>"
     )
     p = tmp_path / "wide.svg"
+    p.write_bytes(svg)
+    return p
+
+
+@pytest.fixture
+def touchstrip_svg(tmp_path: Path) -> Path:
+    """Write an 800x100 SVG for full touchstrip tests."""
+    svg = (
+        b'<svg xmlns="http://www.w3.org/2000/svg" width="800" height="100">'
+        b'<rect width="800" height="100" fill="cyan"/>'
+        b"</svg>"
+    )
+    p = tmp_path / "touchstrip.svg"
     p.write_bytes(svg)
     return p
 
@@ -856,3 +870,126 @@ class TestMainRendererFlag:
         ):
             main([])
             mock_set.assert_not_called()
+
+
+class TestComposeFullTouchstrip:
+    """Tests for ``compose_full_touchstrip``."""
+
+    def test_returns_jpeg_bytes(self):
+        svg_img = Image.new("RGBA", TOUCHSCREEN_SIZE, (0, 255, 255, 255))
+        result = compose_full_touchstrip(svg_img, TOUCHSCREEN_SIZE)
+        assert isinstance(result, bytes)
+        decoded = Image.open(io.BytesIO(result))
+        assert decoded.format == "JPEG"
+        assert decoded.size == TOUCHSCREEN_SIZE
+
+    def test_centres_smaller_image(self):
+        """A smaller image is centred on the touchstrip canvas."""
+        svg_img = Image.new("RGBA", (400, 50), (255, 0, 0, 255))
+        result = compose_full_touchstrip(svg_img, TOUCHSCREEN_SIZE)
+        decoded = Image.open(io.BytesIO(result)).convert("RGB")
+        cx, cy = TOUCHSCREEN_SIZE[0] // 2, TOUCHSCREEN_SIZE[1] // 2
+        r, _, _ = decoded.getpixel((cx, cy))
+        assert r > 200
+
+    def test_full_size_fills_edge_to_edge(self):
+        svg_img = Image.new("RGBA", TOUCHSCREEN_SIZE, (0, 255, 0, 255))
+        result = compose_full_touchstrip(svg_img, TOUCHSCREEN_SIZE)
+        decoded = Image.open(io.BytesIO(result)).convert("RGB")
+        _, g, _ = decoded.getpixel((0, 0))
+        assert g > 200
+
+    def test_rgb_image_no_alpha(self):
+        svg_img = Image.new("RGB", TOUCHSCREEN_SIZE, (0, 0, 255))
+        result = compose_full_touchstrip(svg_img, TOUCHSCREEN_SIZE)
+        decoded = Image.open(io.BytesIO(result))
+        assert decoded.size == TOUCHSCREEN_SIZE
+
+    def test_custom_background(self):
+        svg_img = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
+        result = compose_full_touchstrip(svg_img, TOUCHSCREEN_SIZE, background="#ff0000")
+        decoded = Image.open(io.BytesIO(result)).convert("RGB")
+        r, _, _ = decoded.getpixel((0, 0))
+        assert r > 200
+
+
+class TestParserTouchstrip:
+    """Tests for the ``--touchstrip`` CLI flag."""
+
+    def test_touchstrip_default_none(self):
+        args = parse_args([])
+        assert args.touchstrip is None
+
+    def test_touchstrip_accepts_path(self, tmp_path: Path):
+        p = tmp_path / "ts.svg"
+        args = parse_args(["--touchstrip", str(p)])
+        assert args.touchstrip == p
+
+    def test_touchstrip_conflicts_with_card(self, tmp_path: Path):
+        ts = tmp_path / "ts.svg"
+        card = tmp_path / "c.svg"
+        with pytest.raises(SystemExit):
+            parse_args(["--touchstrip", str(ts), "--card0", str(card)])
+
+    def test_touchstrip_conflicts_with_any_card(self, tmp_path: Path):
+        ts = tmp_path / "ts.svg"
+        card = tmp_path / "c.svg"
+        with pytest.raises(SystemExit):
+            parse_args(["--touchstrip", str(ts), "--card3", str(card)])
+
+
+class TestRenderPreviewTouchstrip:
+    """Tests for render_preview with --touchstrip."""
+
+    def test_touchstrip_flag_renders_full(self, touchstrip_svg: Path):
+        args = parse_args(["--touchstrip", str(touchstrip_svg)])
+        key_images, touchstrip = render_preview(args, STREAM_DECK_PLUS)
+        assert key_images == {}
+        decoded = Image.open(io.BytesIO(touchstrip))
+        assert decoded.size == TOUCHSCREEN_SIZE
+
+    def test_touchstrip_with_keys(self, touchstrip_svg: Path, square_svg: Path):
+        args = parse_args([
+            "--touchstrip", str(touchstrip_svg),
+            "--key0", str(square_svg),
+        ])
+        key_images, touchstrip = render_preview(args, STREAM_DECK_PLUS)
+        assert 0 in key_images
+        decoded = Image.open(io.BytesIO(touchstrip))
+        assert decoded.size == TOUCHSCREEN_SIZE
+
+    def test_touchstrip_missing_svg_exits(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ):
+        args = parse_args(["--touchstrip", str(tmp_path / "nonexistent.svg")])
+        with pytest.raises(SystemExit):
+            render_preview(args, STREAM_DECK_PLUS)
+        assert "Touchstrip SVG not found" in capsys.readouterr().err
+
+    def test_touchstrip_background(self, touchstrip_svg: Path):
+        args = parse_args([
+            "--touchstrip", str(touchstrip_svg),
+            "--background", "#ff0000",
+        ])
+        _, touchstrip = render_preview(args, STREAM_DECK_PLUS)
+        assert isinstance(touchstrip, bytes)
+        decoded = Image.open(io.BytesIO(touchstrip))
+        assert decoded.size == TOUCHSCREEN_SIZE
+
+
+class TestCollectSvgPathsTouchstrip:
+    """Tests for collect_svg_paths with --touchstrip."""
+
+    def test_includes_touchstrip_path(self, tmp_path: Path):
+        ts = tmp_path / "ts.svg"
+        args = parse_args(["--touchstrip", str(ts)])
+        paths = collect_svg_paths(args)
+        assert ts in paths
+
+    def test_touchstrip_after_keys(self, tmp_path: Path):
+        k = tmp_path / "k.svg"
+        ts = tmp_path / "ts.svg"
+        args = parse_args(["--touchstrip", str(ts), "--key0", str(k)])
+        paths = collect_svg_paths(args)
+        assert paths[0] == k
+        assert paths[-1] == ts
