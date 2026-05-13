@@ -821,7 +821,6 @@ class GaugeController(CardController):
         )
 
         # ----- static bindings (text / icon ) -----
-        self.card.set("label", "Charge")
         self.card.set("min_label", "-50")
         self.card.set("mid_label", "0")
         self.card.set("max_label", "+50")
@@ -1124,6 +1123,7 @@ class StreamDeckApp:
 
         if screen.touch_strip is not None:
             screen.touch_strip.background_color = "#1c1c1c"
+            screen.set_touchstrip_background_svg_from_file(EXAMPLES_DIR.joinpath("background.svg"))
             screen.set_card(0, self.audio.card)
             screen.set_card(1, self.lights.card)
             screen.set_card(2, self.gauge.card)

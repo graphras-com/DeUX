@@ -18,12 +18,6 @@ bindings:
         to: 50
         origin: 0 0
 
-  label:
-    type: text
-    node: label
-    default: "Charge"
-    max_width: 100
-
   min_label:
     type: text
     node: min_label

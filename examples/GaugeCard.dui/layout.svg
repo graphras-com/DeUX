@@ -1,47 +1,101 @@
-<svg xmlns="http://www.w3.org/2000/svg" id="GaugeCard" width="200" height="100" viewBox="0 0 200 100" font-family="ArialMT,Arial,sans-serif">
-    <defs>
-        <line id="short_tick" x1="0" y1="-85" x2="0" y2="-90"/>
-        <line id="long_tick" x1="0" y1="-85" x2="0" y2="-95"/>
-    </defs>
-    <rect id="background" x="0" y="0" width="200" height="100"  stroke="none" fill="#1C1C1C"/>
-    <g transform="translate(100,117)">
-        <g id="ticks"  stroke="#DEDEDE" stroke-width="2">
-            <use href="#long_tick" transform="rotate(-50)" />
-            <use href="#short_tick" transform="rotate(-45)" />
-            <use href="#long_tick" transform="rotate(-40)" />
-            <use href="#short_tick" transform="rotate(-35)" />
-            <use href="#long_tick" transform="rotate(-30)" />
-            <use href="#short_tick" transform="rotate(-25)" />
-            <use href="#long_tick" transform="rotate(-20)" />
-            <use href="#short_tick" transform="rotate(-15)" />
-            <use href="#long_tick" transform="rotate(-10)" />
-            <use href="#short_tick" transform="rotate(-5)" />
-            <use href="#long_tick" transform="rotate(0)" />
-            <use href="#short_tick" transform="rotate(5)" />
-            <use href="#long_tick" transform="rotate(10)" />
-            <use href="#short_tick" transform="rotate(15)" />
-            <use href="#long_tick" transform="rotate(20)" />
-            <use href="#short_tick" transform="rotate(25)" />
-            <use href="#long_tick" transform="rotate(30)" />
-            <use href="#short_tick" transform="rotate(35)" />
-            <use href="#long_tick" transform="rotate(40)" />
-            <use href="#short_tick" transform="rotate(45)" />
-            <use href="#long_tick" transform="rotate(50)" />
-        </g>
-        <g id="value">
-            <text id="min_label" x="-71" y="-68" font-size="16" fill="#DEDEDE" text-anchor="end" dominant-baseline="middle">-50</text>
-            <text id="mid_label" x="0" y="-103" font-size="16" fill="#DEDEDE" text-anchor="middle" dominant-baseline="middle">0</text>
-            <text id="max_label" x="71" y="-68" font-size="16" fill="#DEDEDE" text-anchor="start" dominant-baseline="middle">-50</text>
-        </g>
-        <g id="icon" transform="translate(-16 -79)" color="#DEDEDE">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 256 256"><path fill="currentColor" d="M190 136a6 6 0 0 1-6 6h-10v10a6 6 0 0 1-12 0v-10h-10a6 6 0 0 1 0-12h10v-10a6 6 0 0 1 12 0v10h10a6 6 0 0 1 6 6m-86-6H72a6 6 0 0 0 0 12h32a6 6 0 0 0 0-12m134-42v96a14 14 0 0 1-14 14H32a14 14 0 0 1-14-14V88a14 14 0 0 1 14-14h18V56a14 14 0 0 1 14-14h32a14 14 0 0 1 14 14v18h36V56a14 14 0 0 1 14-14h32a14 14 0 0 1 14 14v18h18a14 14 0 0 1 14 14m-80-14h36V56a2 2 0 0 0-2-2h-32a2 2 0 0 0-2 2Zm-96 0h36V56a2 2 0 0 0-2-2H64a2 2 0 0 0-2 2Zm164 14a2 2 0 0 0-2-2H32a2 2 0 0 0-2 2v96a2 2 0 0 0 2 2h192a2 2 0 0 0 2-2Z"/></svg>
-        </g>
-        <text id="label" color="#DEDEDE" x="0" y="-44" font-size="14" text-anchor="middle" dominant-baseline="middle" fill="currentColor">
-            Charge
-        </text>
-        <polyline id="needle" points="0,0 2,-2 1,-78 0,-81 -1,-78 -2,-2" transform="rotate(0)" fill="#DEDEDE" stroke="#DEDEDE" stroke-width="1" />
+<svg xmlns="http://www.w3.org/2000/svg" id="GaugeCard" width="200" height="100" viewBox="0 0 200 100">
+  <style>
+    .background-dark {
+      color: rgb(20, 20, 21);
+    }
 
-        <circle id="hub_cover" cx="0" cy="0" r="37" stroke="none" fill="#1C1C1C" />
+    .background-light {
+      color: rgb(61.1804878049, 61.1804878049, 64.2395121951);
+    }
+
+    .text-primary {
+      color: rgb(232.5489539749, 236.1207112971, 246.9635460251);
+    }
+
+    .text-secondary {
+      color: rgb(105.3263598326, 129.1380753138, 201.4236401674);
+    }
+
+    .text-selected {
+      color: rgb(225.0652719665, 229.8276150628, 244.2847280335);
+    }
+
+    .text-muted {
+      color: rgb(134.8902439024, 134.8902439024, 140.6097560976);
+    }
+
+    .text-fancy {
+      color: rgb(201.4236401674, 177.6119246862, 105.3263598326);
+    }
+
+    .border-primary {
+      color: rgb(134.8902439024, 134.8902439024, 140.6097560976);
+    }
+
+    .border-secondary {
+      color: rgb(65.756097561, 65.756097561, 69.043902439);
+    }
+
+    .icon {
+      color: rgb(111.512195122, 111.512195122, 117.087804878);
+    }
+
+    .icon-active {
+      color: rgb(201.4236401674, 177.6119246862, 105.3263598326);
+    }
+
+    .icon-inactive {
+      color: rgb(111.512195122, 111.512195122, 117.087804878);
+    }
+
+    .sliders {
+      color: rgb(201.4236401674, 177.6119246862, 105.3263598326);
+    }
+
+    .dynamic {
+      color: rgb(201.4236401674, 177.6119246862, 105.3263598326);
+    }
+  </style>
+  <defs>
+    <filter id="shadow" x="-100%" y="-100%" width="200%" height="200%">
+      <feDropShadow dx="-1" dy="-1" stdDeviation="1" flood-color="black" flood-opacity=".5"/>
+    </filter>
+    <line id="short_tick" x1="0" y1="-85" x2="0" y2="-90"/>
+    <line id="long_tick" x1="0" y1="-85" x2="0" y2="-95"/>
+  </defs>
+  <g transform="translate(100,117)">
+    <g id="ticks" class="border-primary" stroke="currentColor" stroke-width="2">
+      <use href="#long_tick"  transform="rotate(-50)" />
+      <use href="#short_tick" transform="rotate(-45)" />
+      <use href="#long_tick" transform="rotate(-40)" />
+      <use href="#short_tick" transform="rotate(-35)" />
+      <use href="#long_tick" transform="rotate(-30)" />
+      <use href="#short_tick" transform="rotate(-25)" />
+      <use href="#long_tick" transform="rotate(-20)" />
+      <use href="#short_tick" transform="rotate(-15)" />
+      <use href="#long_tick" transform="rotate(-10)" />
+      <use href="#short_tick" transform="rotate(-5)" />
+      <use href="#long_tick" transform="rotate(0)" />
+      <use href="#short_tick" transform="rotate(5)" />
+      <use href="#long_tick" transform="rotate(10)" />
+      <use href="#short_tick" transform="rotate(15)" />
+      <use href="#long_tick" transform="rotate(20)" />
+      <use href="#short_tick" transform="rotate(25)" />
+      <use href="#long_tick" transform="rotate(30)" />
+      <use href="#short_tick" transform="rotate(35)" />
+      <use href="#long_tick" transform="rotate(40)" />
+      <use href="#short_tick" transform="rotate(45)" />
+      <use href="#long_tick" transform="rotate(50)" />
     </g>
-        
+    <g id="value">
+      <text id="min_label" class="text-primary" filter="url(#shadow)" x="-71" y="-68" font-size="12" fill="currentColor" text-anchor="end" dominant-baseline="middle">-50</text>
+      <text id="mid_label" class="text-primary" filter="url(#shadow)" x="0" y="-103" font-size="12" fill="currentColor" text-anchor="middle" dominant-baseline="middle">0</text>
+      <text id="max_label" class="text-primary" filter="url(#shadow)" x="71" y="-68" font-size="12" fill="currentColor" text-anchor="start" dominant-baseline="middle">+50</text>
+    </g>
+    <g id="icon" class="icon" transform="translate(-16 -70)" color="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 256 256"><path fill="currentColor" d="M190 136a6 6 0 0 1-6 6h-10v10a6 6 0 0 1-12 0v-10h-10a6 6 0 0 1 0-12h10v-10a6 6 0 0 1 12 0v10h10a6 6 0 0 1 6 6m-86-6H72a6 6 0 0 0 0 12h32a6 6 0 0 0 0-12m134-42v96a14 14 0 0 1-14 14H32a14 14 0 0 1-14-14V88a14 14 0 0 1 14-14h18V56a14 14 0 0 1 14-14h32a14 14 0 0 1 14 14v18h36V56a14 14 0 0 1 14-14h32a14 14 0 0 1 14 14v18h18a14 14 0 0 1 14 14m-80-14h36V56a2 2 0 0 0-2-2h-32a2 2 0 0 0-2 2Zm-96 0h36V56a2 2 0 0 0-2-2H64a2 2 0 0 0-2 2Zm164 14a2 2 0 0 0-2-2H32a2 2 0 0 0-2 2v96a2 2 0 0 0 2 2h192a2 2 0 0 0 2-2Z"/></svg>
+    </g>
+    <polyline id="needle" class="sliders" filter="url(#shadow)" points="1.5,-25 0,-81 -1.5,-25" transform="rotate(0)" fill="currentColor" stroke="currentColor" stroke-width="1" />
+    <circle id="hub_cover" class="border-secondary" filter="url(#shadow)" cx="0" cy="0" r="25" stroke="none" fill="currentColor" />
+  </g>    
 </svg>
