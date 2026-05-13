@@ -63,7 +63,7 @@
   </defs>
   <text id="date" class="text-secondary" filter="url(#shadow)" x="100" y="17" font-size="20" fill="currentColor" text-anchor="middle" dominant-baseline="middle">Friday, 24 April</text>
   <text id="time" class="text-primary" filter="url(#shadow)" x="100" y="50" font-size="30" fill="currentColor" text-anchor="middle" dominant-baseline="middle">20:41</text>
-  <text id="pager" class="text-muted" filter="url(#shadow)" x="100" y="82" font-size="12" fill="currentColor" text-anchor="middle" dominant-baseline="middle">
+  <text id="pager" class="text-muted" filter="url(#shadow)" x="100" y="82" font-size="14" fill="currentColor" text-anchor="middle" dominant-baseline="middle">
     <tspan>Main</tspan><tspan>·</tspan><tspan class="text-selected" fill="currentColor">Livingroom</tspan><tspan>·</tspan><tspan>Study</tspan><tspan>·</tspan><tspan>Settings</tspan>
   </text>
   <rect id="brightness" class="sliders" x="0" y="97" width="200" height="3" stroke="none" fill="currentColor" rx="1" ry="1"/>

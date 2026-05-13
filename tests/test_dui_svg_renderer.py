@@ -27,10 +27,13 @@ from deckui.dui.schema import (
 )
 from deckui.dui.svg_renderer import (
     SvgRenderer,
+    _find_font_file,
     _fit_image,
+    _font_file_index,
     _image_to_data_uri,
     _load_font,
     _resolve_font_attrs,
+    _system_font_dirs,
     _truncate_text,
     _wrap_text,
 )
@@ -1221,6 +1224,84 @@ class TestLoadFont:
         font2 = _load_font("Arial", 12)
         assert font1 is font2
         _load_font.cache_clear()
+
+    def test_loads_font_via_system_directory_scan(self, tmp_path, monkeypatch):
+        """When Pillow cannot resolve by name, fall back to directory scan."""
+        from PIL import ImageFont
+
+        _load_font.cache_clear()
+        _font_file_index.cache_clear()
+
+        # Create a fake .ttf — we use a real font file's bytes to avoid
+        # FreeType parse errors.  Copy Arial (or default) bytes.
+        real_font = ImageFont.truetype("Arial", 12)
+        font_path = real_font.path  # type: ignore[attr-defined]
+
+        fake_dir = tmp_path / "fonts"
+        fake_dir.mkdir()
+        import shutil
+
+        shutil.copy(font_path, fake_dir / "myfancyfont.ttf")
+
+        # Patch _system_font_dirs to return our tmp dir only.
+        monkeypatch.setattr(
+            "deckui.dui.svg_renderer._system_font_dirs",
+            lambda: [fake_dir],
+        )
+        _font_file_index.cache_clear()
+
+        font = _load_font("MyFancyFont", 14)
+        assert isinstance(font, ImageFont.FreeTypeFont)
+        _load_font.cache_clear()
+        _font_file_index.cache_clear()
+
+    def test_find_font_file_space_variations(self, tmp_path, monkeypatch):
+        """_find_font_file tries space-removed and hyphenated stems."""
+        _font_file_index.cache_clear()
+
+        fake_dir = tmp_path / "fonts"
+        fake_dir.mkdir()
+        # Create an empty file — we only test the lookup, not loading.
+        (fake_dir / "frutigerlinotype.ttf").touch()
+
+        monkeypatch.setattr(
+            "deckui.dui.svg_renderer._system_font_dirs",
+            lambda: [fake_dir],
+        )
+        _font_file_index.cache_clear()
+
+        result = _find_font_file("Frutiger Linotype")
+        assert result is not None
+        assert result.stem == "frutigerlinotype"
+        _font_file_index.cache_clear()
+
+    def test_find_font_file_returns_none_for_missing(self, tmp_path, monkeypatch):
+        """_find_font_file returns None when no match exists."""
+        _font_file_index.cache_clear()
+        fake_dir = tmp_path / "fonts"
+        fake_dir.mkdir()
+
+        monkeypatch.setattr(
+            "deckui.dui.svg_renderer._system_font_dirs",
+            lambda: [fake_dir],
+        )
+        _font_file_index.cache_clear()
+
+        assert _find_font_file("NonExistentFont999") is None
+        _font_file_index.cache_clear()
+
+
+class TestSystemFontDirs:
+    """Test _system_font_dirs — platform font directory discovery."""
+
+    def test_returns_list_of_paths(self):
+        from pathlib import Path
+
+        dirs = _system_font_dirs()
+        assert isinstance(dirs, list)
+        for d in dirs:
+            assert isinstance(d, Path)
+            assert d.is_dir()
 
 
 class TestWrapText:

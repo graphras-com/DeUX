@@ -15,18 +15,6 @@ bindings:
     max_width: 190
     overflow: ellipsis
 
-  background:
-    type: color
-    node: background
-    attribute: color
-    default: "#1c1c1c"
-
-  foreground:
-    type: color
-    node: foreground
-    attribute: color
-    default: "#dedede"
-
 events:
   - name: decrease_duration
     source: encoder_turn
