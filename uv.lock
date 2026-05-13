@@ -379,6 +379,7 @@ dependencies = [
     { name = "cairosvg" },
     { name = "pillow" },
     { name = "platformdirs" },
+    { name = "pyvips" },
     { name = "pyyaml" },
     { name = "streamdeck" },
 ]
@@ -390,9 +391,6 @@ docs = [
     { name = "mkdocs-material" },
     { name = "mkdocstrings", extra = ["python"] },
     { name = "pylint" },
-]
-pyvips = [
-    { name = "pyvips" },
 ]
 test = [
     { name = "pytest" },
@@ -414,12 +412,12 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'test'", specifier = ">=9.0.3" },
     { name = "pytest-asyncio", marker = "extra == 'test'", specifier = ">=0.24" },
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=6.0" },
-    { name = "pyvips", marker = "extra == 'pyvips'", specifier = ">=2.2.0" },
+    { name = "pyvips", specifier = ">=2.2.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "streamdeck", specifier = ">=0.9.8" },
     { name = "types-pyyaml", marker = "extra == 'test'", specifier = ">=6.0" },
 ]
-provides-extras = ["docs", "pyvips", "test"]
+provides-extras = ["docs", "test"]
 
 [[package]]
 name = "defusedxml"

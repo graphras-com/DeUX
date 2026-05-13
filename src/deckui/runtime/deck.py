@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, cast
 
+from PIL import Image
 from StreamDeck.DeviceManager import DeviceManager
 
 from ..render.key_renderer import render_blank_key
 from ..render.metrics import RenderMetrics
-from ..render.touch_renderer import compose_touchstrip
+from ..render.touch_renderer import compose_card_with_background, compose_touchstrip
 from .async_event import AsyncEvent
 from .capabilities import DeviceCapabilities
 from .device_info import DeviceInfo
@@ -472,6 +474,7 @@ class Deck:
             return
 
         metrics = self._metrics
+        touch_strip = screen.touch_strip
 
         # Re-wire push_fn for every DuiCard each render so that a card
         # reused on multiple screens always animates at the slot of the
@@ -484,14 +487,40 @@ class Deck:
             x_pos = card_idx * metrics.panel_width
             y_pos = 0
 
-            async def _make_push(x: int, y: int, w: int, h: int) -> PushFn:
+            # Capture the background tile for this card's panel slot
+            bg_tile = touch_strip.bg_tile(card_idx)
+            card.set_bg_tile(bg_tile)
+
+            async def _make_push(
+                x: int,
+                y: int,
+                w: int,
+                h: int,
+                tile: Image.Image | None,
+            ) -> PushFn:
                 async def _push_card_frame(frame_bytes: bytes) -> None:
+                    if tile is not None:
+                        # Decode the frame, composite onto the bg tile, re-encode
+                        frame_img = Image.open(io.BytesIO(frame_bytes))
+                        out_bytes = compose_card_with_background(
+                            frame_img,
+                            bg_tile=tile,
+                            panel_width=w,
+                            panel_height=h,
+                            image_format=(
+                                self._caps.touchscreen_image_format
+                                if self._caps
+                                else "JPEG"
+                            ),
+                        )
+                    else:
+                        out_bytes = frame_bytes
                     loop = asyncio.get_running_loop()
                     async with self._device_lock:
                         await loop.run_in_executor(
                             self._executor,
                             self._device.set_touchscreen_image,
-                            frame_bytes,
+                            out_bytes,
                             x,
                             y,
                             w,
@@ -505,6 +534,7 @@ class Deck:
                 y_pos,
                 metrics.panel_width,
                 metrics.panel_height,
+                bg_tile,
             )
             card.set_push_fn(
                 push_fn, panel_size=(metrics.panel_width, metrics.panel_height)
@@ -525,6 +555,7 @@ class Deck:
         touchstrip_bytes = compose_touchstrip(
             card_images,
             background=screen.touch_strip.background_color,
+            bg_tiles=touch_strip.bg_tiles,
             touchscreen_width=metrics.touchscreen_width,
             touchscreen_height=metrics.touchscreen_height,
             panel_count=metrics.panel_count,

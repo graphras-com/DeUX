@@ -38,7 +38,6 @@ bindings:
     type: image
     node: cover
     fit: cover
-    placeholder_node: cover_placeholder
 
   value_text:
     type: text
@@ -56,13 +55,6 @@ bindings:
     node: volume_bar
     default: 0.5
     direction: horizontal
-
-spinner:
-  type: rotation
-  node: spinner
-  frames: 8
-  interval_ms: 100
-  background_node: spinner_background
 
 events:
   - name: toggle_play_pause

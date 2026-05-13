@@ -337,7 +337,7 @@ class TestDuiCardRender:
         card = DuiCard(spec)
         img = card.render()
         assert isinstance(img, Image.Image)
-        assert img.mode == "RGB"
+        assert img.mode == "RGBA"
         assert img.size == (197, 98)
 
     def test_render_with_changed_binding(self):
@@ -349,6 +349,30 @@ class TestDuiCardRender:
         card.set("title", "World")
         img2 = card.render()
         assert img1.tobytes() != img2.tobytes()
+
+
+class TestDuiCardBgTile:
+    """Tests for DuiCard background tile support."""
+
+    def test_set_bg_tile(self):
+        spec = _make_card_spec()
+        card = DuiCard(spec)
+        tile = Image.new("RGB", (200, 100), (255, 0, 0))
+        card.set_bg_tile(tile)
+        assert card._bg_tile is tile
+
+    def test_set_bg_tile_none(self):
+        spec = _make_card_spec()
+        card = DuiCard(spec)
+        tile = Image.new("RGB", (200, 100), (255, 0, 0))
+        card.set_bg_tile(tile)
+        card.set_bg_tile(None)
+        assert card._bg_tile is None
+
+    def test_bg_tile_initially_none(self):
+        spec = _make_card_spec()
+        card = DuiCard(spec)
+        assert card._bg_tile is None
 
 
 class TestDuiCardPrepareAssets:

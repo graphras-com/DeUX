@@ -2,8 +2,16 @@
 
 from __future__ import annotations
 
+import io
+import logging
+from pathlib import Path
+
+from PIL import Image
+
 from .cards.base import Card
 from .cards.blank import BlankCard
+
+logger = logging.getLogger(__name__)
 
 
 class TouchStrip:
@@ -17,10 +25,20 @@ class TouchStrip:
     owns its own ``TouchStrip``, so different screens can use different
     background colours.
 
+    An optional background SVG (covering the full touchscreen, e.g.
+    800x100 on Stream Deck+) can be set via :meth:`set_background_svg`.
+    When set, the SVG is rasterized once, sliced into per-panel tiles,
+    and cached.  Cards render with transparent backgrounds and are
+    composited onto their tile at render time.
+
     Parameters
     ----------
     panel_count
         Number of card zones.
+    panel_width
+        Width of each card panel in pixels.
+    panel_height
+        Height of each card panel in pixels.
     background_color
         Initial background colour.
     """
@@ -28,11 +46,17 @@ class TouchStrip:
     def __init__(
         self,
         panel_count: int = 4,
+        panel_width: int = 200,
+        panel_height: int = 100,
         background_color: str = "black",
     ) -> None:
         self._panel_count = panel_count
+        self._panel_width = panel_width
+        self._panel_height = panel_height
         self._cards: list[Card] = [BlankCard() for _ in range(panel_count)]
         self._background_color = background_color
+        self._bg_svg: bytes | None = None
+        self._bg_tiles: list[Image.Image] | None = None
 
     @property
     def panel_count(self) -> int:
@@ -94,6 +118,120 @@ class TouchStrip:
     def cards(self) -> list[Card]:
         """All card zones on this touch strip."""
         return self._cards
+
+    @property
+    def panel_width(self) -> int:
+        """Width of each card panel in pixels."""
+        return self._panel_width
+
+    @property
+    def panel_height(self) -> int:
+        """Height of each card panel in pixels."""
+        return self._panel_height
+
+    @property
+    def bg_tiles(self) -> list[Image.Image] | None:
+        """Pre-sliced background tiles, or ``None`` if no background SVG is set."""
+        return self._bg_tiles
+
+    def bg_tile(self, index: int) -> Image.Image | None:
+        """Return the cached background tile for panel *index*, or ``None``.
+
+        Parameters
+        ----------
+        index
+            Panel index (0 to panel_count-1).
+
+        Returns
+        -------
+        Image.Image or None
+            The RGB tile image, or ``None`` if no background SVG is set.
+        """
+        if self._bg_tiles is None or not 0 <= index < len(self._bg_tiles):
+            return None
+        return self._bg_tiles[index]
+
+    def set_background_svg(self, svg_data: bytes) -> None:
+        """Set a background SVG for the entire touchstrip.
+
+        The SVG is rasterized once at the full touchscreen resolution
+        (``panel_width * panel_count`` x ``panel_height``), sliced into
+        per-panel tiles, and cached.  All cards are marked dirty so they
+        re-render with the new background.
+
+        Parameters
+        ----------
+        svg_data
+            Raw SVG content as UTF-8 bytes.
+        """
+        self._bg_svg = svg_data
+        self._rasterize_and_slice()
+        for card in self._cards:
+            card.mark_dirty()
+
+    def set_background_svg_from_file(self, path: str | Path) -> None:
+        """Load a background SVG from a file path.
+
+        Convenience wrapper around :meth:`set_background_svg`.
+
+        Parameters
+        ----------
+        path
+            Path to an SVG file.
+
+        Raises
+        ------
+        FileNotFoundError
+            If *path* does not exist.
+        """
+        svg_data = Path(path).read_bytes()
+        self.set_background_svg(svg_data)
+
+    def clear_background_svg(self) -> None:
+        """Remove the background SVG and revert to solid-colour background.
+
+        All cards are marked dirty so they re-render without the
+        background tiles.
+        """
+        self._bg_svg = None
+        self._bg_tiles = None
+        for card in self._cards:
+            card.mark_dirty()
+
+    def _rasterize_and_slice(self) -> None:
+        """Rasterize the background SVG and slice into per-panel tiles.
+
+        The full-width image is cropped into ``panel_count`` tiles of
+        ``panel_width x panel_height`` each.
+        """
+        if self._bg_svg is None:
+            self._bg_tiles = None
+            return
+
+        from ..render.svg_rasterize import _svg_to_png
+
+        total_width = self._panel_width * self._panel_count
+        total_height = self._panel_height
+
+        png_data = _svg_to_png(self._bg_svg, total_width, total_height)
+        full_img = Image.open(io.BytesIO(png_data)).convert("RGB")
+
+        tiles: list[Image.Image] = []
+        for i in range(self._panel_count):
+            x0 = i * self._panel_width
+            x1 = x0 + self._panel_width
+            tile = full_img.crop((x0, 0, x1, total_height))
+            tiles.append(tile)
+
+        self._bg_tiles = tiles
+        logger.debug(
+            "Background SVG rasterized: %dx%d -> %d tiles of %dx%d",
+            total_width,
+            total_height,
+            self._panel_count,
+            self._panel_width,
+            self._panel_height,
+        )
 
     @property
     def any_dirty(self) -> bool:

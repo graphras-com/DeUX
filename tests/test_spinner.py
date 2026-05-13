@@ -318,3 +318,70 @@ class TestBackgroundNode:
         )
         sf = SpinnerFrames(spec, width=120, height=120)
         assert len(sf.frames) == 2
+
+
+class TestSpinnerWithBgTile:
+    """Spinner frames composited onto a background tile."""
+
+    @patch("deckui.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    def test_rotation_with_bg_tile(self, mock_raster):
+        tile = Image.new("RGB", (120, 120), (255, 0, 0))
+        spec = _make_spec(
+            spinner=SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=4)
+        )
+        sf = SpinnerFrames(spec, width=120, height=120, bg_tile=tile)
+        assert len(sf.frames) == 4
+        for frame_bytes in sf.frames:
+            img = Image.open(io.BytesIO(frame_bytes))
+            assert img.size == (120, 120)
+
+    @patch("deckui.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    def test_pulse_with_bg_tile(self, mock_raster):
+        tile = Image.new("RGB", (120, 120), (0, 255, 0))
+        spec = _make_spec(
+            spinner=SpinnerSpec(type=SpinnerType.PULSE, node="spinner", frames=4)
+        )
+        sf = SpinnerFrames(spec, width=120, height=120, bg_tile=tile)
+        assert len(sf.frames) == 4
+
+    def test_blank_frames_with_bg_tile(self):
+        """Blank fallback frames use the background tile instead of black."""
+        tile = Image.new("RGB", (120, 120), (0, 0, 255))
+        spec = _make_spec(
+            spinner=SpinnerSpec(type=SpinnerType.ROTATION, node="nonexistent", frames=2)
+        )
+        sf = SpinnerFrames(spec, width=120, height=120, bg_tile=tile)
+        for frame_bytes in sf.frames:
+            img = Image.open(io.BytesIO(frame_bytes))
+            r, g, b = img.getpixel((60, 60))
+            assert b > 200
+            assert r < 50
+
+    def test_custom_frames_with_bg_tile(self):
+        """Custom PNG frames are composited onto the background tile."""
+        tile = Image.new("RGB", (120, 120), (255, 0, 0))
+        frame_img = Image.new("RGBA", (120, 120), (0, 255, 0, 128))
+        buf = io.BytesIO()
+        frame_img.save(buf, format="PNG")
+        frame_png = buf.getvalue()
+        spec = _make_spec(
+            spinner=SpinnerSpec(type=SpinnerType.CUSTOM, frames=1),
+            assets={"spinner/frame_00.png": frame_png},
+        )
+        sf = SpinnerFrames(spec, width=120, height=120, bg_tile=tile)
+        assert len(sf.frames) == 1
+
+    def test_gif_frames_with_bg_tile(self):
+        """GIF frames are composited onto the background tile."""
+        tile = Image.new("RGB", (120, 120), (255, 0, 0))
+        f1 = Image.new("RGB", (120, 120), (0, 255, 0))
+        f2 = Image.new("RGB", (120, 120), (0, 0, 255))
+        buf = io.BytesIO()
+        f1.save(buf, format="GIF", save_all=True, append_images=[f2], loop=0)
+        gif_data = buf.getvalue()
+        spec = _make_spec(
+            spinner=SpinnerSpec(type=SpinnerType.CUSTOM, frames=2),
+            assets={"spinner.gif": gif_data},
+        )
+        sf = SpinnerFrames(spec, width=120, height=120, bg_tile=tile)
+        assert len(sf.frames) == 2
