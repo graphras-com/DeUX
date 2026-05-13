@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .controls.encoder_slot import EncoderSlot
@@ -52,6 +53,8 @@ class Screen:
             metrics = RenderMetrics(self._caps)
             self._touch_strip: TouchStrip | None = TouchStrip(
                 panel_count=metrics.panel_count,
+                panel_width=metrics.panel_width,
+                panel_height=metrics.panel_height,
             )
         else:
             self._touch_strip = None
@@ -195,6 +198,63 @@ class Screen:
     def touchstrip_background(self, value: str) -> None:
         if self._touch_strip is not None:
             self._touch_strip.background_color = value
+
+    def set_touchstrip_background_svg(self, svg_data: bytes) -> None:
+        """Set a background SVG for the touchstrip.
+
+        The SVG is rasterized once, sliced into per-panel tiles, and
+        cached.  Cards with transparent areas will show the background
+        through.  When no background SVG is set, the solid
+        :attr:`touchstrip_background` colour is used instead.
+
+        Parameters
+        ----------
+        svg_data
+            Raw SVG content as UTF-8 bytes.
+
+        Raises
+        ------
+        IndexError
+            If the device has no touchscreen.
+        """
+        if self._touch_strip is None:
+            raise IndexError("This device has no touchscreen")
+        self._touch_strip.set_background_svg(svg_data)
+
+    def set_touchstrip_background_svg_from_file(self, path: str | Path) -> None:
+        """Load a touchstrip background SVG from a file path.
+
+        Convenience wrapper around :meth:`set_touchstrip_background_svg`.
+
+        Parameters
+        ----------
+        path
+            Path to an SVG file.
+
+        Raises
+        ------
+        IndexError
+            If the device has no touchscreen.
+        FileNotFoundError
+            If *path* does not exist.
+        """
+        if self._touch_strip is None:
+            raise IndexError("This device has no touchscreen")
+        self._touch_strip.set_background_svg_from_file(path)
+
+    def clear_touchstrip_background_svg(self) -> None:
+        """Remove the touchstrip background SVG.
+
+        Reverts to the solid :attr:`touchstrip_background` colour.
+
+        Raises
+        ------
+        IndexError
+            If the device has no touchscreen.
+        """
+        if self._touch_strip is None:
+            raise IndexError("This device has no touchscreen")
+        self._touch_strip.clear_background_svg()
 
     @property
     def cards(self) -> list[Card]:

@@ -27,6 +27,10 @@ class SpinnerFrames:
     Frames are generated lazily on first access and cached for the
     lifetime of the instance.
 
+    When a *bg_tile* is provided, each frame is composited onto the
+    background tile before encoding so that transparent regions of
+    the spinner reveal the touchstrip background underneath.
+
     Parameters
     ----------
     spec
@@ -37,6 +41,10 @@ class SpinnerFrames:
         Target image height in pixels.
     image_format
         Encoding format (``"JPEG"`` or ``"BMP"``).
+    rendered_svg
+        Optional pre-rendered SVG source with bindings already applied.
+    bg_tile
+        Optional RGB background tile to composite frames onto.
     """
 
     def __init__(
@@ -46,6 +54,7 @@ class SpinnerFrames:
         height: int,
         image_format: str = "JPEG",
         rendered_svg: str | None = None,
+        bg_tile: Image.Image | None = None,
     ) -> None:
         if spec.spinner is None:
             raise ValueError("PackageSpec has no spinner configuration")
@@ -55,6 +64,7 @@ class SpinnerFrames:
         self._height = height
         self._image_format = image_format
         self._rendered_svg = rendered_svg
+        self._bg_tile = bg_tile
         self._cached_frames: list[bytes] | None = None
 
     @property
@@ -201,8 +211,7 @@ class SpinnerFrames:
                 img = img.resize(
                     (self._width, self._height), Image.Resampling.LANCZOS
                 )
-            if img.mode != "RGB":
-                img = img.convert("RGB")
+            img = self._composite_on_bg(img)
             frames.append(_encode_image(img, self._image_format))
         return frames
 
@@ -229,8 +238,7 @@ class SpinnerFrames:
                     frame = frame.resize(
                         (self._width, self._height), Image.Resampling.LANCZOS
                     )
-                if frame.mode != "RGB":
-                    frame = frame.convert("RGB")
+                frame = self._composite_on_bg(frame)
                 frames.append(_encode_image(frame, self._image_format))
                 gif.seek(gif.tell() + 1)
         except EOFError:
@@ -244,14 +252,46 @@ class SpinnerFrames:
     def _blank_frames(self) -> list[bytes]:
         """Return a list of blank encoded frames as fallback.
 
+        When a background tile is set, blank frames show the background
+        tile instead of solid black.
+
         Returns
         -------
         list[bytes]
-            Black frames, one per configured spinner frame count.
+            Blank or background-filled frames, one per configured spinner
+            frame count.
         """
-        blank = Image.new("RGB", (self._width, self._height), "black")
-        data = _encode_image(blank, self._image_format)
+        if self._bg_tile is not None:
+            data = _encode_image(self._bg_tile.copy(), self._image_format)
+        else:
+            blank = Image.new("RGB", (self._width, self._height), "black")
+            data = _encode_image(blank, self._image_format)
         return [data] * self._spinner.frames
+
+    def _composite_on_bg(self, img: Image.Image) -> Image.Image:
+        """Composite a frame onto the background tile if available.
+
+        Parameters
+        ----------
+        img
+            The frame image (RGB or RGBA).
+
+        Returns
+        -------
+        Image.Image
+            An RGB image, composited onto the background tile when one
+            is set, or the original image converted to RGB otherwise.
+        """
+        if self._bg_tile is not None:
+            base = self._bg_tile.copy()
+            if img.mode == "RGBA":
+                base.paste(img, mask=img)
+            else:
+                base.paste(img)
+            return base
+        if img.mode != "RGB":
+            return img.convert("RGB")
+        return img
 
     def _rasterise(self, root: ET.Element) -> bytes:
         """Rasterise an SVG element tree to encoded image bytes.
@@ -270,7 +310,8 @@ class SpinnerFrames:
 
         svg_bytes = ET.tostring(root, encoding="unicode", xml_declaration=True)
         png_data = _svg_to_png(svg_bytes.encode("utf-8"), self._width, self._height)
-        img = Image.open(io.BytesIO(png_data)).convert("RGB")
+        img = Image.open(io.BytesIO(png_data)).convert("RGBA")
+        img = self._composite_on_bg(img)
         return _encode_image(img, self._image_format)
 
     @staticmethod

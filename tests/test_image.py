@@ -12,6 +12,7 @@ from deckui.render.key_renderer import (
     render_key_image,
 )
 from deckui.render.touch_renderer import (
+    compose_card_with_background,
     compose_touchstrip,
     render_blank_touchscreen,
 )
@@ -195,3 +196,165 @@ class TestEncodeImage:
         img = Image.new("RGB", (10, 10), "red")
         result = _encode_image(img, image_format="BMP")
         assert result[:2] == b"BM"
+
+
+class TestComposeTouchstripWithBgTiles:
+    """Tests for compose_touchstrip with bg_tiles parameter."""
+
+    def _full_args(self) -> dict[str, int]:
+        return {
+            "touchscreen_width": TOUCHSCREEN_SIZE[0],
+            "touchscreen_height": TOUCHSCREEN_SIZE[1],
+            "panel_count": 4,
+            "panel_width": PANEL_WIDTH,
+        }
+
+    def test_bg_tiles_show_through_none_cards(self):
+        red_tile = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), (255, 0, 0))
+        tiles = [red_tile] * 4
+        result = compose_touchstrip(
+            [None, None, None, None],
+            bg_tiles=tiles,
+            **self._full_args(),
+        )
+        img = _decode_jpeg(result)
+        r, g, b = img.getpixel((100, 50))
+        assert r > 200
+        assert g < 50
+
+    def test_rgba_card_composited_on_tile(self):
+        """An RGBA card with semi-transparent areas reveals the bg tile."""
+        blue_tile = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), (0, 0, 255))
+        tiles = [blue_tile] * 4
+        # Fully transparent card — bg tile should show
+        card = Image.new("RGBA", (PANEL_WIDTH, PANEL_HEIGHT), (255, 0, 0, 0))
+        result = compose_touchstrip(
+            [card, None, None, None],
+            bg_tiles=tiles,
+            **self._full_args(),
+        )
+        img = _decode_jpeg(result)
+        r, g, b = img.getpixel((100, 50))
+        assert b > 200
+        assert r < 50
+
+    def test_opaque_rgba_card_covers_tile(self):
+        blue_tile = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), (0, 0, 255))
+        tiles = [blue_tile] * 4
+        card = Image.new("RGBA", (PANEL_WIDTH, PANEL_HEIGHT), (255, 0, 0, 255))
+        result = compose_touchstrip(
+            [card, None, None, None],
+            bg_tiles=tiles,
+            **self._full_args(),
+        )
+        img = _decode_jpeg(result)
+        r, g, b = img.getpixel((100, 50))
+        assert r > 200
+        assert b < 50
+
+    def test_rgb_card_with_bg_tiles(self):
+        """RGB card (no alpha) replaces the bg tile entirely."""
+        blue_tile = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), (0, 0, 255))
+        tiles = [blue_tile] * 4
+        card = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), (0, 255, 0))
+        result = compose_touchstrip(
+            [card, None, None, None],
+            bg_tiles=tiles,
+            **self._full_args(),
+        )
+        img = _decode_jpeg(result)
+        r, g, b = img.getpixel((100, 50))
+        assert g > 200
+
+    def test_partial_tiles_list(self):
+        """bg_tiles shorter than panel_count — extra panels use background colour."""
+        red_tile = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), (255, 0, 0))
+        result = compose_touchstrip(
+            [None, None, None, None],
+            bg_tiles=[red_tile],  # Only 1 tile for 4 panels
+            **self._full_args(),
+        )
+        img = _decode_jpeg(result)
+        # Panel 0 should be red (tile)
+        r, _, _ = img.getpixel((100, 50))
+        assert r > 200
+        # Panel 1 should be black (fallback)
+        r2, g2, b2 = img.getpixel((300, 50))
+        assert r2 < 10 and g2 < 10 and b2 < 10
+
+
+class TestComposeCardWithBackground:
+    """Tests for single-card compositing."""
+
+    def test_with_bg_tile_transparent_card(self):
+        tile = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), (0, 0, 255))
+        card = Image.new("RGBA", (PANEL_WIDTH, PANEL_HEIGHT), (0, 0, 0, 0))
+        result = compose_card_with_background(
+            card,
+            bg_tile=tile,
+            panel_width=PANEL_WIDTH,
+            panel_height=PANEL_HEIGHT,
+        )
+        img = _decode_jpeg(result)
+        r, g, b = img.getpixel((100, 50))
+        assert b > 200
+
+    def test_with_bg_tile_opaque_card(self):
+        tile = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), (0, 0, 255))
+        card = Image.new("RGBA", (PANEL_WIDTH, PANEL_HEIGHT), (255, 0, 0, 255))
+        result = compose_card_with_background(
+            card,
+            bg_tile=tile,
+            panel_width=PANEL_WIDTH,
+            panel_height=PANEL_HEIGHT,
+        )
+        img = _decode_jpeg(result)
+        r, g, b = img.getpixel((100, 50))
+        assert r > 200
+        assert b < 50
+
+    def test_none_card_with_bg_tile(self):
+        tile = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), (0, 255, 0))
+        result = compose_card_with_background(
+            None,
+            bg_tile=tile,
+            panel_width=PANEL_WIDTH,
+            panel_height=PANEL_HEIGHT,
+        )
+        img = _decode_jpeg(result)
+        _, g, _ = img.getpixel((100, 50))
+        assert g > 200
+
+    def test_no_tile_no_card(self):
+        result = compose_card_with_background(
+            None,
+            panel_width=PANEL_WIDTH,
+            panel_height=PANEL_HEIGHT,
+        )
+        img = _decode_jpeg(result)
+        r, g, b = img.getpixel((100, 50))
+        assert r < 10 and g < 10 and b < 10
+
+    def test_no_tile_with_card(self):
+        card = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), (255, 0, 0))
+        result = compose_card_with_background(
+            card,
+            panel_width=PANEL_WIDTH,
+            panel_height=PANEL_HEIGHT,
+        )
+        img = _decode_jpeg(result)
+        r, _, _ = img.getpixel((100, 50))
+        assert r > 200
+
+    def test_rgba_card_no_tile_on_colored_bg(self):
+        card = Image.new("RGBA", (PANEL_WIDTH, PANEL_HEIGHT), (0, 0, 0, 0))
+        result = compose_card_with_background(
+            card,
+            background="#ff0000",
+            panel_width=PANEL_WIDTH,
+            panel_height=PANEL_HEIGHT,
+        )
+        img = _decode_jpeg(result)
+        r, g, b = img.getpixel((100, 50))
+        assert r > 200
+        assert g < 50

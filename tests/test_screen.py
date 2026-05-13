@@ -208,3 +208,46 @@ class TestPageSetCard:
         screen = Screen("mini", STREAM_DECK_MINI)
         with pytest.raises(IndexError, match="no touchscreen"):
             screen.set_card(0, BlankCard())
+
+
+class TestScreenTouchstripBackgroundSvg:
+    """Tests for the Screen-level background SVG API."""
+
+    @staticmethod
+    def _make_svg() -> bytes:
+        return (
+            b'<svg xmlns="http://www.w3.org/2000/svg" width="800" height="100">'
+            b'<rect width="800" height="100" fill="red"/>'
+            b"</svg>"
+        )
+
+    def test_set_background_svg(self, page: Screen):
+        page.set_touchstrip_background_svg(self._make_svg())
+        assert page.touch_strip is not None
+        assert page.touch_strip.bg_tiles is not None
+
+    def test_clear_background_svg(self, page: Screen):
+        page.set_touchstrip_background_svg(self._make_svg())
+        page.clear_touchstrip_background_svg()
+        assert page.touch_strip.bg_tiles is None
+
+    def test_set_background_svg_from_file(self, page: Screen, tmp_path):
+        svg_file = tmp_path / "bg.svg"
+        svg_file.write_bytes(self._make_svg())
+        page.set_touchstrip_background_svg_from_file(svg_file)
+        assert page.touch_strip.bg_tiles is not None
+
+    def test_no_touchscreen_set(self):
+        screen = Screen("mini", STREAM_DECK_MINI)
+        with pytest.raises(IndexError, match="no touchscreen"):
+            screen.set_touchstrip_background_svg(self._make_svg())
+
+    def test_no_touchscreen_clear(self):
+        screen = Screen("mini", STREAM_DECK_MINI)
+        with pytest.raises(IndexError, match="no touchscreen"):
+            screen.clear_touchstrip_background_svg()
+
+    def test_no_touchscreen_file(self):
+        screen = Screen("mini", STREAM_DECK_MINI)
+        with pytest.raises(IndexError, match="no touchscreen"):
+            screen.set_touchstrip_background_svg_from_file("/fake.svg")

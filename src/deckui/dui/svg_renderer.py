@@ -1049,6 +1049,10 @@ class SvgRenderer:
     def _rasterise(self, svg_data: bytes) -> Image.Image:
         """Rasterise SVG bytes to a PIL Image via CairoSVG.
 
+        The image is returned in RGBA mode so that transparent regions
+        in the SVG are preserved.  This allows compositing onto a
+        background tile when a touchstrip background SVG is active.
+
         Parameters
         ----------
         svg_data : bytes
@@ -1057,7 +1061,7 @@ class SvgRenderer:
         Returns
         -------
         Image.Image
-            An RGB :class:`~PIL.Image.Image` at the SVG's native dimensions.
+            An RGBA :class:`~PIL.Image.Image` at the SVG's native dimensions.
         """
         from ..render.svg_rasterize import _svg_to_png
 
@@ -1065,4 +1069,4 @@ class SvgRenderer:
         height = int(float(self._base_root.get("height", "98")))
 
         png_data = _svg_to_png(svg_data, width, height)
-        return Image.open(io.BytesIO(png_data)).convert("RGB")
+        return Image.open(io.BytesIO(png_data)).convert("RGBA")

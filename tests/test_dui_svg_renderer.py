@@ -308,7 +308,7 @@ class TestSvgRendererRender:
         renderer = SvgRenderer(spec)
         img = renderer.render()
         assert isinstance(img, Image.Image)
-        assert img.mode == "RGB"
+        assert img.mode == "RGBA"
         assert img.size == (100, 50)
 
     def test_text_binding_applied(self):
@@ -1041,7 +1041,7 @@ class TestSvgRendererToggleRender:
         renderer = SvgRenderer(spec)
         img = renderer.render()
         assert isinstance(img, Image.Image)
-        assert img.mode == "RGB"
+        assert img.mode == "RGBA"
         assert img.size == (100, 50)
 
     def test_toggle_missing_node_on_logs_warning(self, caplog):
@@ -1542,7 +1542,7 @@ class TestSvgRendererWrappedText:
         renderer.set("label", "Arthur Olsen's Favorites")
         img = renderer.render()
         assert isinstance(img, Image.Image)
-        assert img.mode == "RGB"
+        assert img.mode == "RGBA"
         assert img.size == (106, 106)
 
     def test_wrap_different_text_different_pixels(self):
@@ -1768,7 +1768,7 @@ class TestIconifyBindingRendering:
         renderer = SvgRenderer(spec)
         img = renderer.render()
         assert isinstance(img, Image.Image)
-        assert img.mode == "RGB"
+        assert img.mode == "RGBA"
         assert img.size == (106, 106)
 
     def test_set_same_value_no_change(self, monkeypatch):
