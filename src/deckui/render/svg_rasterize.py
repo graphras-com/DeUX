@@ -4,12 +4,22 @@ Built-in backends: ``cairo`` (CairoSVG), ``pyvips``, and ``rsvg-cli``
 (subprocess).  Third-party backends can be registered at runtime via
 :func:`register_svg_backend`.
 
+An application-wide CSS stylesheet can be set via
+:func:`set_svg_stylesheet`.  It is applied to every SVG before
+rasterisation — natively for pyvips, or by injecting a ``<style>``
+element for other backends.
+
 Examples
 --------
 Select a specific backend::
 
     from deckui import set_svg_backend
     set_svg_backend("pyvips")
+
+Set a global CSS stylesheet::
+
+    from deckui import set_svg_stylesheet
+    set_svg_stylesheet(\"\"\".text-primary { color: #ff0000; }\"\"\")
 
 Register a custom backend::
 
@@ -29,6 +39,7 @@ import logging
 import os
 import platform
 import subprocess
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
@@ -145,7 +156,14 @@ class PyvipsRasterizer:
     module can be imported even when pyvips is not installed.
     """
 
-    def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
+    def rasterize(
+        self,
+        svg_data: bytes,
+        width: int,
+        height: int,
+        *,
+        stylesheet: str | None = None,
+    ) -> bytes:
         """Rasterise *svg_data* to PNG via ``pyvips``.
 
         Parameters
@@ -156,6 +174,10 @@ class PyvipsRasterizer:
             Desired output width in pixels.
         height : int
             Desired output height in pixels.
+        stylesheet : str or None, optional
+            CSS stylesheet text to apply during rasterisation.  Passed
+            to ``pyvips.Image.svgload_buffer`` as the ``stylesheet``
+            parameter (requires librsvg >= 2.48).
 
         Returns
         -------
@@ -175,7 +197,11 @@ class PyvipsRasterizer:
             # by raising the pyvips logger threshold to WARNING.
             logging.getLogger("pyvips").setLevel(logging.WARNING)
 
-            image = pyvips.Image.svgload_buffer(svg_data)
+            load_kwargs: dict[str, str] = {}
+            if stylesheet is not None:
+                load_kwargs["stylesheet"] = stylesheet
+
+            image = pyvips.Image.svgload_buffer(svg_data, **load_kwargs)
             # Scale to fit the requested dimensions.
             h_scale = width / image.width
             v_scale = height / image.height
@@ -240,6 +266,7 @@ class RsvgCliRasterizer:
 
 _registry: dict[str, SvgRasterizer] = {}
 _active_backend: str | None = None
+_active_stylesheet: str | None = None
 
 
 def register_svg_backend(name: str, backend: SvgRasterizer) -> None:
@@ -327,6 +354,127 @@ def list_svg_backends() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Application-wide CSS stylesheet
+# ---------------------------------------------------------------------------
+
+
+def set_svg_stylesheet(css: str | None) -> None:
+    """Set an application-wide CSS stylesheet for SVG rasterisation.
+
+    The stylesheet is applied to every SVG before rasterisation.  When
+    the pyvips backend is active, the CSS is passed via the native
+    ``stylesheet`` parameter (requires librsvg >= 2.48).  For all other
+    backends the CSS is injected as a ``<style>`` element **before** any
+    existing ``<style>`` elements in the SVG, so that per-package styles
+    can override the application defaults.
+
+    Pass ``None`` to clear the stylesheet.
+
+    Parameters
+    ----------
+    css : str or None
+        Raw CSS text, or ``None`` to remove a previously set stylesheet.
+
+    Examples
+    --------
+    ::
+
+        from deckui import set_svg_stylesheet
+
+        set_svg_stylesheet(\"\"\"
+            .text-primary { color: #ff0000; }
+        \"\"\")
+    """
+    global _active_stylesheet  # noqa: PLW0603
+    _active_stylesheet = css
+    logger.debug(
+        "SVG stylesheet %s",
+        "cleared" if css is None else f"set ({len(css)} chars)",
+    )
+
+
+def get_svg_stylesheet() -> str | None:
+    """Return the currently active application-wide CSS stylesheet.
+
+    Returns
+    -------
+    str or None
+        The CSS text set via :func:`set_svg_stylesheet`, or ``None``
+        if no stylesheet is active.
+    """
+    return _active_stylesheet
+
+
+def load_svg_stylesheet(path: str | Path) -> None:
+    """Load a CSS stylesheet from a file and set it as the active stylesheet.
+
+    This is a convenience wrapper around :func:`set_svg_stylesheet` that
+    reads the CSS text from *path* and applies it application-wide.
+
+    Parameters
+    ----------
+    path : str or Path
+        Path to a CSS file (UTF-8 encoded).
+
+    Raises
+    ------
+    FileNotFoundError
+        If *path* does not exist.
+    IsADirectoryError
+        If *path* is a directory.
+
+    Examples
+    --------
+    ::
+
+        from deckui import load_svg_stylesheet
+
+        load_svg_stylesheet("assets/theme.css")
+    """
+    css = Path(path).read_text(encoding="utf-8")
+    set_svg_stylesheet(css)
+
+
+_SVG_NS = "http://www.w3.org/2000/svg"
+
+
+def _inject_stylesheet(svg_data: bytes, css: str) -> bytes:
+    """Inject a ``<style>`` element into SVG bytes as the first child.
+
+    The ``<style>`` element is inserted as the **first child** of the
+    root ``<svg>`` element, before any existing ``<style>`` or ``<defs>``
+    elements.  This ensures that per-package styles (defined later in
+    the document) take precedence in the CSS cascade.
+
+    Parameters
+    ----------
+    svg_data : bytes
+        Raw SVG content (UTF-8).
+    css : str
+        CSS text to inject.
+
+    Returns
+    -------
+    bytes
+        Modified SVG content with the stylesheet injected.
+    """
+    # Register the SVG namespace so ET doesn't emit ns0: prefixes.
+    ET.register_namespace("", _SVG_NS)
+    ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
+
+    root = ET.fromstring(svg_data)  # noqa: S314
+
+    style_elem = ET.Element(f"{{{_SVG_NS}}}style")
+    style_elem.set("type", "text/css")
+    style_elem.text = css
+
+    # Insert as first child so existing <style> elements override it.
+    root.insert(0, style_elem)
+
+    return ET.tostring(root, encoding="unicode", xml_declaration=False).encode("utf-8")
+
+
+# ---------------------------------------------------------------------------
 # Auto-fallback ordering
 # ---------------------------------------------------------------------------
 
@@ -337,7 +485,12 @@ def _svg_to_png(svg_data: bytes, width: int, height: int) -> bytes:
     """Convert SVG bytes to PNG bytes using the active backend.
 
     When the backend is ``"auto"`` (the default), tries each registered
-    backend in order: cairo -> pyvips -> rsvg-cli.
+    backend in order: pyvips -> cairo -> rsvg-cli.
+
+    If an application-wide stylesheet has been set via
+    :func:`set_svg_stylesheet`, it is applied before rasterisation.
+    For the pyvips backend the stylesheet is passed natively; for all
+    other backends it is injected as a ``<style>`` element.
 
     Parameters
     ----------
@@ -360,18 +513,22 @@ def _svg_to_png(svg_data: bytes, width: int, height: int) -> bytes:
         fails.
     """
     backend_name = _active_backend or "auto"
+    css = _active_stylesheet
 
     if backend_name != "auto":
-        return _registry[backend_name].rasterize(svg_data, width, height)
+        backend = _registry[backend_name]
+        return _rasterize_with_stylesheet(backend, backend_name, svg_data, width, height, css)
 
     # Auto mode: try backends in order, collecting errors.
     errors: list[str] = []
     for name in _AUTO_ORDER:
-        backend = _registry.get(name)
-        if backend is None:
+        auto_backend = _registry.get(name)
+        if auto_backend is None:
             continue
         try:
-            return backend.rasterize(svg_data, width, height)
+            return _rasterize_with_stylesheet(
+                auto_backend, name, svg_data, width, height, css
+            )
         except RasterizeError as exc:
             logger.debug("Backend %r failed: %s", name, exc)
             errors.append(f"  - {name}: {exc}")
@@ -386,6 +543,49 @@ def _svg_to_png(svg_data: bytes, width: int, height: int) -> bytes:
         "  - Python package: pip install pyvips\n"
         "\nBackend errors:\n" + error_detail
     )
+
+
+def _rasterize_with_stylesheet(
+    backend: SvgRasterizer,
+    name: str,
+    svg_data: bytes,
+    width: int,
+    height: int,
+    css: str | None,
+) -> bytes:
+    """Rasterise SVG data, applying the stylesheet appropriately.
+
+    For the pyvips backend, the stylesheet is passed via the native
+    ``stylesheet`` keyword argument.  For all other backends the
+    stylesheet is injected as a ``<style>`` element into the SVG data.
+
+    Parameters
+    ----------
+    backend : SvgRasterizer
+        The rasterisation backend instance.
+    name : str
+        The registered name of the backend.
+    svg_data : bytes
+        Raw SVG content.
+    width : int
+        Desired output width in pixels.
+    height : int
+        Desired output height in pixels.
+    css : str or None
+        CSS stylesheet text, or ``None`` if no stylesheet is active.
+
+    Returns
+    -------
+    bytes
+        Rasterised PNG image bytes.
+    """
+    if css is not None and name == "pyvips" and isinstance(backend, PyvipsRasterizer):
+        return backend.rasterize(svg_data, width, height, stylesheet=css)
+
+    if css is not None:
+        svg_data = _inject_stylesheet(svg_data, css)
+
+    return backend.rasterize(svg_data, width, height)
 
 
 # ---------------------------------------------------------------------------
