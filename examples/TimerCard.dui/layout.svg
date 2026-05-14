@@ -1,7 +1,66 @@
 <svg id="TimerCard" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100" width="200" height="100" font-family="'Frutiger Linotype'">
-    <!--
-    <rect id="background" color="#1c1c1c" x="0" y="0" width="200" height="100" fill="currentColor"/>
-    -->
+  <style>
+    .background-dark {
+      color: rgb(20, 20, 21);
+    }
+
+    .background-light {
+      color: rgb(61.1804878049, 61.1804878049, 64.2395121951);
+    }
+
+    .text-primary {
+      color: rgb(232.5489539749, 236.1207112971, 246.9635460251);
+    }
+
+    .text-secondary {
+      color: rgb(105.3263598326, 129.1380753138, 201.4236401674);
+    }
+
+    .text-selected {
+      color: rgb(225.0652719665, 229.8276150628, 244.2847280335);
+    }
+
+    .text-muted {
+      color: rgb(134.8902439024, 134.8902439024, 140.6097560976);
+    }
+
+    .text-fancy {
+      color: rgb(201.4236401674, 177.6119246862, 105.3263598326);
+    }
+
+    .border-primary {
+      color: rgb(134.8902439024, 134.8902439024, 140.6097560976);
+    }
+
+    .border-secondary {
+      color: rgb(65.756097561, 65.756097561, 69.043902439);
+    }
+
+    .icon {
+      color: rgb(111.512195122, 111.512195122, 117.087804878);
+    }
+
+    .icon-active {
+      color: rgb(201.4236401674, 177.6119246862, 105.3263598326);
+    }
+
+    .icon-inactive {
+      color: rgb(111.512195122, 111.512195122, 117.087804878);
+    }
+
+    .sliders {
+      color: rgb(201.4236401674, 177.6119246862, 105.3263598326);
+    }
+
+    .dynamic {
+      color: rgb(201.4236401674, 177.6119246862, 105.3263598326);
+    }
+  </style>
+  <defs>
+    <filter id="shadow" x="-100%" y="-100%" width="200%" height="200%">
+      <feDropShadow dx="-1" dy="-1" stdDeviation="3" flood-color="black" flood-opacity=".5"/>
+    </filter>
+  </defs>
     <g id="foreground" color="#dedede" transform="translate(100 50)">
         <text id="timer" font-size="30" fill="currentColor" text-anchor="middle" dominant-baseline="middle">00:00:00</text>
     </g>

@@ -58,7 +58,7 @@
   </style>
   <defs>
     <filter id="shadow" x="-100%" y="-100%" width="200%" height="200%">
-      <feDropShadow dx="-1" dy="-1" stdDeviation="1" flood-color="black" flood-opacity=".5"/>
+      <feDropShadow dx="-1" dy="-1" stdDeviation="3" flood-color="black" flood-opacity=".5"/>
     </filter>
     <line id="short_tick" x1="0" y1="-85" x2="0" y2="-90"/>
     <line id="long_tick" x1="0" y1="-85" x2="0" y2="-95"/>

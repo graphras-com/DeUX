@@ -65,7 +65,7 @@
       <rect width="100%" height="100%" fill="url(#fadeGradient)" />
     </mask>
     <filter id="shadow" x="-100%" y="-100%" width="200%" height="200%">
-      <feDropShadow dx="-1" dy="-1" stdDeviation="1" flood-color="black" flood-opacity=".5"/>
+      <feDropShadow dx="-1" dy="-1" stdDeviation="3" flood-color="black" flood-opacity=".5"/>
     </filter>
   </defs>
   <g transform="translate(102 2)">
@@ -74,7 +74,7 @@
   <g transform="translate(4 20)">
       <text id="artist" class="text-secondary" filter="url(#shadow)" x="0" y="0" font-size="20" font-weight="bold" fill="currentColor">The Beatles</text>
       <text id="title" class="text-primary" filter="url(#shadow)" x="0" y="18" font-size="16" fill="currentColor">Come Together</text>
-      <text id="album" class="text-fancy" filter="url(#shadow)" x="0" y="32" font-size="12" fill="currentColor">Abbey Road</text>
+      <text id="album" class="text-fancy" filter="url(#shadow)" x="0" y="34" font-size="14" fill="currentColor">Abbey Road</text>
   </g>
   <g transform="translate(4 85)">
       <text id="state" class="text-primary" filter="url(#shadow)" x="0" y="0" font-size="14" fill="currentColor">Stopped</text>

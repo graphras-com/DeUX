@@ -58,7 +58,7 @@
   </style>
   <defs>
     <filter id="shadow" x="-100%" y="-100%" width="200%" height="200%">
-      <feDropShadow dx="-1" dy="-1" stdDeviation="1" flood-color="black" flood-opacity=".5"/>
+      <feDropShadow dx="-1" dy="-1" stdDeviation="3" flood-color="black" flood-opacity=".5"/>
     </filter>
   </defs>
   <text id="date" class="text-secondary" filter="url(#shadow)" x="100" y="17" font-size="20" fill="currentColor" text-anchor="middle" dominant-baseline="middle">Friday, 24 April</text>
