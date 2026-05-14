@@ -47,6 +47,7 @@ class TestPublicAPI:
             "clear_image_cache",
             "fetch_image",
             "get_svg_backend",
+            "get_svg_stylesheet",
             "list_devices",
             "list_dui_packages",
             "list_svg_backends",
@@ -56,6 +57,7 @@ class TestPublicAPI:
             "remove_dui_path",
             "resolve_dui",
             "set_svg_backend",
+            "set_svg_stylesheet",
         }
         assert set(deckui.__all__) == expected
 

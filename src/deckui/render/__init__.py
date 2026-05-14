@@ -11,9 +11,11 @@ from .svg_rasterize import (
     RasterizeError,
     SvgRasterizer,
     get_svg_backend,
+    get_svg_stylesheet,
     list_svg_backends,
     register_svg_backend,
     set_svg_backend,
+    set_svg_stylesheet,
 )
 from .touch_renderer import (
     compose_touchstrip,
@@ -29,6 +31,7 @@ __all__ = [
     "compose_touchstrip",
     "fetch_image",
     "get_svg_backend",
+    "get_svg_stylesheet",
     "list_svg_backends",
     "register_svg_backend",
     "render_blank_key",
@@ -36,4 +39,5 @@ __all__ = [
     "render_info_screen",
     "render_key_image",
     "set_svg_backend",
+    "set_svg_stylesheet",
 ]

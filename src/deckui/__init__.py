@@ -49,9 +49,11 @@ from .render import (
     clear_image_cache,
     fetch_image,
     get_svg_backend,
+    get_svg_stylesheet,
     list_svg_backends,
     register_svg_backend,
     set_svg_backend,
+    set_svg_stylesheet,
 )
 from .runtime import (
     AsyncEvent,
@@ -115,6 +117,7 @@ __all__ = [
     "clear_image_cache",
     "fetch_image",
     "get_svg_backend",
+    "get_svg_stylesheet",
     "list_devices",
     "list_dui_packages",
     "list_svg_backends",
@@ -124,6 +127,7 @@ __all__ = [
     "remove_dui_path",
     "resolve_dui",
     "set_svg_backend",
+    "set_svg_stylesheet",
 ]
 
 from deckui._version import __version__
