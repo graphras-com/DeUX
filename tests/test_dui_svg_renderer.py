@@ -1232,10 +1232,19 @@ class TestLoadFont:
         _load_font.cache_clear()
         _font_file_index.cache_clear()
 
-        # Create a fake .ttf — we use a real font file's bytes to avoid
-        # FreeType parse errors.  Copy Arial (or default) bytes.
-        real_font = ImageFont.truetype("Arial", 12)
-        font_path = real_font.path  # type: ignore[attr-defined]
+        # Find any usable TrueType font file on this system.
+        font_path = None
+        for candidate in [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Ubuntu CI
+            "Arial",  # macOS / Windows
+        ]:
+            try:
+                font_path = ImageFont.truetype(candidate, 12).path  # type: ignore[attr-defined]
+                break
+            except OSError:
+                continue
+        if font_path is None:
+            pytest.skip("No TrueType font available on this system")
 
         fake_dir = tmp_path / "fonts"
         fake_dir.mkdir()
