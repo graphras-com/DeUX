@@ -405,6 +405,36 @@ def get_svg_stylesheet() -> str | None:
     return _active_stylesheet
 
 
+def load_svg_stylesheet(path: str | Path) -> None:
+    """Load a CSS stylesheet from a file and set it as the active stylesheet.
+
+    This is a convenience wrapper around :func:`set_svg_stylesheet` that
+    reads the CSS text from *path* and applies it application-wide.
+
+    Parameters
+    ----------
+    path : str or Path
+        Path to a CSS file (UTF-8 encoded).
+
+    Raises
+    ------
+    FileNotFoundError
+        If *path* does not exist.
+    IsADirectoryError
+        If *path* is a directory.
+
+    Examples
+    --------
+    ::
+
+        from deckui import load_svg_stylesheet
+
+        load_svg_stylesheet("assets/theme.css")
+    """
+    css = Path(path).read_text(encoding="utf-8")
+    set_svg_stylesheet(css)
+
+
 _SVG_NS = "http://www.w3.org/2000/svg"
 
 

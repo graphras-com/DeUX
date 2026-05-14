@@ -20,6 +20,7 @@ from deckui.render.svg_rasterize import (
     get_svg_backend,
     get_svg_stylesheet,
     list_svg_backends,
+    load_svg_stylesheet,
     register_svg_backend,
     set_svg_backend,
     set_svg_stylesheet,
@@ -528,10 +529,15 @@ class TestStylesheetExports:
 
     def test_render_exports_stylesheet(self):
         """render.__init__ exports stylesheet API."""
-        from deckui.render import get_svg_stylesheet, set_svg_stylesheet
+        from deckui.render import (
+            get_svg_stylesheet,
+            load_svg_stylesheet,
+            set_svg_stylesheet,
+        )
 
         assert callable(set_svg_stylesheet)
         assert callable(get_svg_stylesheet)
+        assert callable(load_svg_stylesheet)
 
     def test_toplevel_exports_stylesheet(self):
         """deckui.__init__ exports stylesheet API."""
@@ -539,3 +545,45 @@ class TestStylesheetExports:
 
         assert callable(deckui.set_svg_stylesheet)
         assert callable(deckui.get_svg_stylesheet)
+        assert callable(deckui.load_svg_stylesheet)
+
+
+class TestLoadSvgStylesheet:
+    """Tests for load_svg_stylesheet — file-based convenience function."""
+
+    def test_loads_css_from_file(self, tmp_path):
+        """load_svg_stylesheet reads a CSS file and sets it as active."""
+        css_file = tmp_path / "theme.css"
+        css_file.write_text(".text-primary { color: red; }", encoding="utf-8")
+
+        load_svg_stylesheet(css_file)
+
+        assert get_svg_stylesheet() == ".text-primary { color: red; }"
+
+    def test_loads_from_string_path(self, tmp_path):
+        """load_svg_stylesheet accepts a string path."""
+        css_file = tmp_path / "style.css"
+        css_file.write_text(".bg { fill: black; }", encoding="utf-8")
+
+        load_svg_stylesheet(str(css_file))
+
+        assert get_svg_stylesheet() == ".bg { fill: black; }"
+
+    def test_file_not_found_raises(self):
+        """load_svg_stylesheet raises FileNotFoundError for missing file."""
+        with pytest.raises(FileNotFoundError):
+            load_svg_stylesheet("/nonexistent/path/theme.css")
+
+    def test_preserves_utf8_content(self, tmp_path):
+        """load_svg_stylesheet preserves UTF-8 content including special chars."""
+        css_file = tmp_path / "unicode.css"
+        css_file.write_text(
+            ".fancy { content: '\u2026\u2014'; }", encoding="utf-8"
+        )
+
+        load_svg_stylesheet(css_file)
+
+        result = get_svg_stylesheet()
+        assert result is not None
+        assert "\u2026" in result
+        assert "\u2014" in result

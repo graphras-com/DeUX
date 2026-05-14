@@ -53,6 +53,7 @@ class TestPublicAPI:
             "list_svg_backends",
             "load_all_packages",
             "load_package",
+            "load_svg_stylesheet",
             "register_svg_backend",
             "remove_dui_path",
             "resolve_dui",
