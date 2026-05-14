@@ -96,6 +96,7 @@ from deckui import (
     DuiCard,
     DuiKey,
     add_dui_path,
+    load_svg_stylesheet
 )
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -106,6 +107,9 @@ log = logging.getLogger(__name__)
 # by name (e.g. ``DuiCard("AudioCard")``).
 EXAMPLES_DIR = Path(__file__).resolve().parent
 add_dui_path(EXAMPLES_DIR)
+
+load_svg_stylesheet(EXAMPLES_DIR.joinpath("assets/theme.css"))
+
 
 # ===========================================================================
 # Time helpers (used by TimerController)
@@ -1125,7 +1129,7 @@ class StreamDeckApp:
 
         if screen.touch_strip is not None:
             screen.touch_strip.background_color = "#1c1c1c"
-            screen.set_touchstrip_background_svg_from_file(EXAMPLES_DIR.joinpath("background.svg"))
+            screen.set_touchstrip_background_svg_from_file(EXAMPLES_DIR.joinpath("assets/background.svg"))
             screen.set_card(0, self.audio.card)
             screen.set_card(1, self.lights.card)
             screen.set_card(2, self.gauge.card)
@@ -1147,7 +1151,7 @@ class StreamDeckApp:
 
         if screen.touch_strip is not None:
             screen.touch_strip.background_color = "#1c1c1c"
-            screen.set_touchstrip_background_svg_from_file(EXAMPLES_DIR.joinpath("background.svg"))
+            screen.set_touchstrip_background_svg_from_file(EXAMPLES_DIR.joinpath("assets/background.svg"))
             screen.set_card(2, self.timer.card)
             screen.set_card(3, self.dashboard.card)
 
