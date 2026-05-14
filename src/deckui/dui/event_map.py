@@ -143,10 +143,16 @@ class EventMap:
             return
 
     async def _hold_delay(self, seconds: float, handler: AsyncHandler) -> None:
-        """Sleep then fire the hold handler if still pressed."""
+        """Sleep then fire the hold handler if still pressed.
+
+        Detaches ``_hold_task`` before invoking the handler so that a
+        subsequent encoder release does not cancel the in-flight handler
+        via :meth:`_cancel_hold_timer`.
+        """
         await asyncio.sleep(seconds)
         if self._pressed:
             self._hold_fired = True
+            self._hold_task = None
             await handler()
 
     def _cancel_hold_timer(self) -> None:

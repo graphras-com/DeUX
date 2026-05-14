@@ -861,7 +861,7 @@ class GaugeController(CardController):
             await self._svc.start()
 
     async def on_attach(self, deck: Deck) -> None:
-        """Start the background drift simulator.
+        """Start the background drift simulator if enabled.
 
         Parameters
         ----------
@@ -870,7 +870,8 @@ class GaugeController(CardController):
             independent of deck state).
         """
         del deck
-        await self._svc.start()
+        if self._svc._simulate:
+            await self._svc.start()
 
     async def on_detach(self) -> None:
         """Stop the background drift simulator."""
@@ -1050,7 +1051,7 @@ class StreamDeckApp:
         self.audio = AudioController(catalog)
         self.lights = LightsController()
         self.timer = TimerController()
-        self.gauge = GaugeController()
+        self.gauge = GaugeController(simulate=False)
         self.dashboard = DashboardController()
         self.favorites = FavoritesController(catalog, self.audio)
         self.scenes = SceneController(scene_defs)
