@@ -8,8 +8,11 @@ import functools
 import io
 import logging
 import math
+import os
+import platform
 import xml.etree.ElementTree as ET
 from contextlib import suppress
+from pathlib import Path
 from typing import Any
 
 from PIL import Image, ImageFont
@@ -196,20 +199,114 @@ def _resolve_font_attrs(root: ET.Element, elem: ET.Element) -> tuple[str, float]
     )
 
 
+def _system_font_dirs() -> list[Path]:
+    """Return platform-specific system font directories.
+
+    Returns
+    -------
+    list[Path]
+        Directories that may contain ``.ttf`` / ``.otf`` font files.
+    """
+    dirs: list[Path] = []
+    system = platform.system()
+    if system == "Darwin":
+        dirs.append(Path.home() / "Library" / "Fonts")
+        dirs.append(Path("/Library/Fonts"))
+        dirs.append(Path("/System/Library/Fonts"))
+        dirs.append(Path("/System/Library/Fonts/Supplemental"))
+    elif system == "Linux":
+        dirs.append(Path.home() / ".local" / "share" / "fonts")
+        dirs.append(Path.home() / ".fonts")
+        dirs.append(Path("/usr/share/fonts"))
+        dirs.append(Path("/usr/local/share/fonts"))
+    elif system == "Windows":  # pragma: no cover
+        windir = Path(os.environ.get("WINDIR", r"C:\Windows"))
+        dirs.append(windir / "Fonts")
+        local = os.environ.get("LOCALAPPDATA")
+        if local:
+            dirs.append(Path(local) / "Microsoft" / "Windows" / "Fonts")
+    return [d for d in dirs if d.is_dir()]
+
+
+@functools.lru_cache(maxsize=1)
+def _font_file_index() -> dict[str, Path]:
+    """Build a lowercase-name-to-path index of system font files.
+
+    Scans platform font directories once and caches the result.
+
+    Returns
+    -------
+    dict[str, Path]
+        Mapping of lowercased font stem names to their file paths.
+    """
+    index: dict[str, Path] = {}
+    for font_dir in _system_font_dirs():
+        try:
+            for entry in font_dir.iterdir():
+                if entry.suffix.lower() in {".ttf", ".otf", ".ttc"}:
+                    index[entry.stem.lower()] = entry
+        except PermissionError:
+            continue
+    return index
+
+
+def _find_font_file(family: str) -> Path | None:
+    """Search system font directories for a font matching *family*.
+
+    Generates candidate file-stem names from the family string and
+    checks them against the cached font file index.
+
+    Parameters
+    ----------
+    family : str
+        Font family name (e.g. ``"Frutiger Linotype"``).
+
+    Returns
+    -------
+    Path or None
+        Path to a matching font file, or ``None`` if not found.
+    """
+    index = _font_file_index()
+    # Build candidate stems: original, without spaces, hyphenated, etc.
+    base = family.lower()
+    candidates = [
+        base,
+        base.replace(" ", ""),
+        base.replace(" ", "-"),
+        base.replace(" ", "_"),
+    ]
+    # Try individual words (e.g. "Frutiger Linotype" -> "frutiger")
+    words = base.split()
+    if len(words) > 1:
+        candidates.extend(words)
+    # Also try without common suffixes
+    for suffix in ("mt", "bold", "italic", "-regular", "-bold"):
+        if base.endswith(suffix):
+            stripped = base[: -len(suffix)].rstrip(" -_")
+            candidates.append(stripped)
+    for stem in dict.fromkeys(candidates):  # deduplicate, preserve order
+        if stem in index:
+            return index[stem]
+    return None
+
+
 @functools.lru_cache(maxsize=32)
 def _load_font(family: str, size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     """Load a TrueType font by family name and size, with fallbacks.
 
-    Tries several name variations.  If all fail, logs a warning and
-    returns Pillow's built-in default font.  Results are cached.
+    First tries Pillow's built-in font name resolution (which works
+    when the OS font API recognises the name).  If that fails, scans
+    platform-specific font directories for a matching ``.ttf`` /
+    ``.otf`` file.
 
     Parameters
     ----------
     family
-        Font family name (e.g. ``"ArialMT"``).
+        Font family name (e.g. ``"ArialMT"``, ``"Frutiger Linotype"``).
     size
         Font size in pixels (integer for cache-key hashability).
     """
+    # 1. Try Pillow's built-in resolution with name variations.
     candidates: list[str] = [family]
     for suffix in ("MT", "Bold", "Italic", "-Regular", "-Bold"):
         if family.endswith(suffix):
@@ -227,6 +324,14 @@ def _load_font(family: str, size: int) -> ImageFont.FreeTypeFont | ImageFont.Ima
             return ImageFont.truetype(name, size)
         except OSError:
             continue
+
+    # 2. Scan system font directories for a matching file.
+    font_path = _find_font_file(family)
+    if font_path is not None:
+        try:
+            return ImageFont.truetype(str(font_path), size)
+        except OSError:
+            pass
 
     logger.warning(
         "Could not load font '%s' at size %d; using Pillow default font. "

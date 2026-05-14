@@ -44,12 +44,6 @@ bindings:
     node: value_text
     default: "50%"
 
-  bar_color:
-    type: color
-    node: volume_bar
-    attribute: fill
-    default: "#dedede"
-
   volume:
     type: range
     node: volume_bar

@@ -438,8 +438,8 @@ class TimerController(CardController):
 
         self._svc = MockTimerService(initial_seconds)
 
-        self._default_background: str = self.card.get("background")
-        self._default_foreground: str = self.card.get("foreground")
+        #self._default_background: str = self.card.get("background")
+        #self._default_foreground: str = self.card.get("foreground")
 
         # ----- bindings -----
         self.card.bind(
@@ -530,6 +530,8 @@ class TimerController(CardController):
         This is pure UI animation -- not a backend state transition --
         so the controller drives the card directly.
         """
+        pass
+        """
         swapped = False
         for _ in range(self.FLASH_COUNT):
             swapped = not swapped
@@ -551,7 +553,7 @@ class TimerController(CardController):
             foreground=self._default_foreground,
         )
         await self.card.request_refresh()
-
+        """
     async def _tick_loop(self) -> None:
         """Drive the service tick once per second."""
         try:
@@ -1145,6 +1147,7 @@ class StreamDeckApp:
 
         if screen.touch_strip is not None:
             screen.touch_strip.background_color = "#1c1c1c"
+            screen.set_touchstrip_background_svg_from_file(EXAMPLES_DIR.joinpath("background.svg"))
             screen.set_card(2, self.timer.card)
             screen.set_card(3, self.dashboard.card)
 
