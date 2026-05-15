@@ -112,8 +112,6 @@ log = logging.getLogger(__name__)
 EXAMPLES_DIR = Path(__file__).resolve().parent
 add_dui_path(EXAMPLES_DIR)
 
-load_svg_stylesheet(EXAMPLES_DIR.joinpath("assets/theme.css"))
-
 # ===========================================================================
 # Time helpers (used by TimerController)
 # ===========================================================================
@@ -956,6 +954,7 @@ class SceneController:
         """
 
         background_class = key.get("background_class")
+        icon_class = key.get("icon_class")
         
         @key.on_event("press")
         async def _press() -> None:
@@ -1134,11 +1133,16 @@ class ThemeGenerator:
         saturation = random.uniform(0.45, 0.85)
         value = random.uniform(0.35, 0.75)
         r, g, b = colorsys.hsv_to_rgb(hue, saturation, value)
+        log.info(f"Random primary color: rgb({round(r * 255)},{round(g * 255)},{round(b * 255)})")
         return self.generate_theme(round(r * 255), round(g * 255), round(b * 255))
 
 # ===========================================================================
 # Application
 # ===========================================================================
+
+tg = ThemeGenerator()
+
+set_svg_stylesheet(tg.generate_theme(39,87,179))
 
 class StreamDeckApp:
     """Top-level demo app -- glues controllers to the deck.

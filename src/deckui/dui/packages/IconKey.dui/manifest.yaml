@@ -20,6 +20,11 @@ bindings:
     default: "Icon Key"
     max_width: 110
 
+  icon_class:
+    type: css_class
+    node: icon
+    default: icon
+
   background_class:
     type: css_class
     node: background
