@@ -955,19 +955,20 @@ class SceneController:
             Scene label, passed to the service on click.
         """
 
-        """
-        bg = key.get("background")
+        background_class = key.get("background_class")
         
         @key.on_event("press")
         async def _press() -> None:
-            key.set("background", "success")
+            log.info("setting background_class to success")
+            key.set("background_class", "success")
             await key.request_refresh()
 
         @key.on_event("release")
         async def _release() -> None:
-            key.set("background", "background-dark")
+            log.info(f"restore background_class to: {background_class}")
+            key.set("background_class", "background-dark")
             await key.request_refresh()
-        """
+        
         key.forward("click", lambda: self._svc.activate(label))
 
 class ScreenCycler:
@@ -1094,7 +1095,9 @@ class ThemeGenerator:
         background = _scl(primary, saturation=-85, lightness=-80)
         analogous_left = _adj(primary, hue=-30)
         complementary = _adj(primary, hue=180)
+        success = _adj(primary, hue=-140)
         warning = _scl(_adj(primary, hue=170), saturation=45, lightness=38)
+        error = _adj(_adj(primary, hue=180), hue=-40)
         text_primary = _scl(primary, lightness=85)
 
         return {
@@ -1108,6 +1111,9 @@ class ThemeGenerator:
             "text-muted": _hex(*_scl(background, lightness=50)),
             "text-selected": _hex(*text_primary),
             "text-fancy": _hex(*complementary),
+            "success": _hex(*success),
+            "warning": _hex(*warning),
+            "error": _hex(*error),
             "icon": _hex(*analogous_left),
             "icon-active": _hex(*warning),
             "icon-inactive": _hex(*_scl(background, lightness=40)),

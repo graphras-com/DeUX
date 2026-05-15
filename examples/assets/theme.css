@@ -1,55 +1,18 @@
-.background-dark {
-  color: rgb(22.205, 23.045, 25.595);
-}
-
-.background-light {
-  color: rgb(60.852848954, 63.1548707113, 70.143151046);
-}
-
-.text-primary {
-  color: rgb(225.0652719665, 229.8276150628, 244.2847280335);
-}
-
-.text-secondary {
-  color: #3F5BB0;
-}
-
-.text-selected {
-  color: rgb(225.0652719665, 229.8276150628, 244.2847280335);
-}
-
-.text-muted {
-  color: rgb(131.2551359833, 135.3163075314, 147.6448640167);
-}
-
-.text-fancy {
-  color: #b0943f;
-}
-
-.border-primary {
-  color: rgb(131.2551359833, 135.3163075314, 147.6448640167);
-}
-
-.border-secondary {
-  color: rgb(65.1470543933, 67.6115230126, 75.0929456067);
-}
-
-.icon {
-  color: rgb(63, 147.5, 176);
-}
-
-.icon-active {
-  color: rgb(230.6406150628, 181.1957099517, 111.3393849372);
-}
-
-.icon-inactive {
-  color: rgb(108.0891087866, 112.1780460251, 124.5908912134);
-}
-
-.sliders {
-  color: #b0943f;
-}
-
-.dynamic {
-  color: #b0943f;
-}
+  .background-dark { color: #0c0c0e; }
+.background-light { color: #35343d; }
+.text-primary { color: #d4d3f2; }
+.text-secondary { color: #211e67; }
+.text-selected { color: #d4d3f2; }
+.text-muted { color: #7d7c90; }
+.text-fancy { color: #64671e; }
+.text-accent { color: #1e4067; }
+.success { color: #33671e; }
+.warning { color: #e2cc32; }
+.error { color: #67391e; }
+.border-primary { color: #7d7c90; }
+.border-secondary { color: #393943; }
+.icon { color: #1e4067; }
+.icon-active { color: #e2cc32; }
+.icon-inactive { color: #666577; }
+.sliders { color: #64671e; }
+.dynamic { color: #64671e; }

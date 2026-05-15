@@ -21,6 +21,7 @@ from .iconify import IconifyError, fetch_icon
 from .schema import (
     Binding,
     ColorBinding,
+    CssClassBinding,
     IconifyBinding,
     ImageBinding,
     ImageFit,
@@ -438,7 +439,7 @@ class SvgRenderer:
         self._range_extents: dict[str, float] = {}
 
         for name, binding in spec.bindings.items():
-            if isinstance(binding, (TextBinding, VisibilityBinding, ColorBinding)):
+            if isinstance(binding, (TextBinding, VisibilityBinding, ColorBinding, CssClassBinding)):
                 self._values[name] = binding.default
             elif isinstance(binding, RangeBinding):
                 self._values[name] = binding.default
@@ -668,6 +669,8 @@ class SvgRenderer:
             self._apply_list(root, elem, binding, value)
         elif isinstance(binding, TransformBinding):
             self._apply_transform(elem, binding, value)
+        elif isinstance(binding, CssClassBinding):
+            self._apply_css_class(elem, value)
 
     def _apply_text(
         self,
@@ -810,6 +813,23 @@ class SvgRenderer:
             elem.attrib.pop("display", None)
         else:
             elem.set("display", "none")
+
+    def _apply_css_class(self, elem: ET.Element, value: Any) -> None:
+        """Set or remove the ``class`` attribute on an SVG element.
+
+        Parameters
+        ----------
+        elem : ET.Element
+            The SVG element to update.
+        value : Any
+            A string class value.  Non-empty strings are set as the
+            ``class`` attribute; empty or ``None`` removes it.
+        """
+        class_str = str(value) if value else ""
+        if class_str:
+            elem.set("class", class_str)
+        else:
+            elem.attrib.pop("class", None)
 
     def _apply_toggle(
         self,

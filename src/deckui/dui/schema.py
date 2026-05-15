@@ -34,6 +34,7 @@ class BindingType(Enum):
     ICONIFY = "iconify"
     LIST = "list"
     TRANSFORM = "transform"
+    CSS_CLASS = "css_class"
 
 
 class OverflowMode(Enum):
@@ -275,6 +276,25 @@ class TransformBinding:
     transforms: tuple[TransformSpec, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class CssClassBinding:
+    """Bind a CSS class string to an SVG element's ``class`` attribute.
+
+    The binding replaces the entire ``class`` attribute value on the
+    target node.  Setting an empty string removes the attribute.
+
+    Parameters
+    ----------
+    node : str
+        ID of the SVG element whose ``class`` attribute is controlled.
+    default : str
+        Initial class value applied when no explicit value has been set.
+    """
+
+    node: str
+    default: str = ""
+
+
 Binding = (
     TextBinding
     | ImageBinding
@@ -286,6 +306,7 @@ Binding = (
     | IconifyBinding
     | ListBinding
     | TransformBinding
+    | CssClassBinding
 )
 
 VALID_SOURCES = frozenset(

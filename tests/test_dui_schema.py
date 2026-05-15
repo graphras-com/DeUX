@@ -11,6 +11,7 @@ from deckui.dui.schema import (
     VALID_SOURCES,
     BindingType,
     ColorBinding,
+    CssClassBinding,
     EventMapping,
     IconifyBinding,
     ImageBinding,
@@ -183,6 +184,22 @@ class TestColorBinding:
     def test_invalid_attribute_raises(self):
         with pytest.raises(ValueError, match="Invalid color attribute"):
             ColorBinding(node="bg", attribute="opacity")
+
+
+class TestCssClassBinding:
+    def test_defaults(self):
+        b = CssClassBinding(node="card")
+        assert b.node == "card"
+        assert b.default == ""
+
+    def test_custom_default(self):
+        b = CssClassBinding(node="card", default="active")
+        assert b.default == "active"
+
+    def test_frozen(self):
+        b = CssClassBinding(node="card")
+        with pytest.raises(AttributeError):
+            b.node = "other"  # type: ignore[misc]
 
 
 class TestRangeDirection:

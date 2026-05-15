@@ -24,6 +24,7 @@ from .schema import (
     Binding,
     BindingType,
     ColorBinding,
+    CssClassBinding,
     EventMapping,
     IconifyBinding,
     ImageBinding,
@@ -291,6 +292,12 @@ def _parse_binding(name: str, raw: dict[str, Any]) -> Binding:
 
     if binding_type == BindingType.TRANSFORM:
         return _parse_transform_binding(name, node, raw)
+
+    if binding_type == BindingType.CSS_CLASS:
+        default_raw = raw.get("default", "")
+        if not isinstance(default_raw, str):
+            raise PackageError(f"Binding '{name}': default must be a string")
+        return CssClassBinding(node=node, default=default_raw)
 
     return ColorBinding(
         node=node,
