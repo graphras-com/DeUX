@@ -510,8 +510,8 @@ class MockGaugeService:
         When ``True``, a background task drifts the value randomly.
     """
 
-    UPDATE_INTERVAL_S = 2.0
-    DRIFT_RANGE = 0.02
+    UPDATE_INTERVAL_S = 1.0
+    DRIFT_RANGE = 0.1
 
     def __init__(
         self,

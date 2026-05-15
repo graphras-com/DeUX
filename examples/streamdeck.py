@@ -75,6 +75,8 @@ import datetime
 import logging
 from pathlib import Path
 from typing import Any
+import random
+import colorsys
 
 from mock_backend import (
     MEDIA_CATALOG,
@@ -86,6 +88,7 @@ from mock_backend import (
     MockScenesService,
     MockTimerService,
 )
+
 from PIL import Image
 
 from deckui import (
@@ -96,7 +99,8 @@ from deckui import (
     DuiCard,
     DuiKey,
     add_dui_path,
-    load_svg_stylesheet
+    load_svg_stylesheet,
+    set_svg_stylesheet,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -109,7 +113,6 @@ EXAMPLES_DIR = Path(__file__).resolve().parent
 add_dui_path(EXAMPLES_DIR)
 
 load_svg_stylesheet(EXAMPLES_DIR.joinpath("assets/theme.css"))
-
 
 # ===========================================================================
 # Time helpers (used by TimerController)
@@ -588,6 +591,7 @@ class DashboardController(CardController):
     def __init__(self) -> None:
         self._deck: Deck | None = None
         self._clock_task: asyncio.Task[None] | None = None
+        self._theme_generator = ThemeGenerator()
 
         self.card = DuiCard("DashboardCard")
 
@@ -617,6 +621,7 @@ class DashboardController(CardController):
         # ----- DUI handlers route through the deck (deck-owned state) -----
         self.card.forward("brightness_up", self._brightness_up)
         self.card.forward("brightness_down", self._brightness_down)
+        self.card.forward("change_theme", self._change_theme)
 
     @property
     def brightness(self) -> int:
@@ -700,6 +705,17 @@ class DashboardController(CardController):
         await self._deck.set_brightness(
             self._deck.brightness - abs(steps) * self.BRIGHTNESS_STEP
         )
+
+    async def _change_theme(self) -> None:
+        """Generate and apply a random theme on encoder hold."""
+        if self._deck is None:
+            return
+        css = self._theme_generator.generate_random_theme()
+        set_svg_stylesheet(css)
+        screen = self._deck.active_screen
+        if screen is not None:
+            screen.mark_all_dirty()
+        log.info("Applied new random theme")
 
     async def _clock_loop(self) -> None:
         """Refresh the clock display every second.
@@ -893,6 +909,7 @@ class SceneController:
 
     def __init__(self, scenes: list[dict[str, str]]) -> None:
         self._scenes = scenes
+        self._theme_generator = ThemeGenerator()
         self._svc = MockScenesService()
         self._keys: list[DuiKey] = []
 
@@ -1022,6 +1039,95 @@ class ScreenCycler:
         target = self._screens[(idx + 1) % len(self._screens)]
         log.info("Cycling to screen: %s", target)
         await self._deck.set_screen(target)
+
+# ===========================================================================
+# Theme Generator
+# ===========================================================================
+
+class ThemeGenerator:
+    def __init__(self, scss_path: str | None = None):
+        pass
+
+    # --- colour math (operates on float RGB 0-255 tuples) ---
+
+    @staticmethod
+    def _rgb_to_hsl(r: float, g: float, b: float) -> tuple[float, float, float]:
+        h, l, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
+        return h * 360, s * 100, l * 100
+
+    @staticmethod
+    def _hsl_to_rgb(h: float, s: float, l: float) -> tuple[float, float, float]:
+        r, g, b = colorsys.hls_to_rgb(h / 360, l / 100, s / 100)
+        return r * 255, g * 255, b * 255
+
+    @staticmethod
+    def _adjust(rgb: tuple[float, ...], hue: float = 0) -> tuple[float, float, float]:
+        h, s, l = ThemeGenerator._rgb_to_hsl(*rgb)
+        return ThemeGenerator._hsl_to_rgb((h + hue) % 360, s, l)
+
+    @staticmethod
+    def _scale(rgb: tuple[float, ...], saturation: float = 0, lightness: float = 0) -> tuple[float, float, float]:
+        h, s, l = ThemeGenerator._rgb_to_hsl(*rgb)
+        if saturation > 0:
+            s += (100 - s) * saturation / 100
+        elif saturation < 0:
+            s += s * saturation / 100
+        if lightness > 0:
+            l += (100 - l) * lightness / 100
+        elif lightness < 0:
+            l += l * lightness / 100
+        return ThemeGenerator._hsl_to_rgb(h, max(0, min(100, s)), max(0, min(100, l)))
+
+    @staticmethod
+    def _to_hex(r: float, g: float, b: float) -> str:
+        return f"#{round(r):02x}{round(g):02x}{round(b):02x}"
+
+    # --- palette generation ---
+
+    @staticmethod
+    def _generate_palette(primary: tuple[float, ...]) -> dict[str, str]:
+        _adj = ThemeGenerator._adjust
+        _scl = ThemeGenerator._scale
+        _hex = ThemeGenerator._to_hex
+
+        background = _scl(primary, saturation=-85, lightness=-80)
+        analogous_left = _adj(primary, hue=-30)
+        complementary = _adj(primary, hue=180)
+        warning = _scl(_adj(primary, hue=170), saturation=45, lightness=38)
+        text_primary = _scl(primary, lightness=85)
+
+        return {
+            "background-dark": _hex(*background),
+            "background-light": _hex(*_scl(background, lightness=18)),
+            "border-primary": _hex(*_scl(background, lightness=50)),
+            "border-secondary": _hex(*_scl(background, lightness=20)),
+            "text-primary": _hex(*text_primary),
+            "text-secondary": _hex(*primary),
+            "text-accent": _hex(*analogous_left),
+            "text-muted": _hex(*_scl(background, lightness=50)),
+            "text-selected": _hex(*text_primary),
+            "text-fancy": _hex(*complementary),
+            "icon": _hex(*analogous_left),
+            "icon-active": _hex(*warning),
+            "icon-inactive": _hex(*_scl(background, lightness=40)),
+            "sliders": _hex(*complementary),
+            "dynamic": _hex(*complementary),
+        }
+
+    @staticmethod
+    def _palette_to_css(palette: dict[str, str]) -> str:
+        return "\n".join(f".{name} {{ color: {color}; }}" for name, color in palette.items())
+
+    def generate_theme(self, r: int, g: int, b: int) -> str:
+        palette = self._generate_palette((float(r), float(g), float(b)))
+        return self._palette_to_css(palette)
+
+    def generate_random_theme(self) -> str:
+        hue = random.random()
+        saturation = random.uniform(0.45, 0.85)
+        value = random.uniform(0.35, 0.75)
+        r, g, b = colorsys.hsv_to_rgb(hue, saturation, value)
+        return self.generate_theme(round(r * 255), round(g * 255), round(b * 255))
 
 # ===========================================================================
 # Application

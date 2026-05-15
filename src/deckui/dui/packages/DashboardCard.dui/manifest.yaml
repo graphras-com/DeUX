@@ -29,9 +29,9 @@ bindings:
     default_items: [Main, Livingroom, Settings]
     default_index: 0
     active_attrs:
-      fill: "#DEDEDE"
+      class: "text-selected"
     inactive_attrs:
-      fill: "#8F8F8F"
+      class: "text-muted"
     separator: " · "
 
   brightness:
@@ -54,3 +54,7 @@ events:
   - name: next_screen
     source: encoder_press_release
     max_duration_ms: 250
+
+  - name: change_theme
+    source: encoder_hold
+    max_duration_ms: 300

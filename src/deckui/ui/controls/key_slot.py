@@ -92,6 +92,10 @@ class KeySlot:
         """Whether the key image needs re-rendering."""
         return self._dirty
 
+    def mark_dirty(self) -> None:
+        """Flag this key for re-rendering on the next refresh."""
+        self._dirty = True
+
     def mark_clean(self) -> None:
         """Clear the dirty flag after the key image has been flushed."""
         self._dirty = False

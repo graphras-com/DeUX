@@ -262,3 +262,22 @@ class Screen:
         if self._touch_strip is None:
             return []
         return self._touch_strip.cards
+
+    def mark_all_dirty(self) -> None:
+        """Flag every control on this screen for re-rendering.
+
+        Marks all configured keys, touch-strip cards, and the info
+        screen (if present) as dirty so the next refresh cycle
+        re-renders the entire screen.  If the touch strip has a
+        background SVG it is re-rasterized so that stylesheet changes
+        are reflected.  Useful when a global property such as the
+        active stylesheet changes.
+        """
+        for key_slot in self._keys.values():
+            key_slot.mark_dirty()
+        if self._touch_strip is not None:
+            self._touch_strip.invalidate_background()
+        for card in self.cards:
+            card.mark_dirty()
+        if self._info_screen is not None:
+            self._info_screen.mark_dirty()

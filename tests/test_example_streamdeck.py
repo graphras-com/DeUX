@@ -309,8 +309,8 @@ def _dash_spec() -> PackageSpec:
                 child_tag="tspan",
                 default_items=("Main", "Livingroom", "Settings"),
                 default_index=0,
-                active_attrs={"fill": "#DEDEDE"},
-                inactive_attrs={"fill": "#8F8F8F"},
+                active_attrs={"class": "text-selected"},
+                inactive_attrs={"class": "text-muted"},
                 separator=" · ",
             ),
             "brightness": RangeBinding(
@@ -334,6 +334,11 @@ def _dash_spec() -> PackageSpec:
                 name="next_screen",
                 source="encoder_press_release",
                 max_duration_ms=250,
+            ),
+            EventMapping(
+                name="change_theme",
+                source="encoder_hold",
+                max_duration_ms=300,
             ),
         ),
     )
