@@ -19,18 +19,6 @@ bindings:
     node: label
     default: "Icon Key"
     max_width: 110
-  
-  background:
-    type: color
-    node: background
-    attribute: color
-    default: "#1c1c1c"
-
-  foreground:
-    type: color
-    node: foreground
-    attribute: color
-    default: "#dedede"
 
 spinner:
   type: rotation

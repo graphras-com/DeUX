@@ -858,38 +858,27 @@ class TestSceneController:
         assert screen.set_key.call_count == len(SCENE_DEFS)
 
     def test_initial_colors_are_defaults(self, ctrl: SceneController) -> None:
-        """Each key starts with default background/foreground colors from manifest."""
+        """Each key starts with default background color from manifest."""
         for key in ctrl.keys:
             assert key.get("background") == "#1c1c1c"
-            assert key.get("foreground") == "#dedede"
 
-    async def test_press_swaps_colors(self, ctrl: SceneController) -> None:
-        """key.dispatch(pressed=True) swaps fg/bg via the press handler."""
+    async def test_press_does_not_change_colors(self, ctrl: SceneController) -> None:
+        """Press no longer swaps colors; visual feedback is disabled."""
         key = ctrl.keys[0]
         await key.dispatch(pressed=True)
-        assert key.get("background") == "#dedede"
-        assert key.get("foreground") == "#1c1c1c"
+        assert key.get("background") == "#1c1c1c"
 
-    async def test_release_restores_colors(self, ctrl: SceneController) -> None:
-        """A release after a press restores the original colors."""
+    async def test_release_keeps_colors(self, ctrl: SceneController) -> None:
+        """Release keeps colors unchanged since visual feedback is disabled."""
         key = ctrl.keys[0]
         await key.dispatch(pressed=True)
         await key.dispatch(pressed=False)
         assert key.get("background") == "#1c1c1c"
-        assert key.get("foreground") == "#dedede"
 
-    async def test_press_release_requests_refresh(
+    async def test_press_release_refresh_from_click_forward(
         self, ctrl: SceneController
     ) -> None:
-        """Press and release each call request_refresh on the key.
-
-        The stub mimics ``Deck.refresh`` by clearing the dirty flag,
-        which is what makes the auto-refresh wrapper idempotent in
-        production: when a handler explicitly calls ``request_refresh``,
-        the card is rendered and marked clean, so the wrapper's
-        post-handler ``if is_dirty: refresh()`` check finds nothing to
-        do.
-        """
+        """Only the click forward on release triggers a refresh; press does not."""
         key = ctrl.keys[0]
         refreshes = 0
 
@@ -901,16 +890,15 @@ class TestSceneController:
         key.set_refresh_callback(_refresh)
         await key.dispatch(pressed=True)
         await key.dispatch(pressed=False)
-        assert refreshes == 2
+        assert refreshes == 1
 
-    async def test_each_key_has_independent_handlers(
+    async def test_keys_remain_independent(
         self, ctrl: SceneController
     ) -> None:
-        """Closure capture is per-key: pressing one key only affects that key."""
+        """Pressing one key does not affect another key's state."""
         first, second = ctrl.keys[0], ctrl.keys[1]
         await first.dispatch(pressed=True)
-        # First is inverted, second is untouched.
-        assert first.get("background") == "#dedede"
+        assert first.get("background") == "#1c1c1c"
         assert second.get("background") == "#1c1c1c"
 
 
