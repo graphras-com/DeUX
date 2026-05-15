@@ -13,6 +13,7 @@ from deckui.dui.card import DuiCard
 from deckui.dui.key import DuiKey
 from deckui.dui.schema import (
     ColorBinding,
+    CssClassBinding,
     EventMapping,
     IconifyBinding,
     ImageBinding,
@@ -367,6 +368,9 @@ def _iconkey_spec() -> PackageSpec:
             ),
             "foreground": ColorBinding(
                 node="foreground", attribute="color", default="#dedede"
+            ),
+            "background_class": CssClassBinding(
+                node="background", default="background-dark"
             ),
         },
         events=(
@@ -863,22 +867,24 @@ class TestSceneController:
             assert key.get("background") == "#1c1c1c"
 
     async def test_press_does_not_change_colors(self, ctrl: SceneController) -> None:
-        """Press no longer swaps colors; visual feedback is disabled."""
+        """Press changes background_class but not background color."""
         key = ctrl.keys[0]
         await key.dispatch(pressed=True)
         assert key.get("background") == "#1c1c1c"
+        assert key.get("background_class") == "success"
 
     async def test_release_keeps_colors(self, ctrl: SceneController) -> None:
-        """Release keeps colors unchanged since visual feedback is disabled."""
+        """Release restores background_class to default."""
         key = ctrl.keys[0]
         await key.dispatch(pressed=True)
         await key.dispatch(pressed=False)
         assert key.get("background") == "#1c1c1c"
+        assert key.get("background_class") == "background-dark"
 
     async def test_press_release_refresh_from_click_forward(
         self, ctrl: SceneController
     ) -> None:
-        """Only the click forward on release triggers a refresh; press does not."""
+        """Press and release each trigger a refresh, plus the click forward."""
         key = ctrl.keys[0]
         refreshes = 0
 
@@ -890,7 +896,7 @@ class TestSceneController:
         key.set_refresh_callback(_refresh)
         await key.dispatch(pressed=True)
         await key.dispatch(pressed=False)
-        assert refreshes == 1
+        assert refreshes == 2
 
     async def test_keys_remain_independent(
         self, ctrl: SceneController
@@ -899,7 +905,9 @@ class TestSceneController:
         first, second = ctrl.keys[0], ctrl.keys[1]
         await first.dispatch(pressed=True)
         assert first.get("background") == "#1c1c1c"
+        assert first.get("background_class") == "success"
         assert second.get("background") == "#1c1c1c"
+        assert second.get("background_class") == "background-dark"
 
 
 # ===================================================================

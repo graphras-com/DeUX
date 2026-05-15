@@ -20,6 +20,11 @@ bindings:
     default: "Icon Key"
     max_width: 110
 
+  background_class:
+    type: css_class
+    node: background
+    default: background-dark
+
 spinner:
   type: rotation
   node: spinner
