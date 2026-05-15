@@ -9,6 +9,7 @@ import pytest
 from deckui.dui.loader import PackageError, load_all_packages, load_package
 from deckui.dui.schema import (
     ColorBinding,
+    CssClassBinding,
     IconifyBinding,
     ImageBinding,
     ImageFit,
@@ -126,6 +127,38 @@ class TestLoadPackageValid:
         assert isinstance(b, ColorBinding)
         assert b.attribute == "fill"
         assert b.default == "#ff0000"
+
+    def test_css_class_binding_parsed(self, tmp_path):
+        pkg = tmp_path / "CC.dui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="card"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: CC\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  style:\n    type: css_class\n    node: card\n"
+            "    default: active",
+            encoding="utf-8",
+        )
+        spec = load_package(pkg)
+        b = spec.bindings["style"]
+        assert isinstance(b, CssClassBinding)
+        assert b.node == "card"
+        assert b.default == "active"
+
+    def test_css_class_binding_default_empty(self, tmp_path):
+        pkg = tmp_path / "CC2.dui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="card"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: CC2\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  style:\n    type: css_class\n    node: card",
+            encoding="utf-8",
+        )
+        spec = load_package(pkg)
+        b = spec.bindings["style"]
+        assert isinstance(b, CssClassBinding)
+        assert b.default == ""
 
     def test_range_binding_parsed(self, card_dui_path):
         spec = load_package(card_dui_path)
@@ -524,6 +557,20 @@ class TestLoadPackageInvalid:
             encoding="utf-8",
         )
         with pytest.raises(PackageError, match="invalid fit"):
+            load_package(pkg)
+
+    def test_css_class_binding_non_string_default(self, tmp_path):
+        pkg = tmp_path / "Bad.dui"
+        pkg.mkdir()
+        svg = '<svg xmlns="http://www.w3.org/2000/svg"><g id="card"/></svg>'
+        (pkg / "layout.svg").write_text(svg, encoding="utf-8")
+        (pkg / "manifest.yaml").write_text(
+            "name: Bad\ntype: Key\nversion: 1\nlayout: layout.svg\n"
+            "bindings:\n  style:\n    type: css_class\n    node: card\n"
+            "    default: 42",
+            encoding="utf-8",
+        )
+        with pytest.raises(PackageError, match="default must be a string"):
             load_package(pkg)
 
     def test_image_placeholder_not_in_svg(self, tmp_path):

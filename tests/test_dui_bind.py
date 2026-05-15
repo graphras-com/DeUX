@@ -7,6 +7,7 @@ import pytest
 from deckui.dui.card import DuiCard
 from deckui.dui.key import DuiKey
 from deckui.dui.schema import (
+    CssClassBinding,
     EventMapping,
     PackageSpec,
     PackageType,
@@ -24,6 +25,7 @@ _CARD_SVG = (
     '<rect id="bar" x="4" y="86" width="189" height="4" fill="#0f0"/>'
     '<rect id="on_node" x="0" y="0" width="10" height="10" fill="#0f0"/>'
     '<rect id="off_node" x="0" y="0" width="10" height="10" fill="#f00"/>'
+    '<g id="styled"/>'
     "</svg>"
 )
 
@@ -581,3 +583,34 @@ class TestDuiCardBindToggle:
         assert card.get("lights") is True
         await event.emit(False)
         assert card.get("lights") is False
+
+
+class TestDuiCardBindCssClass:
+    """bind() with a css_class binding -- string emit drives class attribute."""
+
+    def _card(self) -> DuiCard:
+        spec = PackageSpec(
+            name="CC",
+            type=PackageType.TOUCH_STRIP_CARD,
+            version=1,
+            svg_source=_CARD_SVG,
+            bindings={
+                "style": CssClassBinding(node="styled", default="idle"),
+            },
+        )
+        return DuiCard(spec)
+
+    async def test_emit_changes_class(self):
+        card = self._card()
+        event = AsyncEvent()
+        card.bind("style", event)
+        await event.emit("active")
+        assert card.get("style") == "active"
+
+    async def test_emit_clears_class(self):
+        card = self._card()
+        event = AsyncEvent()
+        card.bind("style", event)
+        await event.emit("active")
+        await event.emit("")
+        assert card.get("style") == ""

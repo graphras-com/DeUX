@@ -9,6 +9,7 @@ from PIL import Image, ImageFont
 
 from deckui.dui.schema import (
     ColorBinding,
+    CssClassBinding,
     IconifyBinding,
     ImageBinding,
     ImageFit,
@@ -72,6 +73,13 @@ _COLOR_SVG = (
     '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="100" height="50">'
     '<rect id="accent" width="100" height="50" fill="#ff0000"/>'
     "</svg>"
+)
+
+_CSS_CLASS_SVG = (
+    '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="100" height="50">'
+    '<g id="card" class="default">'
+    '<rect width="100" height="50" fill="#ff0000"/>'
+    "</g></svg>"
 )
 
 _RANGE_SVG = (
@@ -293,6 +301,22 @@ class TestSvgRendererDefaults:
         renderer = SvgRenderer(spec)
         assert renderer.get("accent") == "#00ff00"
 
+    def test_css_class_default(self):
+        spec = _make_spec(
+            _CSS_CLASS_SVG,
+            bindings={"style": CssClassBinding(node="card", default="active")},
+        )
+        renderer = SvgRenderer(spec)
+        assert renderer.get("style") == "active"
+
+    def test_css_class_default_empty(self):
+        spec = _make_spec(
+            _CSS_CLASS_SVG,
+            bindings={"style": CssClassBinding(node="card")},
+        )
+        renderer = SvgRenderer(spec)
+        assert renderer.get("style") == ""
+
     def test_image_default_none(self):
         spec = _make_spec(
             _IMAGE_SVG,
@@ -376,6 +400,31 @@ class TestSvgRendererRender:
         img_changed = renderer.render()
 
         assert img_default.tobytes() != img_changed.tobytes()
+
+    def test_css_class_binding_set_and_clear(self):
+        spec = _make_spec(
+            _CSS_CLASS_SVG,
+            bindings={"style": CssClassBinding(node="card", default="")},
+        )
+        renderer = SvgRenderer(spec)
+        assert renderer.get("style") == ""
+
+        changed = renderer.set("style", "highlight")
+        assert changed is True
+        assert renderer.get("style") == "highlight"
+
+        changed = renderer.set("style", "")
+        assert changed is True
+        assert renderer.get("style") == ""
+
+    def test_css_class_binding_idempotent(self):
+        spec = _make_spec(
+            _CSS_CLASS_SVG,
+            bindings={"style": CssClassBinding(node="card", default="active")},
+        )
+        renderer = SvgRenderer(spec)
+        changed = renderer.set("style", "active")
+        assert changed is False
 
     def test_image_binding_with_pil(self):
         spec = _make_spec(
