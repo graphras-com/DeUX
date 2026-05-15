@@ -954,19 +954,20 @@ class SceneController:
         label : str
             Scene label, passed to the service on click.
         """
-        bg = key.get("background")
-        fg = key.get("foreground")
 
+        """
+        bg = key.get("background")
+        
         @key.on_event("press")
         async def _press() -> None:
-            key.set_many(background=fg, foreground=bg)
+            key.set("background", "success")
             await key.request_refresh()
 
         @key.on_event("release")
         async def _release() -> None:
-            key.set_many(background=bg, foreground=fg)
+            key.set("background", "background-dark")
             await key.request_refresh()
-
+        """
         key.forward("click", lambda: self._svc.activate(label))
 
 class ScreenCycler:
