@@ -99,7 +99,8 @@ from deckui import (
     DuiCard,
     DuiKey,
     add_dui_path,
-    load_svg_stylesheet
+    load_svg_stylesheet,
+    set_svg_stylesheet,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -112,7 +113,6 @@ EXAMPLES_DIR = Path(__file__).resolve().parent
 add_dui_path(EXAMPLES_DIR)
 
 load_svg_stylesheet(EXAMPLES_DIR.joinpath("assets/theme.css"))
-
 
 # ===========================================================================
 # Time helpers (used by TimerController)
@@ -707,12 +707,15 @@ class DashboardController(CardController):
         )
 
     async def _change_theme(self) -> None:
+        """Generate and apply a random theme on encoder hold."""
         if self._deck is None:
             return
         css = self._theme_generator.generate_random_theme()
-        #load_svg_stylesheet()
-        log.info("Generate new theme")
-        print(css)
+        set_svg_stylesheet(css)
+        screen = self._deck.active_screen
+        if screen is not None:
+            screen.mark_all_dirty()
+        log.info("Applied new random theme")
 
     async def _clock_loop(self) -> None:
         """Refresh the clock display every second.

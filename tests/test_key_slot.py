@@ -70,3 +70,10 @@ class TestKeySlotRendering:
         assert key_slot.is_dirty is True
         key_slot.mark_clean()
         assert key_slot.is_dirty is False
+
+    def test_mark_dirty(self, key_slot: KeySlot):
+        """mark_dirty re-flags a clean key for rendering."""
+        key_slot.mark_clean()
+        assert key_slot.is_dirty is False
+        key_slot.mark_dirty()
+        assert key_slot.is_dirty is True

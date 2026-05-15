@@ -577,3 +577,32 @@ class TestTouchStripBackgroundSvg:
         # Tile 1 should be blue
         r, g, b = tile1.getpixel((50, 25))
         assert r < 50 and g < 50 and b > 200
+
+
+class TestTouchStripInvalidateBackground:
+    """Tests for TouchStrip.invalidate_background."""
+
+    @staticmethod
+    def _make_svg(width: int = 800, height: int = 100, fill: str = "red") -> bytes:
+        return (
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">'
+            f'<rect width="{width}" height="{height}" fill="{fill}"/>'
+            f"</svg>"
+        ).encode()
+
+    def test_rerasterizes_when_bg_svg_set(self):
+        """invalidate_background re-slices the cached SVG."""
+        ts = TouchStrip(panel_count=2, panel_width=100, panel_height=50)
+        ts.set_background_svg(self._make_svg(width=200, height=50))
+        old_tiles = ts.bg_tiles
+        assert old_tiles is not None
+        ts.invalidate_background()
+        # Tiles should be freshly created (new list object)
+        assert ts.bg_tiles is not None
+        assert ts.bg_tiles is not old_tiles
+
+    def test_noop_without_bg_svg(self):
+        """invalidate_background is a no-op when no background SVG is set."""
+        ts = TouchStrip(panel_count=2, panel_width=100, panel_height=50)
+        ts.invalidate_background()
+        assert ts.bg_tiles is None

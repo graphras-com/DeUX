@@ -251,3 +251,59 @@ class TestScreenTouchstripBackgroundSvg:
         screen = Screen("mini", STREAM_DECK_MINI)
         with pytest.raises(IndexError, match="no touchscreen"):
             screen.set_touchstrip_background_svg_from_file("/fake.svg")
+
+
+class TestScreenMarkAllDirty:
+    """Tests for Screen.mark_all_dirty."""
+
+    def test_marks_keys_dirty(self, page: Screen):
+        """All configured keys are marked dirty."""
+        k0 = page.key(0)
+        k1 = page.key(1)
+        k0.mark_clean()
+        k1.mark_clean()
+        assert k0.is_dirty is False
+        assert k1.is_dirty is False
+        page.mark_all_dirty()
+        assert k0.is_dirty is True
+        assert k1.is_dirty is True
+
+    def test_marks_cards_dirty(self, page: Screen):
+        """All touch-strip cards are marked dirty."""
+        for card in page.cards:
+            card.mark_clean()
+        page.mark_all_dirty()
+        assert all(card.is_dirty for card in page.cards)
+
+    def test_marks_info_screen_dirty(self):
+        """Info screen is marked dirty when present."""
+        screen = Screen("neo", STREAM_DECK_NEO)
+        info = screen.info_screen
+        assert info is not None
+        info.mark_clean()
+        assert info.is_dirty is False
+        screen.mark_all_dirty()
+        assert info.is_dirty is True
+
+    def test_no_error_without_touchscreen(self):
+        """mark_all_dirty does not raise on devices without a touchscreen."""
+        screen = Screen("mini", STREAM_DECK_MINI)
+        screen.key(0).mark_clean()
+        screen.mark_all_dirty()
+        assert screen.key(0).is_dirty is True
+
+    def test_invalidates_touchstrip_background(self, page: Screen):
+        """mark_all_dirty re-rasterizes the touchstrip background SVG."""
+        ts = page.touch_strip
+        assert ts is not None
+        svg = (
+            b'<svg xmlns="http://www.w3.org/2000/svg" width="800" height="100">'
+            b'<rect width="800" height="100" fill="red"/>'
+            b"</svg>"
+        )
+        ts.set_background_svg(svg)
+        old_tiles = ts.bg_tiles
+        assert old_tiles is not None
+        page.mark_all_dirty()
+        assert ts.bg_tiles is not None
+        assert ts.bg_tiles is not old_tiles

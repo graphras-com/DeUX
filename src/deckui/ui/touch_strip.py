@@ -198,6 +198,16 @@ class TouchStrip:
         for card in self._cards:
             card.mark_dirty()
 
+    def invalidate_background(self) -> None:
+        """Re-rasterize the cached background SVG tiles.
+
+        Call this when a global property that affects SVG rendering
+        (such as the active stylesheet) has changed.  If no background
+        SVG is set this is a no-op.
+        """
+        if self._bg_svg is not None:
+            self._rasterize_and_slice()
+
     def _rasterize_and_slice(self) -> None:
         """Rasterize the background SVG and slice into per-panel tiles.
 
