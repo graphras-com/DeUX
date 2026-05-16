@@ -822,7 +822,6 @@ def compose_svg_layers(
     ET.register_namespace("xlink", _XLINK_NS)
 
     wrapper = ET.Element(f"{{{_SVG_NS}}}svg")
-    wrapper.set("xmlns", _SVG_NS)
     wrapper.set("width", str(width))
     wrapper.set("height", str(height))
     wrapper.set("viewBox", f"0 0 {width} {height}")
