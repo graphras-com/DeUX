@@ -86,7 +86,6 @@ from mock_backend import (
     MockScenesService,
     MockTimerService,
 )
-
 from PIL import Image
 
 from deckui import (
@@ -938,7 +937,7 @@ class SceneController:
         async def _release() -> None:
             key.set("background_class", background_class)
             await key.request_refresh()
-        
+
         key.forward("click", lambda: self._svc.activate(label))
 
 class ScreenCycler:

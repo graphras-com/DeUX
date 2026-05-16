@@ -197,11 +197,11 @@ def _rgb_to_hsl(r: float, g: float, b: float) -> tuple[float, float, float]:
         ``(hue, saturation, lightness)`` with hue in degrees
         (0–360) and saturation/lightness as percentages (0–100).
     """
-    h, l, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
-    return h * 360, s * 100, l * 100
+    h, lt, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
+    return h * 360, s * 100, lt * 100
 
 
-def _hsl_to_rgb(h: float, s: float, l: float) -> tuple[float, float, float]:
+def _hsl_to_rgb(h: float, s: float, lt: float) -> tuple[float, float, float]:
     """Convert HSL back to RGB (0–255).
 
     Parameters
@@ -210,7 +210,7 @@ def _hsl_to_rgb(h: float, s: float, l: float) -> tuple[float, float, float]:
         Hue in degrees (0–360).
     s : float
         Saturation as a percentage (0–100).
-    l : float
+    lt : float
         Lightness as a percentage (0–100).
 
     Returns
@@ -218,7 +218,7 @@ def _hsl_to_rgb(h: float, s: float, l: float) -> tuple[float, float, float]:
     tuple[float, float, float]
         ``(r, g, b)`` channels in 0–255.
     """
-    r, g, b = colorsys.hls_to_rgb(h / 360, l / 100, s / 100)
+    r, g, b = colorsys.hls_to_rgb(h / 360, lt / 100, s / 100)
     return r * 255, g * 255, b * 255
 
 
@@ -239,8 +239,8 @@ def _adjust(
     tuple[float, float, float]
         Adjusted ``(r, g, b)`` in 0–255.
     """
-    h, s, l = _rgb_to_hsl(*rgb)
-    return _hsl_to_rgb((h + hue) % 360, s, l)
+    h, s, lt = _rgb_to_hsl(*rgb)
+    return _hsl_to_rgb((h + hue) % 360, s, lt)
 
 
 def _scale(
@@ -267,16 +267,16 @@ def _scale(
     tuple[float, float, float]
         Adjusted ``(r, g, b)`` in 0–255.
     """
-    h, s, l = _rgb_to_hsl(*rgb)
+    h, s, lt = _rgb_to_hsl(*rgb)
     if saturation > 0:
         s += (100 - s) * saturation / 100
     elif saturation < 0:
         s += s * saturation / 100
     if lightness > 0:
-        l += (100 - l) * lightness / 100
+        lt += (100 - lt) * lightness / 100
     elif lightness < 0:
-        l += l * lightness / 100
-    return _hsl_to_rgb(h, max(0, min(100, s)), max(0, min(100, l)))
+        lt += lt * lightness / 100
+    return _hsl_to_rgb(h, max(0, min(100, s)), max(0, min(100, lt)))
 
 
 def _to_hex(r: float, g: float, b: float) -> str:
@@ -404,10 +404,7 @@ def set_active_theme(theme: Theme | None) -> None:
     global _active_theme  # noqa: PLW0603
     from .svg_rasterize import set_svg_stylesheet
 
-    if theme is None:
-        _active_theme = Theme.default()
-    else:
-        _active_theme = theme
+    _active_theme = Theme.default() if theme is None else theme
     set_svg_stylesheet(_active_theme.css)
     logger.debug("Active theme set to %r", _active_theme)
 

@@ -8,6 +8,7 @@ import pytest
 
 import deckui.render.svg_rasterize as svg_mod
 import deckui.render.theme as theme_mod
+from deckui.render.metrics import RenderMetrics
 from deckui.render.theme import (
     Theme,
     _adjust,
@@ -23,7 +24,6 @@ from deckui.render.theme import (
 )
 from deckui.runtime.capabilities import STREAM_DECK_PLUS
 from deckui.runtime.deck import Deck
-from deckui.render.metrics import RenderMetrics
 from deckui.ui.screen import Screen
 
 
@@ -44,33 +44,33 @@ def _reset_theme():
 
 class TestRgbToHsl:
     def test_pure_red(self):
-        h, s, l = _rgb_to_hsl(255, 0, 0)
+        h, s, lt = _rgb_to_hsl(255, 0, 0)
         assert abs(h - 0) < 0.1
         assert abs(s - 100) < 0.1
-        assert abs(l - 50) < 0.1
+        assert abs(lt - 50) < 0.1
 
     def test_pure_green(self):
-        h, s, l = _rgb_to_hsl(0, 255, 0)
+        h, s, lt = _rgb_to_hsl(0, 255, 0)
         assert abs(h - 120) < 0.1
 
     def test_pure_blue(self):
-        h, s, l = _rgb_to_hsl(0, 0, 255)
+        h, s, lt = _rgb_to_hsl(0, 0, 255)
         assert abs(h - 240) < 0.1
 
     def test_white(self):
-        h, s, l = _rgb_to_hsl(255, 255, 255)
-        assert abs(l - 100) < 0.1
+        h, s, lt = _rgb_to_hsl(255, 255, 255)
+        assert abs(lt - 100) < 0.1
 
     def test_black(self):
-        h, s, l = _rgb_to_hsl(0, 0, 0)
-        assert abs(l - 0) < 0.1
+        h, s, lt = _rgb_to_hsl(0, 0, 0)
+        assert abs(lt - 0) < 0.1
 
 
 class TestHslToRgb:
     def test_round_trip(self):
         r, g, b = 39.0, 87.0, 179.0
-        h, s, l = _rgb_to_hsl(r, g, b)
-        r2, g2, b2 = _hsl_to_rgb(h, s, l)
+        h, s, lt = _rgb_to_hsl(r, g, b)
+        r2, g2, b2 = _hsl_to_rgb(h, s, lt)
         assert abs(r - r2) < 1
         assert abs(g - g2) < 1
         assert abs(b - b2) < 1
@@ -265,11 +265,12 @@ class TestThemeFromRandom:
         assert theme.font_family == "Roboto"
 
     def test_two_random_themes_differ(self):
-        """Extremely unlikely to get the same random colour twice."""
+        """Two random themes exercise the random path."""
         t1 = Theme.from_random()
         t2 = Theme.from_random()
-        # They could theoretically match, but probability is negligible
-        assert t1.primary != t2.primary or True  # always passes but exercises code
+        # Both should be valid themes regardless of whether colours match
+        assert len(t1.palette) == 18
+        assert len(t2.palette) == 18
 
 
 class TestThemeRepr:
