@@ -77,6 +77,7 @@ from pathlib import Path
 from typing import Any
 import random
 import colorsys
+from textwrap import dedent
 
 from mock_backend import (
     MEDIA_CATALOG,
@@ -589,7 +590,6 @@ class DashboardController(CardController):
     def __init__(self) -> None:
         self._deck: Deck | None = None
         self._clock_task: asyncio.Task[None] | None = None
-        self._theme_generator = ThemeGenerator()
 
         self.card = DuiCard("DashboardCard")
 
@@ -708,7 +708,7 @@ class DashboardController(CardController):
         """Generate and apply a random theme on encoder hold."""
         if self._deck is None:
             return
-        css = self._theme_generator.generate_random_theme()
+        css = ThemeGenerator.generate_random_theme()
         set_svg_stylesheet(css)
         screen = self._deck.active_screen
         if screen is not None:
@@ -1122,27 +1122,34 @@ class ThemeGenerator:
 
     @staticmethod
     def _palette_to_css(palette: dict[str, str]) -> str:
-        return "\n".join(f".{name} {{ color: {color}; }}" for name, color in palette.items())
+        font = dedent("""
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-    def generate_theme(self, r: int, g: int, b: int) -> str:
-        palette = self._generate_palette((float(r), float(g), float(b)))
-        return self._palette_to_css(palette)
-
-    def generate_random_theme(self) -> str:
+            svg {
+                font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            }
+        """)
+        classes = "\n".join(f".{name} {{ color: {color}; }}" for name, color in palette.items())
+        log.info(f"Generated CSS:\n{font}{classes}")
+        return font + classes
+    
+    @staticmethod
+    def generate_theme(r: int, g: int, b: int) -> str:
+        palette = ThemeGenerator._generate_palette((float(r), float(g), float(b)))
+        return ThemeGenerator._palette_to_css(palette)
+    
+    @staticmethod
+    def generate_random_theme() -> str:
         hue = random.random()
         saturation = random.uniform(0.45, 0.85)
         value = random.uniform(0.35, 0.75)
         r, g, b = colorsys.hsv_to_rgb(hue, saturation, value)
         log.info(f"Random primary color: rgb({round(r * 255)},{round(g * 255)},{round(b * 255)})")
-        return self.generate_theme(round(r * 255), round(g * 255), round(b * 255))
+        return ThemeGenerator.generate_theme(round(r * 255), round(g * 255), round(b * 255))
 
 # ===========================================================================
 # Application
 # ===========================================================================
-
-tg = ThemeGenerator()
-
-set_svg_stylesheet(tg.generate_theme(39,87,179))
 
 class StreamDeckApp:
     """Top-level demo app -- glues controllers to the deck.
@@ -1165,6 +1172,9 @@ class StreamDeckApp:
         catalog: list[dict[str, str]],
         scene_defs: list[dict[str, str]],
     ) -> None:
+        
+        set_svg_stylesheet(ThemeGenerator.generate_theme(39,87,179))
+
         self.audio = AudioController(catalog)
         self.lights = LightsController()
         self.timer = TimerController()
