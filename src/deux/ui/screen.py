@@ -300,12 +300,15 @@ class Screen:
             self._info_screen.mark_dirty()
 
     def screenshot(self, directory: str | Path) -> list[Path]:
-        """Save the current screen state as individual JPEG files.
+        """Save the current screen state as individual PNG files.
 
         Writes one file per key that has been rendered, one file per
         touch-strip card that has been rendered, and one file for the
         info screen (if it has content).  Blank or unrendered controls
         are skipped.
+
+        PNG is used instead of JPEG to avoid additional compression
+        artifacts on the already-small device images.
 
         Parameters
         ----------
@@ -323,38 +326,48 @@ class Screen:
         ::
 
             paths = screen.screenshot("/tmp/deck_screenshot")
-            # [PosixPath('/tmp/deck_screenshot/key_0.jpg'),
-            #  PosixPath('/tmp/deck_screenshot/card_1.jpg')]
+            # [PosixPath('/tmp/deck_screenshot/key_0.png'),
+            #  PosixPath('/tmp/deck_screenshot/card_1.png')]
         """
+        from PIL import Image
+
         out_dir = Path(directory)
         out_dir.mkdir(parents=True, exist_ok=True)
         written: list[Path] = []
 
-        # Keys
+        # Keys — decode device JPEG/BMP bytes back to PIL, re-encode as PNG.
         for index, key_slot in self._keys.items():
             if key_slot.image_bytes is None:
                 continue
-            path = out_dir / f"key_{index}.jpg"
-            path.write_bytes(key_slot.image_bytes)
+            img = Image.open(io.BytesIO(key_slot.image_bytes))
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            path = out_dir / f"key_{index}.png"
+            path.write_bytes(buf.getvalue())
             written.append(path)
 
         # Touch-strip cards
         if self._touch_strip is not None:
             for index, card in enumerate(self._touch_strip.cards):
-                img = card.rendered
-                if img is None:
+                card_img = card.rendered
+                if card_img is None:
                     continue
                 buf = io.BytesIO()
-                rgb = img.convert("RGB") if img.mode != "RGB" else img
-                rgb.save(buf, format="JPEG", quality=90)
-                path = out_dir / f"card_{index}.jpg"
+                rgb = card_img.convert("RGB") if card_img.mode != "RGB" else card_img
+                rgb.save(buf, format="PNG")
+                path = out_dir / f"card_{index}.png"
                 path.write_bytes(buf.getvalue())
                 written.append(path)
 
         # Info screen
         if self._info_screen is not None and self._info_screen.image is not None:
-            path = out_dir / "info_screen.jpg"
-            path.write_bytes(self._info_screen.render_bytes())
+            info_img: Image.Image = self._info_screen.image
+            if info_img.mode != "RGB":
+                info_img = info_img.convert("RGB")
+            buf = io.BytesIO()
+            info_img.save(buf, format="PNG")
+            path = out_dir / "info_screen.png"
+            path.write_bytes(buf.getvalue())
             written.append(path)
 
         return written

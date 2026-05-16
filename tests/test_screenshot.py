@@ -1,4 +1,4 @@
-"""Tests for Screen.screenshot() — saving screen state as JPEG files."""
+"""Tests for Screen.screenshot() — saving screen state as PNG files."""
 
 from __future__ import annotations
 
@@ -32,11 +32,10 @@ class TestScreenshotKeys:
         paths = screen.screenshot(tmp_path / "out")
 
         assert len(paths) == 1
-        assert paths[0] == tmp_path / "out" / "key_0.jpg"
+        assert paths[0] == tmp_path / "out" / "key_0.png"
         assert paths[0].exists()
-        # Verify it's valid JPEG
         img = Image.open(paths[0])
-        assert img.format == "JPEG"
+        assert img.format == "PNG"
 
     def test_key_without_image_skipped(self, tmp_path: Path) -> None:
         screen = Screen("test", STREAM_DECK_MINI)
@@ -55,7 +54,7 @@ class TestScreenshotKeys:
         paths = screen.screenshot(tmp_path / "out")
 
         names = [p.name for p in paths]
-        assert names == ["key_0.jpg", "key_3.jpg"]
+        assert names == ["key_0.png", "key_3.png"]
 
 
 class TestScreenshotTouchstrip:
@@ -70,9 +69,9 @@ class TestScreenshotTouchstrip:
 
         card_paths = [p for p in paths if p.name.startswith("card_")]
         assert len(card_paths) == 1
-        assert card_paths[0].name == "card_0.jpg"
+        assert card_paths[0].name == "card_0.png"
         img = Image.open(card_paths[0])
-        assert img.format == "JPEG"
+        assert img.format == "PNG"
 
     def test_card_without_render_skipped(self, tmp_path: Path) -> None:
         screen = Screen("test", STREAM_DECK_PLUS)
@@ -113,10 +112,10 @@ class TestScreenshotInfoScreen:
 
         paths = screen.screenshot(tmp_path / "out")
 
-        info_paths = [p for p in paths if p.name == "info_screen.jpg"]
+        info_paths = [p for p in paths if p.name == "info_screen.png"]
         assert len(info_paths) == 1
         img = Image.open(info_paths[0])
-        assert img.format == "JPEG"
+        assert img.format == "PNG"
 
     def test_info_screen_no_image_skipped(self, tmp_path: Path) -> None:
         screen = Screen("test", STREAM_DECK_NEO)
@@ -125,7 +124,7 @@ class TestScreenshotInfoScreen:
 
         paths = screen.screenshot(tmp_path / "out")
 
-        info_paths = [p for p in paths if p.name == "info_screen.jpg"]
+        info_paths = [p for p in paths if p.name == "info_screen.png"]
         assert info_paths == []
 
     def test_no_info_screen_device(self, tmp_path: Path) -> None:
@@ -134,7 +133,7 @@ class TestScreenshotInfoScreen:
 
         paths = screen.screenshot(tmp_path / "out")
 
-        info_paths = [p for p in paths if p.name == "info_screen.jpg"]
+        info_paths = [p for p in paths if p.name == "info_screen.png"]
         assert info_paths == []
 
 
@@ -171,7 +170,7 @@ class TestScreenshotMixed:
         paths = screen.screenshot(tmp_path / "out")
 
         names = [p.name for p in paths]
-        assert names == ["key_0.jpg", "key_2.jpg", "card_1.jpg"]
+        assert names == ["key_0.png", "key_2.png", "card_1.png"]
 
     def test_neo_keys_and_info_screen(self, tmp_path: Path) -> None:
         screen = Screen("test", STREAM_DECK_NEO)
@@ -182,4 +181,4 @@ class TestScreenshotMixed:
         paths = screen.screenshot(tmp_path / "out")
 
         names = [p.name for p in paths]
-        assert names == ["key_0.jpg", "info_screen.jpg"]
+        assert names == ["key_0.png", "info_screen.png"]
