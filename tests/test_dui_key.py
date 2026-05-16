@@ -1,4 +1,4 @@
-"""Tests for deckui.dui.key — DuiKey class."""
+"""Tests for deux.dui.key — DuiKey class."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock
 import pytest
 from PIL import Image
 
-from deckui.dui.key import DuiKey
-from deckui.dui.schema import (
+from deux.dui.key import DuiKey
+from deux.dui.schema import (
     EventMapping,
     PackageSpec,
     PackageType,
@@ -16,9 +16,9 @@ from deckui.dui.schema import (
     TextBinding,
     ToggleBinding,
 )
-from deckui.runtime.capabilities import STREAM_DECK_PLUS
-from deckui.ui.controls.key_slot import KeySlot
-from deckui.ui.screen import Screen
+from deux.runtime.capabilities import STREAM_DECK_PLUS
+from deux.ui.controls.key_slot import KeySlot
+from deux.ui.screen import Screen
 
 _KEY_SVG = (
     '<svg id="TestKey" xmlns="http://www.w3.org/2000/svg" width="120" height="120">'

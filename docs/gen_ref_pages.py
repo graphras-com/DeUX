@@ -1,9 +1,9 @@
 """Auto-generate API reference pages for mkdocstrings.
 
 This script is executed by the mkdocs-gen-files plugin during ``mkdocs build``.
-It walks the ``src/deckui`` package tree and creates a virtual
+It walks the ``src/deux`` package tree and creates a virtual
 ``reference/<module>.md`` page for every public sub-package, each containing
-the appropriate ``::: deckui.<module>`` directive so that *mkdocstrings*
+the appropriate ``::: deux.<module>`` directive so that *mkdocstrings*
 renders the API docs from docstrings automatically.
 
 A ``reference/SUMMARY.md`` file is also generated so that *mkdocs-literate-nav*
@@ -15,7 +15,7 @@ from pathlib import Path
 import mkdocs_gen_files
 
 SRC = Path("src")
-PACKAGE = "deckui"
+PACKAGE = "deux"
 
 nav_lines: list[str] = []
 

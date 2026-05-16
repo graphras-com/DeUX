@@ -7,13 +7,13 @@ from typing import Any
 
 import pytest
 
-from deckui.dui.loader import PackageError, load_package
-from deckui.dui.schema import (
+from deux.dui.loader import PackageError, load_package
+from deux.dui.schema import (
     RotateTransform,
     TransformBinding,
     TransformKind,
 )
-from deckui.dui.svg_renderer import SvgRenderer
+from deux.dui.svg_renderer import SvgRenderer
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 # Architecture
 
-Auto-generated diagrams showing the structure of the DeckUI codebase.
+Auto-generated diagrams showing the structure of the DeUX codebase.
 These are regenerated from source on every docs build.
 
 ## Class Diagram

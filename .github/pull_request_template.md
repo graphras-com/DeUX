@@ -8,7 +8,7 @@ Describe the key changes made.
 
 ## Validation
 
-- [ ] `python -m pytest tests/ --cov=deckui --cov-report=term-missing --cov-fail-under=95`
+- [ ] `python -m pytest tests/ --cov=deux --cov-report=term-missing --cov-fail-under=95`
 - [ ] Added or updated tests where applicable
 - [ ] Updated docs where applicable
 

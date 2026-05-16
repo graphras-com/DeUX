@@ -3,7 +3,7 @@ requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
-name = "deckui"
+name = "deux"
 dynamic = ["version"]
 description = "A high-level, asyncio-native Python library for Elgato Stream Deck devices."
 readme = "README.md"
@@ -37,18 +37,18 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Graphras-com/DeckUI"
-Repository = "https://github.com/Graphras-com/DeckUI"
-Issues = "https://github.com/Graphras-com/DeckUI/issues"
+Homepage = "https://github.com/Graphras-com/DeUX"
+Repository = "https://github.com/Graphras-com/DeUX"
+Issues = "https://github.com/Graphras-com/DeUX/issues"
 
 [tool.hatch.version]
 source = "vcs"
 
 [tool.hatch.build.hooks.vcs]
-version-file = "src/deckui/_version.py"
+version-file = "src/deux/_version.py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/deckui"]
+packages = ["src/deux"]
 
 [tool.ruff]
 line-length = 100

@@ -1,15 +1,15 @@
-# DeckUI
+# DeUX
 
-[![CI](https://github.com/graphras-com/DeckUI/actions/workflows/ci.yml/badge.svg)](https://github.com/graphras-com/DeckUI/actions/workflows/ci.yml)
+[![CI](https://github.com/graphras-com/DeUX/actions/workflows/ci.yml/badge.svg)](https://github.com/graphras-com/DeUX/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org)
 [![gitleaks](https://img.shields.io/badge/protected%20by-gitleaks-blue)](https://github.com/gitleaks/gitleaks)
-[![Dependabot](https://img.shields.io/badge/dependabot-enabled-brightgreen?logo=dependabot)](https://github.com/graphras-com/DeckUI/network/updates)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/graphras-com/DeckUI/blob/main/LICENSE)
-[![Docs](https://img.shields.io/badge/docs-online-blue)](https://graphras-com.github.io/DeckUI/)
+[![Dependabot](https://img.shields.io/badge/dependabot-enabled-brightgreen?logo=dependabot)](https://github.com/graphras-com/DeUX/network/updates)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/graphras-com/DeUX/blob/main/LICENSE)
+[![Docs](https://img.shields.io/badge/docs-online-blue)](https://graphras-com.github.io/DeUX/)
 
 A high-level, asyncio-native Python library for Elgato Stream Deck devices. Define screen layouts, key actions, encoder controls, and touchscreen card UIs using a declarative, event-driven API.
 
-![Stream Deck+](images/streamdeckplus.png "DeckUI on Stream Deck+")
+![Stream Deck+](images/streamdeckplus.png "DeUX on Stream Deck+")
 
 ## Features
 
@@ -36,8 +36,8 @@ Install system dependencies, clone the repo, and run the example:
 ```bash
 brew install hidapi vips
 
-git clone https://github.com/graphras-com/DeckUI.git
-cd DeckUI
+git clone https://github.com/graphras-com/DeUX.git
+cd DeUX
 
 python3 -m venv .venv
 source .venv/bin/activate
@@ -53,8 +53,8 @@ Install system dependencies, clone the repo, and run the example:
 ```bash
 apt-get install libhidapi libvips-dev
 
-git clone https://github.com/graphras-com/DeckUI.git
-cd DeckUI
+git clone https://github.com/graphras-com/DeUX.git
+cd DeUX
 
 python3 -m venv .venv
 source .venv/bin/activate
@@ -68,14 +68,14 @@ python examples/streamdeck.py
 Install directly from GitHub:
 
 ```bash
-pip install git+https://github.com/graphras-com/DeckUI.git
+pip install git+https://github.com/graphras-com/DeUX.git
 ```
 
 Or clone and install locally:
 
 ```bash
-git clone https://github.com/graphras-com/DeckUI.git
-cd DeckUI
+git clone https://github.com/graphras-com/DeUX.git
+cd DeUX
 pip install .
 ```
 
@@ -91,7 +91,7 @@ pip install -e ".[test]"
 
 ```python
 import asyncio
-from deckui import DeckManager
+from deux import DeckManager
 
 async def main():
     manager = DeckManager()
@@ -115,7 +115,7 @@ asyncio.run(main())
 ### Using `.dui` packages
 
 ```python
-from deckui.dui import load_package, DuiCard
+from deux.dui import load_package, DuiCard
 
 spec = load_package("./AudioCard.dui")
 card = DuiCard(spec)
@@ -143,7 +143,7 @@ pytest
 Run tests with coverage (95% threshold):
 
 ```bash
-pytest --cov=deckui --cov-fail-under=95
+pytest --cov=deux --cov-fail-under=95
 ```
 
 Lint:
@@ -178,8 +178,8 @@ Dependabot is enabled for weekly updates of pip and GitHub Actions dependencies.
 
 ## Contributing
 
-Contributions are welcome. Please open an issue or pull request. This project follows the [Contributor Covenant v2.0](https://github.com/graphras-com/DeckUI/blob/main/CODE_OF_CONDUCT.md) code of conduct.
+Contributions are welcome. Please open an issue or pull request. This project follows the [Contributor Covenant v2.0](https://github.com/graphras-com/DeUX/blob/main/CODE_OF_CONDUCT.md) code of conduct.
 
 ## License
 
-Apache-2.0 -- see [LICENSE](https://github.com/graphras-com/DeckUI/blob/main/LICENSE).
+Apache-2.0 -- see [LICENSE](https://github.com/graphras-com/DeUX/blob/main/LICENSE).

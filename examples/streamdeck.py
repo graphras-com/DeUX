@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Stream Deck demo -- a complete walkthrough of the DeckUI library.
+"""Stream Deck demo -- a complete walkthrough of the DeUX library.
 
-This single-file example showcases every major DeckUI concept against
+This single-file example showcases every major DeUX concept against
 any connected Stream Deck.  It is designed to read top-to-bottom as a
 tutorial -- each section introduces one feature.
 
 Domain logic (audio playback, smart lights, timer countdown, dashboard
 telemetry, scene activation) lives in :mod:`mock_backend` so this file
-focuses purely on DeckUI wiring.  Swap those mock services for real
+focuses purely on DeUX wiring.  Swap those mock services for real
 integrations and the code below stays the same.
 
 **Event-driven architecture**
@@ -28,10 +28,10 @@ Every controller follows the same one-way data flow::
 
 DUI handlers in this file **never** mutate card bindings directly --
 they forward the input to a service method via
-:meth:`~deckui.DuiCard.forward`.  The service updates its state and
+:meth:`~deux.DuiCard.forward`.  The service updates its state and
 emits a typed event with the new value in *domain units*.  Reactive
-bindings registered with :meth:`~deckui.DuiCard.bind`,
-:meth:`~deckui.DuiCard.bind_range`, and :meth:`~deckui.DuiCard.bind_many`
+bindings registered with :meth:`~deux.DuiCard.bind`,
+:meth:`~deux.DuiCard.bind_range`, and :meth:`~deux.DuiCard.bind_many`
 translate domain values into card bindings and request a refresh
 automatically.
 
@@ -42,16 +42,16 @@ hardware state.
 
 What it demonstrates
 --------------------
-* :class:`~deckui.DeckManager` for auto-discovery and hot-plug.
-* :class:`~deckui.AsyncEvent` as the property-change-notification
+* :class:`~deux.DeckManager` for auto-discovery and hot-plug.
+* :class:`~deux.AsyncEvent` as the property-change-notification
   primitive both for backend services and for ``Deck`` itself.
 * Name-based DUI package resolution via the DUI repository.
   ``DuiCard("AudioCard")`` and ``DuiKey("IconKey")`` resolve packages
   from registered search paths — no manual ``load_package`` calls.
-* :class:`~deckui.CardController` lifecycle hooks (:meth:`on_attach` /
+* :class:`~deux.CardController` lifecycle hooks (:meth:`on_attach` /
   :meth:`on_detach`) and reactive ``bind``/``forward`` wiring.
 * Triggering re-renders from background tasks via
-  :meth:`~deckui.DuiCard.request_refresh`.
+  :meth:`~deux.DuiCard.request_refresh`.
 * A live, asyncio-driven countdown ``TimerCard`` and a dashboard clock
   that ticks every second; weather telemetry pushed by a simulator.
 * Multi-screen navigation -- a ``Main`` screen and a ``Settings``
@@ -88,7 +88,7 @@ from mock_backend import (
 )
 from PIL import Image
 
-from deckui import (
+from deux import (
     CardController,
     Deck,
     DeckManager,
@@ -505,7 +505,7 @@ class TimerController(CardController):
         Parameters
         ----------
         deck
-            The :class:`~deckui.Deck` instance (unused -- the timer is
+            The :class:`~deux.Deck` instance (unused -- the timer is
             independent of deck state).
         """
         del deck
@@ -549,9 +549,9 @@ class DashboardController(CardController):
 
     Loads ``DashboardCard.dui``.  Brightness is **deck-owned** state:
     the controller does not store a brightness value of its own.  It
-    subscribes to :attr:`deckui.Deck.on_brightness_changed` (via
-    :meth:`~deckui.DuiCard.bind_range`) and delegates writes to
-    :meth:`deckui.Deck.set_brightness`.  Telemetry arrives via
+    subscribes to :attr:`deux.Deck.on_brightness_changed` (via
+    :meth:`~deux.DuiCard.bind_range`) and delegates writes to
+    :meth:`deux.Deck.set_brightness`.  Telemetry arrives via
     :attr:`MockDashboardService.on_telemetry_changed`.  The clock is
     genuinely poll-driven (system time), so a small task ticks once a
     second.
@@ -621,7 +621,7 @@ class DashboardController(CardController):
         Parameters
         ----------
         deck
-            The freshly-connected :class:`~deckui.Deck` instance.
+            The freshly-connected :class:`~deux.Deck` instance.
         """
         self._deck = deck
 
@@ -714,7 +714,7 @@ class FavoritesController:
     """Favourite-media keys -- one :class:`DuiKey` per catalog entry.
 
     Multi-instance "list of keys" controller -- one key per catalog row
-    -- so it doesn't subclass :class:`~deckui.KeyController` (which is
+    -- so it doesn't subclass :class:`~deux.KeyController` (which is
     intentionally 1:1).  Instead it manages its own list of keys and
     provides :meth:`install` to slot them onto a screen.
 
@@ -854,7 +854,7 @@ class GaugeController(CardController):
         Parameters
         ----------
         deck
-            The :class:`~deckui.Deck` instance (unused -- the gauge is
+            The :class:`~deux.Deck` instance (unused -- the gauge is
             independent of deck state).
         """
         del deck
@@ -948,7 +948,7 @@ class ScreenCycler:
     screen on each trigger, wrapping around at the end.
 
     Source of truth for the *current* screen is
-    :attr:`deckui.Deck.active_screen` -- the cycler does not maintain
+    :attr:`deux.Deck.active_screen` -- the cycler does not maintain
     its own active-screen state.  It does remember the **last-cycled
     screen name** so that on reconnect the app can resume on the
     user's last choice.
@@ -1020,8 +1020,8 @@ class StreamDeckApp:
 
     Build the controllers once; iterate over them in
     :meth:`on_connect` / :meth:`on_disconnect` to drive the uniform
-    :meth:`~deckui.CardController.on_attach` /
-    :meth:`~deckui.CardController.on_detach` lifecycle.
+    :meth:`~deux.CardController.on_attach` /
+    :meth:`~deux.CardController.on_detach` lifecycle.
 
     Parameters
     ----------
@@ -1070,7 +1070,7 @@ class StreamDeckApp:
         Parameters
         ----------
         deck
-            The :class:`~deckui.runtime.deck.Deck` handle.
+            The :class:`~deux.runtime.deck.Deck` handle.
         """
         caps = deck.capabilities
         log.info(

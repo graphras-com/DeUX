@@ -1,4 +1,4 @@
-"""Shared fixtures for deckui tests."""
+"""Shared fixtures for deux tests."""
 
 from __future__ import annotations
 
@@ -8,17 +8,17 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 
-import deckui.dui.repository as _repo_mod
-import deckui.render.svg_rasterize as _svg_mod
-from deckui.render.metrics import RenderMetrics
-from deckui.runtime.capabilities import (
+import deux.dui.repository as _repo_mod
+import deux.render.svg_rasterize as _svg_mod
+from deux.render.metrics import RenderMetrics
+from deux.runtime.capabilities import (
     STREAM_DECK_PLUS,
     DeviceCapabilities,
 )
-from deckui.ui.controls.encoder_slot import EncoderSlot
-from deckui.ui.controls.key_slot import KeySlot
-from deckui.ui.screen import Screen
-from deckui.ui.touch_strip import TouchStrip
+from deux.ui.controls.encoder_slot import EncoderSlot
+from deux.ui.controls.key_slot import KeySlot
+from deux.ui.screen import Screen
+from deux.ui.touch_strip import TouchStrip
 
 # Capture pristine state BEFORE any test modules are imported
 # (some examples set the backend at module level during collection).
@@ -326,7 +326,7 @@ def key_dui_path(tmp_path):
 @pytest.fixture
 def card_package_spec(card_dui_path):
     """A loaded PackageSpec for a TouchStripCard."""
-    from deckui.dui.loader import load_package
+    from deux.dui.loader import load_package
 
     return load_package(card_dui_path)
 
@@ -334,7 +334,7 @@ def card_package_spec(card_dui_path):
 @pytest.fixture
 def key_package_spec(key_dui_path):
     """A loaded PackageSpec for a Key."""
-    from deckui.dui.loader import load_package
+    from deux.dui.loader import load_package
 
     return load_package(key_dui_path)
 

@@ -1,14 +1,14 @@
-"""Tests for deckui.__init__ — public API surface."""
+"""Tests for deux.__init__ — public API surface."""
 
 from __future__ import annotations
 
-import deckui
+import deux
 
 
 class TestPublicAPI:
     def test_version(self):
-        assert isinstance(deckui.__version__, str)
-        assert len(deckui.__version__) > 0
+        assert isinstance(deux.__version__, str)
+        assert len(deux.__version__) > 0
 
     def test_all_exports(self):
         expected = {
@@ -64,25 +64,25 @@ class TestPublicAPI:
             "set_svg_backend",
             "set_svg_stylesheet",
         }
-        assert set(deckui.__all__) == expected
+        assert set(deux.__all__) == expected
 
     def test_key_slot_importable(self):
-        from deckui import KeySlot
+        from deux import KeySlot
 
         assert KeySlot is not None
 
     def test_deck_error_importable(self):
-        from deckui import DeckError
+        from deux import DeckError
 
         assert DeckError is not None
 
     def test_encoder_slot_importable(self):
-        from deckui import EncoderSlot
+        from deux import EncoderSlot
 
         assert EncoderSlot is not None
 
     def test_event_types_importable(self):
-        from deckui import (
+        from deux import (
             EncoderPressEvent,
             EncoderTurnEvent,
             EventType,
@@ -97,23 +97,23 @@ class TestPublicAPI:
         assert EventType is not None
 
     def test_screen_importable(self):
-        from deckui import Screen
+        from deux import Screen
 
         assert Screen is not None
 
     def test_touchscreen_importable(self):
-        from deckui import Card, TouchStrip
+        from deux import Card, TouchStrip
 
         assert TouchStrip is not None
         assert Card is not None
 
     def test_device_info_importable(self):
-        from deckui import DeviceInfo
+        from deux import DeviceInfo
 
         assert DeviceInfo is not None
 
     def test_dui_importable(self):
-        from deckui import (
+        from deux import (
             DuiCard,
             DuiKey,
             DuiRepository,
@@ -142,12 +142,12 @@ class TestPublicAPI:
         assert resolve_dui is not None
 
     def test_blank_card_importable(self):
-        from deckui import BlankCard
+        from deux import BlankCard
 
         assert BlankCard is not None
 
     def test_core_ui_importable(self):
-        from deckui import (
+        from deux import (
             BlankCard,
             Card,
             EncoderSlot,
@@ -164,24 +164,24 @@ class TestPublicAPI:
         assert TouchStrip is not None
 
     def test_new_multi_device_exports(self):
-        from deckui import DeviceCapabilities, InfoScreen, RenderMetrics
+        from deux import DeviceCapabilities, InfoScreen, RenderMetrics
 
         assert DeviceCapabilities is not None
         assert InfoScreen is not None
         assert RenderMetrics is not None
 
     def test_async_event_importable(self):
-        from deckui import AsyncEvent
+        from deux import AsyncEvent
 
         assert AsyncEvent is not None
 
     def test_deck_importable(self):
-        from deckui import Deck
+        from deux import Deck
 
         assert Deck is not None
 
     def test_controllers_importable(self):
-        from deckui import CardController, KeyController
+        from deux import CardController, KeyController
 
         assert CardController is not None
         assert KeyController is not None

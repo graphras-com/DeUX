@@ -1,8 +1,8 @@
-"""Tests for deckui.runtime.capabilities — DeviceCapabilities class."""
+"""Tests for deux.runtime.capabilities — DeviceCapabilities class."""
 
 from __future__ import annotations
 
-from deckui.runtime.capabilities import (
+from deux.runtime.capabilities import (
     STREAM_DECK_PLUS,
     DeviceCapabilities,
 )

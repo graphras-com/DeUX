@@ -1,4 +1,4 @@
-"""Tests for deckui.runtime.transport — AsyncTransport class."""
+"""Tests for deux.runtime.transport — AsyncTransport class."""
 
 from __future__ import annotations
 
@@ -7,15 +7,15 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from deckui.runtime.capabilities import STREAM_DECK_PLUS
-from deckui.runtime.events import (
+from deux.runtime.capabilities import STREAM_DECK_PLUS
+from deux.runtime.events import (
     EncoderPressEvent,
     EncoderTurnEvent,
     EventType,
     KeyEvent,
     TouchEvent,
 )
-from deckui.runtime.transport import AsyncTransport
+from deux.runtime.transport import AsyncTransport
 from tests.conftest import STREAM_DECK_MINI
 
 

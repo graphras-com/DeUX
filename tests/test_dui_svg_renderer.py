@@ -1,4 +1,4 @@
-"""Tests for deckui.dui.svg_renderer — SVG rendering engine."""
+"""Tests for deux.dui.svg_renderer — SVG rendering engine."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import io
 import pytest
 from PIL import Image, ImageFont
 
-from deckui.dui.schema import (
+from deux.dui.schema import (
     ColorBinding,
     CssClassBinding,
     IconifyBinding,
@@ -26,7 +26,7 @@ from deckui.dui.schema import (
     ToggleBinding,
     VisibilityBinding,
 )
-from deckui.dui.svg_renderer import (
+from deux.dui.svg_renderer import (
     SvgRenderer,
     _find_font_file,
     _fit_image,
@@ -858,7 +858,7 @@ class TestSvgRendererSlider:
         import copy
 
         root = copy.deepcopy(renderer._base_root)
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         binding = spec.bindings["pos"]
         renderer._apply_slider(_find_element_by_id(root, "knob"), binding, 0.5)
@@ -878,7 +878,7 @@ class TestSvgRendererSlider:
         import copy
 
         root = copy.deepcopy(renderer._base_root)
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         binding = spec.bindings["pos"]
         renderer._apply_slider(_find_element_by_id(root, "knob"), binding, 0.0)
@@ -898,7 +898,7 @@ class TestSvgRendererSlider:
         import copy
 
         root = copy.deepcopy(renderer._base_root)
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         binding = spec.bindings["pos"]
         renderer._apply_slider(_find_element_by_id(root, "knob"), binding, 1.0)
@@ -922,7 +922,7 @@ class TestSvgRendererSlider:
         import copy
 
         root = copy.deepcopy(renderer._base_root)
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         binding = spec.bindings["vpos"]
         renderer._apply_slider(_find_element_by_id(root, "vknob"), binding, 0.5)
@@ -1032,7 +1032,7 @@ class TestSvgRendererToggleRender:
         )
         renderer = SvgRenderer(spec)
         root = copy.deepcopy(renderer._base_root)
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         elem_on = _find_element_by_id(root, "icon_on")
         elem_off = _find_element_by_id(root, "icon_off")
@@ -1055,7 +1055,7 @@ class TestSvgRendererToggleRender:
         )
         renderer = SvgRenderer(spec)
         root = copy.deepcopy(renderer._base_root)
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         elem_on = _find_element_by_id(root, "icon_on")
         elem_off = _find_element_by_id(root, "icon_off")
@@ -1196,7 +1196,7 @@ class TestResolveFontAttrs:
         import xml.etree.ElementTree as ET
 
         root = ET.fromstring(_WRAP_SVG_FONT_ON_TEXT)
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         elem = _find_element_by_id(root, "label")
         family, size = _resolve_font_attrs(root, elem)
@@ -1207,7 +1207,7 @@ class TestResolveFontAttrs:
         import xml.etree.ElementTree as ET
 
         root = ET.fromstring(_WRAP_SVG)
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         elem = _find_element_by_id(root, "label")
         family, size = _resolve_font_attrs(root, elem)
@@ -1218,7 +1218,7 @@ class TestResolveFontAttrs:
         import xml.etree.ElementTree as ET
 
         root = ET.fromstring(_WRAP_SVG_NO_FONT)
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         elem = _find_element_by_id(root, "label")
         family, size = _resolve_font_attrs(root, elem)
@@ -1234,7 +1234,7 @@ class TestResolveFontAttrs:
             "</svg>"
         )
         root = ET.fromstring(svg)
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         elem = _find_element_by_id(root, "t")
         family, size = _resolve_font_attrs(root, elem)
@@ -1303,7 +1303,7 @@ class TestLoadFont:
 
         # Patch _system_font_dirs to return our tmp dir only.
         monkeypatch.setattr(
-            "deckui.dui.svg_renderer._system_font_dirs",
+            "deux.dui.svg_renderer._system_font_dirs",
             lambda: [fake_dir],
         )
         _font_file_index.cache_clear()
@@ -1323,7 +1323,7 @@ class TestLoadFont:
         (fake_dir / "frutigerlinotype.ttf").touch()
 
         monkeypatch.setattr(
-            "deckui.dui.svg_renderer._system_font_dirs",
+            "deux.dui.svg_renderer._system_font_dirs",
             lambda: [fake_dir],
         )
         _font_file_index.cache_clear()
@@ -1340,7 +1340,7 @@ class TestLoadFont:
         fake_dir.mkdir()
 
         monkeypatch.setattr(
-            "deckui.dui.svg_renderer._system_font_dirs",
+            "deux.dui.svg_renderer._system_font_dirs",
             lambda: [fake_dir],
         )
         _font_file_index.cache_clear()
@@ -1469,7 +1469,7 @@ class TestSvgRendererWrappedText:
 
         root = copy.deepcopy(renderer._base_root)
         binding = spec.bindings["label"]
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         elem = _find_element_by_id(root, "label")
         renderer._apply_text(root, elem, binding, "Arthur Olsen's Favorites")
@@ -1494,7 +1494,7 @@ class TestSvgRendererWrappedText:
         )
         renderer = SvgRenderer(spec)
         root = copy.deepcopy(renderer._base_root)
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         elem = _find_element_by_id(root, "label")
         binding = spec.bindings["label"]
@@ -1517,7 +1517,7 @@ class TestSvgRendererWrappedText:
         )
         renderer = SvgRenderer(spec)
         root = copy.deepcopy(renderer._base_root)
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         elem = _find_element_by_id(root, "label")
         binding = spec.bindings["label"]
@@ -1539,7 +1539,7 @@ class TestSvgRendererWrappedText:
         )
         renderer = SvgRenderer(spec)
         root = copy.deepcopy(renderer._base_root)
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         elem = _find_element_by_id(root, "label")
         binding = spec.bindings["label"]
@@ -1568,7 +1568,7 @@ class TestSvgRendererWrappedText:
         )
         renderer = SvgRenderer(spec)
         root = copy.deepcopy(renderer._base_root)
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         elem = _find_element_by_id(root, "label")
         binding = spec.bindings["label"]
@@ -1598,7 +1598,7 @@ class TestSvgRendererWrappedText:
         )
         renderer = SvgRenderer(spec)
         root = copy.deepcopy(renderer._base_root)
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         elem = _find_element_by_id(root, "label")
         binding = spec.bindings["label"]
@@ -1620,7 +1620,7 @@ class TestSvgRendererWrappedText:
         )
         renderer = SvgRenderer(spec)
         root = copy.deepcopy(renderer._base_root)
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         elem = _find_element_by_id(root, "label")
         binding = spec.bindings["label"]
@@ -1652,7 +1652,7 @@ class TestSvgRendererWrappedText:
         )
         renderer = SvgRenderer(spec)
         root = copy.deepcopy(renderer._base_root)
-        from deckui.dui.svg_renderer import _find_element_by_id
+        from deux.dui.svg_renderer import _find_element_by_id
 
         elem = _find_element_by_id(root, "label")
         binding = spec.bindings["label"]
@@ -1732,7 +1732,7 @@ def _find_by_id(root, target_id: str):
 
 class TestIconifyBindingRendering:
     def _patch_fetch(self, monkeypatch, svg: str = _ICONIFY_SAMPLE):
-        import deckui.dui.svg_renderer as svg_renderer_mod
+        import deux.dui.svg_renderer as svg_renderer_mod
 
         monkeypatch.setattr(
             svg_renderer_mod, "fetch_icon", lambda name: svg, raising=True
@@ -1776,7 +1776,7 @@ class TestIconifyBindingRendering:
             calls.append(name)
             return _ICONIFY_SAMPLE
 
-        import deckui.dui.svg_renderer as svg_renderer_mod
+        import deux.dui.svg_renderer as svg_renderer_mod
 
         monkeypatch.setattr(svg_renderer_mod, "fetch_icon", fake_fetch, raising=True)
 
@@ -1851,8 +1851,8 @@ class TestIconifyBindingRendering:
         """A failed icon fetch is logged and renders an empty <g>."""
         import logging
 
-        import deckui.dui.svg_renderer as svg_renderer_mod
-        from deckui.dui.iconify import IconifyError
+        import deux.dui.svg_renderer as svg_renderer_mod
+        from deux.dui.iconify import IconifyError
 
         def boom(name: str) -> str:
             raise IconifyError("no network")
@@ -1866,7 +1866,7 @@ class TestIconifyBindingRendering:
             },
         )
         renderer = SvgRenderer(spec)
-        with caplog.at_level(logging.WARNING, logger="deckui.dui.svg_renderer"):
+        with caplog.at_level(logging.WARNING, logger="deux.dui.svg_renderer"):
             root = self._serialise_with_bindings(renderer)
         g = _find_by_id(root, "icon")
         assert list(g) == []
@@ -1876,7 +1876,7 @@ class TestIconifyBindingRendering:
         """A fetched payload that is not parseable XML is skipped gracefully."""
         import logging
 
-        import deckui.dui.svg_renderer as svg_renderer_mod
+        import deux.dui.svg_renderer as svg_renderer_mod
 
         monkeypatch.setattr(
             svg_renderer_mod, "fetch_icon", lambda name: "<svg><broken", raising=True
@@ -1889,7 +1889,7 @@ class TestIconifyBindingRendering:
             },
         )
         renderer = SvgRenderer(spec)
-        with caplog.at_level(logging.WARNING, logger="deckui.dui.svg_renderer"):
+        with caplog.at_level(logging.WARNING, logger="deux.dui.svg_renderer"):
             root = self._serialise_with_bindings(renderer)
         g = _find_by_id(root, "icon")
         assert list(g) == []
@@ -2102,7 +2102,7 @@ class TestListBinding:
             '<path d="M10 20v-6h4v6"/></svg>'
         )
         monkeypatch.setattr(
-            "deckui.dui.svg_renderer.fetch_icon", lambda _name: icon_svg
+            "deux.dui.svg_renderer.fetch_icon", lambda _name: icon_svg
         )
         renderer = self._make_renderer(items=("Home", "icon:mdi:cog"), index=1)
         svg = renderer.render_svg()
@@ -2113,12 +2113,12 @@ class TestListBinding:
 
     def test_icon_fetch_failure_skips(self, monkeypatch):
         """If icon fetch fails, the item is silently skipped."""
-        from deckui.dui.iconify import IconifyError
+        from deux.dui.iconify import IconifyError
 
         def _fail(name):
             raise IconifyError(f"not found: {name}")
 
-        monkeypatch.setattr("deckui.dui.svg_renderer.fetch_icon", _fail)
+        monkeypatch.setattr("deux.dui.svg_renderer.fetch_icon", _fail)
         renderer = self._make_renderer(items=("A", "icon:bad:icon"), index=0)
         svg = renderer.render_svg()
         # Only "A" should render
@@ -2127,7 +2127,7 @@ class TestListBinding:
     def test_icon_parse_failure_skips(self, monkeypatch):
         """If icon SVG is malformed, the item is silently skipped."""
         monkeypatch.setattr(
-            "deckui.dui.svg_renderer.fetch_icon", lambda _: "not valid xml <<<"
+            "deux.dui.svg_renderer.fetch_icon", lambda _: "not valid xml <<<"
         )
         renderer = self._make_renderer(items=("icon:bad:svg",), index=0)
         svg = renderer.render_svg()

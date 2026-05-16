@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
-import deckui.render.svg_rasterize as svg_mod
-from deckui.render.svg_rasterize import (
+import deux.render.svg_rasterize as svg_mod
+from deux.render.svg_rasterize import (
     CairoRasterizer,
     PyvipsRasterizer,
     RasterizeError,
@@ -276,7 +276,7 @@ class TestPublicExports:
 
     def test_render_exports(self):
         """render.__init__ exports backend API."""
-        from deckui.render import (
+        from deux.render import (
             SvgRasterizer,
             get_svg_backend,
             list_svg_backends,
@@ -291,14 +291,14 @@ class TestPublicExports:
         assert SvgRasterizer is not None
 
     def test_toplevel_exports(self):
-        """deckui.__init__ exports backend API."""
-        import deckui
+        """deux.__init__ exports backend API."""
+        import deux
 
-        assert callable(deckui.register_svg_backend)
-        assert callable(deckui.set_svg_backend)
-        assert callable(deckui.get_svg_backend)
-        assert callable(deckui.list_svg_backends)
-        assert deckui.SvgRasterizer is not None
+        assert callable(deux.register_svg_backend)
+        assert callable(deux.set_svg_backend)
+        assert callable(deux.get_svg_backend)
+        assert callable(deux.list_svg_backends)
+        assert deux.SvgRasterizer is not None
 
 
 class TestSvgStylesheet:
@@ -529,7 +529,7 @@ class TestStylesheetExports:
 
     def test_render_exports_stylesheet(self):
         """render.__init__ exports stylesheet API."""
-        from deckui.render import (
+        from deux.render import (
             get_svg_stylesheet,
             load_svg_stylesheet,
             set_svg_stylesheet,
@@ -540,12 +540,12 @@ class TestStylesheetExports:
         assert callable(load_svg_stylesheet)
 
     def test_toplevel_exports_stylesheet(self):
-        """deckui.__init__ exports stylesheet API."""
-        import deckui
+        """deux.__init__ exports stylesheet API."""
+        import deux
 
-        assert callable(deckui.set_svg_stylesheet)
-        assert callable(deckui.get_svg_stylesheet)
-        assert callable(deckui.load_svg_stylesheet)
+        assert callable(deux.set_svg_stylesheet)
+        assert callable(deux.get_svg_stylesheet)
+        assert callable(deux.load_svg_stylesheet)
 
 
 class TestLoadSvgStylesheet:

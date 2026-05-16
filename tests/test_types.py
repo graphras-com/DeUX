@@ -1,4 +1,4 @@
-"""Tests for deckui.runtime.events — events, enums, and dataclasses."""
+"""Tests for deux.runtime.events — events, enums, and dataclasses."""
 
 from __future__ import annotations
 
@@ -6,10 +6,10 @@ import dataclasses
 
 import pytest
 
-from deckui.render.metrics import RenderMetrics
-from deckui.runtime.capabilities import STREAM_DECK_PLUS
-from deckui.runtime.device_info import DeviceInfo
-from deckui.runtime.events import (
+from deux.render.metrics import RenderMetrics
+from deux.runtime.capabilities import STREAM_DECK_PLUS
+from deux.runtime.device_info import DeviceInfo
+from deux.runtime.events import (
     EncoderPressEvent,
     EncoderTurnEvent,
     EventType,

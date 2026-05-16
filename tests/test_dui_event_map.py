@@ -1,4 +1,4 @@
-"""Tests for deckui.dui.event_map — event routing and gesture detection."""
+"""Tests for deux.dui.event_map — event routing and gesture detection."""
 
 from __future__ import annotations
 
@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from deckui.dui.event_map import EventMap
-from deckui.dui.schema import EventMapping, Region
-from deckui.runtime.events import EventType
+from deux.dui.event_map import EventMap
+from deux.dui.schema import EventMapping, Region
+from deux.runtime.events import EventType
 
 
 def _make_events(*specs: tuple) -> tuple[EventMapping, ...]:

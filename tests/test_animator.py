@@ -1,4 +1,4 @@
-"""Tests for deckui.dui.animator — SpinnerAnimator class."""
+"""Tests for deux.dui.animator — SpinnerAnimator class."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from deckui.dui.animator import SpinnerAnimator
+from deux.dui.animator import SpinnerAnimator
 
 
 class TestSpinnerAnimatorLifecycle:

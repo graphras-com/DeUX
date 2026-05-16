@@ -1,4 +1,4 @@
-"""Tests for deckui.dui.repository — DUI package repository and name-based resolution."""
+"""Tests for deux.dui.repository — DUI package repository and name-based resolution."""
 
 from __future__ import annotations
 
@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from deckui.dui.card import DuiCard
-from deckui.dui.key import DuiKey
-from deckui.dui.loader import PackageError
-from deckui.dui.repository import (
+from deux.dui.card import DuiCard
+from deux.dui.key import DuiKey
+from deux.dui.loader import PackageError
+from deux.dui.repository import (
     DuiRepository,
     _get_repository,
     add_dui_path,
@@ -18,7 +18,7 @@ from deckui.dui.repository import (
     remove_dui_path,
     resolve_dui,
 )
-from deckui.dui.schema import PackageSpec, PackageType
+from deux.dui.schema import PackageSpec, PackageType
 
 # ── Minimal SVG templates (mirrors conftest but self-contained) ───────
 

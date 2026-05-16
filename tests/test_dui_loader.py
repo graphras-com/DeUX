@@ -1,4 +1,4 @@
-"""Tests for deckui.dui.loader — package loading and validation."""
+"""Tests for deux.dui.loader — package loading and validation."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ import logging
 
 import pytest
 
-from deckui.dui.loader import PackageError, load_all_packages, load_package
-from deckui.dui.schema import (
+from deux.dui.loader import PackageError, load_all_packages, load_package
+from deux.dui.schema import (
     ColorBinding,
     CssClassBinding,
     IconifyBinding,
@@ -1495,7 +1495,7 @@ class TestLoadPackageMetadata:
         assert spec.category is None
         assert spec.url is None
         assert spec.icon is None
-        assert spec.min_deckui is None
+        assert spec.min_deux is None
         assert spec.device == ()
 
     def test_all_metadata_parsed(self, tmp_path):
@@ -1507,7 +1507,7 @@ class TestLoadPackageMetadata:
             "category: media\n"
             'url: "https://example.com"\n'
             'icon: "assets/icon.png"\n'
-            'min_deckui: "0.5.0"\n'
+            'min_deux: "0.5.0"\n'
             "device: [StreamDeckPlus]\n"
         )
         pkg = tmp_path / "M.dui"
@@ -1525,7 +1525,7 @@ class TestLoadPackageMetadata:
         assert spec.category == "media"
         assert spec.url == "https://example.com"
         assert spec.icon == "assets/icon.png"
-        assert spec.min_deckui == "0.5.0"
+        assert spec.min_deux == "0.5.0"
         assert spec.device == ("StreamDeckPlus",)
 
     def test_invalid_category(self, tmp_path):
@@ -1568,9 +1568,9 @@ class TestLoadPackageMetadata:
         with pytest.raises(PackageError, match="'icon' must be a string"):
             load_package(self._make_pkg(tmp_path, "icon: 123"))
 
-    def test_min_deckui_not_string(self, tmp_path):
-        with pytest.raises(PackageError, match="'min_deckui' must be a string"):
-            load_package(self._make_pkg(tmp_path, "min_deckui: 1"))
+    def test_min_deux_not_string(self, tmp_path):
+        with pytest.raises(PackageError, match="'min_deux' must be a string"):
+            load_package(self._make_pkg(tmp_path, "min_deux: 1"))
 
     def test_category_not_string(self, tmp_path):
         with pytest.raises(PackageError, match="'category' must be a string"):

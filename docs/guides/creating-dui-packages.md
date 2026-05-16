@@ -38,7 +38,7 @@ These fields are optional for local use but required when publishing to a DUI pa
 | `category` | `str` | no | Primary category from a controlled vocabulary (see below) |
 | `url` | `str` | no | Project or source URL |
 | `icon` | `str` | no | Path to a thumbnail in `assets/` for repository listings |
-| `min_deckui` | `str` | no | Minimum DeckUI version required (e.g. `"0.5.0"`) |
+| `min_deux` | `str` | no | Minimum DeUX version required (e.g. `"0.5.0"`) |
 | `device` | `list[str]` | no | Explicit device compatibility (`[StreamDeckPlus, StreamDeckXL]`) |
 
 #### Valid Categories
@@ -82,7 +82,7 @@ category: media
 tags: [music, spotify, media-player]
 url: https://github.com/jane/nowplaying-dui
 icon: assets/icon.png
-min_deckui: "0.5.0"
+min_deux: "0.5.0"
 
 bindings:
   title:
@@ -537,7 +537,7 @@ events:
 ```
 
 ```python
-from deckui.dui import DuiKey, load_package
+from deux.dui import DuiKey, load_package
 
 spec = load_package("./SmartLight.dui")
 key = DuiKey(spec)
@@ -665,7 +665,7 @@ events:
 ### Loading a Package
 
 ```python
-from deckui.dui import load_package, load_all_packages
+from deux.dui import load_package, load_all_packages
 
 # Load a single package
 spec = load_package("path/to/AudioPlayer.dui")
@@ -677,7 +677,7 @@ packages = load_all_packages("path/to/packages/")
 ### Touchscreen Card
 
 ```python
-from deckui.dui import DuiCard
+from deux.dui import DuiCard
 
 card = DuiCard(spec, screen)
 
@@ -710,7 +710,7 @@ image = card.render()
 ### Physical Key
 
 ```python
-from deckui.dui import DuiKey
+from deux.dui import DuiKey
 
 key = DuiKey(spec, slot)
 
@@ -753,7 +753,7 @@ Use the verify tool to check packages before publishing to a repository.
 ### Basic verification
 
 ```bash
-python -m deckui.tools.verify path/to/MyPackage.dui
+python -m deux.tools.verify path/to/MyPackage.dui
 ```
 
 Checks that the package loads correctly and reports warnings for missing metadata, oversized assets, uppercase tags, and unknown manifest keys.
@@ -761,7 +761,7 @@ Checks that the package loads correctly and reports warnings for missing metadat
 ### Strict mode (for repository submission)
 
 ```bash
-python -m deckui.tools.verify --strict path/to/MyPackage.dui
+python -m deux.tools.verify --strict path/to/MyPackage.dui
 ```
 
 Promotes all warnings to errors. Use this as a gate for repository submissions — packages must have `description` and `author` to pass.
@@ -769,7 +769,7 @@ Promotes all warnings to errors. Use this as a gate for repository submissions �
 ### Build a repository index
 
 ```bash
-python -m deckui.tools.verify --index path/to/packages/
+python -m deux.tools.verify --index path/to/packages/
 ```
 
 Verifies all `.dui` packages in a directory and emits a `repository.json` to stdout containing metadata from every valid package. This JSON index is all a repository needs — no external database required.

@@ -1,4 +1,4 @@
-"""Tests for deckui.tools.preview — SVG preview CLI tool."""
+"""Tests for deux.tools.preview — SVG preview CLI tool."""
 
 from __future__ import annotations
 
@@ -13,12 +13,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from PIL import Image
 
-from deckui.render.svg_rasterize import RasterizeError
-from deckui.runtime.capabilities import STREAM_DECK_PLUS
+from deux.render.svg_rasterize import RasterizeError
+from deux.runtime.capabilities import STREAM_DECK_PLUS
 
 if TYPE_CHECKING:
     from pathlib import Path
-from deckui.tools.preview import (
+from deux.tools.preview import (
     _MAX_CARD_SLOTS,
     _MAX_KEY_SLOTS,
     _svg_to_png_fit,
@@ -464,7 +464,7 @@ class TestPushToDevice:
     async def test_push_renders_and_pushes(
         self, mock_streamdeck_device: MagicMock, square_svg: Path
     ):
-        from deckui.tools.preview import push_to_device
+        from deux.tools.preview import push_to_device
 
         # The device protocol-cast accepts the StreamDeck mock
         mock_streamdeck_device.DECK_VISUAL = True
@@ -473,11 +473,11 @@ class TestPushToDevice:
 
         with (
             patch(
-                "deckui.tools.preview._find_and_open_device",
+                "deux.tools.preview._find_and_open_device",
                 return_value=mock_streamdeck_device,
             ),
             patch(
-                "deckui.tools.preview._wait_for_interrupt",
+                "deux.tools.preview._wait_for_interrupt",
                 new_callable=AsyncMock,
             ),
         ):
@@ -496,18 +496,18 @@ class TestPushToDevice:
         mock_streamdeck_device.close.assert_called_once()
 
     async def test_brightness_clamped(self, mock_streamdeck_device: MagicMock):
-        from deckui.tools.preview import push_to_device
+        from deux.tools.preview import push_to_device
 
         mock_streamdeck_device.DECK_VISUAL = True
         args = parse_args(["--brightness", "150"])
 
         with (
             patch(
-                "deckui.tools.preview._find_and_open_device",
+                "deux.tools.preview._find_and_open_device",
                 return_value=mock_streamdeck_device,
             ),
             patch(
-                "deckui.tools.preview._wait_for_interrupt",
+                "deux.tools.preview._wait_for_interrupt",
                 new_callable=AsyncMock,
             ),
         ):
@@ -519,18 +519,18 @@ class TestPushToDevice:
         self, mock_mini_device: MagicMock
     ):
         """A device without a touchscreen does not call set_touchscreen_image."""
-        from deckui.tools.preview import push_to_device
+        from deux.tools.preview import push_to_device
 
         mock_mini_device.DECK_VISUAL = True
         args = parse_args([])
 
         with (
             patch(
-                "deckui.tools.preview._find_and_open_device",
+                "deux.tools.preview._find_and_open_device",
                 return_value=mock_mini_device,
             ),
             patch(
-                "deckui.tools.preview._wait_for_interrupt",
+                "deux.tools.preview._wait_for_interrupt",
                 new_callable=AsyncMock,
             ),
         ):
@@ -540,20 +540,20 @@ class TestPushToDevice:
 
 
 class TestMain:
-    @patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock)
+    @patch("deux.tools.preview.push_to_device", new_callable=AsyncMock)
     def test_main_calls_push(self, mock_push: AsyncMock, square_svg: Path):
         main(["--key0", str(square_svg)])
         mock_push.assert_awaited_once()
         args = mock_push.call_args.args[0]
         assert args.key0 == square_svg
 
-    @patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock)
+    @patch("deux.tools.preview.push_to_device", new_callable=AsyncMock)
     def test_main_passes_poll_interval(self, mock_push: AsyncMock):
         main(["--poll-interval", "1.5"])
         kwargs = mock_push.call_args.kwargs
         assert kwargs["poll_interval"] == 1.5
 
-    @patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock)
+    @patch("deux.tools.preview.push_to_device", new_callable=AsyncMock)
     def test_main_verbose(self, mock_push: AsyncMock):
         main(["-v"])
         mock_push.assert_awaited_once()
@@ -561,14 +561,14 @@ class TestMain:
 
 class TestWaitForInterrupt:
     async def test_returns_on_sigint(self):
-        from deckui.tools.preview import _wait_for_interrupt
+        from deux.tools.preview import _wait_for_interrupt
 
         loop = asyncio.get_running_loop()
         loop.call_later(0.05, os.kill, os.getpid(), signal.SIGINT)
         await asyncio.wait_for(_wait_for_interrupt(), timeout=1.0)
 
     async def test_signal_handler_removed_after_return(self):
-        from deckui.tools.preview import _wait_for_interrupt
+        from deux.tools.preview import _wait_for_interrupt
 
         loop = asyncio.get_running_loop()
         loop.call_later(0.05, os.kill, os.getpid(), signal.SIGINT)
@@ -599,7 +599,7 @@ class TestSvgToPngFit:
         fake_png.save(buf, format="PNG")
         fake_png_bytes = buf.getvalue()
 
-        import deckui.render.svg_rasterize as svg_mod
+        import deux.render.svg_rasterize as svg_mod
 
         class FailBackend:
             def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
@@ -625,7 +625,7 @@ class TestSvgToPngFit:
         """When all backends fail in auto mode, RasterizeError is raised."""
         svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>'
 
-        import deckui.render.svg_rasterize as svg_mod
+        import deux.render.svg_rasterize as svg_mod
 
         class FailBackend:
             def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
@@ -646,7 +646,7 @@ class TestSvgToPngFit:
 
 class TestFindAndOpenDevice:
     def test_no_devices_exits(self, capsys: pytest.CaptureFixture[str]):
-        from deckui.tools.preview import _find_and_open_device
+        from deux.tools.preview import _find_and_open_device
 
         mock_dm = MagicMock()
         mock_dm.return_value.enumerate.return_value = []
@@ -658,7 +658,7 @@ class TestFindAndOpenDevice:
         assert "No Stream Deck devices found" in capsys.readouterr().err
 
     def test_no_visual_devices_exits(self, capsys: pytest.CaptureFixture[str]):
-        from deckui.tools.preview import _find_and_open_device
+        from deux.tools.preview import _find_and_open_device
 
         device = MagicMock()
         device.DECK_VISUAL = False
@@ -672,7 +672,7 @@ class TestFindAndOpenDevice:
         assert "No visual Stream Deck devices found" in capsys.readouterr().err
 
     def test_opens_first_visual_device(self):
-        from deckui.tools.preview import _find_and_open_device
+        from deux.tools.preview import _find_and_open_device
 
         device = MagicMock()
         device.DECK_VISUAL = True
@@ -688,13 +688,13 @@ class TestFindAndOpenDevice:
 
 
 class TestMainModule:
-    @patch("deckui.tools.preview.main")
+    @patch("deux.tools.preview.main")
     def test_main_module(self, mock_main: MagicMock):
         import importlib
 
-        import deckui.tools.__main__
+        import deux.tools.__main__
 
-        importlib.reload(deckui.tools.__main__)
+        importlib.reload(deux.tools.__main__)
         mock_main.assert_called()
 
 
@@ -830,18 +830,18 @@ class TestPushToDeviceWatch:
     async def test_push_with_watch_invokes_watch(
         self, mock_streamdeck_device: MagicMock, square_svg: Path
     ):
-        from deckui.tools.preview import push_to_device
+        from deux.tools.preview import push_to_device
 
         mock_streamdeck_device.DECK_VISUAL = True
         args = parse_args(["--key0", str(square_svg), "--watch"])
 
         with (
             patch(
-                "deckui.tools.preview._find_and_open_device",
+                "deux.tools.preview._find_and_open_device",
                 return_value=mock_streamdeck_device,
             ),
             patch(
-                "deckui.tools.preview._watch_and_reload",
+                "deux.tools.preview._watch_and_reload",
                 new_callable=AsyncMock,
             ) as mock_watch,
         ):
@@ -856,8 +856,8 @@ class TestMainRendererFlag:
     def test_main_sets_renderer(self):
         """``--renderer`` flag calls ``set_svg_backend`` before running."""
         with (
-            patch("deckui.tools.preview.set_svg_backend") as mock_set,
-            patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock),
+            patch("deux.tools.preview.set_svg_backend") as mock_set,
+            patch("deux.tools.preview.push_to_device", new_callable=AsyncMock),
         ):
             main(["--renderer", "cairo"])
             mock_set.assert_called_once_with("cairo")
@@ -865,8 +865,8 @@ class TestMainRendererFlag:
     def test_main_auto_skips_set(self):
         """``--renderer auto`` (default) does not call ``set_svg_backend``."""
         with (
-            patch("deckui.tools.preview.set_svg_backend") as mock_set,
-            patch("deckui.tools.preview.push_to_device", new_callable=AsyncMock),
+            patch("deux.tools.preview.set_svg_backend") as mock_set,
+            patch("deux.tools.preview.push_to_device", new_callable=AsyncMock),
         ):
             main([])
             mock_set.assert_not_called()

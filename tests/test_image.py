@@ -1,4 +1,4 @@
-"""Tests for deckui.render — rendering helpers."""
+"""Tests for deux.render — rendering helpers."""
 
 from __future__ import annotations
 
@@ -6,12 +6,12 @@ import io
 
 from PIL import Image
 
-from deckui.render.key_renderer import (
+from deux.render.key_renderer import (
     _encode_image,
     render_blank_key,
     render_key_image,
 )
-from deckui.render.touch_renderer import (
+from deux.render.touch_renderer import (
     compose_card_with_background,
     compose_touchstrip,
     render_blank_touchscreen,

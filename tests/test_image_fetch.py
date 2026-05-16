@@ -1,4 +1,4 @@
-"""Tests for deckui.render.image_fetch — remote image fetch and cache."""
+"""Tests for deux.render.image_fetch — remote image fetch and cache."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from unittest.mock import patch
 import pytest
 from PIL import Image
 
-from deckui.render import image_fetch as mod
-from deckui.render.image_fetch import (
+from deux.render import image_fetch as mod
+from deux.render.image_fetch import (
     ImageFetchError,
     _validate_url,
     clear_cache,
@@ -187,17 +187,17 @@ class TestPackageExports:
     """Ensure fetch_image is accessible from the package root."""
 
     def test_render_package_exports(self):
-        from deckui.render import ImageFetchError as IE
-        from deckui.render import clear_image_cache
-        from deckui.render import fetch_image as fi
+        from deux.render import ImageFetchError as IE
+        from deux.render import clear_image_cache
+        from deux.render import fetch_image as fi
 
         assert IE is ImageFetchError
         assert fi is fetch_image
         assert callable(clear_image_cache)
 
     def test_root_package_exports(self):
-        import deckui
+        import deux
 
-        assert hasattr(deckui, "fetch_image")
-        assert hasattr(deckui, "ImageFetchError")
-        assert hasattr(deckui, "clear_image_cache")
+        assert hasattr(deux, "fetch_image")
+        assert hasattr(deux, "ImageFetchError")
+        assert hasattr(deux, "clear_image_cache")

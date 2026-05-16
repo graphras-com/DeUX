@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate architecture diagrams from DeckUI source code.
+"""Generate architecture diagrams from DeUX source code.
 
 Uses pyreverse to extract class and package relationships, then renders
 them to SVG via Graphviz. The resulting files are placed in
@@ -19,7 +19,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-PROJECT_NAME = "deckui"
+PROJECT_NAME = "deux"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_ROOT = REPO_ROOT / "src"
 PACKAGE_PATH = SRC_ROOT / PROJECT_NAME

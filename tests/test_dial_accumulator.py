@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from deckui.ui.controls.dial_accumulator import DialAccumulator
+from deux.ui.controls.dial_accumulator import DialAccumulator
 
 
 class TestDialAccumulatorInit:
