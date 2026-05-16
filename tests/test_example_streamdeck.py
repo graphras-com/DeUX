@@ -372,6 +372,9 @@ def _iconkey_spec() -> PackageSpec:
             "background_class": CssClassBinding(
                 node="background", default="background-dark"
             ),
+            "icon_class": CssClassBinding(
+                node="icon", default="icon"
+            ),
         },
         events=(
             EventMapping(name="click", source="key_press_release", max_duration_ms=300),

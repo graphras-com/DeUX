@@ -154,7 +154,7 @@ def _truncate_text(
     return text[: max(1, max_chars - 1)] + ellipsis
 
 
-_DEFAULT_FONT_FAMILY = "sans-serif"
+_DEFAULT_FONT_FAMILY = "Inter"
 _DEFAULT_FONT_SIZE = 16.0
 _DEFAULT_LINE_HEIGHT_RATIO = 1.2
 
@@ -288,6 +288,11 @@ def _find_font_file(family: str) -> Path | None:
     for stem in dict.fromkeys(candidates):  # deduplicate, preserve order
         if stem in index:
             return index[stem]
+    # Prefix match for variable font filenames (e.g. "inter" -> "inter-variablefont_...")
+    for stem in dict.fromkeys(candidates):
+        for key, path in index.items():
+            if key.startswith(stem):
+                return path
     return None
 
 

@@ -1222,7 +1222,7 @@ class TestResolveFontAttrs:
 
         elem = _find_element_by_id(root, "label")
         family, size = _resolve_font_attrs(root, elem)
-        assert family == "sans-serif"
+        assert family == "Inter"
         assert size == 16.0
 
     def test_font_size_with_px_suffix(self):
