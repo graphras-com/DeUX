@@ -19,6 +19,8 @@ wheels/
 sdist/
 
 playground/
+screenshots/*
+!screenshots/.gitkeep
 
 # Virtual environments
 .venv/

@@ -67,7 +67,7 @@ SCENE_DEFS: list[dict[str, str]] = [
     {"label": "Normal", "icon": "fa-regular:smile-beam"},
     {"label": "Tired", "icon": "fa-regular:tired"},
     {"label": "Cinema", "icon": "mdi:cinema"},
-    {"label": "Bedtime", "icon": "icon-park-outline:sleep-two"},
+    {"label": "Screenshot", "icon": "material-symbols:screenshot-keyboard-outline"},
 ]
 
 # ===========================================================================
