@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -297,3 +298,63 @@ class Screen:
             card.mark_dirty()
         if self._info_screen is not None:
             self._info_screen.mark_dirty()
+
+    def screenshot(self, directory: str | Path) -> list[Path]:
+        """Save the current screen state as individual JPEG files.
+
+        Writes one file per key that has been rendered, one file per
+        touch-strip card that has been rendered, and one file for the
+        info screen (if it has content).  Blank or unrendered controls
+        are skipped.
+
+        Parameters
+        ----------
+        directory : str or Path
+            Target directory for the screenshot files.  Created
+            (including parents) if it does not already exist.
+
+        Returns
+        -------
+        list[Path]
+            Paths of all files written, in the order they were saved.
+
+        Examples
+        --------
+        ::
+
+            paths = screen.screenshot("/tmp/deck_screenshot")
+            # [PosixPath('/tmp/deck_screenshot/key_0.jpg'),
+            #  PosixPath('/tmp/deck_screenshot/card_1.jpg')]
+        """
+        out_dir = Path(directory)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        written: list[Path] = []
+
+        # Keys
+        for index, key_slot in self._keys.items():
+            if key_slot.image_bytes is None:
+                continue
+            path = out_dir / f"key_{index}.jpg"
+            path.write_bytes(key_slot.image_bytes)
+            written.append(path)
+
+        # Touch-strip cards
+        if self._touch_strip is not None:
+            for index, card in enumerate(self._touch_strip.cards):
+                img = card.rendered
+                if img is None:
+                    continue
+                buf = io.BytesIO()
+                rgb = img.convert("RGB") if img.mode != "RGB" else img
+                rgb.save(buf, format="JPEG", quality=90)
+                path = out_dir / f"card_{index}.jpg"
+                path.write_bytes(buf.getvalue())
+                written.append(path)
+
+        # Info screen
+        if self._info_screen is not None and self._info_screen.image is not None:
+            path = out_dir / "info_screen.jpg"
+            path.write_bytes(self._info_screen.render_bytes())
+            written.append(path)
+
+        return written
