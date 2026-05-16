@@ -30,6 +30,7 @@ from .transport import AsyncTransport
 if TYPE_CHECKING:
     from ..dui.animator import PushFn
     from ..dui.key import DuiKey
+    from ..render.theme import Theme
     from ..ui.cards.base import Card
     from ..ui.controls.key_slot import KeySlot
     from ..ui.screen import Screen
@@ -91,6 +92,7 @@ class Deck:
 
         self._screens: dict[str, Screen] = {}
         self._active_screen: Screen | None = None
+        self._theme: Theme | None = None
 
         self.on_brightness_changed = AsyncEvent()
         self.on_screen_changed = AsyncEvent()
@@ -247,6 +249,40 @@ class Deck:
         """Current brightness level (0-100)."""
         return self._brightness
 
+    @property
+    def theme(self) -> Theme | None:
+        """Per-deck theme override, or ``None`` to inherit the system theme.
+
+        When set, this theme is used for all screens on this deck
+        unless a screen has its own :attr:`~deckui.Screen.theme`
+        override.  Set to ``None`` to fall back to the system-wide
+        theme.
+        """
+        return self._theme
+
+    @theme.setter
+    def theme(self, value: Theme | None) -> None:
+        self._theme = value
+
+    def _resolve_stylesheet(self) -> str:
+        """Resolve the effective CSS stylesheet for the active screen.
+
+        The cascade is: screen theme > deck theme > system theme.
+
+        Returns
+        -------
+        str
+            CSS stylesheet string from the most specific theme.
+        """
+        from ..render.theme import get_active_theme
+
+        screen = self._active_screen
+        if screen is not None and screen.theme is not None:
+            return screen.theme.css
+        if self._theme is not None:
+            return self._theme.css
+        return get_active_theme().css
+
     async def set_brightness(self, percent: int) -> None:
         """Set screen brightness.
 
@@ -330,6 +366,11 @@ class Deck:
 
         self._active_screen = target
         logger.info("Switching to screen: %s", name)
+
+        # Apply the resolved theme cascade for this screen.
+        from ..render.svg_rasterize import set_svg_stylesheet
+
+        set_svg_stylesheet(self._resolve_stylesheet())
 
         self._wire_refresh_callbacks()
 

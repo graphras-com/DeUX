@@ -75,9 +75,6 @@ import datetime
 import logging
 from pathlib import Path
 from typing import Any
-import random
-import colorsys
-from textwrap import dedent
 
 from mock_backend import (
     MEDIA_CATALOG,
@@ -89,7 +86,6 @@ from mock_backend import (
     MockScenesService,
     MockTimerService,
 )
-
 from PIL import Image
 
 from deckui import (
@@ -99,8 +95,9 @@ from deckui import (
     DeviceInfo,
     DuiCard,
     DuiKey,
+    Theme,
     add_dui_path,
-    set_svg_stylesheet,
+    set_active_theme,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -686,8 +683,7 @@ class DashboardController(CardController):
         """Generate and apply a random theme on encoder hold."""
         if self._deck is None:
             return
-        css = ThemeGenerator.generate_random_theme()
-        set_svg_stylesheet(css)
+        set_active_theme(Theme.from_random())
         screen = self._deck.active_screen
         if screen is not None:
             screen.mark_all_dirty()
@@ -941,7 +937,7 @@ class SceneController:
         async def _release() -> None:
             key.set("background_class", background_class)
             await key.request_refresh()
-        
+
         key.forward("click", lambda: self._svc.activate(label))
 
 class ScreenCycler:
@@ -1016,250 +1012,6 @@ class ScreenCycler:
         await self._deck.set_screen(target)
 
 # ===========================================================================
-# Theme Generator
-# ===========================================================================
-
-class ThemeGenerator:
-    """Generate CSS colour themes from a single primary RGB colour.
-
-    All methods are static -- no instance state is required.  A primary
-    colour is expanded into a full 18-class palette via HSL colour-math
-    (analogous, complementary, success/warning/error derivations) and
-    emitted as CSS class rules ready for :func:`~deckui.set_svg_stylesheet`.
-
-    The generated stylesheet also sets ``font-family`` to *Inter* with
-    a system-font fallback stack so SVG layouts rendered by the library
-    use a consistent typeface.
-    """
-
-    # Font stack injected at the top of every generated stylesheet.
-    _FONT_CSS = dedent("""\
-        svg {
-            font-family: 'Inter', system-ui, -apple-system, \
-BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        }
-    """)
-
-    # --- colour math (operates on float RGB 0-255 tuples) ---
-
-    @staticmethod
-    def _rgb_to_hsl(r: float, g: float, b: float) -> tuple[float, float, float]:
-        """Convert RGB (0-255) to HSL (degrees, percent, percent).
-
-        Parameters
-        ----------
-        r, g, b : float
-            Red, green, blue channels in the 0-255 range.
-
-        Returns
-        -------
-        tuple[float, float, float]
-            ``(hue, saturation, lightness)`` with hue in degrees
-            (0-360) and saturation/lightness as percentages (0-100).
-        """
-        h, l, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
-        return h * 360, s * 100, l * 100
-
-    @staticmethod
-    def _hsl_to_rgb(h: float, s: float, l: float) -> tuple[float, float, float]:
-        """Convert HSL back to RGB (0-255).
-
-        Parameters
-        ----------
-        h : float
-            Hue in degrees (0-360).
-        s : float
-            Saturation as a percentage (0-100).
-        l : float
-            Lightness as a percentage (0-100).
-
-        Returns
-        -------
-        tuple[float, float, float]
-            ``(r, g, b)`` channels in the 0-255 range.
-        """
-        r, g, b = colorsys.hls_to_rgb(h / 360, l / 100, s / 100)
-        return r * 255, g * 255, b * 255
-
-    @staticmethod
-    def _adjust(
-        rgb: tuple[float, ...], hue: float = 0
-    ) -> tuple[float, float, float]:
-        """Shift the hue of *rgb* by *hue* degrees.
-
-        Parameters
-        ----------
-        rgb : tuple[float, ...]
-            ``(r, g, b)`` in 0-255.
-        hue : float, default=0
-            Hue rotation in degrees.
-
-        Returns
-        -------
-        tuple[float, float, float]
-            Adjusted ``(r, g, b)`` in 0-255.
-        """
-        h, s, l = ThemeGenerator._rgb_to_hsl(*rgb)
-        return ThemeGenerator._hsl_to_rgb((h + hue) % 360, s, l)
-
-    @staticmethod
-    def _scale(
-        rgb: tuple[float, ...],
-        saturation: float = 0,
-        lightness: float = 0,
-    ) -> tuple[float, float, float]:
-        """Scale saturation and/or lightness of *rgb*.
-
-        Positive values scale towards 100 %; negative values scale
-        towards 0 %.
-
-        Parameters
-        ----------
-        rgb : tuple[float, ...]
-            ``(r, g, b)`` in 0-255.
-        saturation : float, default=0
-            Percentage to scale saturation by.
-        lightness : float, default=0
-            Percentage to scale lightness by.
-
-        Returns
-        -------
-        tuple[float, float, float]
-            Adjusted ``(r, g, b)`` in 0-255.
-        """
-        h, s, l = ThemeGenerator._rgb_to_hsl(*rgb)
-        if saturation > 0:
-            s += (100 - s) * saturation / 100
-        elif saturation < 0:
-            s += s * saturation / 100
-        if lightness > 0:
-            l += (100 - l) * lightness / 100
-        elif lightness < 0:
-            l += l * lightness / 100
-        return ThemeGenerator._hsl_to_rgb(h, max(0, min(100, s)), max(0, min(100, l)))
-
-    @staticmethod
-    def _to_hex(r: float, g: float, b: float) -> str:
-        """Format an RGB triplet as a ``#rrggbb`` hex string."""
-        return f"#{round(r):02x}{round(g):02x}{round(b):02x}"
-
-    # --- palette generation ---
-
-    @staticmethod
-    def _generate_palette(primary: tuple[float, ...]) -> dict[str, str]:
-        """Derive a full CSS-class colour palette from a *primary* colour.
-
-        The palette contains 18 named colours covering backgrounds,
-        text, borders, icons, and semantic states (success, warning,
-        error) — matching the CSS classes expected by the bundled DUI
-        SVG layouts.
-
-        Parameters
-        ----------
-        primary : tuple[float, ...]
-            ``(r, g, b)`` primary colour in 0-255.
-
-        Returns
-        -------
-        dict[str, str]
-            Mapping of CSS class name to hex colour string.
-        """
-        _adj = ThemeGenerator._adjust
-        _scl = ThemeGenerator._scale
-        _hex = ThemeGenerator._to_hex
-
-        background = _scl(primary, saturation=-85, lightness=-80)
-        analogous_left = _adj(primary, hue=-30)
-        complementary = _adj(primary, hue=180)
-        success = _adj(primary, hue=-140)
-        warning = _scl(_adj(primary, hue=170), saturation=45, lightness=38)
-        error = _adj(_adj(primary, hue=180), hue=-40)
-        text_primary = _scl(primary, lightness=85)
-
-        return {
-            "background-dark": _hex(*background),
-            "background-light": _hex(*_scl(background, lightness=18)),
-            "border-primary": _hex(*_scl(background, lightness=50)),
-            "border-secondary": _hex(*_scl(background, lightness=20)),
-            "text-primary": _hex(*text_primary),
-            "text-secondary": _hex(*primary),
-            "text-accent": _hex(*analogous_left),
-            "text-muted": _hex(*_scl(background, lightness=50)),
-            "text-selected": _hex(*text_primary),
-            "text-fancy": _hex(*complementary),
-            "success": _hex(*success),
-            "warning": _hex(*warning),
-            "error": _hex(*error),
-            "icon": _hex(*analogous_left),
-            "icon-active": _hex(*warning),
-            "icon-inactive": _hex(*_scl(background, lightness=40)),
-            "sliders": _hex(*complementary),
-            "dynamic": _hex(*complementary),
-        }
-
-    @staticmethod
-    def _palette_to_css(palette: dict[str, str]) -> str:
-        """Convert a palette dict to a CSS stylesheet string.
-
-        Prepends the font-family declaration so all SVG elements use
-        Inter by default.
-
-        Parameters
-        ----------
-        palette : dict[str, str]
-            Mapping of CSS class name to hex colour string.
-
-        Returns
-        -------
-        str
-            Complete CSS stylesheet ready for
-            :func:`~deckui.set_svg_stylesheet`.
-        """
-        classes = "\n".join(
-            f".{name} {{ color: {color}; }}" for name, color in palette.items()
-        )
-        return ThemeGenerator._FONT_CSS + classes
-
-    @staticmethod
-    def generate_theme(r: int, g: int, b: int) -> str:
-        """Generate a complete CSS theme from a primary RGB colour.
-
-        Parameters
-        ----------
-        r, g, b : int
-            Primary colour channels (0-255).
-
-        Returns
-        -------
-        str
-            CSS stylesheet string.
-        """
-        palette = ThemeGenerator._generate_palette((float(r), float(g), float(b)))
-        return ThemeGenerator._palette_to_css(palette)
-
-    @staticmethod
-    def generate_random_theme() -> str:
-        """Generate a CSS theme from a random primary colour.
-
-        Picks a random hue with moderate saturation and value to
-        ensure readable, visually appealing palettes.
-
-        Returns
-        -------
-        str
-            CSS stylesheet string.
-        """
-        hue = random.random()
-        saturation = random.uniform(0.45, 0.85)
-        value = random.uniform(0.35, 0.75)
-        r, g, b = colorsys.hsv_to_rgb(hue, saturation, value)
-        log.debug(
-            "Random primary colour: rgb(%d, %d, %d)",
-            round(r * 255), round(g * 255), round(b * 255),
-        )
-        return ThemeGenerator.generate_theme(round(r * 255), round(g * 255), round(b * 255))
-
-# ===========================================================================
 # Application
 # ===========================================================================
 
@@ -1284,9 +1036,8 @@ class StreamDeckApp:
         catalog: list[dict[str, str]],
         scene_defs: list[dict[str, str]],
     ) -> None:
-        # Install the default colour theme before any DUI packages are
-        # loaded so SVG renders pick up the correct CSS classes.
-        set_svg_stylesheet(ThemeGenerator.generate_theme(39, 87, 179))
+        # The library auto-applies the default theme (rgb(39, 87, 179),
+        # Inter font) on import, so no manual stylesheet setup is needed.
 
         self.audio = AudioController(catalog)
         self.lights = LightsController()

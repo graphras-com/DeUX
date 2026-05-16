@@ -12,6 +12,7 @@ from .info_screen import InfoScreen
 from .touch_strip import TouchStrip
 
 if TYPE_CHECKING:
+    from ..render.theme import Theme
     from ..runtime.capabilities import DeviceCapabilities
     from .cards.base import Card
 
@@ -46,6 +47,7 @@ class Screen:
         self._caps = caps
         self._keys: dict[int, KeySlot] = {}
         self._encoders: dict[int, EncoderSlot] = {}
+        self._theme: Theme | None = None
 
         if self._caps.has_touchscreen and self._caps.dial_count > 0:
             from ..render.metrics import RenderMetrics
@@ -77,6 +79,20 @@ class Screen:
     def capabilities(self) -> DeviceCapabilities:
         """The device capabilities this screen is configured for."""
         return self._caps
+
+    @property
+    def theme(self) -> Theme | None:
+        """Per-screen theme override, or ``None`` to inherit.
+
+        When set, this theme takes precedence over both the deck-level
+        and system-wide theme for this screen.  Set to ``None`` to fall
+        back to the deck or system theme.
+        """
+        return self._theme
+
+    @theme.setter
+    def theme(self, value: Theme | None) -> None:
+        self._theme = value
 
     def key(self, index: int) -> KeySlot:
         """Get or create a key slot by index.

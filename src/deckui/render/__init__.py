@@ -18,12 +18,23 @@ from .svg_rasterize import (
     set_svg_backend,
     set_svg_stylesheet,
 )
+from .theme import (
+    Theme,
+    _apply_default_theme,
+    get_active_theme,
+    get_default_font_family,
+    set_active_theme,
+)
 from .touch_renderer import (
     compose_touchstrip,
     render_blank_touchscreen,
 )
 
+# Apply the default theme so a baseline CSS stylesheet is always active.
+_apply_default_theme()
+
 __all__ = [
+    "Theme",
     "ImageFetchError",
     "RasterizeError",
     "RenderMetrics",
@@ -31,6 +42,8 @@ __all__ = [
     "clear_image_cache",
     "compose_touchstrip",
     "fetch_image",
+    "get_active_theme",
+    "get_default_font_family",
     "get_svg_backend",
     "get_svg_stylesheet",
     "list_svg_backends",
@@ -40,6 +53,7 @@ __all__ = [
     "render_blank_touchscreen",
     "render_info_screen",
     "render_key_image",
+    "set_active_theme",
     "set_svg_backend",
     "set_svg_stylesheet",
 ]

@@ -159,6 +159,25 @@ _DEFAULT_FONT_SIZE = 16.0
 _DEFAULT_LINE_HEIGHT_RATIO = 1.2
 
 
+def _get_default_font_family() -> str:
+    """Return the default font family from the active theme.
+
+    Falls back to the module-level ``_DEFAULT_FONT_FAMILY`` if
+    the theme system is not yet initialised (e.g. during import).
+
+    Returns
+    -------
+    str
+        The default font family name.
+    """
+    try:
+        from ..render.theme import get_default_font_family
+
+        return get_default_font_family()
+    except Exception:
+        return _DEFAULT_FONT_FAMILY
+
+
 def _resolve_font_attrs(root: ET.Element, elem: ET.Element) -> tuple[str, float]:
     """Resolve font-family and font-size from an SVG element and its ancestors.
 
@@ -195,7 +214,7 @@ def _resolve_font_attrs(root: ET.Element, elem: ET.Element) -> tuple[str, float]
         current = parent_map.get(current)
 
     return (
-        family or _DEFAULT_FONT_FAMILY,
+        family or _get_default_font_family(),
         size or _DEFAULT_FONT_SIZE,
     )
 
