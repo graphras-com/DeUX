@@ -14,7 +14,7 @@ from StreamDeck.DeviceManager import DeviceManager
 
 from ..render.key_renderer import render_blank_key
 from ..render.metrics import RenderMetrics
-from ..render.touch_renderer import compose_card_with_background, compose_touchstrip
+from ..render.touch_renderer import compose_card_with_background
 from .async_event import AsyncEvent
 from .capabilities import DeviceCapabilities
 from .device_info import DeviceInfo
@@ -506,7 +506,15 @@ class Deck:
             )
 
     async def _render_touchscreen(self) -> None:
-        """Render and push the full touch-strip image for the active screen."""
+        """Render and push each card panel individually to the device.
+
+        Uses the SVG-native pipeline for DuiCards: background
+        compositing happens at the SVG level, and each panel is
+        rasterised directly to device-ready bytes and pushed as a
+        per-panel update.
+
+        Non-DUI cards fall back to the legacy Pillow compositing path.
+        """
         screen = self._current_screen()
         if not self._device or not screen or not self._metrics:
             return
@@ -517,104 +525,130 @@ class Deck:
         metrics = self._metrics
         touch_strip = screen.touch_strip
 
-        # Re-wire push_fn for every DuiCard each render so that a card
-        # reused on multiple screens always animates at the slot of the
-        # currently active screen.
         from ..dui.card import DuiCard
 
+        bg_svg_root = touch_strip.bg_svg_root
+
         for card_idx, card in enumerate(screen.cards):
-            if not isinstance(card, DuiCard):
-                continue
             x_pos = card_idx * metrics.panel_width
             y_pos = 0
 
-            # Capture the background tile for this card's panel slot
-            bg_tile = touch_strip.bg_tile(card_idx)
-            card.set_bg_tile(bg_tile)
+            if isinstance(card, DuiCard):
+                # Set up background layer for SVG-level compositing
+                bg_tile = touch_strip.bg_tile(card_idx)
+                card.set_bg_tile(bg_tile)
 
-            async def _make_push(
-                x: int,
-                y: int,
-                w: int,
-                h: int,
-                tile: Image.Image | None,
-            ) -> PushFn:
-                async def _push_card_frame(frame_bytes: bytes) -> None:
-                    if tile is not None:
-                        # Decode the frame, composite onto the bg tile, re-encode
-                        frame_img = Image.open(io.BytesIO(frame_bytes))
-                        out_bytes = compose_card_with_background(
-                            frame_img,
-                            bg_tile=tile,
-                            panel_width=w,
-                            panel_height=h,
-                            image_format=(
-                                self._caps.touchscreen_image_format
-                                if self._caps
-                                else "JPEG"
-                            ),
-                        )
-                    else:
-                        out_bytes = frame_bytes
-                    loop = asyncio.get_running_loop()
-                    async with self._device_lock:
-                        await loop.run_in_executor(
-                            self._executor,
-                            self._device.set_touchscreen_image,
-                            out_bytes,
-                            x,
-                            y,
-                            w,
-                            h,
-                        )
+                if bg_svg_root is not None:
+                    card.set_background_layer(
+                        bg_svg_root,
+                        card_idx,
+                        metrics.panel_width,
+                        metrics.panel_height,
+                    )
+                else:
+                    card.clear_background_layer()
 
-                return _push_card_frame
+                # Wire push_fn for spinner animations (per-panel update)
+                async def _make_push(
+                    x: int,
+                    y: int,
+                    w: int,
+                    h: int,
+                    tile: Image.Image | None,
+                ) -> PushFn:
+                    async def _push_card_frame(frame_bytes: bytes) -> None:
+                        if tile is not None:
+                            # Decode the frame, composite onto the bg tile, re-encode
+                            frame_img = Image.open(io.BytesIO(frame_bytes))
+                            out_bytes = compose_card_with_background(
+                                frame_img,
+                                bg_tile=tile,
+                                panel_width=w,
+                                panel_height=h,
+                                image_format=(
+                                    self._caps.touchscreen_image_format
+                                    if self._caps
+                                    else "JPEG"
+                                ),
+                            )
+                        else:
+                            out_bytes = frame_bytes
+                        loop = asyncio.get_running_loop()
+                        async with self._device_lock:
+                            await loop.run_in_executor(
+                                self._executor,
+                                self._device.set_touchscreen_image,
+                                out_bytes,
+                                x,
+                                y,
+                                w,
+                                h,
+                            )
 
-            push_fn = await _make_push(
-                x_pos,
-                y_pos,
-                metrics.panel_width,
-                metrics.panel_height,
-                bg_tile,
-            )
-            card.set_push_fn(
-                push_fn, panel_size=(metrics.panel_width, metrics.panel_height)
-            )
+                    return _push_card_frame
 
-        card_images = []
-        for card in screen.cards:
-            # Skip re-rendering cards with active spinner animations
-            if self._is_animating(card):
-                card_images.append(card.rendered)
-                continue
-            await card.prepare_assets()
-            img = card.render()
-            card.set_rendered(img)
-            card_images.append(img)
+                push_fn = await _make_push(
+                    x_pos,
+                    y_pos,
+                    metrics.panel_width,
+                    metrics.panel_height,
+                    bg_tile,
+                )
+                card.set_push_fn(
+                    push_fn, panel_size=(metrics.panel_width, metrics.panel_height)
+                )
 
-        metrics = self._metrics
-        touchstrip_bytes = compose_touchstrip(
-            card_images,
-            background=screen.touch_strip.background_color,
-            bg_tiles=touch_strip.bg_tiles,
-            touchscreen_width=metrics.touchscreen_width,
-            touchscreen_height=metrics.touchscreen_height,
-            panel_count=metrics.panel_count,
-            panel_width=metrics.panel_width,
-            image_format=self._caps.touchscreen_image_format if self._caps else "JPEG",
-        )
+                # Skip re-rendering cards with active spinner animations
+                if self._is_animating(card):
+                    continue
 
-        loop = asyncio.get_running_loop()
-        async with self._device_lock:
-            await loop.run_in_executor(
-                self._executor,
-                self._device.set_touchscreen_image,
-                touchstrip_bytes,
-                0,
-                0,
-                metrics.touchscreen_width,
-                metrics.touchscreen_height,
-            )
+                await card.prepare_assets()
+
+                # SVG-native pipeline: render directly to device bytes
+                image_fmt = (
+                    self._caps.touchscreen_image_format if self._caps else "JPEG"
+                )
+                panel_bytes = card.render_bytes(
+                    panel_width=metrics.panel_width,
+                    panel_height=metrics.panel_height,
+                    image_format=image_fmt,
+                    background=touch_strip.background_color,
+                )
+
+                # Also render a PIL image for caching (used by screenshot)
+                img = card.render()
+                card.set_rendered(img)
+
+            else:
+                # Non-DUI card: legacy path with Pillow compositing
+                await card.prepare_assets()
+                rendered = card.render()
+                card.set_rendered(rendered)
+
+                bg_tile = touch_strip.bg_tile(card_idx)
+                panel_bytes = compose_card_with_background(
+                    rendered,
+                    bg_tile=bg_tile,
+                    background=touch_strip.background_color,
+                    panel_width=metrics.panel_width,
+                    panel_height=metrics.panel_height,
+                    image_format=(
+                        self._caps.touchscreen_image_format if self._caps else "JPEG"
+                    ),
+                )
+
+            # Push per-panel update
+            loop = asyncio.get_running_loop()
+            async with self._device_lock:
+                await loop.run_in_executor(
+                    self._executor,
+                    self._device.set_touchscreen_image,
+                    panel_bytes,
+                    x_pos,
+                    y_pos,
+                    metrics.panel_width,
+                    metrics.panel_height,
+                )
 
     async def _render_info_screen(self) -> None:
         """Render and push the info screen image (e.g. Neo)."""

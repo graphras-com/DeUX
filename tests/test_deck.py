@@ -627,7 +627,8 @@ class TestDeckRenderTouchscreen:
         deck._active_screen = p
 
         await deck._render_touchscreen()
-        mock_streamdeck_device.set_touchscreen_image.assert_called_once()
+        # Per-panel rendering: one call per panel (4 panels on SD+)
+        assert mock_streamdeck_device.set_touchscreen_image.call_count == 4
 
     async def test_renders_custom_cards(self, deck, mock_streamdeck_device):
         deck._device = mock_streamdeck_device
@@ -639,7 +640,8 @@ class TestDeckRenderTouchscreen:
         deck._active_screen = p
 
         await deck._render_touchscreen()
-        mock_streamdeck_device.set_touchscreen_image.assert_called_once()
+        # Per-panel rendering: one call per panel (4 panels on SD+)
+        assert mock_streamdeck_device.set_touchscreen_image.call_count == 4
 
 
 class TestDeckInfo:

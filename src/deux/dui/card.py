@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING, Any
 
 from ..ui.cards.base import Card
@@ -79,6 +80,8 @@ class DuiCard(Card):
         self._push_fn: PushFn | None = None
         self._panel_size: tuple[int, int] | None = None
         self._bg_tile: Image.Image | None = None
+        self._bg_svg_root: ET.Element | None = None
+        self._card_index: int | None = None
 
     @property
     def spec(self) -> PackageSpec:
@@ -125,6 +128,84 @@ class DuiCard(Card):
             The RGB background tile, or ``None`` to clear.
         """
         self._bg_tile = tile
+
+    def set_background_layer(
+        self,
+        bg_root: ET.Element,
+        card_index: int,
+        panel_width: int,
+        panel_height: int,
+    ) -> None:
+        """Set a background SVG layer underneath the card content.
+
+        The background SVG's ``viewBox`` is sliced to the region for
+        *card_index* and composed as a layer beneath the card's own
+        SVG.  The composed tree is cached so subsequent renders only
+        need to apply bindings and rasterise.
+
+        Parameters
+        ----------
+        bg_root : ET.Element
+            The full-width background ``<svg>`` root element.
+        card_index : int
+            Zero-based panel index.
+        panel_width : int
+            Width of a single panel in pixels.
+        panel_height : int
+            Height of a single panel in pixels.
+        """
+        self._bg_svg_root = bg_root
+        self._card_index = card_index
+        self._renderer.set_base_layer(bg_root, card_index, panel_width, panel_height)
+        self._renderer.set_target_size(panel_width, panel_height)
+
+    def clear_background_layer(self) -> None:
+        """Remove the background layer and revert to the card's own SVG."""
+        self._bg_svg_root = None
+        self._card_index = None
+        self._renderer.clear_base_layer()
+
+    def render_bytes(
+        self,
+        *,
+        panel_width: int,
+        panel_height: int,
+        image_format: str = "JPEG",
+        background: str = "black",
+    ) -> bytes:
+        """Render the card directly to encoded image bytes.
+
+        Uses the SVG-native pipeline: background compositing happens
+        at the SVG level (if a background layer is set), dimensions are
+        set for vector scaling, and the output is rasterised directly
+        to the requested format.
+
+        Parameters
+        ----------
+        panel_width : int
+            Target panel width in pixels.
+        panel_height : int
+            Target panel height in pixels.
+        image_format : str, default="JPEG"
+            Image encoding format (``"JPEG"`` or ``"BMP"``).
+        background : str, default="black"
+            Fallback background colour (used when no background SVG
+            layer is set).
+
+        Returns
+        -------
+        bytes
+            Encoded image bytes ready to send to the device.
+        """
+        self._renderer.set_target_size(panel_width, panel_height)
+        fmt = image_format.upper()
+        out_fmt = "jpeg" if fmt == "JPEG" else "bmp"
+        # Only inject a solid background if no SVG background layer is set.
+        bg = background if self._bg_svg_root is None else None
+        return self._renderer.render_bytes(
+            output_format=out_fmt,
+            background=bg,
+        )
 
     def set(self, name: str, value: Any) -> DuiCard:
         """Set a binding value.  Marks the card dirty if changed.
