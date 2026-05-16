@@ -883,13 +883,22 @@ class SceneController:
         self._scenes = scenes
         self._svc = MockScenesService()
         self._keys: list[DuiKey] = []
+        self._deck: Deck | None = None
 
         # In a real app this subscriber would update an "active scene"
         # indicator.  Here it just demonstrates that the activation
         # round-trips through the service.
         @self._svc.on_scene_activated
         async def _on_activated(label: str) -> None:
-            log.info("Scene confirmed active: %s", label)
+            if label == "Screenshot":
+                log.info("Take Screenshot")
+                if self._deck is not None:
+                    screen = self._deck.active_screen
+                    if screen is not None:
+                        screen.screenshot("/tmp/deck_screenshot")
+                        log.info("Screenshot saved to /tmp/deck_screenshot")
+            else:
+                log.info("Scene confirmed active: %s", label)
 
         for scene in self._scenes:
             key = DuiKey("IconKey")
@@ -906,6 +915,16 @@ class SceneController:
     def svc(self) -> MockScenesService:
         """The underlying scenes service."""
         return self._svc
+
+    def set_deck(self, deck: Deck) -> None:
+        """Store a reference to the deck for screenshot access.
+
+        Parameters
+        ----------
+        deck
+            The connected :class:`~deux.Deck` instance.
+        """
+        self._deck = deck
 
     def install(self, screen: Any, positions: list[int]) -> None:
         """Place scene keys onto *screen* at the given *positions*."""
@@ -935,6 +954,11 @@ class SceneController:
 
         @key.on_event("release")
         async def _release() -> None:
+            key.set("background_class", background_class)
+            await key.request_refresh()
+
+        @key.on_event("click")
+        async def _click() -> None:
             key.set("background_class", background_class)
             await key.request_refresh()
 
@@ -1090,6 +1114,7 @@ class StreamDeckApp:
         for controller in self._controllers:
             await controller.on_attach(deck)
         self.nav.on_attach(deck)
+        self.scenes.set_deck(deck)
 
         self._build_main_screen(deck)
         self._build_settings_screen(deck)
