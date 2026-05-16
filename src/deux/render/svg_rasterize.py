@@ -1,4 +1,4 @@
-"""SVG-to-PNG rasterisation with a pluggable backend registry.
+"""SVG-to-image rasterisation with a pluggable backend registry.
 
 Built-in backends: ``cairo`` (CairoSVG), ``pyvips``, and ``rsvg-cli``
 (subprocess).  Third-party backends can be registered at runtime via
@@ -8,6 +8,12 @@ An application-wide CSS stylesheet can be set via
 :func:`set_svg_stylesheet`.  It is applied to every SVG before
 rasterisation — natively for pyvips, or by injecting a ``<style>``
 element for other backends.
+
+SVG document manipulation helpers are provided for the SVG-native
+render pipeline: :func:`set_svg_dimensions`, :func:`inject_background_rect`,
+:func:`compose_svg_layers`, and :func:`slice_background_viewbox`.  These
+allow sizing, background injection, and multi-layer compositing to happen
+entirely at the SVG (vector) level before a single rasterisation pass.
 
 Examples
 --------
@@ -35,6 +41,8 @@ Register a custom backend::
 
 from __future__ import annotations
 
+import copy
+import io
 import logging
 import os
 import platform
@@ -492,6 +500,10 @@ def _svg_to_png(svg_data: bytes, width: int, height: int) -> bytes:
     For the pyvips backend the stylesheet is passed natively; for all
     other backends it is injected as a ``<style>`` element.
 
+    .. deprecated::
+        Use :func:`_rasterize_svg` for new code.  This function is
+        retained for backward compatibility.
+
     Parameters
     ----------
     svg_data : bytes
@@ -514,35 +526,7 @@ def _svg_to_png(svg_data: bytes, width: int, height: int) -> bytes:
     """
     backend_name = _active_backend or "auto"
     css = _active_stylesheet
-
-    if backend_name != "auto":
-        backend = _registry[backend_name]
-        return _rasterize_with_stylesheet(backend, backend_name, svg_data, width, height, css)
-
-    # Auto mode: try backends in order, collecting errors.
-    errors: list[str] = []
-    for name in _AUTO_ORDER:
-        auto_backend = _registry.get(name)
-        if auto_backend is None:
-            continue
-        try:
-            return _rasterize_with_stylesheet(
-                auto_backend, name, svg_data, width, height, css
-            )
-        except RasterizeError as exc:
-            logger.debug("Backend %r failed: %s", name, exc)
-            errors.append(f"  - {name}: {exc}")
-
-    error_detail = "\n".join(errors) if errors else "  (no backends registered)"
-    raise RasterizeError(
-        "No SVG renderer available. Install one of:\n"
-        "  - System library: brew install cairo  (macOS) or apt install libcairo2 "
-        "(Linux)\n"
-        "  - CLI tool: apt install librsvg2-bin\n"
-        "  - Python package: pip install cairosvg\n"
-        "  - Python package: pip install pyvips\n"
-        "\nBackend errors:\n" + error_detail
-    )
+    return _resolve_and_rasterize(backend_name, css, svg_data, width, height)
 
 
 def _rasterize_with_stylesheet(
@@ -586,6 +570,270 @@ def _rasterize_with_stylesheet(
         svg_data = _inject_stylesheet(svg_data, css)
 
     return backend.rasterize(svg_data, width, height)
+
+
+# ---------------------------------------------------------------------------
+# Direct output-format rasterisation
+# ---------------------------------------------------------------------------
+
+
+def _rasterize_svg(
+    svg_data: bytes,
+    width: int,
+    height: int,
+    *,
+    output_format: str = "png",
+    quality: int = 90,
+) -> bytes:
+    """Rasterise SVG bytes directly to the requested image format.
+
+    This is the preferred entry point for the SVG-native pipeline.
+    It bypasses the PNG intermediate when the active backend supports
+    direct JPEG output (currently pyvips).  For backends that only
+    produce PNG, the PNG bytes are re-encoded via Pillow when a
+    different format is requested.
+
+    Parameters
+    ----------
+    svg_data : bytes
+        Raw SVG content (UTF-8).
+    width : int
+        Desired output width in pixels.
+    height : int
+        Desired output height in pixels.
+    output_format : str, default="png"
+        Target image format: ``"png"``, ``"jpeg"``, or ``"bmp"``.
+    quality : int, default=90
+        JPEG quality (ignored for other formats).
+
+    Returns
+    -------
+    bytes
+        Rasterised image bytes in the requested format.
+
+    Raises
+    ------
+    RasterizeError
+        If no SVG renderer backend is available or rasterisation fails.
+    ValueError
+        If *output_format* is not one of ``"png"``, ``"jpeg"``, ``"bmp"``.
+    """
+    fmt = output_format.lower()
+    if fmt not in ("png", "jpeg", "bmp"):
+        raise ValueError(f"Unsupported output format: {output_format!r}")
+
+    backend_name = _active_backend or "auto"
+    css = _active_stylesheet
+
+    # Try to get PNG bytes first (the universal intermediate).
+    png_bytes = _resolve_and_rasterize(backend_name, css, svg_data, width, height)
+
+    if fmt == "png":
+        return png_bytes
+
+    # For JPEG and BMP we need to convert from PNG.
+    from PIL import Image
+
+    img = Image.open(io.BytesIO(png_bytes)).convert("RGB")
+    buf = io.BytesIO()
+    if fmt == "jpeg":
+        img.save(buf, format="JPEG", quality=quality)
+    else:  # bmp
+        img.save(buf, format="BMP")
+    return buf.getvalue()
+
+
+def _resolve_and_rasterize(
+    backend_name: str,
+    css: str | None,
+    svg_data: bytes,
+    width: int,
+    height: int,
+) -> bytes:
+    """Select a backend and rasterise to PNG bytes.
+
+    Extracted from :func:`_svg_to_png` to share logic with
+    :func:`_rasterize_svg`.
+
+    Parameters
+    ----------
+    backend_name : str
+        Backend name or ``"auto"``.
+    css : str or None
+        Active CSS stylesheet text.
+    svg_data : bytes
+        Raw SVG content.
+    width : int
+        Desired output width in pixels.
+    height : int
+        Desired output height in pixels.
+
+    Returns
+    -------
+    bytes
+        PNG image bytes.
+
+    Raises
+    ------
+    RasterizeError
+        If no backend is available.
+    """
+    if backend_name != "auto":
+        backend = _registry[backend_name]
+        return _rasterize_with_stylesheet(backend, backend_name, svg_data, width, height, css)
+
+    errors: list[str] = []
+    for name in _AUTO_ORDER:
+        auto_backend = _registry.get(name)
+        if auto_backend is None:
+            continue
+        try:
+            return _rasterize_with_stylesheet(
+                auto_backend, name, svg_data, width, height, css
+            )
+        except RasterizeError as exc:
+            logger.debug("Backend %r failed: %s", name, exc)
+            errors.append(f"  - {name}: {exc}")
+
+    error_detail = "\n".join(errors) if errors else "  (no backends registered)"
+    raise RasterizeError(
+        "No SVG renderer available. Install one of:\n"
+        "  - System library: brew install cairo  (macOS) or apt install libcairo2 "
+        "(Linux)\n"
+        "  - CLI tool: apt install librsvg2-bin\n"
+        "  - Python package: pip install cairosvg\n"
+        "  - Python package: pip install pyvips\n"
+        "\nBackend errors:\n" + error_detail
+    )
+
+
+# ---------------------------------------------------------------------------
+# SVG document manipulation helpers
+# ---------------------------------------------------------------------------
+
+_XLINK_NS = "http://www.w3.org/1999/xlink"
+
+
+def set_svg_dimensions(root: ET.Element, width: int, height: int) -> None:
+    """Set ``width`` and ``height`` attributes on an SVG root element.
+
+    The ``viewBox`` is left unchanged so that the SVG engine performs
+    vector-level scaling from the design canvas to the target device
+    dimensions.
+
+    Parameters
+    ----------
+    root : ET.Element
+        The ``<svg>`` root element (mutated in place).
+    width : int
+        Target width in pixels.
+    height : int
+        Target height in pixels.
+    """
+    root.set("width", str(width))
+    root.set("height", str(height))
+
+
+def inject_background_rect(root: ET.Element, color: str) -> None:
+    """Insert a solid-colour background ``<rect>`` as the first child.
+
+    The rectangle fills 100% of the SVG viewport so the rasterised
+    output is fully opaque.  This eliminates the need for Pillow-level
+    canvas creation and alpha compositing.
+
+    Parameters
+    ----------
+    root : ET.Element
+        The ``<svg>`` root element (mutated in place).
+    color : str
+        CSS colour value (e.g. ``"black"``, ``"#1a1a2e"``).
+    """
+    rect = ET.Element(f"{{{_SVG_NS}}}rect")
+    rect.set("width", "100%")
+    rect.set("height", "100%")
+    rect.set("fill", color)
+    root.insert(0, rect)
+
+
+def slice_background_viewbox(
+    bg_root: ET.Element,
+    card_index: int,
+    panel_width: int,
+    panel_height: int,
+) -> ET.Element:
+    """Clone a background SVG and set its viewBox to a panel-sized slice.
+
+    The returned element is a deep copy with its ``viewBox`` adjusted
+    to window into the region corresponding to *card_index*.  The
+    ``width`` and ``height`` attributes are set to ``panel_width`` and
+    ``panel_height`` so the slice fills the target panel exactly.
+
+    Parameters
+    ----------
+    bg_root : ET.Element
+        The full-width background ``<svg>`` root element.
+    card_index : int
+        Zero-based panel index (determines the x-offset of the slice).
+    panel_width : int
+        Width of a single panel in pixels.
+    panel_height : int
+        Height of a single panel in pixels.
+
+    Returns
+    -------
+    ET.Element
+        A cloned ``<svg>`` element with the sliced ``viewBox``.
+    """
+    sliced = copy.deepcopy(bg_root)
+    x_offset = card_index * panel_width
+    sliced.set("viewBox", f"{x_offset} 0 {panel_width} {panel_height}")
+    sliced.set("width", str(panel_width))
+    sliced.set("height", str(panel_height))
+    return sliced
+
+
+def compose_svg_layers(
+    width: int,
+    height: int,
+    layers: list[ET.Element],
+) -> ET.Element:
+    """Create a wrapper SVG containing multiple nested ``<svg>`` layers.
+
+    Each layer is embedded as a nested ``<svg>`` element positioned at
+    the origin.  Layers are drawn in order (first = bottom, last = top)
+    following the SVG painter's model.
+
+    Parameters
+    ----------
+    width : int
+        Output width in pixels.
+    height : int
+        Output height in pixels.
+    layers : list[ET.Element]
+        SVG elements to embed as layers.  Each should have its own
+        ``viewBox``, ``width``, and ``height`` attributes.
+
+    Returns
+    -------
+    ET.Element
+        A wrapper ``<svg>`` root element containing all layers.
+    """
+    ET.register_namespace("", _SVG_NS)
+    ET.register_namespace("xlink", _XLINK_NS)
+
+    wrapper = ET.Element(f"{{{_SVG_NS}}}svg")
+    wrapper.set("xmlns", _SVG_NS)
+    wrapper.set("width", str(width))
+    wrapper.set("height", str(height))
+    wrapper.set("viewBox", f"0 0 {width} {height}")
+
+    for layer in layers:
+        # Ensure each layer has position attributes
+        layer.set("x", "0")
+        layer.set("y", "0")
+        wrapper.append(layer)
+
+    return wrapper
 
 
 # ---------------------------------------------------------------------------

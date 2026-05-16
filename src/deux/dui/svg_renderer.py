@@ -460,7 +460,10 @@ class SvgRenderer:
         self._spec = spec
         self._values: dict[str, Any] = {}
         self._base_root: ET.Element = ET.fromstring(spec.svg_source)  # noqa: S314
+        self._original_root: ET.Element = copy.deepcopy(self._base_root)
         self._range_extents: dict[str, float] = {}
+        self._target_width: int | None = None
+        self._target_height: int | None = None
 
         for name, binding in spec.bindings.items():
             if isinstance(binding, (TextBinding, VisibilityBinding, ColorBinding, CssClassBinding)):
@@ -575,13 +578,81 @@ class SvgRenderer:
             )
         return self._values.get(name)
 
+    def set_target_size(self, width: int, height: int) -> None:
+        """Set the target rasterisation dimensions.
+
+        When set, the SVG ``width`` and ``height`` attributes are
+        overridden to these values before rasterisation, enabling
+        vector-level scaling from the ``viewBox`` design canvas to the
+        device's native pixel dimensions.
+
+        Parameters
+        ----------
+        width : int
+            Target width in pixels.
+        height : int
+            Target height in pixels.
+        """
+        self._target_width = width
+        self._target_height = height
+
+    def set_base_layer(
+        self,
+        bg_root: ET.Element,
+        card_index: int,
+        panel_width: int,
+        panel_height: int,
+    ) -> None:
+        """Set a background SVG layer underneath the card content.
+
+        The background SVG's ``viewBox`` is sliced to the region
+        corresponding to *card_index*, then composed as a layer beneath
+        the card's own SVG template.  The composed tree replaces
+        ``_base_root`` so that subsequent :meth:`render` calls produce
+        a single SVG document with both layers.
+
+        Call this when the background SVG or the card's slot assignment
+        changes — not on every render.
+
+        Parameters
+        ----------
+        bg_root : ET.Element
+            The full-width background ``<svg>`` root element.
+        card_index : int
+            Zero-based panel index.
+        panel_width : int
+            Width of a single panel in pixels.
+        panel_height : int
+            Height of a single panel in pixels.
+        """
+        from ..render.svg_rasterize import compose_svg_layers, slice_background_viewbox
+
+        bg_slice = slice_background_viewbox(bg_root, card_index, panel_width, panel_height)
+        card_layer = copy.deepcopy(self._original_root)
+        card_layer.set("width", str(panel_width))
+        card_layer.set("height", str(panel_height))
+
+        composed = compose_svg_layers(panel_width, panel_height, [bg_slice, card_layer])
+        self._base_root = composed
+
+    def clear_base_layer(self) -> None:
+        """Remove the background layer and revert to the original SVG template.
+
+        After calling this, :meth:`render` will produce output from the
+        card's own SVG only, without any background layer.
+        """
+        self._base_root = copy.deepcopy(self._original_root)
+
     def render(self) -> Image.Image:
         """Rasterise the SVG with current binding values to a PIL Image.
 
         Returns
         -------
         Image.Image
-            An RGB :class:`~PIL.Image.Image` at the SVG's native dimensions.
+            An RGBA :class:`~PIL.Image.Image`.  When target dimensions
+            are set via :meth:`set_target_size` the image is rasterised
+            at those dimensions (vector scaling); otherwise at the SVG's
+            native dimensions.
         """
         root = copy.deepcopy(self._base_root)
 
@@ -595,6 +666,73 @@ class SvgRenderer:
         svg_bytes = ET.tostring(root, encoding="unicode", xml_declaration=True)
         logger.debug("Rendered SVG before rasterisation:\n%s", svg_bytes)
         return self._rasterise(svg_bytes.encode("utf-8"))
+
+    def render_bytes(
+        self,
+        *,
+        output_format: str = "jpeg",
+        background: str | None = None,
+        quality: int = 90,
+    ) -> bytes:
+        """Rasterise the SVG directly to encoded image bytes.
+
+        This is the SVG-native pipeline entry point.  It applies
+        bindings, optionally injects a background colour, sets the
+        target dimensions, and rasterises to the requested format in
+        a single pass — no intermediate PIL Image.
+
+        Parameters
+        ----------
+        output_format : str, default="jpeg"
+            Target image format: ``"jpeg"``, ``"bmp"``, or ``"png"``.
+        background : str or None, optional
+            CSS colour for a solid background rect injected under all
+            content.  When ``None``, no background is injected (the
+            SVG's own background or transparency is preserved).
+        quality : int, default=90
+            JPEG quality (ignored for other formats).
+
+        Returns
+        -------
+        bytes
+            Encoded image bytes ready to send to the device.
+        """
+        from ..render.svg_rasterize import (
+            _rasterize_svg,
+            inject_background_rect,
+            set_svg_dimensions,
+        )
+
+        root = copy.deepcopy(self._base_root)
+
+        for name, binding in self._spec.bindings.items():
+            value = self._values.get(name)
+            self._apply_binding(root, name, binding, value)
+
+        self._inline_assets(root)
+        self._hide_spinner_node(root)
+
+        if background is not None:
+            inject_background_rect(root, background)
+
+        # Determine rasterisation dimensions.
+        if self._target_width is not None and self._target_height is not None:
+            width = self._target_width
+            height = self._target_height
+        else:
+            width = int(float(root.get("width", "197")))
+            height = int(float(root.get("height", "98")))
+
+        set_svg_dimensions(root, width, height)
+
+        svg_bytes = ET.tostring(root, encoding="unicode", xml_declaration=True)
+        return _rasterize_svg(
+            svg_bytes.encode("utf-8"),
+            width,
+            height,
+            output_format=output_format,
+            quality=quality,
+        )
 
     def render_svg(self) -> str:
         """Return the SVG source with current bindings applied (not rasterised).
@@ -1196,11 +1334,16 @@ class SvgRenderer:
                 elem.set(f"{{{_XLINK_NS}}}href", data_uri)
 
     def _rasterise(self, svg_data: bytes) -> Image.Image:
-        """Rasterise SVG bytes to a PIL Image via CairoSVG.
+        """Rasterise SVG bytes to a PIL Image.
 
         The image is returned in RGBA mode so that transparent regions
         in the SVG are preserved.  This allows compositing onto a
         background tile when a touchstrip background SVG is active.
+
+        When target dimensions have been set via :meth:`set_target_size`,
+        the SVG is rasterised at those dimensions (vector scaling by the
+        rasteriser backend).  Otherwise the SVG's intrinsic ``width`` and
+        ``height`` attributes are used.
 
         Parameters
         ----------
@@ -1210,12 +1353,16 @@ class SvgRenderer:
         Returns
         -------
         Image.Image
-            An RGBA :class:`~PIL.Image.Image` at the SVG's native dimensions.
+            An RGBA :class:`~PIL.Image.Image`.
         """
         from ..render.svg_rasterize import _svg_to_png
 
-        width = int(float(self._base_root.get("width", "197")))
-        height = int(float(self._base_root.get("height", "98")))
+        if self._target_width is not None and self._target_height is not None:
+            width = self._target_width
+            height = self._target_height
+        else:
+            width = int(float(self._base_root.get("width", "197")))
+            height = int(float(self._base_root.get("height", "98")))
 
         png_data = _svg_to_png(svg_data, width, height)
         return Image.open(io.BytesIO(png_data)).convert("RGBA")

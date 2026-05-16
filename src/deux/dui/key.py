@@ -5,9 +5,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from PIL import Image
-
-from ..render.key_renderer import _encode_image
 from ..ui.controls.key_slot import KeySlot
 from .animator import PushFn, SpinnerAnimator
 from .event_map import EventMap
@@ -496,8 +493,13 @@ class DuiKey(KeySlot):
     ) -> bytes:
         """Render the SVG layout to image bytes for the key.
 
-        The SVG is rasterised and scaled edge-to-edge to *key_size*
-        (no margins or padding) and encoded in *image_format*.
+        Uses the SVG-native pipeline: the SVG is rasterised at
+        *key_size* directly (vector scaling via ``viewBox``) with a
+        black background injected at the SVG level.  No Pillow resize
+        or compositing is needed.
+
+        Falls back to the legacy Pillow path for BMP format since
+        pyvips does not support BMP output natively.
 
         Parameters
         ----------
@@ -511,12 +513,13 @@ class DuiKey(KeySlot):
         bytes
             Encoded image bytes.
         """
-        img = self._renderer.render()
-        if img.size != key_size:
-            img = img.resize(key_size, Image.Resampling.LANCZOS)
-        if img.mode != "RGB":
-            img = img.convert("RGB")
-        return _encode_image(img, image_format)
+        self._renderer.set_target_size(*key_size)
+        fmt = image_format.upper()
+        out_fmt = "jpeg" if fmt == "JPEG" else "bmp"
+        return self._renderer.render_bytes(
+            output_format=out_fmt,
+            background="black",
+        )
 
     @property
     def has_dui_content(self) -> bool:

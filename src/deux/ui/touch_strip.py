@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import logging
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from PIL import Image
@@ -56,6 +57,7 @@ class TouchStrip:
         self._cards: list[Card] = [BlankCard() for _ in range(panel_count)]
         self._background_color = background_color
         self._bg_svg: bytes | None = None
+        self._bg_svg_root: ET.Element | None = None
         self._bg_tiles: list[Image.Image] | None = None
 
     @property
@@ -151,13 +153,24 @@ class TouchStrip:
             return None
         return self._bg_tiles[index]
 
+    @property
+    def bg_svg_root(self) -> ET.Element | None:
+        """The parsed background SVG root element, or ``None``.
+
+        Used by the SVG-native pipeline to compose background layers
+        with card SVGs at the vector level before rasterisation.
+        """
+        return self._bg_svg_root
+
     def set_background_svg(self, svg_data: bytes) -> None:
         """Set a background SVG for the entire touchstrip.
 
-        The SVG is rasterized once at the full touchscreen resolution
-        (``panel_width * panel_count`` x ``panel_height``), sliced into
-        per-panel tiles, and cached.  All cards are marked dirty so they
-        re-render with the new background.
+        The SVG is parsed and cached as an XML element tree for
+        SVG-level composition.  For backward compatibility, the SVG
+        is also rasterized and sliced into per-panel PIL tiles.
+
+        All cards are marked dirty so they re-render with the new
+        background.
 
         Parameters
         ----------
@@ -165,6 +178,7 @@ class TouchStrip:
             Raw SVG content as UTF-8 bytes.
         """
         self._bg_svg = svg_data
+        self._bg_svg_root = ET.fromstring(svg_data)  # noqa: S314
         self._rasterize_and_slice()
         for card in self._cards:
             card.mark_dirty()
@@ -194,6 +208,7 @@ class TouchStrip:
         background tiles.
         """
         self._bg_svg = None
+        self._bg_svg_root = None
         self._bg_tiles = None
         for card in self._cards:
             card.mark_dirty()
