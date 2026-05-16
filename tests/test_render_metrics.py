@@ -1,9 +1,9 @@
-"""Tests for deckui.render.metrics — RenderMetrics class."""
+"""Tests for deux.render.metrics — RenderMetrics class."""
 
 from __future__ import annotations
 
-from deckui.render.metrics import RenderMetrics
-from deckui.runtime.capabilities import STREAM_DECK_PLUS
+from deux.render.metrics import RenderMetrics
+from deux.runtime.capabilities import STREAM_DECK_PLUS
 from tests.conftest import STREAM_DECK_MINI, STREAM_DECK_NEO, STREAM_DECK_XL
 
 

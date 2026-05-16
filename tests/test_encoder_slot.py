@@ -1,11 +1,11 @@
-"""Tests for deckui.ui.controls.encoder_slot — EncoderSlot class."""
+"""Tests for deux.ui.controls.encoder_slot — EncoderSlot class."""
 
 from __future__ import annotations
 
 import asyncio
 
-from deckui.ui.controls.dial_accumulator import DialAccumulator
-from deckui.ui.controls.encoder_slot import EncoderSlot
+from deux.ui.controls.dial_accumulator import DialAccumulator
+from deux.ui.controls.encoder_slot import EncoderSlot
 
 
 class TestEncoderSlotInit:

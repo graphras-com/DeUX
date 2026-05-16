@@ -1,4 +1,4 @@
-"""Tests for deckui.dui.iconify — icon fetch and cache."""
+"""Tests for deux.dui.iconify — icon fetch and cache."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
-from deckui.dui import iconify as iconify_mod
-from deckui.dui.iconify import (
+from deux.dui import iconify as iconify_mod
+from deux.dui.iconify import (
     USER_AGENT,
     IconifyError,
     _parse_name,
@@ -221,7 +221,7 @@ class TestDiskCache:
         """An empty file on disk is treated as a cache miss."""
         _write_disk_cache("mdi", "empty", "valid")
         # Overwrite with empty content to simulate corruption.
-        from deckui.dui.iconify import _disk_cache_path
+        from deux.dui.iconify import _disk_cache_path
 
         path = _disk_cache_path("mdi", "empty")
         path.write_text("", encoding="utf-8")

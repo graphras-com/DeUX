@@ -1,5 +1,5 @@
 name: Bug Report
-description: Report a reproducible defect in DeckUI.
+description: Report a reproducible defect in DeUX.
 title: "[Bug]: "
 labels:
   - bug
@@ -19,7 +19,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: DeckUI Version
+      label: DeUX Version
       description: Package version, commit SHA, or branch name.
       placeholder: 0.4.1 / 93d657a / docs/add-github-templates
     validations:

@@ -20,7 +20,7 @@ on:
         description: Coverage target path.
         required: false
         type: string
-        default: "deckui"
+        default: "deux"
       coverage-threshold:
         description: Coverage fail-under percentage.
         required: false

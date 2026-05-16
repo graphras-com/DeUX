@@ -9,9 +9,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from deckui.dui.card import DuiCard
-from deckui.dui.key import DuiKey
-from deckui.dui.schema import (
+from deux.dui.card import DuiCard
+from deux.dui.key import DuiKey
+from deux.dui.schema import (
     ColorBinding,
     CssClassBinding,
     EventMapping,
@@ -505,7 +505,7 @@ class TestAudioController:
     @pytest.fixture
     def ctrl(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> AudioController:
         """An AudioController with mocked DUI resolution."""
-        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
+        monkeypatch.setattr("deux.dui.repository.resolve_dui", _mock_resolve)
         return AudioController(MEDIA_CATALOG, assets_dir=tmp_path)
 
     def test_initial_state(self, ctrl: AudioController) -> None:
@@ -613,7 +613,7 @@ class TestLightsController:
     @pytest.fixture
     def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> LightsController:
         """A LightsController with mocked DUI resolution."""
-        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
+        monkeypatch.setattr("deux.dui.repository.resolve_dui", _mock_resolve)
         return LightsController()
 
     def test_initial_state(self, ctrl: LightsController) -> None:
@@ -666,7 +666,7 @@ class TestTimerController:
     @pytest.fixture
     def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> TimerController:
         """A TimerController with mocked DUI resolution."""
-        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
+        monkeypatch.setattr("deux.dui.repository.resolve_dui", _mock_resolve)
         return TimerController()
 
     def test_initial_format(self, ctrl: TimerController) -> None:
@@ -696,7 +696,7 @@ class TestTimerController:
     async def test_adjust_duration_clamps_to_zero(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
+        monkeypatch.setattr("deux.dui.repository.resolve_dui", _mock_resolve)
         ctrl = TimerController()
         await ctrl._svc.adjust_duration(-10000)
         assert ctrl.duration == 0
@@ -744,12 +744,12 @@ class TestDashboardController:
     @pytest.fixture
     def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> DashboardController:
         """A DashboardController with mocked DUI resolution."""
-        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
+        monkeypatch.setattr("deux.dui.repository.resolve_dui", _mock_resolve)
         return DashboardController()
 
     def _real_deck(self, brightness: int = 50) -> Any:
         """Build a real Deck so the AsyncEvents are wired correctly."""
-        from deckui.runtime.deck import Deck
+        from deux.runtime.deck import Deck
 
         return Deck(serial_number="TEST_DASH", brightness=brightness)
 
@@ -838,7 +838,7 @@ class TestSceneController:
     @pytest.fixture
     def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> SceneController:
         """A SceneController with mocked DUI resolution."""
-        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
+        monkeypatch.setattr("deux.dui.repository.resolve_dui", _mock_resolve)
         return SceneController(SCENE_DEFS)
 
     def test_creates_correct_number_of_keys(self, ctrl: SceneController) -> None:
@@ -924,7 +924,7 @@ class TestFavoritesController:
     @pytest.fixture
     def ctrl(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> FavoritesController:
         """A FavoritesController with mocked DUI resolution."""
-        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
+        monkeypatch.setattr("deux.dui.repository.resolve_dui", _mock_resolve)
         audio = AudioController(MEDIA_CATALOG, assets_dir=tmp_path)
         return FavoritesController(MEDIA_CATALOG, audio, assets_dir=tmp_path)
 
@@ -962,7 +962,7 @@ class TestGaugeController:
     @pytest.fixture
     def ctrl(self, monkeypatch: pytest.MonkeyPatch) -> GaugeController:
         """A GaugeController with mocked DUI resolution."""
-        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
+        monkeypatch.setattr("deux.dui.repository.resolve_dui", _mock_resolve)
         return GaugeController(simulate=False)
 
     def test_initial_value(self, ctrl: GaugeController) -> None:
@@ -1028,7 +1028,7 @@ class TestGaugeController:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """on_attach starts the drift task when simulate=True."""
-        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
+        monkeypatch.setattr("deux.dui.repository.resolve_dui", _mock_resolve)
         ctrl = GaugeController(simulate=True)
         deck = MagicMock()
         await ctrl.on_attach(deck)
@@ -1079,7 +1079,7 @@ class TestGaugeController:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """toggle_simulator stops the drift task when it is running."""
-        monkeypatch.setattr("deckui.dui.repository.resolve_dui", _mock_resolve)
+        monkeypatch.setattr("deux.dui.repository.resolve_dui", _mock_resolve)
         ctrl = GaugeController(simulate=True)
         deck = MagicMock()
         await ctrl.on_attach(deck)
@@ -1105,7 +1105,7 @@ class TestScreenCycler:
         semantics, so we wire one in by hand and have ``set_screen``
         emit it.
         """
-        from deckui import AsyncEvent
+        from deux import AsyncEvent
 
         deck = MagicMock()
         deck.on_screen_changed = AsyncEvent()

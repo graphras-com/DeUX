@@ -17,7 +17,7 @@ System libraries (required for HID + SVG rasterisation):
 ```bash
 ruff check .                                                    # lint
 mypy                                                            # strict typecheck
-pytest tests/ --cov=deckui --cov-report=term-missing --cov-fail-under=95
+pytest tests/ --cov=deux --cov-report=term-missing --cov-fail-under=95
 ```
 
 CI runs the same three checks across Python 3.11/3.12/3.13 plus a Hatchling build and Gitleaks scan. **Coverage threshold is 95% — new code must keep or raise it.**
@@ -42,15 +42,15 @@ python examples/streamdeck.py
 
 ## Architecture
 
-Single package `src/deckui` (src layout, Hatchling build). Five subpackages with strict layering:
+Single package `src/deux` (src layout, Hatchling build). Five subpackages with strict layering:
 
 - **`runtime/`** — device session: `DeckManager` is the **only public entry point**. It owns discovery (`discovery.py`), hot-plug polling, auto-reconnect, and creates `Deck` instances. `Deck` wraps one device, holds `DeviceCapabilities` (auto-detected from hardware), and uses `AsyncTransport` to bridge the synchronous `StreamDeck` library callbacks onto the asyncio loop. Events flow as typed `DeckEvent` subclasses (`KeyEvent`, `EncoderPressEvent`, `EncoderTurnEvent`, `TouchEvent`).
 - **`ui/`** — declarative layout primitives attached to a `Deck`: `Screen` is a named layout containing `KeySlot`s, `EncoderSlot`s, an optional `TouchStrip` of `Card`s, and an optional `InfoScreen`. Screens swap atomically via `deck.set_screen(name)`. Slots expose decorator-based handlers (`@key.on_press`, `@encoder.on_turn`, etc.). Available slots/zones are gated by `DeviceCapabilities` — accessing absent hardware raises `DeckError`.
 - **`dui/`** — the `.dui` package format: a directory containing `layout.svg` + `manifest.yaml`. `loader.load_package()` parses + validates into a `PackageSpec` (`schema.py`); `DuiCard` / `DuiKey` (`card.py`, `key.py`) wrap a spec to render via `SvgRenderer` and dispatch declared events through `EventMap`. Bindings are typed (text, image, visibility, color, range, slider, toggle, iconify) and drive SVG node attributes at render time. `animator.py` + `spinner.py` handle async spinner refresh; `iconify.py` fetches Iconify icons.
 - **`render/`** — pure-image layer: `key_renderer`, `screen_renderer`, `touch_renderer`, `svg_rasterize` (CairoSVG-backed), `image_fetch` (caching HTTP loader), and `metrics.py` which derives panel/touch-strip geometry from capabilities.
-- **`tools/`** — CLIs invoked as `python -m deckui.tools.preview` and `python -m deckui.tools.verify` (preview SVGs on a connected deck with optional `--watch`; verify a `.dui` package or a directory of packages with optional `--strict` / `--index`).
+- **`tools/`** — CLIs invoked as `python -m deux.tools.preview` and `python -m deux.tools.verify` (preview SVGs on a connected deck with optional `--watch`; verify a `.dui` package or a directory of packages with optional `--strict` / `--index`).
 
-Public surface is whatever `deckui/__init__.py` re-exports — keep `__all__` accurate when you add or rename symbols.
+Public surface is whatever `deux/__init__.py` re-exports — keep `__all__` accurate when you add or rename symbols.
 
 ### Key architectural rules
 

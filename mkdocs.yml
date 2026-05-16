@@ -1,6 +1,6 @@
-site_name: DeckUI
+site_name: DeUX
 site_description: A high-level, asyncio-native Python library for Elgato Stream Deck devices.
-repo_url: https://github.com/graphras-com/DeckUI
+repo_url: https://github.com/graphras-com/DeUX
 
 theme:
   name: material

@@ -8,10 +8,10 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from PIL import Image
 
-from deckui.dui.card import DuiCard
-from deckui.dui.key import DuiKey
-from deckui.dui.loader import PackageError, _parse_spinner, load_package
-from deckui.dui.schema import (
+from deux.dui.card import DuiCard
+from deux.dui.key import DuiKey
+from deux.dui.loader import PackageError, _parse_spinner, load_package
+from deux.dui.schema import (
     Binding,
     EventMapping,
     PackageSpec,
@@ -132,7 +132,7 @@ class TestCardBusyState:
         assert card.is_dirty is False
 
     @patch(
-        "deckui.render.svg_rasterize._svg_to_png",
+        "deux.render.svg_rasterize._svg_to_png",
         side_effect=lambda b, w, h: _fake_png(w, h),
     )
     async def test_card_spinner_starts_and_stops(self, mock_raster):
@@ -150,7 +150,7 @@ class TestCardBusyState:
         assert card.is_animating is False
 
     @patch(
-        "deckui.render.svg_rasterize._svg_to_png",
+        "deux.render.svg_rasterize._svg_to_png",
         side_effect=lambda b, w, h: _fake_png(w, h),
     )
     async def test_card_spinner_uses_rendered_svg(self, mock_raster):
@@ -239,7 +239,7 @@ class TestKeyBusyState:
         assert key._dirty is False
 
     @patch(
-        "deckui.render.svg_rasterize._svg_to_png",
+        "deux.render.svg_rasterize._svg_to_png",
         side_effect=lambda b, w, h: _fake_png(w, h),
     )
     async def test_key_spinner_starts_and_stops(self, mock_raster):
@@ -257,7 +257,7 @@ class TestKeyBusyState:
         assert key.is_animating is False
 
     @patch(
-        "deckui.render.svg_rasterize._svg_to_png",
+        "deux.render.svg_rasterize._svg_to_png",
         side_effect=lambda b, w, h: _fake_png(w, h),
     )
     async def test_key_spinner_uses_rendered_svg(self, mock_raster):

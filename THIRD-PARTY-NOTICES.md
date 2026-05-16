@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-DeckUI depends on the following open-source libraries. We are grateful to
+DeUX depends on the following open-source libraries. We are grateful to
 their authors and contributors.
 
 ---

@@ -1,10 +1,10 @@
-"""Tests for deckui.render.screen_renderer — info screen rendering."""
+"""Tests for deux.render.screen_renderer — info screen rendering."""
 
 from __future__ import annotations
 
 from PIL import Image
 
-from deckui.render.screen_renderer import render_info_screen
+from deux.render.screen_renderer import render_info_screen
 
 
 class TestRenderInfoScreen:

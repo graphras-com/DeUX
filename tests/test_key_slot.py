@@ -1,10 +1,10 @@
-"""Tests for deckui.ui.controls.key_slot — KeySlot class."""
+"""Tests for deux.ui.controls.key_slot — KeySlot class."""
 
 from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
-from deckui.ui.controls.key_slot import KeySlot
+from deux.ui.controls.key_slot import KeySlot
 
 
 class TestKeySlotInit:

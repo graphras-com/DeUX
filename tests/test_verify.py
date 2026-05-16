@@ -1,4 +1,4 @@
-"""Tests for deckui.tools.verify — package verification and index generation."""
+"""Tests for deux.tools.verify — package verification and index generation."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from deckui.tools.verify import (
+from deux.tools.verify import (
     main,
     verify_directory,
     verify_package,
@@ -167,7 +167,7 @@ class TestVerifyDirectory:
         assert card["tags"] == ["music", "test"]
 
     def test_not_a_directory(self, tmp_path):
-        from deckui.dui.loader import PackageError
+        from deux.dui.loader import PackageError
 
         with pytest.raises(PackageError, match="Not a directory"):
             verify_directory(tmp_path / "nope")

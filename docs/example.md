@@ -1,7 +1,7 @@
 # Example: A Complete Stream Deck App
 
-This page walks through [`examples/streamdeck.py`](https://github.com/graphras-com/DeckUI/blob/main/examples/streamdeck.py),
-a single-file demo that exercises every major DeckUI feature. It is the
+This page walks through [`examples/streamdeck.py`](https://github.com/graphras-com/DeUX/blob/main/examples/streamdeck.py),
+a single-file demo that exercises every major DeUX feature. It is the
 recommended starting point for new users — clone the repo, plug in any
 Stream Deck, and run:
 
@@ -58,7 +58,7 @@ on the next refresh tick.
 
 ## The lifecycle
 
-The example follows the canonical DeckUI flow:
+The example follows the canonical DeUX flow:
 
 ```python
 async def run() -> None:
@@ -137,7 +137,7 @@ async def _click():
 all four cards) and a focused `settings` screen (dashboard and lights
 only). The dashboard card stays in the same slot on every screen so
 the encoder used to cycle screens is always the rightmost one. The
-same controllers appear on both — DeckUI re-renders whatever is
+same controllers appear on both — DeUX re-renders whatever is
 installed on the active screen.
 
 The cycler doesn't own any widget. Instead, `DashboardCard.dui`

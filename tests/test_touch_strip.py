@@ -1,13 +1,13 @@
-"""Tests for deckui.ui — Card (abstract), BlankCard, and TouchStrip."""
+"""Tests for deux.ui — Card (abstract), BlankCard, and TouchStrip."""
 
 from __future__ import annotations
 
 import pytest
 from PIL import Image
 
-from deckui.ui.cards.base import Card
-from deckui.ui.cards.blank import BlankCard
-from deckui.ui.touch_strip import TouchStrip
+from deux.ui.cards.base import Card
+from deux.ui.cards.blank import BlankCard
+from deux.ui.touch_strip import TouchStrip
 from tests.conftest import PANEL_HEIGHT, PANEL_WIDTH
 
 
@@ -275,7 +275,7 @@ class TestWidgetDispatch:
         assert called == [True]
 
     async def test_dispatch_touch_tap(self):
-        from deckui.runtime.events import EventType, TouchEvent
+        from deux.runtime.events import EventType, TouchEvent
 
         w = _ConcreteWidget()
         called = []
@@ -288,7 +288,7 @@ class TestWidgetDispatch:
         assert called == ["tap"]
 
     async def test_dispatch_touch_long_press(self):
-        from deckui.runtime.events import EventType, TouchEvent
+        from deux.runtime.events import EventType, TouchEvent
 
         w = _ConcreteWidget()
         called = []
@@ -301,7 +301,7 @@ class TestWidgetDispatch:
         assert called == ["long"]
 
     async def test_dispatch_touch_drag(self):
-        from deckui.runtime.events import EventType, TouchEvent
+        from deux.runtime.events import EventType, TouchEvent
 
         w = _ConcreteWidget()
         called = []
@@ -316,7 +316,7 @@ class TestWidgetDispatch:
         assert called == [(10, 20, 30, 40)]
 
     async def test_dispatch_touch_no_handler(self):
-        from deckui.runtime.events import EventType, TouchEvent
+        from deux.runtime.events import EventType, TouchEvent
 
         w = _ConcreteWidget()
         await w.dispatch_touch(TouchEvent(event_type=EventType.TOUCH_SHORT, x=10, y=10))

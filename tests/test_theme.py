@@ -1,4 +1,4 @@
-"""Tests for deckui.render.theme — Theme class and theme system."""
+"""Tests for deux.render.theme — Theme class and theme system."""
 
 from __future__ import annotations
 
@@ -6,10 +6,10 @@ import re
 
 import pytest
 
-import deckui.render.svg_rasterize as svg_mod
-import deckui.render.theme as theme_mod
-from deckui.render.metrics import RenderMetrics
-from deckui.render.theme import (
+import deux.render.svg_rasterize as svg_mod
+import deux.render.theme as theme_mod
+from deux.render.metrics import RenderMetrics
+from deux.render.theme import (
     Theme,
     _adjust,
     _generate_palette,
@@ -22,9 +22,9 @@ from deckui.render.theme import (
     get_default_font_family,
     set_active_theme,
 )
-from deckui.runtime.capabilities import STREAM_DECK_PLUS
-from deckui.runtime.deck import Deck
-from deckui.ui.screen import Screen
+from deux.runtime.capabilities import STREAM_DECK_PLUS
+from deux.runtime.deck import Deck
+from deux.ui.screen import Screen
 
 
 @pytest.fixture(autouse=True)
@@ -448,7 +448,7 @@ class TestDeckResolveStylesheet:
 class TestDefaultThemeAutoApplied:
     def test_stylesheet_is_set_on_import(self):
         """The default theme CSS should be set as stylesheet after import."""
-        from deckui.render.svg_rasterize import get_svg_stylesheet
+        from deux.render.svg_rasterize import get_svg_stylesheet
 
         css = get_svg_stylesheet()
         assert css is not None
@@ -464,14 +464,14 @@ class TestDefaultThemeAutoApplied:
 class TestSvgRendererFontIntegration:
     def test_get_default_font_family_reads_theme(self):
         """_get_default_font_family in svg_renderer reads from active theme."""
-        from deckui.dui.svg_renderer import _get_default_font_family
+        from deux.dui.svg_renderer import _get_default_font_family
 
         set_active_theme(Theme.from_color(0, 0, 0, font_family="Fira Code"))
         assert _get_default_font_family() == "Fira Code"
 
     def test_get_default_font_family_fallback(self):
         """Falls back to 'Inter' when theme is not available."""
-        from deckui.dui.svg_renderer import _get_default_font_family
+        from deux.dui.svg_renderer import _get_default_font_family
 
         theme_mod._active_theme = None
         result = _get_default_font_family()
@@ -484,22 +484,22 @@ class TestSvgRendererFontIntegration:
 
 
 class TestPublicImports:
-    def test_theme_importable_from_deckui(self):
-        from deckui import Theme
+    def test_theme_importable_from_deux(self):
+        from deux import Theme
 
         assert Theme is not None
 
     def test_get_active_theme_importable(self):
-        from deckui import get_active_theme
+        from deux import get_active_theme
 
         assert get_active_theme is not None
 
     def test_set_active_theme_importable(self):
-        from deckui import set_active_theme
+        from deux import set_active_theme
 
         assert set_active_theme is not None
 
     def test_get_default_font_family_importable(self):
-        from deckui import get_default_font_family
+        from deux import get_default_font_family
 
         assert get_default_font_family is not None

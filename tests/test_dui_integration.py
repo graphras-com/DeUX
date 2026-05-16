@@ -1,4 +1,4 @@
-"""Tests for deckui.dui integration — Screen.set_key, Deck rendering, public API."""
+"""Tests for deux.dui integration — Screen.set_key, Deck rendering, public API."""
 
 from __future__ import annotations
 
@@ -7,21 +7,21 @@ from unittest.mock import AsyncMock
 import pytest
 from PIL import Image
 
-from deckui.dui import (
+from deux.dui import (
     DuiCard,
     DuiKey,
     PackageSpec,
     load_all_packages,
     load_package,
 )
-from deckui.dui.schema import (
+from deux.dui.schema import (
     EventMapping,
     PackageType,
     TextBinding,
 )
-from deckui.runtime.capabilities import STREAM_DECK_PLUS
-from deckui.ui.controls.key_slot import KeySlot
-from deckui.ui.screen import Screen
+from deux.runtime.capabilities import STREAM_DECK_PLUS
+from deux.ui.controls.key_slot import KeySlot
+from deux.ui.screen import Screen
 
 _KEY_SVG = (
     '<svg id="K" xmlns="http://www.w3.org/2000/svg" width="120" height="120">'
@@ -106,13 +106,13 @@ class TestDeckDuiKeyRendering:
     """Test that Deck._is_dui_key correctly identifies DuiKeys."""
 
     def test_is_dui_key_true(self):
-        from deckui.runtime.deck import Deck
+        from deux.runtime.deck import Deck
 
         key = DuiKey(_key_spec())
         assert Deck._is_dui_key(key) is True
 
     def test_is_dui_key_false_for_regular(self):
-        from deckui.runtime.deck import Deck
+        from deux.runtime.deck import Deck
 
         key = KeySlot()
         assert Deck._is_dui_key(key) is False
@@ -122,37 +122,37 @@ class TestPublicApiImports:
     """Verify that all dui types are importable from the top-level package."""
 
     def test_dui_card_importable(self):
-        from deckui import DuiCard
+        from deux import DuiCard
 
         assert DuiCard is not None
 
     def test_dui_key_importable(self):
-        from deckui import DuiKey
+        from deux import DuiKey
 
         assert DuiKey is not None
 
     def test_load_package_importable(self):
-        from deckui import load_package
+        from deux import load_package
 
         assert load_package is not None
 
     def test_load_all_packages_importable(self):
-        from deckui import load_all_packages
+        from deux import load_all_packages
 
         assert load_all_packages is not None
 
     def test_package_error_importable(self):
-        from deckui import PackageError
+        from deux import PackageError
 
         assert PackageError is not None
 
     def test_package_spec_importable(self):
-        from deckui import PackageSpec
+        from deux import PackageSpec
 
         assert PackageSpec is not None
 
     def test_all_in_dunder_all(self):
-        import deckui
+        import deux
 
         for name in [
             "DuiCard",
@@ -162,14 +162,14 @@ class TestPublicApiImports:
             "load_package",
             "load_all_packages",
         ]:
-            assert name in deckui.__all__
+            assert name in deux.__all__
 
 
 class TestDuiInitExports:
-    """Verify that all types are exported from deckui.dui."""
+    """Verify that all types are exported from deux.dui."""
 
     def test_all_exports(self):
-        from deckui import dui
+        from deux import dui
 
         expected = [
             "DuiCard",

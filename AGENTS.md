@@ -2,7 +2,7 @@
 
 ## Project
 
-DeckUI — asyncio-native Python library for Elgato Stream Deck devices. Single package at `src/deckui`, built with Hatchling.
+DeUX — asyncio-native Python library for Elgato Stream Deck devices. Single package at `src/deux`, built with Hatchling.
 
 ## Core Mission
 
@@ -35,7 +35,7 @@ You MUST follow this sequence for every task. Do not write any code before step 
 2. **Do the work.**
 3. **Run the full test suite** — every test must pass before you commit:
    ```
-   python -m pytest tests/ --cov=deckui --cov-report=term-missing --cov-fail-under=95
+   python -m pytest tests/ --cov=deux --cov-report=term-missing --cov-fail-under=95
    ```
 4. **Commit** — only after all tests pass.
 5. **Push and create a PR**:
@@ -99,7 +99,7 @@ def example_function(name: str, retries: int = 3) -> bool:
 ruff check .                              # lint
 mypy                                      # typecheck (strict mode)
 pytest                                    # run all tests
-pytest --cov=deckui --cov-fail-under=95   # tests with coverage gate
+pytest --cov=deux --cov-fail-under=95   # tests with coverage gate
 pytest tests/test_screen.py               # single test file
 pytest -k test_name                       # single test
 ```
@@ -108,11 +108,11 @@ CI runs: lint, build, typecheck, tests (3.11/3.12/3.13), gitleaks. All must pass
 
 ## Architecture
 
-- `src/deckui/runtime/` — device discovery, capabilities, transport
-- `src/deckui/ui/` — Screen, KeySlot, EncoderSlot, TouchStrip controls
-- `src/deckui/dui/` — `.dui` package format (SVG layout + YAML manifest, data bindings, event maps)
-- `src/deckui/render/` — image rendering, metrics
-- `src/deckui/tools/` — CLI utilities
+- `src/deux/runtime/` — device discovery, capabilities, transport
+- `src/deux/ui/` — Screen, KeySlot, EncoderSlot, TouchStrip controls
+- `src/deux/dui/` — `.dui` package format (SVG layout + YAML manifest, data bindings, event maps)
+- `src/deux/render/` — image rendering, metrics
+- `src/deux/tools/` — CLI utilities
 
 ## Testing
 
@@ -126,4 +126,4 @@ CI runs: lint, build, typecheck, tests (3.11/3.12/3.13), gitleaks. All must pass
 - Ruff: line length 100, target py311, rules: E/W/F/I/B/UP/C4/SIM (B008 ignored)
 - `tests/*` ignores B011
 - mypy strict with `ignore_missing_imports` for `StreamDeck.*` and `cairosvg`
-- Wheel packages from `src/deckui` (src layout)
+- Wheel packages from `src/deux` (src layout)

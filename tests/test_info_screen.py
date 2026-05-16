@@ -1,10 +1,10 @@
-"""Tests for deckui.ui.info_screen — InfoScreen class."""
+"""Tests for deux.ui.info_screen — InfoScreen class."""
 
 from __future__ import annotations
 
 from PIL import Image
 
-from deckui.ui.info_screen import InfoScreen
+from deux.ui.info_screen import InfoScreen
 
 
 class TestInfoScreenInit:

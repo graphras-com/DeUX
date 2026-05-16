@@ -74,7 +74,7 @@ jobs:
     with:
       python-versions: ${{ vars.CI_PYTHON_TEST_VERSIONS || '["3.11","3.12","3.13"]' }}
       install-spec: ${{ vars.CI_PYTHON_INSTALL_SPEC || '.[test]' }}
-      coverage-target: ${{ vars.CI_PYTHON_COVERAGE_TARGET || 'deckui' }}
+      coverage-target: ${{ vars.CI_PYTHON_COVERAGE_TARGET || 'deux' }}
       coverage-threshold: ${{ fromJSON(vars.CI_PYTHON_COVERAGE_THRESHOLD || '95') }}
       pytest-args: ${{ vars.CI_PYTHON_TEST_ARGS || 'tests/' }}
       system-packages: ${{ vars.CI_PYTHON_SYSTEM_PACKAGES || 'libcairo2-dev libhidapi-dev' }}

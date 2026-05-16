@@ -1,7 +1,7 @@
 """Mock backend services for the Stream Deck demo.
 
-This module contains pure-Python domain logic with **no DeckUI imports
-beyond the** :class:`~deckui.AsyncEvent` **primitive**.  Each service
+This module contains pure-Python domain logic with **no DeUX imports
+beyond the** :class:`~deux.AsyncEvent` **primitive**.  Each service
 simulates a real-world backend (audio player, smart lights, countdown
 timer, dashboard telemetry, scene activator) and emits events when its
 state actually changes.
@@ -17,7 +17,7 @@ The controllers in :mod:`streamdeck` translate domain values to
 presentation, exactly as a real integration with Spotify, Home
 Assistant, etc. would do.
 
-Swap these classes for real integrations and the DeckUI wiring in
+Swap these classes for real integrations and the DeUX wiring in
 ``streamdeck.py`` stays the same.
 """
 
@@ -28,7 +28,7 @@ import contextlib
 import logging
 import random
 
-from deckui import AsyncEvent
+from deux import AsyncEvent
 
 log = logging.getLogger(__name__)
 

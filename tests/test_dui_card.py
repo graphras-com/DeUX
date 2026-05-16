@@ -1,4 +1,4 @@
-"""Tests for deckui.dui.card — DuiCard class."""
+"""Tests for deux.dui.card — DuiCard class."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock
 import pytest
 from PIL import Image
 
-from deckui.dui.card import DuiCard
-from deckui.dui.schema import (
+from deux.dui.card import DuiCard
+from deux.dui.schema import (
     EventMapping,
     PackageSpec,
     PackageType,
@@ -17,10 +17,10 @@ from deckui.dui.schema import (
     TextBinding,
     ToggleBinding,
 )
-from deckui.runtime.capabilities import STREAM_DECK_PLUS
-from deckui.runtime.events import EventType, TouchEvent
-from deckui.ui.cards.base import Card
-from deckui.ui.screen import Screen
+from deux.runtime.capabilities import STREAM_DECK_PLUS
+from deux.runtime.events import EventType, TouchEvent
+from deux.ui.cards.base import Card
+from deux.ui.screen import Screen
 
 _CARD_SVG = (
     '<svg id="TestCard" xmlns="http://www.w3.org/2000/svg" width="197" height="98">'

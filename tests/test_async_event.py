@@ -1,11 +1,11 @@
-"""Tests for :class:`deckui.runtime.async_event.AsyncEvent`."""
+"""Tests for :class:`deux.runtime.async_event.AsyncEvent`."""
 
 from __future__ import annotations
 
 import pytest
 
-from deckui import AsyncEvent
-from deckui.runtime.async_event import AsyncEvent as AsyncEventInternal
+from deux import AsyncEvent
+from deux.runtime.async_event import AsyncEvent as AsyncEventInternal
 
 
 class TestSubscription:
@@ -143,5 +143,5 @@ class TestEmit:
 
 
 def test_top_level_export_matches_internal() -> None:
-    """Public re-export from ``deckui`` is the same class."""
+    """Public re-export from ``deux`` is the same class."""
     assert AsyncEvent is AsyncEventInternal

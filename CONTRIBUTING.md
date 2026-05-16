@@ -1,6 +1,6 @@
-# Contributing to DeckUI
+# Contributing to DeUX
 
-Thank you for your interest in contributing to DeckUI! This guide covers everything
+Thank you for your interest in contributing to DeUX! This guide covers everything
 you need to get started.
 
 ## Prerequisites
@@ -14,8 +14,8 @@ you need to get started.
 ## Setup
 
 ```bash
-git clone git@github.com:graphras-com/DeckUI.git
-cd DeckUI
+git clone git@github.com:graphras-com/DeUX.git
+cd DeUX
 uv sync --extra test
 ```
 
@@ -42,7 +42,7 @@ Every contribution **must** follow this sequence:
    ```bash
    ruff check .                    # lint
    mypy                            # type-check (strict mode)
-   pytest tests/ --cov=deckui --cov-report=term-missing --cov-fail-under=95
+   pytest tests/ --cov=deux --cov-report=term-missing --cov-fail-under=95
    ```
 
 4. **Commit** with a clear, descriptive message.
@@ -105,7 +105,7 @@ pytest -k test_name                  # single test by name
 ## Project Layout
 
 ```
-src/deckui/
+src/deux/
 ├── dui/        # .dui package format (SVG layout, YAML manifest, data bindings)
 ├── render/     # Image rendering and metrics
 ├── runtime/    # Device discovery, capabilities, transport
@@ -122,7 +122,7 @@ Every pull request runs the following checks on Python 3.11, 3.12, and 3.13:
 | Lint | `ruff check .` |
 | Build | Hatchling package build |
 | Type-check | `mypy` |
-| Tests + coverage | `pytest --cov=deckui --cov-fail-under=95` |
+| Tests + coverage | `pytest --cov=deux --cov-fail-under=95` |
 | Secret scanning | gitleaks |
 
 All checks must pass for a PR to be merged.

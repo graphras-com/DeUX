@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from deckui.dui.card import DuiCard
-from deckui.dui.key import DuiKey
-from deckui.dui.schema import (
+from deux.dui.card import DuiCard
+from deux.dui.key import DuiKey
+from deux.dui.schema import (
     PackageSpec,
     PackageType,
     TextBinding,
 )
-from deckui.ui.controller import CardController, KeyController
+from deux.ui.controller import CardController, KeyController
 
 _CARD_SVG = (
     '<svg id="C" xmlns="http://www.w3.org/2000/svg" width="197" height="98">'
@@ -133,16 +133,16 @@ class TestKeyController:
 
 
 class TestExports:
-    """Both classes should be importable from deckui top-level."""
+    """Both classes should be importable from deux top-level."""
 
-    def test_card_controller_importable_from_deckui(self):
-        from deckui import CardController as TopLevel
-        from deckui.ui.controller import CardController as Internal
+    def test_card_controller_importable_from_deux(self):
+        from deux import CardController as TopLevel
+        from deux.ui.controller import CardController as Internal
 
         assert TopLevel is Internal
 
-    def test_key_controller_importable_from_deckui(self):
-        from deckui import KeyController as TopLevel
-        from deckui.ui.controller import KeyController as Internal
+    def test_key_controller_importable_from_deux(self):
+        from deux import KeyController as TopLevel
+        from deux.ui.controller import KeyController as Internal
 
         assert TopLevel is Internal

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from deckui.dui.card import DuiCard
-from deckui.dui.key import DuiKey
-from deckui.dui.schema import (
+from deux.dui.card import DuiCard
+from deux.dui.key import DuiKey
+from deux.dui.schema import (
     CssClassBinding,
     EventMapping,
     PackageSpec,
@@ -15,7 +15,7 @@ from deckui.dui.schema import (
     TextBinding,
     ToggleBinding,
 )
-from deckui.runtime.async_event import AsyncEvent
+from deux.runtime.async_event import AsyncEvent
 
 _CARD_SVG = (
     '<svg id="C" xmlns="http://www.w3.org/2000/svg" width="197" height="98">'
