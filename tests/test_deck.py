@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import io
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -21,6 +22,14 @@ from deux.runtime.events import (
 from deux.ui.cards.base import Card
 from deux.ui.screen import Screen
 from tests.conftest import PANEL_HEIGHT, PANEL_WIDTH
+
+
+def _make_jpeg_frame(width: int, height: int) -> bytes:
+    """Create minimal valid JPEG bytes for push_fn tests."""
+    img = Image.new("RGB", (width, height), "black")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    return buf.getvalue()
 
 
 class _TestCard(Card):
@@ -1025,7 +1034,8 @@ class TestDeckRenderCrossScreen:
         push_fn = shared_card._push_fn
         assert push_fn is not None
         mock_streamdeck_device.set_touchscreen_image.reset_mock()
-        await push_fn(b"frame_a")
+        frame_a = _make_jpeg_frame(metrics.panel_width, metrics.panel_height)
+        await push_fn(frame_a)
         # set_touchscreen_image(frame_bytes, x, y, w, h)
         assert mock_streamdeck_device.set_touchscreen_image.call_args.args[1] == expected_x(1)
 
@@ -1034,5 +1044,6 @@ class TestDeckRenderCrossScreen:
         push_fn = shared_card._push_fn
         assert push_fn is not None
         mock_streamdeck_device.set_touchscreen_image.reset_mock()
-        await push_fn(b"frame_b")
+        frame_b = _make_jpeg_frame(metrics.panel_width, metrics.panel_height)
+        await push_fn(frame_b)
         assert mock_streamdeck_device.set_touchscreen_image.call_args.args[1] == expected_x(3)

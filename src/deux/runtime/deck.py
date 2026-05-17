@@ -428,10 +428,14 @@ class Deck:
             if key_slot and self._is_dui_key(key_slot):
                 await self._render_dui_key(key_slot, key_index)
             else:
-                image_bytes = render_blank_key(
-                    key_size=metrics.key_size,
-                    image_format=caps.key_image_format,
-                )
+                bg_image = screen.key_bg_image
+                if bg_image is not None:
+                    image_bytes = bg_image
+                else:
+                    image_bytes = render_blank_key(
+                        key_size=metrics.key_size,
+                        image_format=caps.key_image_format,
+                    )
                 async with self._device_lock:
                     await loop.run_in_executor(
                         self._executor,
@@ -693,6 +697,10 @@ class Deck:
         for key_index, key_slot in screen.keys.items():
             if key_slot.is_dirty and self._is_dui_key(key_slot):
                 await self._render_dui_key(key_slot, key_index)
+
+        if screen.key_bg_dirty:
+            await self._render_all_keys()
+            screen.clear_key_bg_dirty()
 
         if screen.touch_strip is not None and screen.touch_strip.any_dirty:
             await self._render_touchscreen()
