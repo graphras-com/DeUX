@@ -521,7 +521,7 @@ class TestKeyEvents:
         assert tap_handler in _handlers(result)
         assert release_handler in _handlers(result)
 
-    def test_press_always_fires_with_hold_configured(self):
+    async def test_press_always_fires_with_hold_configured(self):
         """key_press fires even when key_hold is also configured."""
         events = _make_events(
             ("down", "key_press"),
@@ -535,6 +535,7 @@ class TestKeyEvents:
 
         result = em.handle_key_press()
         assert press_handler in _handlers(result)
+        em.handle_key_release()
 
     def test_no_key_press_mapping_returns_empty(self):
         """handle_key_press returns empty list when no key_press mapping."""
@@ -1055,3 +1056,33 @@ class TestAccumulatedTurns:
         em.handle_encoder_turn(-1)
         await asyncio.sleep(0.1)
         handler.assert_awaited_once_with(-1)
+
+    async def test_hold_handler_exception_is_logged(self, caplog: pytest.LogCaptureFixture):
+        """A raising hold handler logs the exception instead of silently dropping it."""
+        events = _make_events(
+            ("long_hold", "key_hold", {"hold_ms": 10}),
+        )
+        em = EventMap(events)
+        handler = AsyncMock(side_effect=RuntimeError("boom"))
+        em.on("long_hold", handler)
+
+        em.handle_key_press()
+        await asyncio.sleep(0.05)
+
+        handler.assert_awaited_once()
+        assert "Hold-timer handler raised an exception" in caplog.text
+        assert "boom" in caplog.text
+
+    async def test_hold_task_is_named(self):
+        """The hold-timer task receives the name 'dui-hold-timer'."""
+        events = _make_events(
+            ("long_hold", "key_hold", {"hold_ms": 5000}),
+        )
+        em = EventMap(events)
+        handler = AsyncMock()
+        em.on("long_hold", handler)
+
+        em.handle_key_press()
+        assert em._hold_task is not None
+        assert em._hold_task.get_name() == "dui-hold-timer"
+        em.handle_key_release()
