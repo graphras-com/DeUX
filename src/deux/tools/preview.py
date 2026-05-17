@@ -124,6 +124,7 @@ def _svg_to_png_fit(svg_data: bytes, max_width: int, max_height: int) -> bytes:
         If no SVG renderer backend is available.
     """
     import re as _re
+
     from .._xml import safe_fromstring
 
     # Try to extract intrinsic dimensions to preserve aspect ratio.

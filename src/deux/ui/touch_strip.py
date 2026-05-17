@@ -7,10 +7,9 @@ import logging
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from .._xml import safe_fromstring
-
 from PIL import Image
 
+from .._xml import safe_fromstring
 from .cards.base import Card
 from .cards.blank import BlankCard
 

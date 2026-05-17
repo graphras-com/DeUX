@@ -9,7 +9,6 @@ from typing import Any
 import yaml
 
 from .._xml import safe_fromstring
-
 from .schema import (
     DEFAULT_HOLD_MS,
     DEFAULT_MAX_DURATION_MS,

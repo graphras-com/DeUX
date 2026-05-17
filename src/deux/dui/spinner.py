@@ -8,10 +8,9 @@ import logging
 import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING
 
-from .._xml import safe_fromstring
-
 from PIL import Image
 
+from .._xml import safe_fromstring
 from ..render.key_renderer import _encode_image
 from .svg_renderer import _find_element_by_id
 
