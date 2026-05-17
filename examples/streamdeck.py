@@ -1145,8 +1145,6 @@ class StreamDeckApp:
         screen = deck.screen("Main")
 
         if screen.touch_strip is not None:
-            screen.touch_strip.background_color = "#1c1c1c"
-            screen.set_touchstrip_background_svg_from_file(EXAMPLES_DIR.joinpath("assets/background.svg"))
             screen.set_card(0, self.audio.card)
             screen.set_card(1, self.lights.card)
             screen.set_card(2, self.gauge.card)
@@ -1167,8 +1165,6 @@ class StreamDeckApp:
         caps = deck.capabilities
 
         if screen.touch_strip is not None:
-            screen.touch_strip.background_color = "#1c1c1c"
-            screen.set_touchstrip_background_svg_from_file(EXAMPLES_DIR.joinpath("assets/background.svg"))
             screen.set_card(2, self.timer.card)
             screen.set_card(3, self.dashboard.card)
 
