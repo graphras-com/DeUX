@@ -137,8 +137,9 @@ class EventMap:
             hold_ms = mapping.hold_ms
             if hold_ms is None:
                 continue  # pragma: no cover — validated by loader
-            self._hold_task = asyncio.ensure_future(
-                self._hold_delay(hold_ms / 1000.0, handler)
+            self._hold_task = asyncio.create_task(
+                self._hold_delay(hold_ms / 1000.0, handler),
+                name="dui-hold-timer",
             )
             return
 
@@ -153,7 +154,10 @@ class EventMap:
         if self._pressed:
             self._hold_fired = True
             self._hold_task = None
-            await handler()
+            try:
+                await handler()
+            except Exception:
+                logger.exception("Hold-timer handler raised an exception")
 
     def _cancel_hold_timer(self) -> None:
         """Cancel an in-progress hold timer if one is running."""
