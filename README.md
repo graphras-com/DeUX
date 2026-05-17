@@ -1,4 +1,4 @@
-# DeUX
+# DeUX [dø]
 
 [![CI](https://github.com/graphras-com/DeUX/actions/workflows/ci.yml/badge.svg)](https://github.com/graphras-com/DeUX/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org)
@@ -85,13 +85,11 @@ For development:
 pip install -e ".[test]"
 ```
 
-## Usage
-
-### Basic key handling
+### Usage
 
 ```python
 import asyncio
-from deux import DeckManager
+from deux import DeckManager, DuiKey
 
 async def main():
     manager = DeckManager()
@@ -99,10 +97,14 @@ async def main():
     @manager.on_connect()
     async def handle(deck):
         screen = deck.screen("main")
+        key = DuiKey("IconKey")
+        key.set("label", "Hello")
+        key.set("icon", "mdi:hand-wave")
+        screen.key(0).set_dui(key)
 
         @screen.key(0).on_press
-        async def on_home():
-            print("Home pressed!")
+        async def on_press():
+            print("Pressed!")
 
         await deck.set_screen("main")
 
@@ -110,20 +112,6 @@ async def main():
         await manager.wait_closed()
 
 asyncio.run(main())
-```
-
-### Using `.dui` packages
-
-```python
-from deux.dui import load_package, DuiCard
-
-spec = load_package("./AudioCard.dui")
-card = DuiCard(spec)
-card.set("artist", "The Beatles")
-
-@card.on("toggle_play_pause")
-async def handle():
-    ...
 ```
 
 ## Configuration
