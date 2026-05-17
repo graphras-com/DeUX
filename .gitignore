@@ -19,6 +19,7 @@ wheels/
 sdist/
 
 playground/
+untracked/
 screenshots/*
 !screenshots/.gitkeep
 
