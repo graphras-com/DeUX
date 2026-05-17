@@ -17,6 +17,7 @@ from typing import Any
 
 from PIL import Image, ImageFont
 
+from .._xml import safe_fromstring
 from .iconify import IconifyError, fetch_icon
 from .schema import (
     Binding,
@@ -459,7 +460,7 @@ class SvgRenderer:
     def __init__(self, spec: PackageSpec) -> None:
         self._spec = spec
         self._values: dict[str, Any] = {}
-        self._base_root: ET.Element = ET.fromstring(spec.svg_source)  # noqa: S314
+        self._base_root: ET.Element = safe_fromstring(spec.svg_source)  # untrusted: .dui pkg
         self._original_root: ET.Element = copy.deepcopy(self._base_root)
         self._range_extents: dict[str, float] = {}
         self._target_width: int | None = None
@@ -1181,8 +1182,8 @@ class SvgRenderer:
             return
 
         try:
-            icon_root = ET.fromstring(svg_source)  # noqa: S314 — trusted API
-        except ET.ParseError as exc:
+            icon_root = safe_fromstring(svg_source)  # untrusted: network (Iconify)
+        except Exception as exc:
             logger.warning(
                 "Iconify binding '%s': failed to parse icon SVG: %s",
                 binding.node,
@@ -1289,8 +1290,8 @@ class SvgRenderer:
             return
 
         try:
-            icon_root = ET.fromstring(svg_source)  # noqa: S314 — trusted API
-        except ET.ParseError as exc:
+            icon_root = safe_fromstring(svg_source)  # untrusted: network (Iconify)
+        except Exception as exc:
             logger.warning(
                 "List binding icon '%s': failed to parse SVG: %s", icon_name, exc
             )

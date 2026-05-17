@@ -51,6 +51,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
+from .._xml import safe_fromstring
+
 logger = logging.getLogger(__name__)
 
 
@@ -470,7 +472,7 @@ def _inject_stylesheet(svg_data: bytes, css: str) -> bytes:
     ET.register_namespace("", _SVG_NS)
     ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
 
-    root = ET.fromstring(svg_data)  # noqa: S314
+    root = safe_fromstring(svg_data)  # untrusted: may contain user SVG
 
     style_elem = ET.Element(f"{{{_SVG_NS}}}style")
     style_elem.set("type", "text/css")

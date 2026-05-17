@@ -108,7 +108,7 @@ class Screen:
             try:
                 svg_data = backgrounds["touchscreen"]
                 self._touch_strip._bg_svg = svg_data
-                self._touch_strip._bg_svg_root = ET.fromstring(svg_data)  # noqa: S314
+                self._touch_strip._bg_svg_root = ET.fromstring(svg_data)  # noqa: S314 — trusted: bundled default backgrounds
                 self._touch_strip._rasterize_and_slice()
             except Exception:
                 logger.debug("Failed to apply default touchscreen background", exc_info=True)
