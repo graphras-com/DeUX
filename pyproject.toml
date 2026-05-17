@@ -101,5 +101,7 @@ module = [
     "StreamDeck.*",
     "cairosvg",
     "pyvips",
+    "defusedxml",
+    "defusedxml.*",
 ]
 ignore_missing_imports = true

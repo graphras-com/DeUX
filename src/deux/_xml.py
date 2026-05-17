@@ -38,4 +38,5 @@ def safe_fromstring(xml_data: str | bytes) -> ET.Element:
     xml.etree.ElementTree.ParseError
         If the document is not well-formed XML.
     """
-    return SafeET.fromstring(xml_data)
+    result: ET.Element = SafeET.fromstring(xml_data)
+    return result
