@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="100" viewBox="0 0 1200 100">
+  <defs>
+    <linearGradient id="backgroundGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop class="background-dark" offset="0%" stop-color="currentColor"/>
+      <stop class="background-light" offset="100%" stop-color="currentColor" />
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1200" height="100" stroke="none" fill="url(#backgroundGradient)"/>
+  <g class="border-secondary">
+    <line x1="200"  y1="5" x2="200"  y2="95" stroke="currentColor" stroke-width="1" stroke-dasharray="4 2"/>
+    <line x1="400"  y1="5" x2="400"  y2="95" stroke="currentColor" stroke-width="1" stroke-dasharray="4 2"/>
+    <line x1="600"  y1="5" x2="600"  y2="95" stroke="currentColor" stroke-width="1" stroke-dasharray="4 2"/>
+    <line x1="800"  y1="5" x2="800"  y2="95" stroke="currentColor" stroke-width="1" stroke-dasharray="4 2"/>
+    <line x1="1000" y1="5" x2="1000" y2="95" stroke="currentColor" stroke-width="1" stroke-dasharray="4 2"/>
+  </g>
+</svg>

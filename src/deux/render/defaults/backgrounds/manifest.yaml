@@ -1,0 +1,81 @@
+# Default background SVGs for all supported Stream Deck devices.
+# Devices are identified by USB VID:PID (hex, lowercase).
+#
+# Surface types:
+#   key         - per-key background
+#   touchscreen - touch strip background (Plus, Plus XL)
+#   screen      - info screen background (Neo)
+
+backgrounds:
+  # --- Classic family (72x72 keys) ---
+
+  # Stream Deck 15-Key Module
+  - vid: 0x0fd9
+    pid: 0x00b9
+    surfaces:
+      key: 72x72.svg
+
+  # Stream Deck 2019
+  - vid: 0x0fd9
+    pid: 0x006d
+    surfaces:
+      key: 72x72.svg
+
+  # Stream Deck Mk.2
+  - vid: 0x0fd9
+    pid: 0x0080
+    surfaces:
+      key: 72x72.svg
+
+  # Stream Deck Mk.2 (Scissor Keys)
+  - vid: 0x0fd9
+    pid: 0x00a5
+    surfaces:
+      key: 72x72.svg
+
+  # --- XL family (96x96 keys) ---
+
+  # Stream Deck Module 32
+  - vid: 0x0fd9
+    pid: 0x00ba
+    surfaces:
+      key: 96x96.svg
+
+  # Stream Deck XL
+  - vid: 0x0fd9
+    pid: 0x006c
+    surfaces:
+      key: 96x96.svg
+
+  # Stream Deck XL 2022
+  - vid: 0x0fd9
+    pid: 0x008f
+    surfaces:
+      key: 96x96.svg
+
+  # --- Neo (96x96 keys + info screen) ---
+
+  # Stream Deck Neo
+  - vid: 0x0fd9
+    pid: 0x009a
+    surfaces:
+      key: 96x96.svg
+      screen: 248x58.svg
+
+  # --- Plus (120x120 keys + touchscreen) ---
+
+  # Stream Deck +
+  - vid: 0x0fd9
+    pid: 0x0084
+    surfaces:
+      key: 120x120.svg
+      touchscreen: 800x100.svg
+
+  # --- Plus XL (112x112 keys + touchscreen) ---
+
+  # Stream Deck + XL
+  - vid: 0x0fd9
+    pid: 0x00c6
+    surfaces:
+      key: 112x112.svg
+      touchscreen: 1200x100.svg

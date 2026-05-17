@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from .defaults import (
+    SurfaceBackgrounds,
+    get_default_backgrounds,
+    list_supported_devices,
+)
 from .image_fetch import ImageFetchError, fetch_image
 from .image_fetch import clear_cache as clear_image_cache
 from .key_renderer import render_blank_key, render_key_image
@@ -34,6 +39,7 @@ from .touch_renderer import (
 _apply_default_theme()
 
 __all__ = [
+    "SurfaceBackgrounds",
     "Theme",
     "ImageFetchError",
     "RasterizeError",
@@ -43,9 +49,11 @@ __all__ = [
     "compose_touchstrip",
     "fetch_image",
     "get_active_theme",
+    "get_default_backgrounds",
     "get_default_font_family",
     "get_svg_backend",
     "get_svg_stylesheet",
+    "list_supported_devices",
     "list_svg_backends",
     "load_svg_stylesheet",
     "register_svg_backend",
