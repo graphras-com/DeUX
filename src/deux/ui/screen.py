@@ -71,10 +71,43 @@ class Screen:
         else:
             self._info_screen = None
 
+        self._apply_default_backgrounds()
+
     @property
     def name(self) -> str:
         """The screen name."""
         return self._name
+
+    def _apply_default_backgrounds(self) -> None:
+        """Load and apply bundled default background SVGs for this device.
+
+        Looks up the device's VID:PID in the bundled manifest and sets
+        the touchscreen background SVG if one is available and no
+        background has been explicitly configured.  Only the SVG source
+        and parsed XML root are stored; PIL rasterisation is deferred
+        until the first render pass to avoid unnecessary work during
+        construction.  Failures are logged but never raised — defaults
+        are best-effort.
+        """
+        import xml.etree.ElementTree as ET  # noqa: N817
+
+        from ..render.defaults import get_default_backgrounds
+
+        try:
+            backgrounds = get_default_backgrounds(
+                self._caps.vendor_id, self._caps.product_id
+            )
+        except Exception:
+            logger.debug("Could not load default backgrounds", exc_info=True)
+            return
+
+        if "touchscreen" in backgrounds and self._touch_strip is not None:
+            try:
+                svg_data = backgrounds["touchscreen"]
+                self._touch_strip._bg_svg = svg_data
+                self._touch_strip._bg_svg_root = ET.fromstring(svg_data)  # noqa: S314
+            except Exception:
+                logger.debug("Failed to apply default touchscreen background", exc_info=True)
 
     @property
     def capabilities(self) -> DeviceCapabilities:

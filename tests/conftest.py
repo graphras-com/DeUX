@@ -63,6 +63,8 @@ PANEL_HEIGHT = _PLUS_METRICS.panel_height
 
 
 STREAM_DECK_MINI = DeviceCapabilities(
+    vendor_id=0x0FD9,
+    product_id=0x0063,
     deck_type="Stream Deck Mini",
     key_count=6,
     key_cols=3,
@@ -90,6 +92,8 @@ STREAM_DECK_MINI = DeviceCapabilities(
 )
 
 STREAM_DECK_NEO = DeviceCapabilities(
+    vendor_id=0x0FD9,
+    product_id=0x009A,
     deck_type="Stream Deck Neo",
     key_count=8,
     key_cols=4,
@@ -117,6 +121,8 @@ STREAM_DECK_NEO = DeviceCapabilities(
 )
 
 STREAM_DECK_XL = DeviceCapabilities(
+    vendor_id=0x0FD9,
+    product_id=0x006C,
     deck_type="Stream Deck XL",
     key_count=32,
     key_cols=8,
@@ -425,6 +431,8 @@ def _make_mock_streamdeck(caps: DeviceCapabilities) -> MagicMock:
     device.TOUCH_KEY_COUNT = caps.touch_key_count
 
     device.deck_type.return_value = caps.deck_type
+    device.vendor_id.return_value = caps.vendor_id
+    device.product_id.return_value = caps.product_id
     device.get_serial_number.return_value = "TEST123"
     device.get_firmware_version.return_value = "1.0.0"
     device.key_count.return_value = caps.key_count

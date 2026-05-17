@@ -38,6 +38,8 @@ class DeviceCapabilities:
     and event routing without hardcoded constants.
     """
 
+    vendor_id: int
+    product_id: int
     deck_type: str
     key_count: int
     key_cols: int
@@ -79,6 +81,8 @@ class DeviceCapabilities:
         """
         key_layout = device.key_layout()
         return cls(
+            vendor_id=device.vendor_id(),
+            product_id=device.product_id(),
             deck_type=device.DECK_TYPE,
             key_count=device.key_count(),
             key_cols=key_layout[0],
@@ -136,6 +140,8 @@ class DeviceCapabilities:
 
 
 STREAM_DECK_PLUS = DeviceCapabilities(
+    vendor_id=0x0FD9,
+    product_id=0x0084,
     deck_type="Stream Deck +",
     key_count=8,
     key_cols=4,
