@@ -313,6 +313,8 @@ await manager.wait_closed()
 
 ## What NOT to Use
 
+**Never register event handlers directly on key slots.** Patterns like `@screen.key(0).on_press` bypass the DUI event system entirely. Always use the semantic events declared in the package manifest via `@key.on_event("event_name")`. For example, the bundled `IconKey` package defines `click`, `hold`, `press`, and `release` events — use those instead of raw slot decorators.
+
 The following are internal implementation details. Never suggest these to developers:
 
 | Module | Internal Components |

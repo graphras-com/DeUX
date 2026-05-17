@@ -100,11 +100,12 @@ async def main():
         key = DuiKey("IconKey")
         key.set("label", "Hello")
         key.set("icon", "mdi:hand-wave")
-        screen.key(0).set_dui(key)
 
-        @screen.key(0).on_press
-        async def on_press():
-            print("Pressed!")
+        @key.on_event("click")
+        async def on_click():
+            print("Clicked!")
+
+        screen.key(0).set_dui(key)
 
         await deck.set_screen("main")
 
