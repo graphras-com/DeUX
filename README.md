@@ -105,7 +105,7 @@ async def main():
         async def on_click():
             print("Clicked!")
 
-        screen.key(0).set_dui(key)
+        screen.set_key(0, key)
 
         await deck.set_screen("main")
 
