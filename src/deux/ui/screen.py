@@ -49,6 +49,9 @@ class Screen:
         self._keys: dict[int, KeySlot] = {}
         self._encoders: dict[int, EncoderSlot] = {}
         self._theme: Theme | None = None
+        self._key_bg_svg: bytes | None = None
+        self._key_bg_image: bytes | None = None
+        self._key_bg_dirty: bool = False
 
         if self._caps.has_touchscreen and self._caps.dial_count > 0:
             from ..render.metrics import RenderMetrics
@@ -106,8 +109,61 @@ class Screen:
                 svg_data = backgrounds["touchscreen"]
                 self._touch_strip._bg_svg = svg_data
                 self._touch_strip._bg_svg_root = ET.fromstring(svg_data)  # noqa: S314
+                self._touch_strip._rasterize_and_slice()
             except Exception:
                 logger.debug("Failed to apply default touchscreen background", exc_info=True)
+
+        if "key" in backgrounds:
+            try:
+                self._key_bg_svg = backgrounds["key"]
+                self._rasterize_key_background()
+            except Exception:
+                logger.debug("Failed to apply default key background", exc_info=True)
+
+    def _rasterize_key_background(self) -> None:
+        """Rasterize the key background SVG into encoded image bytes.
+
+        Uses the device's key size and image format to produce a ready-to-send
+        blank key image with the default background applied.  If no key
+        background SVG is set, clears the cached image.
+        """
+        if self._key_bg_svg is None:
+            self._key_bg_image = None
+            return
+
+        from PIL import Image as PILImage
+
+        from ..render.key_renderer import _encode_image
+        from ..render.svg_rasterize import _svg_to_png
+
+        key_w, key_h = self._caps.key_size
+        png_data = _svg_to_png(self._key_bg_svg, key_w, key_h)
+        img = PILImage.open(io.BytesIO(png_data)).convert("RGB")
+        self._key_bg_image = _encode_image(
+            img, image_format=self._caps.key_image_format
+        )
+        logger.debug("Key background SVG rasterized: %dx%d", key_w, key_h)
+
+    @property
+    def key_bg_image(self) -> bytes | None:
+        """Pre-rendered default key background image, or ``None``.
+
+        Returns
+        -------
+        bytes or None
+            Encoded image bytes ready to push to the device, or ``None``
+            if no default key background is configured.
+        """
+        return self._key_bg_image
+
+    @property
+    def key_bg_dirty(self) -> bool:
+        """Whether the key background needs re-rendering on all blank keys."""
+        return self._key_bg_dirty
+
+    def clear_key_bg_dirty(self) -> None:
+        """Reset the key-background dirty flag after a full key render."""
+        self._key_bg_dirty = False
 
     @property
     def capabilities(self) -> DeviceCapabilities:
@@ -325,6 +381,9 @@ class Screen:
         """
         for key_slot in self._keys.values():
             key_slot.mark_dirty()
+        if self._key_bg_svg is not None:
+            self._rasterize_key_background()
+            self._key_bg_dirty = True
         if self._touch_strip is not None:
             self._touch_strip.invalidate_background()
         for card in self.cards:
