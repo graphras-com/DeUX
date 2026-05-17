@@ -386,6 +386,7 @@ name = "deux"
 source = { editable = "." }
 dependencies = [
     { name = "cairosvg" },
+    { name = "defusedxml" },
     { name = "pillow" },
     { name = "platformdirs" },
     { name = "pyvips" },
@@ -411,6 +412,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "cairosvg", specifier = ">=2.7.0" },
+    { name = "defusedxml", specifier = ">=0.7.0" },
     { name = "mkdocs-gen-files", marker = "extra == 'docs'", specifier = ">=0.5" },
     { name = "mkdocs-literate-nav", marker = "extra == 'docs'", specifier = ">=0.6" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5" },

@@ -7,6 +7,8 @@ import logging
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from .._xml import safe_fromstring
+
 from PIL import Image
 
 from .cards.base import Card
@@ -178,7 +180,7 @@ class TouchStrip:
             Raw SVG content as UTF-8 bytes.
         """
         self._bg_svg = svg_data
-        self._bg_svg_root = ET.fromstring(svg_data)  # noqa: S314
+        self._bg_svg_root = safe_fromstring(svg_data)  # untrusted: user-supplied SVG
         self._rasterize_and_slice()
         for card in self._cards:
             card.mark_dirty()

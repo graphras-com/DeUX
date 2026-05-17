@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+from .._xml import safe_fromstring
 
 from .schema import (
     DEFAULT_HOLD_MS,
@@ -77,8 +78,8 @@ def _find_svg_ids(svg_source: str) -> set[str]:
         If *svg_source* is not valid XML.
     """
     try:
-        root = ET.fromstring(svg_source)  # noqa: S314 — trusted local files only
-    except ET.ParseError as exc:
+        root = safe_fromstring(svg_source)  # untrusted: user-supplied .dui package
+    except Exception as exc:
         raise PackageError(f"Invalid SVG: {exc}") from exc
 
     ids: set[str] = set()

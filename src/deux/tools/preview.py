@@ -124,11 +124,11 @@ def _svg_to_png_fit(svg_data: bytes, max_width: int, max_height: int) -> bytes:
         If no SVG renderer backend is available.
     """
     import re as _re
-    import xml.etree.ElementTree as ET
+    from .._xml import safe_fromstring
 
     # Try to extract intrinsic dimensions to preserve aspect ratio.
     try:
-        root = ET.fromstring(svg_data)
+        root = safe_fromstring(svg_data)  # untrusted: user-supplied SVG
         w_attr = root.get("width", "")
         h_attr = root.get("height", "")
         # Strip unit suffixes like "px", "pt", etc.
@@ -142,7 +142,7 @@ def _svg_to_png_fit(svg_data: bytes, max_width: int, max_height: int) -> bytes:
                 out_w = max(1, int(svg_w * scale))
                 out_h = max(1, int(svg_h * scale))
                 return _svg_to_png(svg_data, out_w, out_h)
-    except ET.ParseError:
+    except Exception:
         logger.debug(
             "Failed to parse SVG intrinsic dimensions; using fallback raster size %dx%d.",
             max_width,

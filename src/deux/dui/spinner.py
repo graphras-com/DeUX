@@ -8,6 +8,8 @@ import logging
 import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING
 
+from .._xml import safe_fromstring
+
 from PIL import Image
 
 from ..render.key_renderer import _encode_image
@@ -103,7 +105,7 @@ class SpinnerFrames:
             Encoded image frames, one per rotation step.
         """
         svg_source = self._rendered_svg or self._spec.svg_source
-        base_root = ET.fromstring(svg_source)  # noqa: S314
+        base_root = safe_fromstring(svg_source)  # untrusted: .dui package
         node = self._spinner.node
         assert node is not None
 
@@ -141,7 +143,7 @@ class SpinnerFrames:
             Encoded image frames with a triangle-wave opacity cycle.
         """
         svg_source = self._rendered_svg or self._spec.svg_source
-        base_root = ET.fromstring(svg_source)  # noqa: S314
+        base_root = safe_fromstring(svg_source)  # untrusted: .dui package
         node = self._spinner.node
         assert node is not None
 
