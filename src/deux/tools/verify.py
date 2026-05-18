@@ -90,7 +90,7 @@ def verify_package(path: str | Path, *, strict: bool = False) -> VerifyResult:
 
     # 1. Try loading the package (validates structure, bindings, events, regions)
     try:
-        spec = load_package(pkg_dir)
+        spec = load_package(pkg_dir, strict=False)
     except PackageError as exc:
         result.diagnostics.append(Diagnostic(Severity.ERROR, f"Load failed: {exc}"))
         return result
