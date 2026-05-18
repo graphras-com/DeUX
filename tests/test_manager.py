@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from deux.runtime.manager import DeckManager
@@ -278,6 +279,52 @@ class TestDeckManagerScanOnce:
             await m._scan_once()
 
         assert m._decks == {}
+
+    async def test_scan_device_open_error_logs_info_then_debug(self, caplog):
+        """Permission / probe errors are logged at info (first) then debug (subsequent).
+
+        Verifies acceptance criteria from issue #196: device probe failures
+        are logged at ``info`` level for the first occurrence and ``debug``
+        for subsequent ones, with exception info attached.
+        """
+        m = DeckManager(poll_interval=10.0)
+
+        @m.on_connect()
+        async def handler(deck):
+            pass
+
+        dev = _make_raw_device(serial="PERM_ERR")
+        dev.open.side_effect = PermissionError("Permission denied")
+
+        with patch("deux.runtime.manager.DeviceManager") as mock_dm:
+            mock_dm.return_value.enumerate.return_value = [dev]
+
+            # First scan — should log at INFO level
+            with caplog.at_level(logging.DEBUG, logger="deux.runtime.manager"):
+                caplog.clear()
+                await m._scan_once()
+
+            info_records = [
+                r
+                for r in caplog.records
+                if r.levelno == logging.INFO and "Failed to probe new device" in r.message
+            ]
+            assert len(info_records) == 1
+            assert info_records[0].exc_info is not None
+            assert info_records[0].exc_info[0] is PermissionError
+
+            # Second scan — same path, should log at DEBUG level
+            with caplog.at_level(logging.DEBUG, logger="deux.runtime.manager"):
+                caplog.clear()
+                await m._scan_once()
+
+            debug_records = [
+                r
+                for r in caplog.records
+                if r.levelno == logging.DEBUG and "Failed to probe device" in r.message
+            ]
+            assert len(debug_records) == 1
+            assert debug_records[0].exc_info is not None
 
 
 class TestDeckManagerDecks:

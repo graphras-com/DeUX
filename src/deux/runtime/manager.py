@@ -79,6 +79,7 @@ class DeckManager:
         self._scan_task: asyncio.Task[None] | None = None
 
         self._decks: dict[str, Deck] = {}
+        self._failed_probe_paths: set[str] = set()
 
         self._connect_handlers: list[tuple[dict[str, str | None], AsyncHandler]] = []
         self._disconnect_handler: AsyncHandler | None = None
@@ -255,6 +256,16 @@ class DeckManager:
                 device_by_serial[serial] = d
                 await loop.run_in_executor(self._executor, d.close)
             except Exception:
+                dev_path = d.id()
+                if dev_path not in self._failed_probe_paths:
+                    self._failed_probe_paths.add(dev_path)
+                    logger.info(
+                        "Failed to probe new device at %s", dev_path, exc_info=True
+                    )
+                else:
+                    logger.debug(
+                        "Failed to probe device at %s", dev_path, exc_info=True
+                    )
                 continue
 
         for serial in list(self._decks):
