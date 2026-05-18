@@ -16,6 +16,7 @@ import urllib.request
 
 from PIL import Image, UnidentifiedImageError
 
+from deux._errors import DeuxError
 from deux._url_safety import check_url
 from deux._version import __version__
 
@@ -40,7 +41,7 @@ _cache: dict[str, Image.Image | None] = {}
 _cache_lock = threading.Lock()
 
 
-class ImageFetchError(Exception):
+class ImageFetchError(DeuxError):
     """Raised when a remote image cannot be fetched or decoded."""
 
 

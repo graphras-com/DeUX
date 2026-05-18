@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, cast
 from PIL import Image
 from StreamDeck.DeviceManager import DeviceManager
 
+from .._errors import DeuxError
 from ..render.key_renderer import render_blank_key
 from ..render.metrics import RenderMetrics
 from ..render.touch_renderer import compose_card_with_background
@@ -43,11 +44,11 @@ logger = logging.getLogger(__name__)
 _HID_WRITE_TIMEOUT: float = 2.0
 
 
-class HidWriteTimeout(Exception):
+class HidWriteTimeout(DeuxError):
     """Raised when a HID write exceeds :data:`_HID_WRITE_TIMEOUT`."""
 
 
-class DeckError(Exception):
+class DeckError(DeuxError):
     """Raised for deck-level errors."""
 
 

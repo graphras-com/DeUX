@@ -8,6 +8,7 @@ from typing import Any
 
 import yaml
 
+from .._errors import DeuxError
 from .._xml import safe_fromstring
 from .schema import (
     DEFAULT_HOLD_MS,
@@ -48,13 +49,12 @@ from .schema import (
 )
 
 logger = logging.getLogger(__name__)
-
 _SVG_NS = {"svg": "http://www.w3.org/2000/svg"}
 
 _PRESS_RELEASE_SOURCES = frozenset({"key_press_release", "encoder_press_release"})
 
 
-class PackageError(Exception):
+class PackageError(DeuxError):
     """Raised when a .dui package is invalid or cannot be loaded."""
 
 

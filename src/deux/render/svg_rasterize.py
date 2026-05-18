@@ -51,10 +51,10 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
+from .._errors import DeuxError
 from .._xml import safe_fromstring
 
 logger = logging.getLogger(__name__)
-
 
 def _ensure_macos_lib_path() -> None:
     """Set ``DYLD_FALLBACK_LIBRARY_PATH`` on macOS if Homebrew libs exist.
@@ -70,7 +70,7 @@ def _ensure_macos_lib_path() -> None:
             os.environ.setdefault("DYLD_FALLBACK_LIBRARY_PATH", str(brew_lib))
 
 
-class RasterizeError(Exception):
+class RasterizeError(DeuxError):
     """Raised when SVG rasterisation fails."""
 
 

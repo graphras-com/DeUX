@@ -28,12 +28,14 @@ import logging
 import socket
 from urllib.parse import urlparse
 
+from deux._errors import DeuxError
+
 logger = logging.getLogger(__name__)
 
 _allow_private_urls: bool = False
 
 
-class SSRFError(Exception):
+class SSRFError(DeuxError):
     """Raised when a URL targets a blocked private/internal address."""
 
 
