@@ -15,11 +15,13 @@ import urllib.request
 
 from PIL import Image, UnidentifiedImageError
 
+from deux._version import __version__
+
 logger = logging.getLogger(__name__)
 
 _REQUEST_TIMEOUT = 10.0
 
-USER_AGENT = "deux/0.1.0 (+https://github.com/graphras-com/DeUX)"
+USER_AGENT = f"deux/{__version__} (+https://github.com/graphras-com/DeUX)"
 
 _cache: dict[str, Image.Image | None] = {}
 _cache_lock = threading.Lock()

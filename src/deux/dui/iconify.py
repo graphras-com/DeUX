@@ -24,13 +24,15 @@ from typing import cast
 
 import platformdirs
 
+from deux._version import __version__
+
 logger = logging.getLogger(__name__)
 
 ICONIFY_API_URL = "https://api.iconify.design"
 
 _REQUEST_TIMEOUT = 10.0
 
-USER_AGENT = "deux/0.1.0 (+https://github.com/graphras-com/DeUX)"
+USER_AGENT = f"deux/{__version__} (+https://github.com/graphras-com/DeUX)"
 
 _cache: dict[str, str | None] = {}
 _cache_lock = threading.Lock()
