@@ -82,7 +82,7 @@ class DeckManager:
         self._path_serial_cache: dict[str, str] = {}
 
         self._connect_handlers: list[tuple[dict[str, str | None], AsyncHandler]] = []
-        self._disconnect_handler: AsyncHandler | None = None
+        self._disconnect_handlers: list[AsyncHandler] = []
 
     async def __aenter__(self) -> DeckManager:
         """Start the manager and return it for use as an async context manager."""
@@ -173,6 +173,9 @@ class DeckManager:
     def on_disconnect(self) -> Callable[[AsyncHandler], AsyncHandler]:
         """Register a callback for when a device disconnects.
 
+        Multiple handlers may be registered; all are called in
+        registration order when a device disconnects.
+
         Examples
         --------
         ::
@@ -180,10 +183,15 @@ class DeckManager:
             @manager.on_disconnect
             async def handle(info: DeviceInfo):
                 ...
+
+        Returns
+        -------
+        Callable
+            Decorator that registers the handler.
         """
 
         def decorator(handler: AsyncHandler) -> AsyncHandler:
-            self._disconnect_handler = handler
+            self._disconnect_handlers.append(handler)
             return handler
 
         return decorator
@@ -302,11 +310,12 @@ class DeckManager:
                     )
                 with suppress(Exception):
                     await deck.stop()
-                if self._disconnect_handler:
-                    try:
-                        await self._disconnect_handler(info)
-                    except Exception:
-                        logger.exception("Error in disconnect handler")
+                if self._disconnect_handlers:
+                    for _dh in self._disconnect_handlers:
+                        try:
+                            await _dh(info)
+                        except Exception:
+                            logger.exception("Error in disconnect handler")
 
         for serial in connected_serials:
             if serial in self._decks:
