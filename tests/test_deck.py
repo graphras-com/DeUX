@@ -143,6 +143,14 @@ class TestDeckBrightness:
         await deck.set_brightness(80)  # equal to default
         mock_streamdeck_device.set_brightness.assert_not_called()
 
+    async def test_set_brightness_rejects_non_int(self, deck):
+        """Passing a non-int raises TypeError at the API boundary."""
+        with pytest.raises(TypeError, match="percent must be an int"):
+            await deck.set_brightness(50.5)  # type: ignore[arg-type]
+
+        with pytest.raises(TypeError, match="percent must be an int"):
+            await deck.set_brightness("50")  # type: ignore[arg-type]
+
     async def test_set_brightness_emits_clamped_value(self, deck):
         seen: list[int] = []
 

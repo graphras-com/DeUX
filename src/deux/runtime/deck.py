@@ -353,6 +353,10 @@ class Deck:
             Brightness level (0-100).  Values outside the range are
             clamped.
         """
+        if not isinstance(percent, int):
+            raise TypeError(
+                f"percent must be an int, got {type(percent).__name__}"
+            )
         clamped = max(0, min(100, percent))
         if clamped == self._brightness:
             return
