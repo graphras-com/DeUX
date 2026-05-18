@@ -145,7 +145,7 @@ class TestDialAccumulatorCancel:
 
         acc = DialAccumulator(cb, delay=0.05)
         acc.tick(1)
-        acc.cancel()
+        await acc.cancel()
         await asyncio.sleep(0.1)
         assert results == []
 
@@ -158,7 +158,7 @@ class TestDialAccumulatorCancel:
         acc = DialAccumulator(cb, delay=0.05)
         acc.tick(1)
         acc.tick(1)
-        acc.cancel()
+        await acc.cancel()
         # New tick after cancel should only have its own value
         acc.tick(-1)
         await asyncio.sleep(0.1)
@@ -169,4 +169,37 @@ class TestDialAccumulatorCancel:
             pass
 
         acc = DialAccumulator(cb, delay=0.05)
-        acc.cancel()  # should not raise
+        await acc.cancel()  # should not raise
+
+    async def test_cancel_awaits_task_completion(self) -> None:
+        """cancel() awaits the task's cancellation — no orphaned tasks."""
+        results: list[int] = []
+
+        async def cb(steps: int) -> None:
+            results.append(steps)
+
+        acc = DialAccumulator(cb, delay=0.05)
+        acc.tick(1)
+        await acc.cancel()
+        # After cancel returns, the flush task must be done
+        assert acc._flush_task is None
+        # Ensure no lingering tasks fire
+        await asyncio.sleep(0.1)
+        assert results == []
+
+    async def test_rapid_ticks_no_orphaned_tasks(self) -> None:
+        """Rapid tick() calls do not accumulate orphaned tasks."""
+        results: list[int] = []
+
+        async def cb(steps: int) -> None:
+            results.append(steps)
+
+        acc = DialAccumulator(cb, delay=0.05)
+        # Fire many rapid ticks
+        for _ in range(50):
+            acc.tick(1)
+        # Only one flush task should be active
+        assert acc._flush_task is not None
+        await asyncio.sleep(0.1)
+        # Should flush exactly once with clamped value (default max_steps=10)
+        assert results == [10]

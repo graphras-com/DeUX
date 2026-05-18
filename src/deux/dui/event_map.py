@@ -165,10 +165,10 @@ class EventMap:
             self._hold_task.cancel()
             self._hold_task = None
 
-    def cancel_accumulators(self) -> None:
+    async def cancel_accumulators(self) -> None:
         """Cancel all active dial accumulators and discard pending ticks."""
         for acc in self._accumulators.values():
-            acc.cancel()
+            await acc.cancel()
 
     def handle_encoder_turn(self, direction: int) -> AsyncHandler | None:
         """Match an encoder turn to a semantic event.

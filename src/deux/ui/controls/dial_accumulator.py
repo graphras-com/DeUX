@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from collections.abc import Awaitable, Callable
 
@@ -51,15 +52,29 @@ class DialAccumulator:
         self._flush_task: asyncio.Task[None] | None = None
 
     def tick(self, direction: int) -> None:
-        """Add *direction* (+1 or -1). Clamps to ±max_steps."""
+        """Add *direction* (+1 or -1). Clamps to ±max_steps.
+
+        Cancels and awaits any previously scheduled flush task before
+        creating a new one, preventing orphaned task accumulation.
+        """
         logger.debug("DialAccumulator.tick: direction=%+d pending=%d", direction, self._pending)
         self._pending = max(-self._max_steps, min(self._max_steps, self._pending + direction))
-        if self._flush_task is not None:
-            self._flush_task.cancel()
-        self._flush_task = asyncio.create_task(self._schedule_flush())
+        old_task = self._flush_task
+        self._flush_task = asyncio.create_task(self._schedule_flush(old_task))
 
-    async def _schedule_flush(self) -> None:
-        """Wait for the debounce delay, then flush accumulated ticks."""
+    async def _schedule_flush(self, old_task: asyncio.Task[None] | None) -> None:
+        """Wait for the debounce delay, then flush accumulated ticks.
+
+        Parameters
+        ----------
+        old_task : asyncio.Task[None] | None
+            The previously scheduled flush task to cancel and await
+            before starting the new debounce timer.
+        """
+        if old_task is not None:
+            old_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await old_task
         try:
             logger.debug("DialAccumulator._schedule_flush: waiting %.2fs", self._delay)
             await asyncio.sleep(self._delay)
@@ -77,10 +92,16 @@ class DialAccumulator:
             return
         await self._callback(steps)
 
-    def cancel(self) -> None:
-        """Cancel any pending flush and reset the accumulated count."""
+    async def cancel(self) -> None:
+        """Cancel any pending flush and reset the accumulated count.
+
+        Awaits the task's cancellation to ensure the flush handler has
+        fully stopped before returning.
+        """
         if self._flush_task is not None:
             self._flush_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._flush_task
             self._flush_task = None
         self._pending = 0
         logger.debug("DialAccumulator.cancel: reset")

@@ -93,7 +93,7 @@ class TestEncoderSlotOnTurnAccumulated:
 
         await encoder.dispatch_turn(1)
         assert isinstance(handle, DialAccumulator)
-        handle.cancel()
+        await handle.cancel()
         await asyncio.sleep(0.1)
         assert results == []
 
@@ -247,7 +247,7 @@ class TestEncoderSlotOnPressTurnAccumulated:
         await encoder.dispatch_press(True)
         await encoder.dispatch_turn(1)
         assert isinstance(handle, DialAccumulator)
-        handle.cancel()
+        await handle.cancel()
         await asyncio.sleep(0.1)
         assert results == []
 
