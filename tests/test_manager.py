@@ -472,3 +472,60 @@ class TestDeckManagerReconnect:
             await m._scan_once()
 
         assert "DISC_ERR" not in m._decks
+
+
+class TestPathSerialCache:
+    """Tests for path-to-serial caching in _scan_once."""
+
+    async def test_cache_avoids_repeated_open_close(self):
+        """Second scan uses cached serial, no additional open/close for probe."""
+        m = DeckManager(poll_interval=10.0)
+        # No connect handler — device won't become managed, so we can
+        # isolate the probe open/close behavior.
+
+        dev = _make_raw_device(serial="CACHE1")
+
+        with patch("deux.runtime.manager.DeviceManager") as mgr_dm:
+            mgr_dm.return_value.enumerate.return_value = [dev]
+            await m._scan_once()
+
+        assert dev.open.call_count == 1
+        assert dev.close.call_count == 1
+        assert m._path_serial_cache["/dev/hid/CACHE1"] == "CACHE1"
+
+        # Reset and scan again — should use cache, no open/close
+        dev.open.reset_mock()
+        dev.close.reset_mock()
+        dev.get_serial_number.reset_mock()
+
+        with patch("deux.runtime.manager.DeviceManager") as mgr_dm:
+            mgr_dm.return_value.enumerate.return_value = [dev]
+            await m._scan_once()
+
+        assert dev.open.call_count == 0
+        assert dev.close.call_count == 0
+        assert dev.get_serial_number.call_count == 0
+
+    async def test_cache_invalidated_on_disconnect(self):
+        """Cache entry removed when device path disappears."""
+        m = DeckManager(poll_interval=10.0)
+        m._path_serial_cache["/dev/hid/GONE"] = "GONE_SERIAL"
+
+        with patch("deux.runtime.manager.DeviceManager") as mgr_dm:
+            mgr_dm.return_value.enumerate.return_value = []
+            await m._scan_once()
+
+        assert "/dev/hid/GONE" not in m._path_serial_cache
+
+    async def test_cache_not_populated_on_probe_failure(self):
+        """Failed probe does not add entry to cache."""
+        m = DeckManager(poll_interval=10.0)
+
+        dev = _make_raw_device(serial="FAIL1")
+        dev.open.side_effect = OSError("USB busy")
+
+        with patch("deux.runtime.manager.DeviceManager") as mgr_dm:
+            mgr_dm.return_value.enumerate.return_value = [dev]
+            await m._scan_once()
+
+        assert "/dev/hid/FAIL1" not in m._path_serial_cache

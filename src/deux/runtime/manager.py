@@ -79,6 +79,7 @@ class DeckManager:
 
         self._decks: dict[str, Deck] = {}
         self._failed_probe_paths: set[str] = set()
+        self._path_serial_cache: dict[str, str] = {}
 
         self._connect_handlers: list[tuple[dict[str, str | None], AsyncHandler]] = []
         self._disconnect_handler: AsyncHandler | None = None
@@ -243,16 +244,24 @@ class DeckManager:
         connected_serials: set[str] = set()
         device_by_serial: dict[str, Any] = {}
 
+        current_paths: set[str] = set()
         for d in visual:
             dev_path = d.id()
+            current_paths.add(dev_path)
             if dev_path in managed_paths:
                 connected_serials.add(managed_paths[dev_path])
+                continue
+            if dev_path in self._path_serial_cache:
+                serial = self._path_serial_cache[dev_path]
+                connected_serials.add(serial)
+                device_by_serial[serial] = d
                 continue
             try:
                 await loop.run_in_executor(get_executor(), d.open)
                 serial = d.get_serial_number()
                 connected_serials.add(serial)
                 device_by_serial[serial] = d
+                self._path_serial_cache[dev_path] = serial
                 await loop.run_in_executor(get_executor(), d.close)
             except Exception:
                 dev_path = d.id()
@@ -266,6 +275,12 @@ class DeckManager:
                         "Failed to probe device at %s", dev_path, exc_info=True
                     )
                 continue
+
+        # Invalidate cache for disconnected paths
+        stale_paths = set(self._path_serial_cache) - current_paths
+        for path in stale_paths:
+            del self._path_serial_cache[path]
+            self._failed_probe_paths.discard(path)
 
         for serial in list(self._decks):
             if serial not in connected_serials:
