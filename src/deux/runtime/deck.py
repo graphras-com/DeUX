@@ -172,6 +172,8 @@ class Deck:
 
         self._running = False
 
+        self._detach_all_cards()
+
         if self._transport:
             self._transport.stop()
 
@@ -190,6 +192,20 @@ class Deck:
         self._closed_event.set()
         shutdown_executor(wait=True)
         logger.info("Deck stopped")
+
+    def _detach_all_cards(self) -> None:
+        """Unsubscribe all AsyncEvent handlers on every DuiCard across all screens.
+
+        Prevents handler accumulation across reconnect cycles.
+        """
+        from ..dui.card import DuiCard
+
+        for screen in self._screens.values():
+            if screen.touch_strip is None:
+                continue
+            for card in screen.touch_strip.cards:
+                if isinstance(card, DuiCard):
+                    card.detach()
 
     async def wait_closed(self) -> None:
         """Block until the deck is closed (e.g. by stop() or disconnect)."""
