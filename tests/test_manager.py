@@ -104,7 +104,7 @@ class TestDeckManagerHandlers:
         async def handler(info):
             pass
 
-        assert m._disconnect_handler is handler
+        assert handler in m._disconnect_handlers
 
     def test_multiple_connect_handlers(self):
         m = DeckManager()
