@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import warnings
+from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
 from ..ui.controls.key_slot import KeySlot
@@ -72,6 +73,7 @@ class DuiKey(KeySlot):
         self._spec = spec
         self._renderer = SvgRenderer(spec)
         self._events = EventMap(spec.events)
+        self._subscriptions: list[tuple[AsyncEvent, AsyncHandler]] = []
         self._dirty = True
         self._busy = False
         self._animator: SpinnerAnimator | None = None
@@ -374,6 +376,7 @@ class DuiKey(KeySlot):
                 await self.request_refresh()
 
         event.subscribe(_on_event)
+        self._subscriptions.append((event, _on_event))
         return self
 
     def bind_range(
@@ -428,6 +431,7 @@ class DuiKey(KeySlot):
                 await self.request_refresh()
 
         event.subscribe(_on_event)
+        self._subscriptions.append((event, _on_event))
         return self
 
     def bind_many(
@@ -461,7 +465,20 @@ class DuiKey(KeySlot):
                 await self.request_refresh()
 
         event.subscribe(_on_event)
+        self._subscriptions.append((event, _on_event))
         return self
+
+    def detach(self) -> None:
+        """Unsubscribe all handlers registered via :meth:`bind` and friends.
+
+        Call this during teardown (e.g. from
+        :meth:`~deux.ui.controller.KeyController.on_detach`) to prevent
+        leaked handlers accumulating across reconnect cycles.
+        """
+        for event, handler in self._subscriptions:
+            with suppress(ValueError):
+                event.unsubscribe(handler)
+        self._subscriptions.clear()
 
     def forward(
         self,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import xml.etree.ElementTree as ET
+from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
 from ..ui.cards.base import Card
@@ -74,6 +75,7 @@ class DuiCard(Card):
         self._spec = spec
         self._renderer = SvgRenderer(spec)
         self._events = EventMap(spec.events, spec.regions)
+        self._subscriptions: list[tuple[AsyncEvent, AsyncHandler]] = []
         self._busy = False
         self._animator: SpinnerAnimator | None = None
         self._spinner_frames: SpinnerFrames | None = None
@@ -422,8 +424,8 @@ class DuiCard(Card):
         callable is invoked with all event ``args``/``kwargs`` and its
         return value becomes the binding value.
 
-        The subscriber lives for the lifetime of the card -- there is
-        no automatic teardown.  Bind once during construction or
+        The subscriber lives for the lifetime of the card unless
+        :meth:`detach` is called.  Bind once during construction or
         :meth:`on_attach`-style lifecycle hooks.
 
         Parameters
@@ -454,6 +456,7 @@ class DuiCard(Card):
                 await self.request_refresh()
 
         event.subscribe(_on_event)
+        self._subscriptions.append((event, _on_event))
         return self
 
     def bind_range(
@@ -510,6 +513,7 @@ class DuiCard(Card):
                 await self.request_refresh()
 
         event.subscribe(_on_event)
+        self._subscriptions.append((event, _on_event))
         return self
 
     def bind_many(
@@ -545,7 +549,20 @@ class DuiCard(Card):
                 await self.request_refresh()
 
         event.subscribe(_on_event)
+        self._subscriptions.append((event, _on_event))
         return self
+
+    def detach(self) -> None:
+        """Unsubscribe all handlers registered via :meth:`bind` and friends.
+
+        Call this during teardown (e.g. from
+        :meth:`~deux.ui.controller.CardController.on_detach`) to prevent
+        leaked handlers accumulating across reconnect cycles.
+        """
+        for event, handler in self._subscriptions:
+            with suppress(ValueError):
+                event.unsubscribe(handler)
+        self._subscriptions.clear()
 
     def forward(
         self,

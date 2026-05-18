@@ -92,9 +92,15 @@ class CardController:
     async def on_detach(self) -> None:
         """Hook invoked from the app's ``on_disconnect`` callback.
 
-        Default implementation is a no-op.  Override to cancel
-        background tasks or release deck-linked resources.
+        The default implementation calls :meth:`~deux.DuiCard.detach`
+        to unsubscribe all ``AsyncEvent`` handlers wired via
+        :meth:`~deux.DuiCard.bind`, :meth:`~deux.DuiCard.bind_range`,
+        or :meth:`~deux.DuiCard.bind_many`.  Override to add additional
+        teardown logic, but call ``await super().on_detach()`` to
+        preserve the unsubscription behaviour.
         """
+        if hasattr(self, "card"):
+            self.card.detach()
 
 
 class KeyController:
@@ -128,5 +134,12 @@ class KeyController:
     async def on_detach(self) -> None:
         """Hook invoked from the app's ``on_disconnect`` callback.
 
-        Default implementation is a no-op.
+        The default implementation calls :meth:`~deux.DuiKey.detach`
+        to unsubscribe all ``AsyncEvent`` handlers wired via
+        :meth:`~deux.DuiKey.bind`, :meth:`~deux.DuiKey.bind_range`,
+        or :meth:`~deux.DuiKey.bind_many`.  Override to add additional
+        teardown logic, but call ``await super().on_detach()`` to
+        preserve the unsubscription behaviour.
         """
+        if hasattr(self, "key"):
+            self.key.detach()

@@ -11,6 +11,7 @@ from deux.dui.schema import (
     PackageType,
     TextBinding,
 )
+from deux.runtime.async_event import AsyncEvent
 from deux.ui.controller import CardController, KeyController
 
 _CARD_SVG = (
@@ -57,6 +58,16 @@ class TestCardController:
         controller.card = DuiCard(_card_spec())
         await controller.on_detach()
 
+    async def test_on_detach_unsubscribes_bound_events(self):
+        """Default on_detach calls card.detach(), removing event handlers."""
+        controller = CardController()
+        controller.card = DuiCard(_card_spec())
+        event = AsyncEvent()
+        controller.card.bind("title", event)
+        assert event.subscriber_count == 1
+        await controller.on_detach()
+        assert event.subscriber_count == 0
+
     async def test_subclass_can_override_lifecycle(self):
         attached: list[object] = []
         detached: list[bool] = []
@@ -99,6 +110,16 @@ class TestKeyController:
         controller = KeyController()
         controller.key = DuiKey(_key_spec())
         await controller.on_detach()
+
+    async def test_on_detach_unsubscribes_bound_events(self):
+        """Default on_detach calls key.detach(), removing event handlers."""
+        controller = KeyController()
+        controller.key = DuiKey(_key_spec())
+        event = AsyncEvent()
+        controller.key.bind("label", event)
+        assert event.subscriber_count == 1
+        await controller.on_detach()
+        assert event.subscriber_count == 0
 
     async def test_subclass_can_override_lifecycle(self):
         attached: list[object] = []

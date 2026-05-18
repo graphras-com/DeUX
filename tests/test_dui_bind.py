@@ -614,3 +614,108 @@ class TestDuiCardBindCssClass:
         await event.emit("active")
         await event.emit("")
         assert card.get("style") == ""
+
+
+# ---------------------------------------------------------------------------
+# Detach lifecycle tests
+# ---------------------------------------------------------------------------
+
+
+class TestDuiCardDetach:
+    """Verify that DuiCard.detach() unsubscribes all handlers."""
+
+    def _card(self) -> DuiCard:
+        spec = _card_spec(
+            bindings={
+                "title": TextBinding(node="title", default=""),
+                "bar": RangeBinding(node="bar", default=0.0),
+            }
+        )
+        return DuiCard(spec)
+
+    async def test_detach_removes_bind_handler(self):
+        """After detach(), the event's subscriber count drops to zero."""
+        card = self._card()
+        event = AsyncEvent()
+        card.bind("title", event)
+        assert event.subscriber_count == 1
+        card.detach()
+        assert event.subscriber_count == 0
+
+    async def test_detach_removes_bind_range_handler(self):
+        """bind_range handlers are also removed by detach()."""
+        card = self._card()
+        event = AsyncEvent()
+        card.bind_range("bar", event, min_val=0, max_val=100)
+        assert event.subscriber_count == 1
+        card.detach()
+        assert event.subscriber_count == 0
+
+    async def test_detach_removes_bind_many_handler(self):
+        """bind_many handlers are also removed by detach()."""
+        card = self._card()
+        event = AsyncEvent()
+        card.bind_many(event, lambda v: {"title": v})
+        assert event.subscriber_count == 1
+        card.detach()
+        assert event.subscriber_count == 0
+
+    async def test_detach_idempotent(self):
+        """Calling detach() twice does not raise."""
+        card = self._card()
+        event = AsyncEvent()
+        card.bind("title", event)
+        card.detach()
+        card.detach()  # should not raise
+        assert event.subscriber_count == 0
+
+    async def test_handler_count_stable_across_reconnect_cycles(self):
+        """Simulates N reconnect cycles; handler count never grows."""
+        event = AsyncEvent()
+        for _ in range(5):
+            card = self._card()
+            card.bind("title", event)
+            assert event.subscriber_count == 1
+            card.detach()
+            assert event.subscriber_count == 0
+
+
+class TestDuiKeyDetach:
+    """Verify that DuiKey.detach() unsubscribes all handlers."""
+
+    def _key(self) -> DuiKey:
+        spec = _key_spec(
+            bindings={
+                "label": TextBinding(node="label", default=""),
+                "bar": RangeBinding(node="bar", default=0.0),
+            }
+        )
+        return DuiKey(spec)
+
+    async def test_detach_removes_bind_handler(self):
+        """After detach(), the event's subscriber count drops to zero."""
+        key = self._key()
+        event = AsyncEvent()
+        key.bind("label", event)
+        assert event.subscriber_count == 1
+        key.detach()
+        assert event.subscriber_count == 0
+
+    async def test_detach_removes_bind_range_handler(self):
+        """bind_range handlers are also removed by detach()."""
+        key = self._key()
+        event = AsyncEvent()
+        key.bind_range("bar", event, min_val=0, max_val=100)
+        assert event.subscriber_count == 1
+        key.detach()
+        assert event.subscriber_count == 0
+
+    async def test_handler_count_stable_across_reconnect_cycles(self):
+        """Simulates N reconnect cycles; handler count never grows."""
+        event = AsyncEvent()
+        for _ in range(5):
+            key = self._key()
+            key.bind("label", event)
+            assert event.subscriber_count == 1
+            key.detach()
+            assert event.subscriber_count == 0
