@@ -500,6 +500,6 @@ class TestPublicImports:
         assert set_active_theme is not None
 
     def test_get_default_font_family_importable(self):
-        from deux import get_default_font_family
+        from deux.render import get_default_font_family
 
         assert get_default_font_family is not None
