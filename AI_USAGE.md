@@ -47,7 +47,7 @@ All entry points are importable from `deux` directly.
 | Method | Description |
 |---|---|
 | `@card.on("event_name")` | Decorator to handle a semantic event (cards) |
-| `@key.on_event("event_name")` | Decorator to handle a semantic event (keys) |
+| `@key.on("event_name")` | Decorator to handle a semantic event (keys) |
 | `.bind_event(name, handler)` | Programmatic event binding |
 | `.forward(event_name, coroutine)` | Forward an event directly to an async function |
 
@@ -296,7 +296,7 @@ async def setup(deck):
     key = DuiKey("PowerKey")
     key.set("label", "Power")
 
-    @key.on_event("activate")
+    @key.on("activate")
     async def handle_power():
         ...
 
@@ -313,7 +313,7 @@ await manager.wait_closed()
 
 ## What NOT to Use
 
-**Never register event handlers directly on key slots.** Patterns like `@screen.key(0).on_press` bypass the DUI event system entirely. Always use the semantic events declared in the package manifest via `@key.on_event("event_name")`. For example, the bundled `IconKey` package defines `click`, `hold`, `press`, and `release` events — use those instead of raw slot decorators.
+**Never register event handlers directly on key slots.** Patterns like `@screen.key(0).on_press` bypass the DUI event system entirely. Always use the semantic events declared in the package manifest via `@key.on("event_name")`. For example, the bundled `IconKey` package defines `click`, `hold`, `press`, and `release` events — use those instead of raw slot decorators.
 
 The following are internal implementation details. Never suggest these to developers:
 

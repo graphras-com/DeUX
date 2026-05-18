@@ -228,15 +228,28 @@ class TestDuiKeyToggleBinding:
 
 
 class TestDuiKeyEvents:
-    def test_on_event_decorator(self):
+    def test_on_decorator(self):
         spec = _make_key_spec(
             events=(EventMapping(name="activate", source="key_press"),),
         )
         key = DuiKey(spec)
 
-        @key.on_event("activate")
+        @key.on("activate")
         async def handler():
             pass
+
+        assert handler is not None
+
+    def test_on_event_deprecated_alias(self):
+        spec = _make_key_spec(
+            events=(EventMapping(name="activate", source="key_press"),),
+        )
+        key = DuiKey(spec)
+
+        with pytest.warns(DeprecationWarning, match="use DuiKey.on"):
+            @key.on_event("activate")
+            async def handler():
+                pass
 
         assert handler is not None
 
