@@ -1019,7 +1019,7 @@ class TestAccumulatedTurns:
         em.on("vol_up", handler)
 
         em.handle_encoder_turn(1)
-        em.cancel_accumulators()
+        await em.cancel_accumulators()
 
         await asyncio.sleep(0.1)
         handler.assert_not_awaited()
