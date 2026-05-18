@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ._executor import get_executor, shutdown_executor
 from .async_event import AsyncEvent
 from .capabilities import DeviceCapabilities
 from .deck import Deck, DeckError
@@ -34,5 +35,7 @@ __all__ = [
     "EventType",
     "KeyEvent",
     "TouchEvent",
+    "get_executor",
     "list_devices",
+    "shutdown_executor",
 ]

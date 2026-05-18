@@ -5,12 +5,12 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
 from StreamDeck.DeviceManager import DeviceManager
 
+from ._executor import get_executor, shutdown_executor
 from .deck import Deck, DeckError
 from .device_info import DeviceInfo
 
@@ -75,7 +75,6 @@ class DeckManager:
         self._auto_reconnect = auto_reconnect
         self._running = False
         self._closed_event = asyncio.Event()
-        self._executor = ThreadPoolExecutor(max_workers=2)
         self._scan_task: asyncio.Task[None] | None = None
 
         self._decks: dict[str, Deck] = {}
@@ -123,7 +122,7 @@ class DeckManager:
         self._decks.clear()
 
         self._closed_event.set()
-        self._executor.shutdown(wait=False)
+        shutdown_executor(wait=True)
         logger.info("DeckManager stopped")
 
     async def wait_closed(self) -> None:
@@ -227,7 +226,7 @@ class DeckManager:
 
         try:
             devices = await loop.run_in_executor(
-                self._executor, DeviceManager().enumerate
+                get_executor(), DeviceManager().enumerate
             )
         except Exception:
             logger.debug("Device enumeration failed")
@@ -250,11 +249,11 @@ class DeckManager:
                 connected_serials.add(managed_paths[dev_path])
                 continue
             try:
-                await loop.run_in_executor(self._executor, d.open)
+                await loop.run_in_executor(get_executor(), d.open)
                 serial = d.get_serial_number()
                 connected_serials.add(serial)
                 device_by_serial[serial] = d
-                await loop.run_in_executor(self._executor, d.close)
+                await loop.run_in_executor(get_executor(), d.close)
             except Exception:
                 dev_path = d.id()
                 if dev_path not in self._failed_probe_paths:

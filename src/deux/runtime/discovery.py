@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from StreamDeck.DeviceManager import DeviceManager
 
+from ._executor import get_executor
 from .device_info import DeviceInfo
 
 
@@ -37,40 +37,37 @@ async def list_devices(
         A list of :class:`DeviceInfo` for each discovered device.
     """
     loop = asyncio.get_running_loop()
-    executor = ThreadPoolExecutor(max_workers=2)
+    executor = get_executor()
 
-    try:
-        devices: list[Any] = await loop.run_in_executor(executor, DeviceManager().enumerate)
+    devices: list[Any] = await loop.run_in_executor(executor, DeviceManager().enumerate)
 
-        if visual_only:
-            devices = [d for d in devices if d.DECK_VISUAL]
+    if visual_only:
+        devices = [d for d in devices if d.DECK_VISUAL]
 
-        results: list[DeviceInfo] = []
-        for d in devices:
-            try:
-                await loop.run_in_executor(executor, d.open)
-                info = DeviceInfo(
-                    deck_type=d.deck_type(),
-                    serial=d.get_serial_number(),
-                    firmware=d.get_firmware_version(),
-                    key_count=d.key_count(),
-                    key_layout=d.key_layout(),
-                    encoder_count=d.dial_count(),
-                    key_pixel_size=(d.KEY_PIXEL_WIDTH, d.KEY_PIXEL_HEIGHT),
-                    touchscreen_size=(
-                        d.TOUCHSCREEN_PIXEL_WIDTH,
-                        d.TOUCHSCREEN_PIXEL_HEIGHT,
-                    ),
-                    key_image_format=d.KEY_IMAGE_FORMAT,
-                )
-                if deck_type is not None and info.deck_type != deck_type:
-                    await loop.run_in_executor(executor, d.close)
-                    continue
-                results.append(info)
+    results: list[DeviceInfo] = []
+    for d in devices:
+        try:
+            await loop.run_in_executor(executor, d.open)
+            info = DeviceInfo(
+                deck_type=d.deck_type(),
+                serial=d.get_serial_number(),
+                firmware=d.get_firmware_version(),
+                key_count=d.key_count(),
+                key_layout=d.key_layout(),
+                encoder_count=d.dial_count(),
+                key_pixel_size=(d.KEY_PIXEL_WIDTH, d.KEY_PIXEL_HEIGHT),
+                touchscreen_size=(
+                    d.TOUCHSCREEN_PIXEL_WIDTH,
+                    d.TOUCHSCREEN_PIXEL_HEIGHT,
+                ),
+                key_image_format=d.KEY_IMAGE_FORMAT,
+            )
+            if deck_type is not None and info.deck_type != deck_type:
                 await loop.run_in_executor(executor, d.close)
-            except Exception:
                 continue
+            results.append(info)
+            await loop.run_in_executor(executor, d.close)
+        except Exception:
+            continue
 
-        return results
-    finally:
-        executor.shutdown(wait=False)
+    return results
