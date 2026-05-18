@@ -31,6 +31,7 @@ from __future__ import annotations
 import warnings
 from typing import Any
 
+from ._errors import DeuxError
 from ._url_safety import SSRFError, set_allow_private_urls
 from .dui import (
     DuiCard,
@@ -84,6 +85,7 @@ __all__ = [
     "DeckEvent",
     "DeckManager",
     "DeviceInfo",
+    "DeuxError",
     "DuiCard",
     "DuiKey",
     "DuiRepository",

@@ -28,6 +28,7 @@ from typing import cast
 
 import platformdirs
 
+from deux._errors import DeuxError
 from deux._url_safety import check_url
 from deux._version import __version__
 
@@ -46,7 +47,7 @@ _disk_cache_dir: Path | None = None
 _disk_cache_dir_lock = threading.Lock()
 
 
-class IconifyError(Exception):
+class IconifyError(DeuxError):
     """Raised when an Iconify icon cannot be resolved."""
 
 

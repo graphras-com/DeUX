@@ -25,6 +25,7 @@ class TestPublicAPI:
             "DeckEvent",
             "DeckManager",
             "DeviceInfo",
+            "DeuxError",
             "DuiCard",
             "DuiKey",
             "DuiRepository",
@@ -209,3 +210,55 @@ class TestDeprecatedImports:
     def test_unknown_attribute_raises(self):
         with pytest.raises(AttributeError, match="no attribute"):
             _ = deux.nonexistent_symbol
+
+
+class TestDeuxErrorHierarchy:
+    """All library exceptions inherit from DeuxError."""
+
+    def test_deux_error_importable(self):
+        from deux import DeuxError
+
+        assert DeuxError is not None
+
+    def test_deux_error_is_exception(self):
+        assert issubclass(deux.DeuxError, Exception)
+
+    def test_deck_error_is_deux_error(self):
+        assert issubclass(deux.DeckError, deux.DeuxError)
+
+    def test_package_error_is_deux_error(self):
+        assert issubclass(deux.PackageError, deux.DeuxError)
+
+    def test_ssrf_error_is_deux_error(self):
+        assert issubclass(deux.SSRFError, deux.DeuxError)
+
+    def test_image_fetch_error_is_deux_error(self):
+        from deux.render import ImageFetchError
+
+        assert issubclass(ImageFetchError, deux.DeuxError)
+
+    def test_rasterize_error_is_deux_error(self):
+        from deux.render import RasterizeError
+
+        assert issubclass(RasterizeError, deux.DeuxError)
+
+    def test_iconify_error_is_deux_error(self):
+        from deux.dui import IconifyError
+
+        assert issubclass(IconifyError, deux.DeuxError)
+
+    def test_hid_write_timeout_is_deux_error(self):
+        from deux.runtime.deck import HidWriteTimeout
+
+        assert issubclass(HidWriteTimeout, deux.DeuxError)
+
+    def test_catch_all_with_deux_error(self):
+        """Catching DeuxError catches any library exception."""
+        with pytest.raises(deux.DeuxError):
+            raise deux.DeckError("test")
+
+        with pytest.raises(deux.DeuxError):
+            raise deux.PackageError("test")
+
+        with pytest.raises(deux.DeuxError):
+            raise deux.SSRFError("test")
