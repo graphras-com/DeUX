@@ -1054,3 +1054,52 @@ class TestDeckRenderCrossScreen:
         frame_b = _make_jpeg_frame(metrics.panel_width, metrics.panel_height)
         await push_fn(frame_b)
         assert mock_streamdeck_device.set_touchscreen_image.call_args.args[1] == expected_x(3)
+
+
+class TestHidWriteTimeout:
+    """Tests for HID write timeout behaviour (issue #197)."""
+
+    async def test_set_key_image_timeout_raises(self, deck, mock_streamdeck_device):
+        """A hanging set_key_image call raises HidWriteTimeout."""
+        from deux.runtime.deck import _HID_WRITE_TIMEOUT, HidWriteTimeout
+
+        # Make the mock block longer than the timeout
+        async def _block_forever():
+            await asyncio.sleep(_HID_WRITE_TIMEOUT + 10)
+
+        def _blocking_set_key_image(*args):
+            import time
+
+            time.sleep(_HID_WRITE_TIMEOUT + 10)
+
+        mock_streamdeck_device.set_key_image = _blocking_set_key_image
+        deck._device = mock_streamdeck_device
+
+        with patch("deux.runtime.deck._HID_WRITE_TIMEOUT", 0.05), pytest.raises(HidWriteTimeout):
+                await deck._exec_device_io(
+                    mock_streamdeck_device.set_key_image, 0, b"fake"
+                )
+
+    async def test_set_brightness_timeout_logs_and_raises(self, deck, mock_streamdeck_device):
+        """A hanging set_brightness call raises HidWriteTimeout."""
+        import time
+
+        from deux.runtime.deck import HidWriteTimeout
+
+        def _hang(*args):
+            time.sleep(10)
+
+        mock_streamdeck_device.set_brightness = _hang
+        deck._device = mock_streamdeck_device
+
+        with patch("deux.runtime.deck._HID_WRITE_TIMEOUT", 0.05), pytest.raises(HidWriteTimeout):
+                await deck._exec_device_io(mock_streamdeck_device.set_brightness, 50)
+
+    async def test_successful_call_no_timeout(self, deck, mock_streamdeck_device):
+        """Normal fast calls complete without raising."""
+        mock_streamdeck_device.set_key_image = MagicMock()
+        deck._device = mock_streamdeck_device
+
+        # Should not raise
+        await deck._exec_device_io(mock_streamdeck_device.set_key_image, 0, b"data")
+        mock_streamdeck_device.set_key_image.assert_called_once_with(0, b"data")

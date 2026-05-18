@@ -37,6 +37,15 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+#: Timeout in seconds for HID write calls dispatched to the executor.
+#: If a call blocks longer than this (e.g. USB suspend), the device is
+#: treated as potentially disconnected.
+_HID_WRITE_TIMEOUT: float = 2.0
+
+
+class HidWriteTimeout(Exception):
+    """Raised when a HID write exceeds :data:`_HID_WRITE_TIMEOUT`."""
+
 
 class DeckError(Exception):
     """Raised for deck-level errors."""
@@ -131,10 +140,8 @@ class Deck:
             )
         self._device = target
 
-        await loop.run_in_executor(get_executor(), self._device.reset)
-        await loop.run_in_executor(
-            get_executor(), self._device.set_brightness, self._brightness
-        )
+        await self._exec_device_io(self._device.reset)
+        await self._exec_device_io(self._device.set_brightness, self._brightness)
 
         self._caps = DeviceCapabilities.from_device(self._device)
         self._metrics = RenderMetrics(self._caps)
@@ -174,11 +181,10 @@ class Deck:
                 await self._event_task
 
         if self._device:
-            loop = asyncio.get_running_loop()
             try:
-                await loop.run_in_executor(get_executor(), self._device.reset)
-                await loop.run_in_executor(get_executor(), self._device.close)
-            except Exception as e:
+                await self._exec_device_io(self._device.reset)
+                await self._exec_device_io(self._device.close)
+            except (HidWriteTimeout, Exception) as e:
                 logger.warning("Error closing device: %s", e)
 
         self._closed_event.set()
@@ -188,6 +194,38 @@ class Deck:
     async def wait_closed(self) -> None:
         """Block until the deck is closed (e.g. by stop() or disconnect)."""
         await self._closed_event.wait()
+
+    async def _exec_device_io(self, func: Any, *args: Any) -> None:
+        """Run a device I/O call in the executor with a timeout.
+
+        Parameters
+        ----------
+        func
+            The blocking HID function to call (e.g.
+            ``self._device.set_key_image``).
+        *args
+            Positional arguments forwarded to *func*.
+
+        Raises
+        ------
+        HidWriteTimeout
+            If the call does not complete within
+            :data:`_HID_WRITE_TIMEOUT` seconds.
+        """
+        loop = asyncio.get_running_loop()
+        try:
+            await asyncio.wait_for(
+                loop.run_in_executor(get_executor(), func, *args),
+                timeout=_HID_WRITE_TIMEOUT,
+            )
+        except TimeoutError:
+            logger.error(
+                "HID write timed out after %.1fs — device may be disconnected",
+                _HID_WRITE_TIMEOUT,
+            )
+            raise HidWriteTimeout(
+                f"HID write to {func!r} timed out after {_HID_WRITE_TIMEOUT}s"
+            ) from None
 
     @property
     def device_path(self) -> str | None:
@@ -302,11 +340,8 @@ class Deck:
         if clamped == self._brightness:
             return
         if self._device is not None:
-            loop = asyncio.get_running_loop()
             async with self._device_lock:
-                await loop.run_in_executor(
-                    get_executor(), self._device.set_brightness, clamped
-                )
+                await self._exec_device_io(self._device.set_brightness, clamped)
         self._brightness = clamped
         await self.on_brightness_changed.emit(clamped)
 
@@ -418,7 +453,6 @@ class Deck:
         if caps is None:
             return
 
-        loop = asyncio.get_running_loop()
         metrics = self._metrics
 
         if metrics is None:
@@ -438,8 +472,7 @@ class Deck:
                         image_format=caps.key_image_format,
                     )
                 async with self._device_lock:
-                    await loop.run_in_executor(
-                        get_executor(),
+                    await self._exec_device_io(
                         self._device.set_key_image,
                         key_index,
                         image_bytes,
@@ -481,10 +514,8 @@ class Deck:
         # Re-wire push_fn every render so a DuiKey reused across screens
         # always animates at the slot of the currently active screen.
         async def _push_key_frame(frame_bytes: bytes) -> None:
-            loop = asyncio.get_running_loop()
             async with self._device_lock:
-                await loop.run_in_executor(
-                    get_executor(),
+                await self._exec_device_io(
                     self._device.set_key_image,
                     key_index,
                     frame_bytes,
@@ -501,10 +532,8 @@ class Deck:
         )
         dui_key.set_rendered_image(image_bytes)
 
-        loop = asyncio.get_running_loop()
         async with self._device_lock:
-            await loop.run_in_executor(
-                get_executor(),
+            await self._exec_device_io(
                 self._device.set_key_image,
                 key_index,
                 image_bytes,
@@ -578,10 +607,8 @@ class Deck:
                             )
                         else:
                             out_bytes = frame_bytes
-                        loop = asyncio.get_running_loop()
                         async with self._device_lock:
-                            await loop.run_in_executor(
-                                get_executor(),
+                            await self._exec_device_io(
                                 self._device.set_touchscreen_image,
                                 out_bytes,
                                 x,
@@ -643,10 +670,8 @@ class Deck:
                 )
 
             # Push per-panel update
-            loop = asyncio.get_running_loop()
             async with self._device_lock:
-                await loop.run_in_executor(
-                    get_executor(),
+                await self._exec_device_io(
                     self._device.set_touchscreen_image,
                     panel_bytes,
                     x_pos,
@@ -667,10 +692,8 @@ class Deck:
 
         image_bytes = info.render_bytes()
 
-        loop = asyncio.get_running_loop()
         async with self._device_lock:
-            await loop.run_in_executor(
-                get_executor(),
+            await self._exec_device_io(
                 self._device.set_screen_image,
                 image_bytes,
                 0,
