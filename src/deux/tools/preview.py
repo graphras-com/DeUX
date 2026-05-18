@@ -46,6 +46,7 @@ from PIL import Image
 from deux.render.key_renderer import _encode_image
 from deux.render.svg_rasterize import _svg_to_png, list_svg_backends, set_svg_backend
 from deux.runtime.capabilities import DeviceCapabilities
+from deux.runtime.deck import _HID_WRITE_TIMEOUT
 
 logger = logging.getLogger(__name__)
 
@@ -454,10 +455,13 @@ async def push_to_device(
         )
 
         brightness = max(0, min(100, args.brightness))
-        await loop.run_in_executor(
-            None,
-            deck.set_brightness,
-            brightness,
+        await asyncio.wait_for(
+            loop.run_in_executor(
+                None,
+                deck.set_brightness,
+                brightness,
+            ),
+            timeout=_HID_WRITE_TIMEOUT,
         )
 
         key_images, touchstrip_bytes = render_preview(args, caps)
@@ -465,22 +469,28 @@ async def push_to_device(
         for key_index in range(caps.key_count):
             jpeg = key_images.get(key_index)
             if jpeg is not None:
-                await loop.run_in_executor(
-                    None,
-                    deck.set_key_image,
-                    key_index,
-                    jpeg,
+                await asyncio.wait_for(
+                    loop.run_in_executor(
+                        None,
+                        deck.set_key_image,
+                        key_index,
+                        jpeg,
+                    ),
+                    timeout=_HID_WRITE_TIMEOUT,
                 )
 
         if caps.has_touchscreen:
-            await loop.run_in_executor(
-                None,
-                deck.set_touchscreen_image,
-                touchstrip_bytes,
-                0,
-                0,
-                caps.touchscreen_width,
-                caps.touchscreen_height,
+            await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    deck.set_touchscreen_image,
+                    touchstrip_bytes,
+                    0,
+                    0,
+                    caps.touchscreen_width,
+                    caps.touchscreen_height,
+                ),
+                timeout=_HID_WRITE_TIMEOUT,
             )
 
         if args.watch:
@@ -493,8 +503,12 @@ async def push_to_device(
             print("Preview pushed — press Ctrl+C to exit", file=sys.stderr)  # noqa: T201
             await _wait_for_interrupt()
     finally:
-        await loop.run_in_executor(None, deck.reset)
-        await loop.run_in_executor(None, deck.close)
+        await asyncio.wait_for(
+            loop.run_in_executor(None, deck.reset), timeout=_HID_WRITE_TIMEOUT
+        )
+        await asyncio.wait_for(
+            loop.run_in_executor(None, deck.close), timeout=_HID_WRITE_TIMEOUT
+        )
 
 
 async def _wait_for_interrupt() -> None:
@@ -595,22 +609,28 @@ async def _watch_and_reload(
                 for key_index in range(caps.key_count):
                     jpeg = key_images.get(key_index)
                     if jpeg is not None:
-                        await loop.run_in_executor(
-                            None,
-                            deck.set_key_image,
-                            key_index,
-                            jpeg,
+                        await asyncio.wait_for(
+                            loop.run_in_executor(
+                                None,
+                                deck.set_key_image,
+                                key_index,
+                                jpeg,
+                            ),
+                            timeout=_HID_WRITE_TIMEOUT,
                         )
 
                 if caps.has_touchscreen:
-                    await loop.run_in_executor(
-                        None,
-                        deck.set_touchscreen_image,
-                        touchstrip_bytes,
-                        0,
-                        0,
-                        caps.touchscreen_width,
-                        caps.touchscreen_height,
+                    await asyncio.wait_for(
+                        loop.run_in_executor(
+                            None,
+                            deck.set_touchscreen_image,
+                            touchstrip_bytes,
+                            0,
+                            0,
+                            caps.touchscreen_width,
+                            caps.touchscreen_height,
+                        ),
+                        timeout=_HID_WRITE_TIMEOUT,
                     )
                 _ = panel_width  # carried for symmetry; geometry comes from caps
                 print("Preview updated", file=sys.stderr)  # noqa: T201
