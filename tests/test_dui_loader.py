@@ -1576,9 +1576,17 @@ class TestLoadPackageMetadata:
         with pytest.raises(PackageError, match="'category' must be a string"):
             load_package(self._make_pkg(tmp_path, "category: 123"))
 
-    def test_unknown_keys_logged(self, tmp_path, caplog):
+    def test_unknown_keys_raises_by_default(self, tmp_path):
+        with pytest.raises(PackageError, match="unknown manifest keys"):
+            load_package(self._make_pkg(tmp_path, "bindigs: typo"))
+
+    def test_unknown_keys_typo_in_bindings(self, tmp_path):
+        with pytest.raises(PackageError, match="unknown manifest keys.*bindigs"):
+            load_package(self._make_pkg(tmp_path, "bindigs: typo"))
+
+    def test_unknown_keys_non_strict_warns(self, tmp_path, caplog):
         with caplog.at_level(logging.WARNING):
-            load_package(self._make_pkg(tmp_path, "desciption: typo"))
+            load_package(self._make_pkg(tmp_path, "desciption: typo"), strict=False)
         assert "unknown manifest keys" in caplog.text
 
 

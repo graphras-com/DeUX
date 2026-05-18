@@ -774,13 +774,16 @@ def _parse_region(name: str, raw: dict[str, Any]) -> Region:
     )
 
 
-def load_package(path: str | Path) -> PackageSpec:
+def load_package(path: str | Path, *, strict: bool = True) -> PackageSpec:
     """Load a .dui package directory into a validated PackageSpec.
 
     Parameters
     ----------
     path
         Path to the ``.dui`` directory.
+    strict : bool, default=True
+        When ``True``, unknown manifest keys raise :exc:`PackageError`.
+        Set to ``False`` for forward-compatible loading that only warns.
 
     Returns
     -------
@@ -846,6 +849,10 @@ def load_package(path: str | Path) -> PackageSpec:
     # ── Optional metadata fields ──────────────────────────────────────
     unknown_keys = set(manifest.keys()) - KNOWN_MANIFEST_KEYS
     if unknown_keys:
+        if strict:
+            raise PackageError(
+                f"Package '{name}': unknown manifest keys: {sorted(unknown_keys)}"
+            )
         logger.warning(
             "Package '%s': unknown manifest keys: %s", name, sorted(unknown_keys)
         )
