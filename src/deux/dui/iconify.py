@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+import ssl
 import threading
 import urllib.error
 import urllib.request
@@ -160,7 +161,8 @@ def _http_get(url: str) -> str:
     identifier with HTTP 403.
     """
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(request, timeout=_REQUEST_TIMEOUT) as resp:
+    ssl_ctx = ssl.create_default_context()
+    with urllib.request.urlopen(request, timeout=_REQUEST_TIMEOUT, context=ssl_ctx) as resp:
         charset = resp.headers.get_content_charset() or "utf-8"
         return cast("str", resp.read().decode(charset))
 
