@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
@@ -54,7 +55,7 @@ class Card(ABC):
         self._pending_callbacks: list[tuple[AsyncHandler, tuple[object, ...]]] = []
         self._rendered: Image.Image | None = None
         self._dirty = True
-        self._request_refresh: AsyncHandler | None = None
+        self._refresh_callbacks: list[AsyncHandler] = []
 
     def on_tap(self, handler: AsyncHandler) -> AsyncHandler:
         """Decorator to register a handler for short tap events in this zone.
@@ -149,20 +150,44 @@ class Card(ABC):
     def set_refresh_callback(self, callback: AsyncHandler) -> None:
         """Register an async callback the card can invoke to request a refresh.
 
+        Multiple callbacks may be registered (e.g. when the same card is
+        installed on screens belonging to different decks).  Each call
+        adds *callback* to the list — duplicates are silently ignored so
+        that re-wiring the same deck does not accumulate entries.
+
         This is set automatically by :class:`~deux.runtime.deck.Deck`
         when dispatching events so that cards with internal timers (e.g.
         long-press detection) can trigger a re-render without a direct
         reference to the deck.
+
+        Parameters
+        ----------
+        callback
+            Async callable that triggers a deck refresh.
         """
-        self._request_refresh = callback
+        if callback not in self._refresh_callbacks:
+            self._refresh_callbacks.append(callback)
+
+    def remove_refresh_callback(self, callback: AsyncHandler) -> None:
+        """Remove a previously registered refresh callback.
+
+        No-op if *callback* is not in the list.
+
+        Parameters
+        ----------
+        callback
+            The callback to remove.
+        """
+        with contextlib.suppress(ValueError):
+            self._refresh_callbacks.remove(callback)
 
     async def request_refresh(self) -> None:
-        """Ask the deck to re-render this card.
+        """Ask all registered decks to re-render this card.
 
-        No-op if no refresh callback has been registered.
+        No-op if no refresh callbacks have been registered.
         """
-        if self._request_refresh is not None:
-            await self._request_refresh()
+        for cb in list(self._refresh_callbacks):
+            await cb()
 
     def queue_pending_callback(
         self, handler: AsyncHandler, args: tuple[object, ...]

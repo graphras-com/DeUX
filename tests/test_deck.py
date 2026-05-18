@@ -1103,3 +1103,53 @@ class TestHidWriteTimeout:
         # Should not raise
         await deck._exec_device_io(mock_streamdeck_device.set_key_image, 0, b"data")
         mock_streamdeck_device.set_key_image.assert_called_once_with(0, b"data")
+
+
+class TestSharedCardMultiDeckRefresh:
+    """Regression tests for GH-208: refresh callback overwrite on shared cards."""
+
+    async def test_shared_key_refreshes_both_decks(self, deck, mock_streamdeck_device):
+        """A KeySlot shared across two decks triggers refresh on both."""
+        from deux.ui.controls.key_slot import KeySlot
+
+        shared_key = KeySlot()
+
+        # Simulate two decks wiring their refresh callbacks
+        cb_deck_a = AsyncMock()
+        cb_deck_b = AsyncMock()
+        shared_key.set_refresh_callback(cb_deck_a)
+        shared_key.set_refresh_callback(cb_deck_b)
+
+        await shared_key.request_refresh()
+
+        cb_deck_a.assert_awaited_once()
+        cb_deck_b.assert_awaited_once()
+
+    async def test_shared_card_refreshes_both_decks(self):
+        """A Card shared across two decks triggers refresh on both."""
+        shared_card = _TestCard()
+
+        cb_deck_a = AsyncMock()
+        cb_deck_b = AsyncMock()
+        shared_card.set_refresh_callback(cb_deck_a)
+        shared_card.set_refresh_callback(cb_deck_b)
+
+        await shared_card.request_refresh()
+
+        cb_deck_a.assert_awaited_once()
+        cb_deck_b.assert_awaited_once()
+
+    async def test_card_remove_refresh_callback(self):
+        """Removing a deck's callback stops refreshes to that deck only."""
+        shared_card = _TestCard()
+
+        cb_deck_a = AsyncMock()
+        cb_deck_b = AsyncMock()
+        shared_card.set_refresh_callback(cb_deck_a)
+        shared_card.set_refresh_callback(cb_deck_b)
+        shared_card.remove_refresh_callback(cb_deck_a)
+
+        await shared_card.request_refresh()
+
+        cb_deck_a.assert_not_awaited()
+        cb_deck_b.assert_awaited_once()
