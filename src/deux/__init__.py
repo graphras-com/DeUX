@@ -28,6 +28,9 @@ Examples
 
 from __future__ import annotations
 
+import warnings
+from typing import Any
+
 from ._url_safety import SSRFError, set_allow_private_urls
 from .dui import (
     DuiCard,
@@ -44,40 +47,21 @@ from .dui import (
     resolve_dui,
 )
 from .render import (
-    ImageFetchError,
-    RenderMetrics,
-    SurfaceBackgrounds,
-    SvgRasterizer,
     Theme,
-    clear_image_cache,
-    fetch_image,
     get_active_theme,
-    get_default_backgrounds,
-    get_default_font_family,
-    get_svg_backend,
-    get_svg_stylesheet,
-    list_supported_devices,
-    list_svg_backends,
-    load_svg_stylesheet,
-    register_svg_backend,
     set_active_theme,
-    set_svg_backend,
-    set_svg_stylesheet,
 )
 from .runtime import (
-    AsyncEvent,
     Deck,
     DeckError,
     DeckEvent,
     DeckManager,
-    DeviceCapabilities,
     DeviceInfo,
     EncoderPressEvent,
     EncoderTurnEvent,
     EventType,
     KeyEvent,
     TouchEvent,
-    list_devices,
 )
 from .ui import (
     BlankCard,
@@ -92,7 +76,6 @@ from .ui import (
 )
 
 __all__ = [
-    "AsyncEvent",
     "BlankCard",
     "Card",
     "CardController",
@@ -100,7 +83,6 @@ __all__ = [
     "DeckError",
     "DeckEvent",
     "DeckManager",
-    "DeviceCapabilities",
     "DeviceInfo",
     "DuiCard",
     "DuiKey",
@@ -109,46 +91,73 @@ __all__ = [
     "EncoderSlot",
     "EncoderTurnEvent",
     "EventType",
-    "ImageFetchError",
     "InfoScreen",
     "KeyController",
     "KeyEvent",
     "KeySlot",
     "PackageError",
     "PackageSpec",
-    "RenderMetrics",
     "SSRFError",
     "Screen",
-    "SurfaceBackgrounds",
-    "SvgRasterizer",
     "Theme",
     "TouchEvent",
     "TouchStrip",
+    "__version__",
     "add_dui_path",
     "clear_dui_cache",
-    "clear_image_cache",
-    "fetch_image",
     "get_active_theme",
-    "get_default_backgrounds",
-    "get_default_font_family",
-    "get_svg_backend",
-    "get_svg_stylesheet",
-    "list_devices",
     "list_dui_packages",
-    "list_supported_devices",
-    "list_svg_backends",
     "load_all_packages",
     "load_package",
-    "load_svg_stylesheet",
-    "register_svg_backend",
     "remove_dui_path",
     "resolve_dui",
     "set_active_theme",
     "set_allow_private_urls",
-    "set_svg_backend",
-    "set_svg_stylesheet",
 ]
 
 from deux._version import __version__
 
-__all__ += ["__version__"]
+# ---------------------------------------------------------------------------
+# Deprecated re-exports – available for one release cycle with a warning.
+# Advanced users should import from the relevant subpackage directly.
+# ---------------------------------------------------------------------------
+
+_DEPRECATED_IMPORTS: dict[str, tuple[str, str]] = {
+    "AsyncEvent": ("deux.runtime", "deux.runtime.AsyncEvent"),
+    "DeviceCapabilities": ("deux.runtime", "deux.runtime.DeviceCapabilities"),
+    "ImageFetchError": ("deux.render", "deux.render.ImageFetchError"),
+    "RenderMetrics": ("deux.render", "deux.render.RenderMetrics"),
+    "SurfaceBackgrounds": ("deux.render", "deux.render.SurfaceBackgrounds"),
+    "SvgRasterizer": ("deux.render", "deux.render.SvgRasterizer"),
+    "clear_image_cache": ("deux.render", "deux.render.clear_image_cache"),
+    "fetch_image": ("deux.render", "deux.render.fetch_image"),
+    "get_default_backgrounds": ("deux.render", "deux.render.get_default_backgrounds"),
+    "get_default_font_family": ("deux.render", "deux.render.get_default_font_family"),
+    "get_svg_backend": ("deux.render", "deux.render.get_svg_backend"),
+    "get_svg_stylesheet": ("deux.render", "deux.render.get_svg_stylesheet"),
+    "list_devices": ("deux.runtime", "deux.runtime.list_devices"),
+    "list_supported_devices": ("deux.render", "deux.render.list_supported_devices"),
+    "list_svg_backends": ("deux.render", "deux.render.list_svg_backends"),
+    "load_svg_stylesheet": ("deux.render", "deux.render.load_svg_stylesheet"),
+    "register_svg_backend": ("deux.render", "deux.render.register_svg_backend"),
+    "set_svg_backend": ("deux.render", "deux.render.set_svg_backend"),
+    "set_svg_stylesheet": ("deux.render", "deux.render.set_svg_stylesheet"),
+}
+
+
+def __getattr__(name: str) -> Any:
+    """Provide deprecated access to internal symbols with a warning."""
+    if name in _DEPRECATED_IMPORTS:
+        subpackage, qualified = _DEPRECATED_IMPORTS[name]
+        warnings.warn(
+            f"Importing '{name}' from 'deux' is deprecated. "
+            f"Use '{qualified}' instead. "
+            f"This re-export will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        import importlib
+
+        module = importlib.import_module(subpackage)
+        return getattr(module, name)
+    raise AttributeError(f"module 'deux' has no attribute {name!r}")

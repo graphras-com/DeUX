@@ -1105,7 +1105,7 @@ class TestScreenCycler:
         semantics, so we wire one in by hand and have ``set_screen``
         emit it.
         """
-        from deux import AsyncEvent
+        from deux.runtime import AsyncEvent
 
         deck = MagicMock()
         deck.on_screen_changed = AsyncEvent()

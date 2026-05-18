@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from deux import AsyncEvent
+from deux.runtime import AsyncEvent
 from deux.runtime.async_event import AsyncEvent as AsyncEventInternal
 
 

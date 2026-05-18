@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import warnings
+
+import pytest
+
 import deux
 
 
@@ -13,7 +17,6 @@ class TestPublicAPI:
     def test_all_exports(self):
         expected = {
             "__version__",
-            "AsyncEvent",
             "BlankCard",
             "Card",
             "CardController",
@@ -21,7 +24,6 @@ class TestPublicAPI:
             "DeckError",
             "DeckEvent",
             "DeckManager",
-            "DeviceCapabilities",
             "DeviceInfo",
             "DuiCard",
             "DuiKey",
@@ -30,44 +32,27 @@ class TestPublicAPI:
             "EncoderSlot",
             "EncoderTurnEvent",
             "EventType",
-            "ImageFetchError",
             "InfoScreen",
             "KeyController",
             "KeyEvent",
             "KeySlot",
             "PackageError",
             "PackageSpec",
-            "RenderMetrics",
             "SSRFError",
             "Screen",
-            "SurfaceBackgrounds",
-            "SvgRasterizer",
             "Theme",
             "TouchEvent",
             "TouchStrip",
             "add_dui_path",
             "clear_dui_cache",
-            "clear_image_cache",
-            "fetch_image",
             "get_active_theme",
-            "get_default_backgrounds",
-            "get_default_font_family",
-            "get_svg_backend",
-            "get_svg_stylesheet",
-            "list_devices",
             "list_dui_packages",
-            "list_supported_devices",
-            "list_svg_backends",
             "load_all_packages",
             "load_package",
-            "load_svg_stylesheet",
-            "register_svg_backend",
             "remove_dui_path",
             "resolve_dui",
             "set_active_theme",
             "set_allow_private_urls",
-            "set_svg_backend",
-            "set_svg_stylesheet",
         }
         assert set(deux.__all__) == expected
 
@@ -168,17 +153,10 @@ class TestPublicAPI:
         assert BlankCard is not None
         assert TouchStrip is not None
 
-    def test_new_multi_device_exports(self):
-        from deux import DeviceCapabilities, InfoScreen, RenderMetrics
+    def test_info_screen_importable(self):
+        from deux import InfoScreen
 
-        assert DeviceCapabilities is not None
         assert InfoScreen is not None
-        assert RenderMetrics is not None
-
-    def test_async_event_importable(self):
-        from deux import AsyncEvent
-
-        assert AsyncEvent is not None
 
     def test_deck_importable(self):
         from deux import Deck
@@ -190,3 +168,44 @@ class TestPublicAPI:
 
         assert CardController is not None
         assert KeyController is not None
+
+
+class TestDeprecatedImports:
+    """Deprecated symbols still importable from deux with a warning."""
+
+    def test_deprecated_async_event(self):
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            from deux import AsyncEvent  # noqa: F401
+
+            # __getattr__ only fires on attribute access, not cached imports
+            _ = deux.AsyncEvent
+            assert any(issubclass(x.category, DeprecationWarning) for x in w)
+
+    def test_deprecated_device_capabilities(self):
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            _ = deux.DeviceCapabilities
+            assert any(issubclass(x.category, DeprecationWarning) for x in w)
+
+    def test_deprecated_render_metrics(self):
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            _ = deux.RenderMetrics
+            assert any(issubclass(x.category, DeprecationWarning) for x in w)
+
+    def test_deprecated_svg_rasterizer(self):
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            _ = deux.SvgRasterizer
+            assert any(issubclass(x.category, DeprecationWarning) for x in w)
+
+    def test_deprecated_list_devices(self):
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            _ = deux.list_devices
+            assert any(issubclass(x.category, DeprecationWarning) for x in w)
+
+    def test_unknown_attribute_raises(self):
+        with pytest.raises(AttributeError, match="no attribute"):
+            _ = deux.nonexistent_symbol
