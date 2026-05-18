@@ -187,7 +187,7 @@ class TestHttpGetBytes:
             def __exit__(self, *exc: object) -> None:
                 return None
 
-        def fake_urlopen(req, timeout):
+        def fake_urlopen(req, timeout, context=None):
             captured["request"] = req
             return _FakeResp()
 

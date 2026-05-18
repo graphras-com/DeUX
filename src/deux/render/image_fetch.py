@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import logging
+import ssl
 import threading
 import urllib.error
 import urllib.request
@@ -83,7 +84,8 @@ def _http_get_bytes(url: str) -> bytes:
         On network or HTTP errors.
     """
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(request, timeout=_REQUEST_TIMEOUT) as resp:
+    ssl_ctx = ssl.create_default_context()
+    with urllib.request.urlopen(request, timeout=_REQUEST_TIMEOUT, context=ssl_ctx) as resp:
         return bytes(resp.read())
 
 
