@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import TYPE_CHECKING, Any
 
 from ..ui.controls.key_slot import KeySlot
@@ -39,7 +40,7 @@ class DuiKey(KeySlot):
         key = DuiKey("IconKey")
         key.set("label", "Shutdown")
 
-        @key.on_event("activate")
+        @key.on("activate")
         async def handle():
             ...
 
@@ -263,14 +264,14 @@ class DuiKey(KeySlot):
         current_norm = float(self.get(name) or 0.0)
         return min_val + current_norm * (max_val - min_val)
 
-    def on_event(self, event_name: str) -> Callable[[AsyncHandler], AsyncHandler]:
+    def on(self, event_name: str) -> Callable[[AsyncHandler], AsyncHandler]:
         """Decorator to register a handler for a named semantic event.
 
         Examples
         --------
         ::
 
-            @key.on_event("activate")
+            @key.on("activate")
             async def handle():
                 ...
 
@@ -290,6 +291,30 @@ class DuiKey(KeySlot):
             return fn
 
         return decorator
+
+    def on_event(self, event_name: str) -> Callable[[AsyncHandler], AsyncHandler]:
+        """Deprecated alias for :meth:`on`.
+
+        .. deprecated:: 0.1
+            Use :meth:`on` instead. ``on_event`` will be removed in a
+            future release.
+
+        Parameters
+        ----------
+        event_name
+            Semantic event name from the manifest.
+
+        Returns
+        -------
+        Callable
+            A decorator that registers the handler and returns it unchanged.
+        """
+        warnings.warn(
+            "DuiKey.on_event() is deprecated, use DuiKey.on() instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.on(event_name)
 
     def bind_event(self, event_name: str, handler: AsyncHandler) -> None:
         """Imperatively register a handler for a named semantic event.

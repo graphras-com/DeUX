@@ -756,7 +756,7 @@ class FavoritesController:
 
             # Late-bind *media* per iteration so each forward target
             # captures its own dict instead of the shared loop variable.
-            @key.on_event("click")
+            @key.on("click")
             async def _click(k=key, m=media):
                 await k.start_busy()
                 await self._audio_svc.play(m)
@@ -947,17 +947,17 @@ class SceneController:
 
         background_class = key.get("background_class")
 
-        @key.on_event("press")
+        @key.on("press")
         async def _press() -> None:
             key.set("background_class", "success")
             await key.request_refresh()
 
-        @key.on_event("release")
+        @key.on("release")
         async def _release() -> None:
             key.set("background_class", background_class)
             await key.request_refresh()
 
-        @key.on_event("click")
+        @key.on("click")
         async def _click() -> None:
             key.set("background_class", background_class)
             await key.request_refresh()

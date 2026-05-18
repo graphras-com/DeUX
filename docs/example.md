@@ -116,17 +116,17 @@ the foreground and background colours so the key visually flashes while
 held; click logs the scene name:
 
 ```python
-@key.on_event("press")
+@key.on("press")
 async def _press():
     key.set_many(background=FG, foreground=BG)
     await key.request_refresh()
 
-@key.on_event("release")
+@key.on("release")
 async def _release():
     key.set_many(background=BG, foreground=FG)
     await key.request_refresh()
 
-@key.on_event("click")
+@key.on("click")
 async def _click():
     log.info("Scene activated: %s", label)
 ```

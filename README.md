@@ -101,7 +101,7 @@ async def main():
         key.set("label", "Hello")
         key.set("icon", "mdi:hand-wave")
 
-        @key.on_event("click")
+        @key.on("click")
         async def on_click():
             print("Clicked!")
 

@@ -473,7 +473,7 @@ immediately while the spinner keeps running until an external signal
 arrives.
 
 ```python
-@key.on_event("toggle")
+@key.on("toggle")
 async def handle():
     await key.start_busy()
     # Fire the API call. The spinner keeps running
@@ -489,7 +489,7 @@ async def on_state_update(new_state):
 If the work completes within the handler, call both in the same handler:
 
 ```python
-@key.on_event("toggle")
+@key.on("toggle")
 async def handle():
     await key.start_busy()
     new_state = await smart_home_api.toggle_light()
@@ -542,7 +542,7 @@ from deux.dui import DuiKey, load_package
 spec = load_package("./SmartLight.dui")
 key = DuiKey(spec)
 
-@key.on_event("toggle")
+@key.on("toggle")
 async def handle():
     await key.start_busy()
     # Spinner starts — the key still shows the current
@@ -717,7 +717,7 @@ key = DuiKey(spec, slot)
 key.set("label", "Deploy")
 key.set("indicator_color", "#00ff00")
 
-@key.on_event("activate")
+@key.on("activate")
 async def on_activate():
     ...
 
