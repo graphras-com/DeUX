@@ -85,6 +85,8 @@ class Deck:
         self._metrics: RenderMetrics | None = None
         self._transport: AsyncTransport | None = None
         self._event_task: asyncio.Task[None] | None = None
+        self._timeout_task: asyncio.Task[None] | None = None
+        self._timeout_event: asyncio.Event = asyncio.Event()
         self._closed_event = asyncio.Event()
         self._running = False
         self._device_lock = asyncio.Lock()
@@ -719,20 +721,43 @@ class Deck:
         if any_changed:
             await self.refresh()
 
+    def schedule_timeout_check(self) -> None:
+        """Signal that a card timeout needs checking.
+
+        Call this method when a card registers a selection timeout so
+        the deck can fire ``_check_timeouts`` without polling.  This is
+        a no-op when the timeout loop is already scheduled to wake.
+        """
+        self._timeout_event.set()
+
+    async def _timeout_loop(self) -> None:
+        """Deadline-driven timeout checker.
+
+        Waits until ``schedule_timeout_check`` is called, then performs
+        the timeout check.  This eliminates the 500 ms polling wake.
+        """
+        try:
+            while self._running:
+                await self._timeout_event.wait()
+                self._timeout_event.clear()
+                if not self._running:
+                    break
+                await self._check_timeouts()
+        except asyncio.CancelledError:
+            pass
+
     async def _event_loop(self) -> None:
         """Dispatch transport events to the active screen handlers."""
         if not self._transport:
             return
 
+        self._timeout_task = asyncio.create_task(
+            self._timeout_loop(), name="deux-timeouts"
+        )
+
         try:
             while self._running:
-                try:
-                    event = await asyncio.wait_for(
-                        self._transport.queue.get(), timeout=0.5
-                    )
-                except TimeoutError:
-                    await self._check_timeouts()
-                    continue
+                event = await self._transport.queue.get()
 
                 if not self._current_screen():
                     continue
@@ -747,6 +772,10 @@ class Deck:
         except Exception:
             logger.exception("Event loop crashed")
         finally:
+            if self._timeout_task and not self._timeout_task.done():
+                self._timeout_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await self._timeout_task
             self._closed_event.set()
 
     async def _drain_card_callbacks(self, card: Card) -> None:
