@@ -11,9 +11,10 @@ import math
 import os
 import platform
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from PIL import Image, ImageFont
 
@@ -781,6 +782,42 @@ class SvgRenderer:
             if bg_elem is not None:
                 bg_elem.set("display", "none")
 
+    #: Dispatch table mapping binding types to handler methods.
+    #: Each handler is called with (root, elem, name, binding, value).
+    #: To support a new binding type, register it here without modifying
+    #: ``_apply_binding`` itself.
+    _BINDING_HANDLERS: ClassVar[
+        dict[type[Binding], Callable[[SvgRenderer, ET.Element, ET.Element, str, Any, Any], None]]
+    ] = {}
+
+    @staticmethod
+    def _register_binding_handler(
+        binding_type: type[Binding],
+    ) -> Callable[
+        [Callable[[SvgRenderer, ET.Element, ET.Element, str, Any, Any], None]],
+        Callable[[SvgRenderer, ET.Element, ET.Element, str, Any, Any], None],
+    ]:
+        """Decorator to register a binding handler in the dispatch table.
+
+        Parameters
+        ----------
+        binding_type : type[Binding]
+            The binding class this handler processes.
+
+        Returns
+        -------
+        Callable
+            The decorator that registers the handler.
+        """
+
+        def decorator(
+            func: Callable[[SvgRenderer, ET.Element, ET.Element, str, Any, Any], None],
+        ) -> Callable[[SvgRenderer, ET.Element, ET.Element, str, Any, Any], None]:
+            SvgRenderer._BINDING_HANDLERS[binding_type] = func
+            return func
+
+        return decorator
+
     def _apply_binding(
         self,
         root: ET.Element,
@@ -788,7 +825,11 @@ class SvgRenderer:
         binding: Binding,
         value: Any,
     ) -> None:
-        """Apply a single binding to the SVG tree."""
+        """Apply a single binding to the SVG tree.
+
+        Uses a dispatch table to route each binding type to its handler,
+        allowing new binding types to be added without modifying this method.
+        """
         if isinstance(binding, ToggleBinding):
             elem_on = _find_element_by_id(root, binding.node_on)
             elem_off = _find_element_by_id(root, binding.node_off)
@@ -814,26 +855,15 @@ class SvgRenderer:
             )
             return
 
-        if isinstance(binding, TextBinding):
-            self._apply_text(root, elem, binding, value)
-        elif isinstance(binding, ImageBinding):
-            self._apply_image(root, elem, binding, value)
-        elif isinstance(binding, VisibilityBinding):
-            self._apply_visibility(elem, value)
-        elif isinstance(binding, ColorBinding):
-            self._apply_color(elem, binding, value)
-        elif isinstance(binding, RangeBinding):
-            self._apply_range(elem, name, binding, value)
-        elif isinstance(binding, SliderBinding):
-            self._apply_slider(elem, binding, value)
-        elif isinstance(binding, IconifyBinding):
-            self._apply_iconify(elem, binding, value)
-        elif isinstance(binding, ListBinding):
-            self._apply_list(root, elem, binding, value)
-        elif isinstance(binding, TransformBinding):
-            self._apply_transform(elem, binding, value)
-        elif isinstance(binding, CssClassBinding):
-            self._apply_css_class(elem, value)
+        handler = self._BINDING_HANDLERS.get(type(binding))
+        if handler is not None:
+            handler(self, root, elem, name, binding, value)
+        else:
+            logger.warning(
+                "Binding '%s': no handler registered for type '%s'",
+                name,
+                type(binding).__name__,
+            )
 
     def _apply_text(
         self,
@@ -1367,3 +1397,78 @@ class SvgRenderer:
 
         png_data = _svg_to_png(svg_data, width, height)
         return Image.open(io.BytesIO(png_data)).convert("RGBA")
+
+
+# ---------------------------------------------------------------------------
+# Binding handler registrations
+# ---------------------------------------------------------------------------
+
+
+@SvgRenderer._register_binding_handler(TextBinding)
+def _handle_text(
+    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
+) -> None:
+    self._apply_text(root, elem, binding, value)
+
+
+@SvgRenderer._register_binding_handler(ImageBinding)
+def _handle_image(
+    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
+) -> None:
+    self._apply_image(root, elem, binding, value)
+
+
+@SvgRenderer._register_binding_handler(VisibilityBinding)
+def _handle_visibility(
+    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
+) -> None:
+    self._apply_visibility(elem, value)
+
+
+@SvgRenderer._register_binding_handler(ColorBinding)
+def _handle_color(
+    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
+) -> None:
+    self._apply_color(elem, binding, value)
+
+
+@SvgRenderer._register_binding_handler(RangeBinding)
+def _handle_range(
+    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
+) -> None:
+    self._apply_range(elem, name, binding, value)
+
+
+@SvgRenderer._register_binding_handler(SliderBinding)
+def _handle_slider(
+    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
+) -> None:
+    self._apply_slider(elem, binding, value)
+
+
+@SvgRenderer._register_binding_handler(IconifyBinding)
+def _handle_iconify(
+    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
+) -> None:
+    self._apply_iconify(elem, binding, value)
+
+
+@SvgRenderer._register_binding_handler(ListBinding)
+def _handle_list(
+    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
+) -> None:
+    self._apply_list(root, elem, binding, value)
+
+
+@SvgRenderer._register_binding_handler(TransformBinding)
+def _handle_transform(
+    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
+) -> None:
+    self._apply_transform(elem, binding, value)
+
+
+@SvgRenderer._register_binding_handler(CssClassBinding)
+def _handle_css_class(
+    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
+) -> None:
+    self._apply_css_class(elem, value)
