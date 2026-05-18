@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, cast
 
@@ -15,6 +14,7 @@ from StreamDeck.DeviceManager import DeviceManager
 from ..render.key_renderer import render_blank_key
 from ..render.metrics import RenderMetrics
 from ..render.touch_renderer import compose_card_with_background
+from ._executor import get_executor, shutdown_executor
 from .async_event import AsyncEvent
 from .capabilities import DeviceCapabilities
 from .device_info import DeviceInfo
@@ -87,7 +87,6 @@ class Deck:
         self._event_task: asyncio.Task[None] | None = None
         self._closed_event = asyncio.Event()
         self._running = False
-        self._executor = ThreadPoolExecutor(max_workers=2)
         self._device_lock = asyncio.Lock()
 
         self._screens: dict[str, Screen] = {}
@@ -104,7 +103,7 @@ class Deck:
 
         loop = asyncio.get_running_loop()
 
-        devices = await loop.run_in_executor(self._executor, DeviceManager().enumerate)
+        devices = await loop.run_in_executor(get_executor(), DeviceManager().enumerate)
 
         if not devices:
             raise DeckError("No Stream Deck devices found")
@@ -116,12 +115,12 @@ class Deck:
         target = None
         for d in visual:
             try:
-                await loop.run_in_executor(self._executor, d.open)
+                await loop.run_in_executor(get_executor(), d.open)
                 serial = d.get_serial_number()
                 if serial == self._serial_number:
                     target = d
                     break
-                await loop.run_in_executor(self._executor, d.close)
+                await loop.run_in_executor(get_executor(), d.close)
             except Exception:
                 continue
         if target is None:
@@ -130,9 +129,9 @@ class Deck:
             )
         self._device = target
 
-        await loop.run_in_executor(self._executor, self._device.reset)
+        await loop.run_in_executor(get_executor(), self._device.reset)
         await loop.run_in_executor(
-            self._executor, self._device.set_brightness, self._brightness
+            get_executor(), self._device.set_brightness, self._brightness
         )
 
         self._caps = DeviceCapabilities.from_device(self._device)
@@ -175,13 +174,13 @@ class Deck:
         if self._device:
             loop = asyncio.get_running_loop()
             try:
-                await loop.run_in_executor(self._executor, self._device.reset)
-                await loop.run_in_executor(self._executor, self._device.close)
+                await loop.run_in_executor(get_executor(), self._device.reset)
+                await loop.run_in_executor(get_executor(), self._device.close)
             except Exception as e:
                 logger.warning("Error closing device: %s", e)
 
         self._closed_event.set()
-        self._executor.shutdown(wait=False)
+        shutdown_executor(wait=True)
         logger.info("Deck stopped")
 
     async def wait_closed(self) -> None:
@@ -304,7 +303,7 @@ class Deck:
             loop = asyncio.get_running_loop()
             async with self._device_lock:
                 await loop.run_in_executor(
-                    self._executor, self._device.set_brightness, clamped
+                    get_executor(), self._device.set_brightness, clamped
                 )
         self._brightness = clamped
         await self.on_brightness_changed.emit(clamped)
@@ -438,7 +437,7 @@ class Deck:
                     )
                 async with self._device_lock:
                     await loop.run_in_executor(
-                        self._executor,
+                        get_executor(),
                         self._device.set_key_image,
                         key_index,
                         image_bytes,
@@ -483,7 +482,7 @@ class Deck:
             loop = asyncio.get_running_loop()
             async with self._device_lock:
                 await loop.run_in_executor(
-                    self._executor,
+                    get_executor(),
                     self._device.set_key_image,
                     key_index,
                     frame_bytes,
@@ -503,7 +502,7 @@ class Deck:
         loop = asyncio.get_running_loop()
         async with self._device_lock:
             await loop.run_in_executor(
-                self._executor,
+                get_executor(),
                 self._device.set_key_image,
                 key_index,
                 image_bytes,
@@ -580,7 +579,7 @@ class Deck:
                         loop = asyncio.get_running_loop()
                         async with self._device_lock:
                             await loop.run_in_executor(
-                                self._executor,
+                                get_executor(),
                                 self._device.set_touchscreen_image,
                                 out_bytes,
                                 x,
@@ -645,7 +644,7 @@ class Deck:
             loop = asyncio.get_running_loop()
             async with self._device_lock:
                 await loop.run_in_executor(
-                    self._executor,
+                    get_executor(),
                     self._device.set_touchscreen_image,
                     panel_bytes,
                     x_pos,
@@ -669,7 +668,7 @@ class Deck:
         loop = asyncio.get_running_loop()
         async with self._device_lock:
             await loop.run_in_executor(
-                self._executor,
+                get_executor(),
                 self._device.set_screen_image,
                 image_bytes,
                 0,
