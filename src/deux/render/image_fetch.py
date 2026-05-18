@@ -15,6 +15,7 @@ import urllib.request
 
 from PIL import Image, UnidentifiedImageError
 
+from deux._url_safety import check_url
 from deux._version import __version__
 
 logger = logging.getLogger(__name__)
@@ -98,8 +99,13 @@ def fetch_image(url: str) -> Image.Image:
     ImageFetchError
         If the URL is malformed, the network request fails, or the
         response cannot be decoded as a valid image.
+    SSRFError
+        If the URL resolves to a private/loopback/link-local address
+        and private URLs have not been explicitly allowed via
+        :func:`deux.set_allow_private_urls`.
     """
     _validate_url(url)
+    check_url(url)
 
     with _cache_lock:
         if url in _cache:

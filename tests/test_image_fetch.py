@@ -34,6 +34,13 @@ def _isolate_cache():
     clear_cache()
 
 
+@pytest.fixture(autouse=True)
+def _bypass_ssrf():
+    """Bypass SSRF checks in image fetch tests (tested separately)."""
+    with patch("deux.render.image_fetch.check_url"):
+        yield
+
+
 class TestValidateUrl:
     """Tests for :func:`_validate_url`."""
 

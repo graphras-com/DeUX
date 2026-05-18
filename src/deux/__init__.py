@@ -28,6 +28,7 @@ Examples
 
 from __future__ import annotations
 
+from ._url_safety import SSRFError, set_allow_private_urls
 from .dui import (
     DuiCard,
     DuiKey,
@@ -116,6 +117,7 @@ __all__ = [
     "PackageError",
     "PackageSpec",
     "RenderMetrics",
+    "SSRFError",
     "Screen",
     "SurfaceBackgrounds",
     "SvgRasterizer",
@@ -142,6 +144,7 @@ __all__ = [
     "remove_dui_path",
     "resolve_dui",
     "set_active_theme",
+    "set_allow_private_urls",
     "set_svg_backend",
     "set_svg_stylesheet",
 ]
