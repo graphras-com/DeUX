@@ -310,8 +310,21 @@ class Screen:
 
     @touchstrip_background.setter
     def touchstrip_background(self, value: str) -> None:
-        if self._touch_strip is not None:
-            self._touch_strip.background_color = value
+        """Set the fill colour for the touchscreen canvas behind cards.
+
+        Parameters
+        ----------
+        value : str
+            CSS colour string for the background.
+
+        Raises
+        ------
+        IndexError
+            If the device has no touchscreen.
+        """
+        if self._touch_strip is None:
+            raise IndexError("This device has no touchscreen")
+        self._touch_strip.background_color = value
 
     def set_touchstrip_background_svg(self, svg_data: bytes) -> None:
         """Set a background SVG for the touchstrip.
