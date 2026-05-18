@@ -38,6 +38,7 @@ class TestPublicAPI:
             "PackageError",
             "PackageSpec",
             "RenderMetrics",
+            "SSRFError",
             "Screen",
             "SurfaceBackgrounds",
             "SvgRasterizer",
@@ -64,6 +65,7 @@ class TestPublicAPI:
             "remove_dui_path",
             "resolve_dui",
             "set_active_theme",
+            "set_allow_private_urls",
             "set_svg_backend",
             "set_svg_stylesheet",
         }

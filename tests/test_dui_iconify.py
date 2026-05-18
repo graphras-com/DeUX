@@ -42,6 +42,13 @@ def _isolate_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     clear_cache(persistent=True)
 
 
+@pytest.fixture(autouse=True)
+def _bypass_ssrf():
+    """Bypass SSRF checks in iconify tests (tested separately)."""
+    with patch("deux.dui.iconify.check_url"):
+        yield
+
+
 class TestParseName:
     def test_simple(self):
         assert _parse_name("line-md:home") == ("line-md", "home")

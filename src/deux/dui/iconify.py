@@ -24,6 +24,7 @@ from typing import cast
 
 import platformdirs
 
+from deux._url_safety import check_url
 from deux._version import __version__
 
 logger = logging.getLogger(__name__)
@@ -188,6 +189,9 @@ def fetch_icon(name: str) -> str:
     IconifyError
         If the name is malformed, the icon does not
         exist, or the network request fails.
+    SSRFError
+        If the constructed API URL resolves to a private address
+        and private URLs have not been explicitly allowed.
     """
     prefix, icon = _parse_name(name)
     key = f"{prefix}:{icon}"
@@ -210,6 +214,7 @@ def fetch_icon(name: str) -> str:
 
     # 3. Network fetch
     url = f"{ICONIFY_API_URL}/{prefix}/{icon}.svg"
+    check_url(url)
     try:
         body = _http_get(url)
     except (urllib.error.URLError, OSError) as exc:
