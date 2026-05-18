@@ -11,6 +11,7 @@ from PIL import Image
 
 from deux.render import image_fetch as mod
 from deux.render.image_fetch import (
+    ALLOWED_FORMATS,
     ImageFetchError,
     _validate_url,
     clear_cache,
@@ -23,6 +24,14 @@ def _png_bytes(size: tuple[int, int] = (4, 4), color: str = "red") -> bytes:
     img = Image.new("RGB", size, color)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _image_bytes(fmt: str, size: tuple[int, int] = (4, 4), color: str = "red") -> bytes:
+    """Create minimal image bytes in a given format for testing."""
+    img = Image.new("RGB", size, color)
+    buf = io.BytesIO()
+    img.save(buf, format=fmt)
     return buf.getvalue()
 
 
@@ -208,3 +217,53 @@ class TestPackageExports:
         assert hasattr(deux, "fetch_image")
         assert hasattr(deux, "ImageFetchError")
         assert hasattr(deux, "clear_image_cache")
+
+
+class TestImageSecurity:
+    """Tests for decompression bomb and format restrictions."""
+
+    def test_disallowed_format_bmp_rejected(self):
+        data = _image_bytes("BMP")
+        with (
+            patch.object(mod, "_http_get_bytes", return_value=data),
+            pytest.raises(ImageFetchError, match="not allowed"),
+        ):
+            fetch_image("https://example.com/img.bmp")
+
+    def test_disallowed_format_tiff_rejected(self):
+        data = _image_bytes("TIFF")
+        with (
+            patch.object(mod, "_http_get_bytes", return_value=data),
+            pytest.raises(ImageFetchError, match="not allowed"),
+        ):
+            fetch_image("https://example.com/img.tiff")
+
+    def test_allowed_formats_accepted(self):
+        for fmt in ("PNG", "JPEG", "GIF", "WEBP"):
+            clear_cache()
+            mode = "RGBA" if fmt in ("PNG", "GIF", "WEBP") else "RGB"
+            img = Image.new(mode, (4, 4), "red")
+            buf = io.BytesIO()
+            img.save(buf, format=fmt)
+            data = buf.getvalue()
+            with patch.object(mod, "_http_get_bytes", return_value=data):
+                result = fetch_image(f"https://example.com/img.{fmt.lower()}")
+            assert isinstance(result, Image.Image)
+
+    def test_decompression_bomb_rejected(self):
+        """An image exceeding MAX_IMAGE_PIXELS is rejected."""
+        # Pillow raises DecompressionBombError at 2x MAX_IMAGE_PIXELS
+        data = _png_bytes(size=(5, 5))  # 25 pixels > 2*4=8
+        with (
+            patch.object(mod.Image, "MAX_IMAGE_PIXELS", 4),
+            patch.object(mod, "_http_get_bytes", return_value=data),
+            pytest.raises(ImageFetchError, match="not a valid image"),
+        ):
+            fetch_image("https://example.com/bomb.png")
+
+    def test_max_image_pixels_is_set(self):
+        assert mod.MAX_IMAGE_PIXELS == 20_000_000
+        assert Image.MAX_IMAGE_PIXELS == 20_000_000
+
+    def test_allowed_formats_constant(self):
+        assert frozenset({"PNG", "JPEG", "GIF", "WEBP"}) == ALLOWED_FORMATS

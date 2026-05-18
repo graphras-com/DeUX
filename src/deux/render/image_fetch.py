@@ -22,6 +22,17 @@ logger = logging.getLogger(__name__)
 
 _REQUEST_TIMEOUT = 10.0
 
+# Limit pixel count to prevent decompression bombs from untrusted images.
+# 20 megapixels is generous for Stream Deck rendering (keys are typically 72x72
+# or 96x96) while still catching malicious payloads.
+MAX_IMAGE_PIXELS: int = 20_000_000
+Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
+
+#: Image formats accepted from remote sources.  Restricting decoders narrows
+#: the attack surface — BMP and TIFF decoders have historically been involved
+#: in Pillow CVEs and are unlikely to appear in legitimate .dui bindings.
+ALLOWED_FORMATS: frozenset[str] = frozenset({"PNG", "JPEG", "GIF", "WEBP"})
+
 USER_AGENT = f"deux/{__version__} (+https://github.com/graphras-com/DeUX)"
 
 _cache: dict[str, Image.Image | None] = {}
@@ -123,8 +134,14 @@ def fetch_image(url: str) -> Image.Image:
 
     try:
         img = Image.open(io.BytesIO(data))
+        fmt = (img.format or "").upper()
+        if fmt not in ALLOWED_FORMATS:
+            raise ImageFetchError(
+                f"Image format '{fmt}' from '{url}' is not allowed. "
+                f"Supported formats: {sorted(ALLOWED_FORMATS)}"
+            )
         img.load()  # force full decode so errors surface now
-    except (UnidentifiedImageError, OSError) as exc:
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
         with _cache_lock:
             _cache[url] = None
         raise ImageFetchError(
