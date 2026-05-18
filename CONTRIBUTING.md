@@ -8,8 +8,8 @@ you need to get started.
 - **Python 3.11+**
 - **[uv](https://docs.astral.sh/uv/)** for dependency management
 - **System libraries:**
-  - macOS: `brew install cairo hidapi`
-  - Linux (Debian/Ubuntu): `sudo apt install libcairo2-dev libhidapi-dev`
+  - macOS: `brew install vips cairo hidapi`
+  - Linux (Debian/Ubuntu): `sudo apt install libvips-dev libcairo2-dev libhidapi-dev`
 
 ## Setup
 
