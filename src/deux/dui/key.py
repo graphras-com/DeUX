@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import logging
 import warnings
-from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
 from ..ui.controls.key_slot import KeySlot
 from .animator import PushFn, SpinnerAnimator
+from .binding_mixin import BindingMixin
 from .event_map import EventMap
 from .schema import PackageSpec
 from .spinner import SpinnerFrames
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class DuiKey(KeySlot):
+class DuiKey(BindingMixin, KeySlot):
     """A physical key whose layout and events are defined by a .dui package.
 
     ``DuiKey`` extends :class:`~deux.ui.controls.key_slot.KeySlot`
@@ -266,33 +266,6 @@ class DuiKey(KeySlot):
         current_norm = float(self.get(name) or 0.0)
         return min_val + current_norm * (max_val - min_val)
 
-    def on(self, event_name: str) -> Callable[[AsyncHandler], AsyncHandler]:
-        """Decorator to register a handler for a named semantic event.
-
-        Examples
-        --------
-        ::
-
-            @key.on("activate")
-            async def handle():
-                ...
-
-        Parameters
-        ----------
-        event_name
-            Semantic event name from the manifest.
-
-        Returns
-        -------
-        Callable
-            A decorator that registers the handler and returns it unchanged.
-        """
-
-        def decorator(fn: AsyncHandler) -> AsyncHandler:
-            self._events.on(event_name, self._wrap_handler(fn))
-            return fn
-
-        return decorator
 
     def on_event(self, event_name: str) -> Callable[[AsyncHandler], AsyncHandler]:
         """Deprecated alias for :meth:`on`.
@@ -318,215 +291,6 @@ class DuiKey(KeySlot):
         )
         return self.on(event_name)
 
-    def bind_event(self, event_name: str, handler: AsyncHandler) -> None:
-        """Imperatively register a handler for a named semantic event.
-
-        Parameters
-        ----------
-        event_name
-            Semantic event name from the manifest.
-        handler
-            The async callable to invoke.
-        """
-        self._events.on(event_name, self._wrap_handler(handler))
-
-    def bind(
-        self,
-        name: str,
-        event: AsyncEvent,
-        *,
-        transform: Callable[..., Any] | None = None,
-    ) -> DuiKey:
-        """Subscribe to *event*; on emit, write binding *name* and refresh.
-
-        Mirror of :meth:`DuiCard.bind`.  Subscribes to a service
-        ``AsyncEvent``, optionally transforms the emitted value, calls
-        :meth:`set`, and requests a refresh if the binding changed.
-
-        Without *transform*, the binding receives the first positional
-        argument from the event.  With *transform*, the callable is
-        invoked with all event ``args``/``kwargs`` and its return
-        value becomes the binding value.
-
-        Parameters
-        ----------
-        name
-            Binding name as defined in the manifest.
-        event
-            The :class:`~deux.runtime.async_event.AsyncEvent` to
-            subscribe to.
-        transform
-            Optional sync callable that maps event args to the binding
-            value.  If ``None``, ``args[0]`` is used.
-
-        Returns
-        -------
-        DuiKey
-            self, for method chaining.
-        """
-
-        async def _on_event(*args: Any, **kwargs: Any) -> None:
-            value = (
-                (args[0] if args else None)
-                if transform is None
-                else transform(*args, **kwargs)
-            )
-            self.set(name, value)
-            if self.is_dirty:
-                await self.request_refresh()
-
-        event.subscribe(_on_event)
-        self._subscriptions.append((event, _on_event))
-        return self
-
-    def bind_range(
-        self,
-        name: str,
-        event: AsyncEvent,
-        *,
-        min_val: float = 0,
-        max_val: float = 1,
-        transform: Callable[..., float] | None = None,
-    ) -> DuiKey:
-        """Subscribe to *event*; on emit, write binding *name* via :meth:`set_range`.
-
-        Mirror of :meth:`DuiCard.bind_range`.
-
-        Parameters
-        ----------
-        name
-            Binding name (must be a ``range`` or ``slider`` binding).
-        event
-            The :class:`~deux.runtime.async_event.AsyncEvent` to
-            subscribe to.
-        min_val
-            Lower bound of the domain range.
-        max_val
-            Upper bound of the domain range.
-        transform
-            Optional sync callable that maps event args to a numeric
-            value in domain units.  If ``None``, ``args[0]`` is used.
-
-        Returns
-        -------
-        DuiKey
-            self, for method chaining.
-
-        Raises
-        ------
-        ValueError
-            If *min_val* equals *max_val*.
-        """
-        if min_val == max_val:
-            raise ValueError("min_val and max_val must not be equal")
-
-        async def _on_event(*args: Any, **kwargs: Any) -> None:
-            value = (
-                float(args[0])
-                if transform is None
-                else float(transform(*args, **kwargs))
-            )
-            self.set_range(name, value, min_val=min_val, max_val=max_val)
-            if self.is_dirty:
-                await self.request_refresh()
-
-        event.subscribe(_on_event)
-        self._subscriptions.append((event, _on_event))
-        return self
-
-    def bind_many(
-        self,
-        event: AsyncEvent,
-        transform: Callable[..., dict[str, Any]],
-    ) -> DuiKey:
-        """Subscribe to *event*; transform args into a dict and :meth:`set_many` it.
-
-        Mirror of :meth:`DuiCard.bind_many`.
-
-        Parameters
-        ----------
-        event
-            The :class:`~deux.runtime.async_event.AsyncEvent` to
-            subscribe to.
-        transform
-            Required sync callable that maps event args to a dict of
-            binding names to values.
-
-        Returns
-        -------
-        DuiKey
-            self, for method chaining.
-        """
-
-        async def _on_event(*args: Any, **kwargs: Any) -> None:
-            values = transform(*args, **kwargs)
-            self.set_many(**values)
-            if self.is_dirty:
-                await self.request_refresh()
-
-        event.subscribe(_on_event)
-        self._subscriptions.append((event, _on_event))
-        return self
-
-    def detach(self) -> None:
-        """Unsubscribe all handlers registered via :meth:`bind` and friends.
-
-        Call this during teardown (e.g. from
-        :meth:`~deux.ui.controller.KeyController.on_detach`) to prevent
-        leaked handlers accumulating across reconnect cycles.
-        """
-        for event, handler in self._subscriptions:
-            with suppress(ValueError):
-                event.unsubscribe(handler)
-        self._subscriptions.clear()
-
-    def forward(
-        self,
-        event_name: str,
-        target: Callable[..., Any],
-    ) -> DuiKey:
-        """Register *target* as the handler for manifest event *event_name*.
-
-        Mirror of :meth:`DuiCard.forward`.  Sugar for forwarding a DUI
-        event directly to a service method or callable.
-
-        Parameters
-        ----------
-        event_name
-            Semantic event name from the manifest.
-        target
-            Async-callable forwarding target (async function or sync
-            callable returning an awaitable).
-
-        Returns
-        -------
-        DuiKey
-            self, for method chaining.
-        """
-
-        async def _handler(*args: Any, **kwargs: Any) -> None:
-            await target(*args, **kwargs)
-
-        self._events.on(event_name, self._wrap_handler(_handler))
-        return self
-
-    def _wrap_handler(self, fn: AsyncHandler) -> AsyncHandler:
-        """Wrap *fn* so any state changes trigger a refresh after it runs.
-
-        Mirrors :meth:`DuiCard._wrap_handler`.  Without this, hold-timer
-        handlers (``key_hold``) -- which fire from a detached asyncio
-        task -- would mutate bindings without ever triggering a render.
-        Wrapping at the registration boundary makes every handler
-        self-refreshing regardless of how it's dispatched.
-        """
-
-        async def _wrapped(*args: Any, **kwargs: Any) -> None:
-            await fn(*args, **kwargs)
-            if self.is_dirty:
-                await self.request_refresh()
-
-        _wrapped.__wrapped__ = fn  # type: ignore[attr-defined]
-        return _wrapped
 
     def render_image(
         self,
