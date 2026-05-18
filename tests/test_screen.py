@@ -70,6 +70,12 @@ class TestScreenForMini:
         screen = Screen("mini", STREAM_DECK_MINI)
         assert screen.touchstrip_background == "black"
 
+    def test_touchstrip_background_setter_raises_no_touch(self):
+        """Setting touchstrip_background raises IndexError on non-touch device."""
+        screen = Screen("mini", STREAM_DECK_MINI)
+        with pytest.raises(IndexError, match="no touchscreen"):
+            screen.touchstrip_background = "red"
+
 
 class TestScreenForNeo:
     """Screen for Neo: 8 keys, no encoders, no touchscreen, info screen."""
