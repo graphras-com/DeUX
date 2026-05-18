@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import io
 import logging
+from collections.abc import Mapping
 from pathlib import Path
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from .controls.encoder_slot import EncoderSlot
@@ -274,14 +276,20 @@ class Screen:
         self._touch_strip.set_card(index, card)
 
     @property
-    def keys(self) -> dict[int, KeySlot]:
-        """Mapping of key index to :class:`KeySlot` for all configured keys."""
-        return self._keys
+    def keys(self) -> Mapping[int, KeySlot]:
+        """Mapping of key index to :class:`KeySlot` for all configured keys.
+
+        Returns a read-only view; external code cannot mutate internal state.
+        """
+        return MappingProxyType(self._keys)
 
     @property
-    def encoders(self) -> dict[int, EncoderSlot]:
-        """Mapping of encoder index to :class:`EncoderSlot` for all configured encoders."""
-        return self._encoders
+    def encoders(self) -> Mapping[int, EncoderSlot]:
+        """Mapping of encoder index to :class:`EncoderSlot` for all configured encoders.
+
+        Returns a read-only view; external code cannot mutate internal state.
+        """
+        return MappingProxyType(self._encoders)
 
     @property
     def touch_strip(self) -> TouchStrip | None:
@@ -364,10 +372,13 @@ class Screen:
 
     @property
     def cards(self) -> list[Card]:
-        """All touch-strip cards, or an empty list if the device has no touchscreen."""
+        """All touch-strip cards, or an empty list if the device has no touchscreen.
+
+        Returns a shallow copy; external code cannot mutate internal state.
+        """
         if self._touch_strip is None:
             return []
-        return self._touch_strip.cards
+        return list(self._touch_strip.cards)
 
     def mark_all_dirty(self) -> None:
         """Flag every control on this screen for re-rendering.
