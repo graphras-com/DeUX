@@ -59,6 +59,39 @@ class TestKeySlotRefreshCallback:
         await key_slot.request_refresh()
         cb.assert_awaited_once()
 
+    async def test_multiple_refresh_callbacks(self, key_slot: KeySlot):
+        """Multiple callbacks are all invoked on request_refresh."""
+        cb1 = AsyncMock()
+        cb2 = AsyncMock()
+        key_slot.set_refresh_callback(cb1)
+        key_slot.set_refresh_callback(cb2)
+        await key_slot.request_refresh()
+        cb1.assert_awaited_once()
+        cb2.assert_awaited_once()
+
+    async def test_duplicate_callback_not_added_twice(self, key_slot: KeySlot):
+        """The same callback registered twice is only called once."""
+        cb = AsyncMock()
+        key_slot.set_refresh_callback(cb)
+        key_slot.set_refresh_callback(cb)
+        await key_slot.request_refresh()
+        cb.assert_awaited_once()
+
+    async def test_remove_refresh_callback(self, key_slot: KeySlot):
+        """Removed callback is no longer invoked."""
+        cb1 = AsyncMock()
+        cb2 = AsyncMock()
+        key_slot.set_refresh_callback(cb1)
+        key_slot.set_refresh_callback(cb2)
+        key_slot.remove_refresh_callback(cb1)
+        await key_slot.request_refresh()
+        cb1.assert_not_awaited()
+        cb2.assert_awaited_once()
+
+    async def test_remove_nonexistent_callback_noop(self, key_slot: KeySlot):
+        """Removing a callback that was never registered is a no-op."""
+        key_slot.remove_refresh_callback(AsyncMock())
+
 
 class TestKeySlotRendering:
     def test_set_rendered_image(self, key_slot: KeySlot):
