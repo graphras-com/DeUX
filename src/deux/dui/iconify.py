@@ -14,9 +14,12 @@ a process restart retries previously-failed icons.
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import os
 import shutil
 import ssl
+import tempfile
 import threading
 import urllib.error
 import urllib.request
@@ -126,7 +129,15 @@ def _write_disk_cache(prefix: str, icon: str, svg: str) -> None:
     path = _disk_cache_path(prefix, icon)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(svg, encoding="utf-8")
+        fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(svg)
+            os.replace(tmp, path)
+        except BaseException:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp)
+            raise
     except OSError:
         logger.debug("Failed to write icon cache file %s", path, exc_info=True)
 
