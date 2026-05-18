@@ -842,16 +842,20 @@ class TestDeckEventLoop:
         await deck._event_loop()
         assert not deck._closed_event.is_set()
 
-    async def test_event_loop_timeout_continues(self, deck):
-        """TimeoutError calls _check_timeouts then continues."""
+    async def test_event_loop_timeout_via_schedule(self, deck):
+        """schedule_timeout_check triggers _check_timeouts."""
         transport = MagicMock()
         transport.queue = asyncio.Queue()
         deck._transport = transport
         deck._running = True
 
         async def stop_after_delay():
-            await asyncio.sleep(0.6)
+            await asyncio.sleep(0.05)
+            deck.schedule_timeout_check()
+            await asyncio.sleep(0.05)
             deck._running = False
+            deck._timeout_event.set()  # unblock timeout loop to exit
+            await transport.queue.put(KeyEvent(key=0, pressed=True))  # unblock get()
 
         asyncio.create_task(stop_after_delay())
         with patch.object(
@@ -874,6 +878,8 @@ class TestDeckEventLoop:
         async def stop_after_delay():
             await asyncio.sleep(0.1)
             deck._running = False
+            # Put a sentinel to unblock queue.get()
+            await transport.queue.put(KeyEvent(key=0, pressed=False))
 
         asyncio.create_task(stop_after_delay())
         await deck._event_loop()
@@ -894,6 +900,7 @@ class TestDeckEventLoop:
         async def stop_after_delay():
             await asyncio.sleep(0.1)
             deck._running = False
+            await transport.queue.put(KeyEvent(key=0, pressed=False))
 
         asyncio.create_task(stop_after_delay())
         with patch("deux.runtime.deck.logger") as mock_logger:
