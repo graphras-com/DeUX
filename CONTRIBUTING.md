@@ -127,6 +127,21 @@ Every pull request runs the following checks on Python 3.11, 3.12, and 3.13:
 
 All checks must pass for a PR to be merged.
 
+## Immutable Collection Convention
+
+Public properties that expose internal collections **must not** leak mutable
+references. Follow these rules:
+
+| Internal type | Return strategy | Return type annotation |
+|---------------|----------------|------------------------|
+| `dict` | `MappingProxyType(self._x)` | `Mapping[K, V]` |
+| `list` | `list(self._x)` (shallow copy) | `list[T]` |
+| `set` | `frozenset(self._x)` | `frozenset[T]` |
+
+- Import `Mapping` from `collections.abc` and `MappingProxyType` from `types`.
+- If the internal value can be `None`, return `None` directly (no copy needed).
+- Mutation must go through dedicated setter methods (e.g., `set_card()`).
+
 ## Reporting Issues
 
 Open an issue on GitHub with:

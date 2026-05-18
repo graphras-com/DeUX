@@ -119,8 +119,11 @@ class TouchStrip:
 
     @property
     def cards(self) -> list[Card]:
-        """All card zones on this touch strip."""
-        return self._cards
+        """All card zones on this touch strip.
+
+        Returns a shallow copy; external code cannot mutate internal state.
+        """
+        return list(self._cards)
 
     @property
     def panel_width(self) -> int:
@@ -134,8 +137,13 @@ class TouchStrip:
 
     @property
     def bg_tiles(self) -> list[Image.Image] | None:
-        """Pre-sliced background tiles, or ``None`` if no background SVG is set."""
-        return self._bg_tiles
+        """Pre-sliced background tiles, or ``None`` if no background SVG is set.
+
+        Returns a shallow copy when tiles exist; external code cannot mutate internal state.
+        """
+        if self._bg_tiles is None:
+            return None
+        return list(self._bg_tiles)
 
     def bg_tile(self, index: int) -> Image.Image | None:
         """Return the cached background tile for panel *index*, or ``None``.
