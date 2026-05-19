@@ -171,6 +171,33 @@ class TestDuiCardBind:
         with pytest.raises(KeyError):
             await event.emit("x")
 
+    async def test_seeds_from_last_emitted_value(self):
+        """bind() with an event that already emitted seeds the binding immediately."""
+        card = self._card()
+        event = AsyncEvent()
+        await event.emit("Already There")
+        card.bind("title", event)
+        assert card.get("title") == "Already There"
+
+    async def test_seeds_with_transform(self):
+        """bind() seeds via transform when event already has a value."""
+        card = self._card()
+        event = AsyncEvent()
+        await event.emit("hello")
+        card.bind("title", event, transform=lambda v: v.upper())
+        assert card.get("title") == "HELLO"
+
+    def test_no_seed_when_event_never_emitted(self):
+        """bind() with a fresh event keeps the manifest default."""
+        card = DuiCard(
+            _card_spec(
+                bindings={"title": TextBinding(node="title", default="default")}
+            )
+        )
+        event = AsyncEvent()
+        card.bind("title", event)
+        assert card.get("title") == "default"
+
 
 # =====================================================================
 # DuiCard.bind_range
@@ -250,6 +277,14 @@ class TestDuiCardBindRange:
         await event.emit(80)
         assert refresh.count == 1
 
+    async def test_seeds_from_last_emitted_value(self):
+        """bind_range() seeds the normalised value when the event already emitted."""
+        card = self._card()
+        event = AsyncEvent()
+        await event.emit(75)
+        card.bind_range("level", event, min_val=0, max_val=100)
+        assert card.get("level") == pytest.approx(0.75)
+
 
 # =====================================================================
 # DuiCard.bind_many
@@ -322,6 +357,21 @@ class TestDuiCardBindMany:
         await event.emit({"title": "Hot", "artist": "Walker"})
 
         assert refresh.count == 0
+
+    async def test_seeds_from_last_emitted_value(self):
+        """bind_many() seeds all bindings when the event already emitted."""
+        card = self._card()
+        event = AsyncEvent()
+        await event.emit({"title": "Seeded", "artist": "Early"})
+        card.bind_many(
+            event,
+            transform=lambda track: {
+                "title": track["title"],
+                "artist": track["artist"],
+            },
+        )
+        assert card.get("title") == "Seeded"
+        assert card.get("artist") == "Early"
 
 
 # =====================================================================
