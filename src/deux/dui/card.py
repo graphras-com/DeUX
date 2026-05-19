@@ -18,6 +18,7 @@ from .svg_renderer import SvgRenderer
 if TYPE_CHECKING:
     from PIL import Image
 
+    from ..render.metrics import RenderMetrics
     from ..runtime.async_event import AsyncEvent
     from ..runtime.events import AsyncHandler, TouchEvent
 
@@ -207,6 +208,52 @@ class DuiCard(BindingMixin, Card):
             output_format=out_fmt,
             background=bg,
         )
+
+    def render_panel_bytes(
+        self,
+        *,
+        metrics: RenderMetrics,
+        card_index: int,
+        bg_tile: Image.Image | None,
+        background: str = "black",
+        image_format: str = "JPEG",
+    ) -> bytes:
+        """Render the card to encoded image bytes using the SVG-native pipeline.
+
+        Overrides the base :meth:`Card.render_panel_bytes` to use
+        SVG-level background compositing and direct rasterisation,
+        avoiding the legacy Pillow compositing path entirely.
+
+        Parameters
+        ----------
+        metrics : RenderMetrics
+            Device metrics (panel dimensions, etc.).
+        card_index : int
+            The zero-based position of this card on the touch strip.
+        bg_tile : Image.Image or None
+            Cropped background tile for this card's panel, or ``None``.
+        background : str, default="black"
+            Fallback background colour.
+        image_format : str, default="JPEG"
+            Image encoding format (``"JPEG"`` or ``"BMP"``).
+
+        Returns
+        -------
+        bytes
+            Encoded image bytes ready to send to the device.
+        """
+        panel_bytes = self.render_bytes(
+            panel_width=metrics.panel_width,
+            panel_height=metrics.panel_height,
+            image_format=image_format,
+            background=background,
+        )
+
+        # Also render a PIL image for caching (used by screenshot).
+        img = self.render()
+        self.set_rendered(img)
+
+        return panel_bytes
 
     def set(self, name: str, value: Any) -> DuiCard:
         """Set a binding value.  Marks the card dirty if changed.
