@@ -1005,10 +1005,28 @@ class SvgRenderer:
         if isinstance(value, bytes):
             img_bytes = value
         elif hasattr(value, "save"):
-            # Legacy PIL.Image.Image support — convert to PNG bytes.
-            buf = io.BytesIO()
-            value.save(buf, format="PNG")
-            img_bytes = buf.getvalue()
+            # Legacy PIL.Image.Image support — convert to raw bytes.
+            # PIL Images are lazily loaded; the underlying stream may be
+            # closed/GC'd by the time we render in a worker thread.
+            fp = getattr(value, "filename", None)
+            if fp:
+                # Source file still on disk — read raw bytes directly.
+                with open(fp, "rb") as fh:
+                    img_bytes = fh.read()
+            else:
+                # In-memory PIL Image: force pixel decode and re-encode via pyvips.
+                import pyvips
+
+                try:
+                    value.load()
+                except Exception:
+                    logger.warning("Image binding: failed to load PIL Image")
+                    return
+                rgba = value.convert("RGBA")
+                w, h = rgba.size
+                raw = rgba.tobytes()
+                vimg = pyvips.Image.new_from_memory(raw, w, h, 4, "uchar")
+                img_bytes = vimg.write_to_buffer(".png")
         else:
             logger.warning("Image binding: unsupported value type %s", type(value))
             return
