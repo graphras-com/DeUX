@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import logging
 import xml.etree.ElementTree as ET
@@ -231,6 +232,32 @@ class TouchStrip:
         """
         if self._bg_svg is not None:
             self._rasterize_and_slice()
+
+    async def set_background_svg_async(self, svg_data: bytes) -> None:
+        """Async variant of :meth:`set_background_svg`.
+
+        Offloads the CPU-bound SVG rasterisation to a worker thread
+        so the event loop stays responsive.
+
+        Parameters
+        ----------
+        svg_data
+            Raw SVG content as UTF-8 bytes.
+        """
+        self._bg_svg = svg_data
+        self._bg_svg_root = safe_fromstring(svg_data)
+        await asyncio.to_thread(self._rasterize_and_slice)
+        for card in self._cards:
+            card.mark_dirty()
+
+    async def invalidate_background_async(self) -> None:
+        """Async variant of :meth:`invalidate_background`.
+
+        Offloads the CPU-bound SVG rasterisation to a worker thread
+        so the event loop stays responsive.
+        """
+        if self._bg_svg is not None:
+            await asyncio.to_thread(self._rasterize_and_slice)
 
     def _rasterize_and_slice(self) -> None:
         """Rasterize the background SVG and slice into per-panel tiles.

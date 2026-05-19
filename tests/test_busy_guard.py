@@ -382,3 +382,57 @@ class TestSpinnerManifestValidation:
 
         with pytest.raises(PackageError, match="background_node.*does not exist in the SVG"):
             load_package(pkg_dir)
+
+
+# ── Cancellation during in-flight rasterisation ─────────────────────
+
+
+class TestCancellationDuringRasterisation:
+    """Verify that cancelling during offloaded rasterisation is handled."""
+
+    @patch(
+        "deux.render.svg_rasterize._svg_to_png",
+        side_effect=lambda b, w, h: _fake_png(w, h),
+    )
+    async def test_card_cancel_during_spinner_start(self, mock_raster):
+        """Cancelling the task that runs start_busy should not leave broken state."""
+        import asyncio
+
+        spinner = SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=4)
+        spec = _make_card_spec(spinner=spinner)
+        card = DuiCard(spec)
+        push_fn = AsyncMock()
+        card.set_push_fn(push_fn, panel_size=(200, 100))
+
+        task = asyncio.create_task(card.start_busy())
+        # Let the event loop progress then cancel
+        await asyncio.sleep(0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        # Card may or may not be busy depending on timing, but must not raise
+        # on subsequent operations.
+        await card.finish_busy()
+
+    @patch(
+        "deux.render.svg_rasterize._svg_to_png",
+        side_effect=lambda b, w, h: _fake_png(w, h),
+    )
+    async def test_key_cancel_during_spinner_start(self, mock_raster):
+        """Cancelling the task that runs start_busy on a key should not leave broken state."""
+        import asyncio
+
+        spinner = SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=4)
+        spec = _make_key_spec(spinner=spinner)
+        key = DuiKey(spec)
+        push_fn = AsyncMock()
+        key.set_push_fn(push_fn, key_size=(120, 120))
+
+        task = asyncio.create_task(key.start_busy())
+        await asyncio.sleep(0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        await key.finish_busy()
