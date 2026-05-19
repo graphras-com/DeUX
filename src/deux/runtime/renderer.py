@@ -202,12 +202,11 @@ class DeckRenderer:
     async def render_touchscreen(self) -> None:
         """Render and push each card panel individually to the device.
 
-        Uses the SVG-native pipeline for DuiCards: background
-        compositing happens at the SVG level, and each panel is
-        rasterised directly to device-ready bytes and pushed as a
-        per-panel update.
-
-        Non-DUI cards fall back to the legacy Pillow compositing path.
+        Delegates panel rendering to the card's
+        :meth:`~deux.ui.cards.base.Card.render_panel_bytes` method,
+        which is overridden by :class:`~deux.dui.card.DuiCard` to use
+        the SVG-native pipeline.  Non-DUI cards fall back to the
+        legacy Pillow compositing path (with a deprecation warning).
         """
         deck = self._deck
         screen = deck._current_screen()
@@ -227,10 +226,10 @@ class DeckRenderer:
         for card_idx, card in enumerate(screen.cards):
             x_pos = card_idx * metrics.panel_width
             y_pos = 0
+            bg_tile = touch_strip.bg_tile(card_idx)
 
             if isinstance(card, DuiCard):
                 # Set up background layer for SVG-level compositing
-                bg_tile = touch_strip.bg_tile(card_idx)
                 card.set_bg_tile(bg_tile)
 
                 if bg_svg_root is not None:
@@ -300,45 +299,21 @@ class DeckRenderer:
                 if self.is_animating(card):
                     continue
 
-                await card.prepare_assets()
+            await card.prepare_assets()
 
-                # SVG-native pipeline: render directly to device bytes.
-                # Offload CPU-bound rasterisation to a thread so the
-                # event loop stays responsive.
-                image_fmt = (
-                    deck._caps.touchscreen_image_format if deck._caps else "JPEG"
-                )
-                panel_bytes = await asyncio.to_thread(
-                    card.render_bytes,
-                    panel_width=metrics.panel_width,
-                    panel_height=metrics.panel_height,
-                    image_format=image_fmt,
-                    background=touch_strip.background_color,
-                )
+            image_fmt = (
+                deck._caps.touchscreen_image_format if deck._caps else "JPEG"
+            )
 
-                # Also render a PIL image for caching (used by screenshot).
-                # Likewise offloaded because it involves SVG rasterisation.
-                img = await asyncio.to_thread(card.render)
-                card.set_rendered(img)
-
-            else:
-                # Non-DUI card: legacy path with Pillow compositing
-                await card.prepare_assets()
-                rendered = await asyncio.to_thread(card.render)
-                card.set_rendered(rendered)
-
-                bg_tile = touch_strip.bg_tile(card_idx)
-                panel_bytes = await asyncio.to_thread(
-                    compose_card_with_background,
-                    rendered,
-                    bg_tile=bg_tile,
-                    background=touch_strip.background_color,
-                    panel_width=metrics.panel_width,
-                    panel_height=metrics.panel_height,
-                    image_format=(
-                        deck._caps.touchscreen_image_format if deck._caps else "JPEG"
-                    ),
-                )
+            # Unified rendering: each card type implements render_panel_bytes
+            panel_bytes = await asyncio.to_thread(
+                card.render_panel_bytes,
+                metrics=metrics,
+                card_index=card_idx,
+                bg_tile=bg_tile,
+                background=touch_strip.background_color,
+                image_format=image_fmt,
+            )
 
             # Push per-panel update
             async with deck._device_lock:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import warnings
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
@@ -11,6 +12,8 @@ from ...runtime.events import AsyncHandler, EventType, TouchEvent
 
 if TYPE_CHECKING:
     from PIL import Image
+
+    from ...render.metrics import RenderMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -252,6 +255,67 @@ class Card(ABC):
     async def prepare_assets(self) -> None:
         """Prepare external assets needed for rendering this card."""
         return None
+
+    def render_panel_bytes(
+        self,
+        *,
+        metrics: RenderMetrics,
+        card_index: int,
+        bg_tile: Image.Image | None,
+        background: str = "black",
+        image_format: str = "JPEG",
+    ) -> bytes:
+        """Render the card to encoded image bytes for a touchscreen panel.
+
+        The base implementation uses the legacy Pillow compositing path:
+        it calls :meth:`render` and composites the result onto the
+        background tile.  Subclasses (e.g.
+        :class:`~deux.dui.card.DuiCard`) override this to use their
+        native rendering pipeline.
+
+        .. deprecated::
+            Non-DUI cards using this legacy rendering path are
+            deprecated.  Migrate to :class:`~deux.dui.card.DuiCard`
+            for SVG-native rendering.
+
+        Parameters
+        ----------
+        metrics : RenderMetrics
+            Device metrics (panel dimensions, etc.).
+        card_index : int
+            The zero-based position of this card on the touch strip.
+        bg_tile : Image.Image or None
+            Cropped background tile for this card's panel, or ``None``.
+        background : str, default="black"
+            Fallback background colour.
+        image_format : str, default="JPEG"
+            Image encoding format (``"JPEG"`` or ``"BMP"``).
+
+        Returns
+        -------
+        bytes
+            Encoded image bytes ready to send to the device.
+        """
+        from ...render.touch_renderer import compose_card_with_background
+
+        warnings.warn(
+            f"{type(self).__name__} uses the legacy Pillow rendering path. "
+            "Migrate to DuiCard for SVG-native rendering.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+        rendered = self.render()
+        self.set_rendered(rendered)
+
+        return compose_card_with_background(
+            rendered,
+            bg_tile=bg_tile,
+            background=background,
+            panel_width=metrics.panel_width,
+            panel_height=metrics.panel_height,
+            image_format=image_format,
+        )
 
     async def dispatch_encoder_turn(self, direction: int) -> None:
         """Dispatch an encoder-turn event to the card."""
