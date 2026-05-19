@@ -138,6 +138,18 @@ class BindingMixin:
 
         event.subscribe(_on_event)
         self._subscriptions.append((event, _on_event))
+
+        # Seed the binding with the event's last emitted value so the
+        # first render already shows the real state instead of defaults.
+        if event.has_value:
+            args, kwargs = event.last_args, event.last_kwargs
+            value = (
+                (args[0] if args else None)
+                if transform is None
+                else transform(*args, **kwargs)
+            )
+            self.set(name, value)
+
         return self
 
     def bind_range(
@@ -195,6 +207,17 @@ class BindingMixin:
 
         event.subscribe(_on_event)
         self._subscriptions.append((event, _on_event))
+
+        # Seed with the last emitted value.
+        if event.has_value:
+            args, kwargs = event.last_args, event.last_kwargs
+            value = (
+                float(args[0])
+                if transform is None
+                else float(transform(*args, **kwargs))
+            )
+            self.set_range(name, value, min_val=min_val, max_val=max_val)
+
         return self
 
     def bind_many(
@@ -231,6 +254,13 @@ class BindingMixin:
 
         event.subscribe(_on_event)
         self._subscriptions.append((event, _on_event))
+
+        # Seed with the last emitted value.
+        if event.has_value:
+            args, kwargs = event.last_args, event.last_kwargs
+            values = transform(*args, **kwargs)
+            self.set_many(**values)
+
         return self
 
     def detach(self) -> None:

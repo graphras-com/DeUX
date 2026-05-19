@@ -142,6 +142,48 @@ class TestEmit:
             await evt.emit()
 
 
+class TestLastValue:
+    def test_has_value_false_before_emit(self) -> None:
+        evt: AsyncEvent = AsyncEvent()
+        assert evt.has_value is False
+
+    def test_last_args_raises_before_emit(self) -> None:
+        evt: AsyncEvent = AsyncEvent()
+        with pytest.raises(LookupError):
+            _ = evt.last_args
+
+    def test_last_kwargs_raises_before_emit(self) -> None:
+        evt: AsyncEvent = AsyncEvent()
+        with pytest.raises(LookupError):
+            _ = evt.last_kwargs
+
+    async def test_has_value_true_after_emit(self) -> None:
+        evt: AsyncEvent = AsyncEvent()
+        await evt.emit(42)
+        assert evt.has_value is True
+
+    async def test_last_args_captures_positional(self) -> None:
+        evt: AsyncEvent = AsyncEvent()
+        await evt.emit(1, "two")
+        assert evt.last_args == (1, "two")
+
+    async def test_last_kwargs_captures_keywords(self) -> None:
+        evt: AsyncEvent = AsyncEvent()
+        await evt.emit(x=10, y=20)
+        assert evt.last_kwargs == {"x": 10, "y": 20}
+
+    async def test_last_value_updates_on_each_emit(self) -> None:
+        evt: AsyncEvent = AsyncEvent()
+        await evt.emit("first")
+        await evt.emit("second")
+        assert evt.last_args == ("second",)
+
+    async def test_last_value_stored_even_with_no_subscribers(self) -> None:
+        evt: AsyncEvent = AsyncEvent()
+        await evt.emit(99)
+        assert evt.last_args == (99,)
+
+
 def test_top_level_export_matches_internal() -> None:
     """Public re-export from ``deux`` is the same class."""
     assert AsyncEvent is AsyncEventInternal

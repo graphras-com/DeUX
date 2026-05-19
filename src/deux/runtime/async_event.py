@@ -50,10 +50,61 @@ class AsyncEvent:
         await on_volume_changed.emit(75)
     """
 
-    __slots__ = ("_handlers",)
+    _UNSET: object = object()
+
+    __slots__ = ("_handlers", "_last_args", "_last_kwargs")
 
     def __init__(self) -> None:
         self._handlers: list[AsyncHandler] = []
+        self._last_args: tuple[Any, ...] | object = AsyncEvent._UNSET
+        self._last_kwargs: dict[str, Any] = {}
+
+    @property
+    def has_value(self) -> bool:
+        """Whether :meth:`emit` has been called at least once.
+
+        Returns
+        -------
+        bool
+            ``True`` after the first :meth:`emit`, ``False`` otherwise.
+        """
+        return self._last_args is not AsyncEvent._UNSET
+
+    @property
+    def last_args(self) -> tuple[Any, ...]:
+        """Positional arguments from the most recent :meth:`emit`.
+
+        Returns
+        -------
+        tuple
+            The positional args from the last emission.
+
+        Raises
+        ------
+        LookupError
+            If :meth:`emit` has never been called.
+        """
+        if self._last_args is AsyncEvent._UNSET:
+            raise LookupError("No value has been emitted yet")
+        return self._last_args  # type: ignore[return-value]
+
+    @property
+    def last_kwargs(self) -> dict[str, Any]:
+        """Keyword arguments from the most recent :meth:`emit`.
+
+        Returns
+        -------
+        dict
+            The keyword args from the last emission.
+
+        Raises
+        ------
+        LookupError
+            If :meth:`emit` has never been called.
+        """
+        if self._last_args is AsyncEvent._UNSET:
+            raise LookupError("No value has been emitted yet")
+        return self._last_kwargs
 
     def subscribe(self, handler: _H) -> _H:
         """Register *handler* as a subscriber.
@@ -116,6 +167,8 @@ class AsyncEvent:
         **kwargs
             Keyword arguments forwarded to every handler.
         """
+        self._last_args = args
+        self._last_kwargs = kwargs
         for handler in list(self._handlers):
             await handler(*args, **kwargs)
 
