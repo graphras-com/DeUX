@@ -185,8 +185,8 @@ class TestDeckSetPage:
         deck._render_all_keys.assert_awaited_once()
         deck._render_touchscreen.assert_awaited_once()
 
-    async def test_emits_event_after_render(self, deck):
-        """on_screen_changed fires after the new screen has rendered."""
+    async def test_emits_event_before_render(self, deck):
+        """on_screen_changed fires before rendering so bind handlers can seed values."""
         deck.screen("main")
         deck._render_all_keys = AsyncMock()
         deck._render_touchscreen = AsyncMock()
@@ -199,7 +199,7 @@ class TestDeckSetPage:
             order.append(f"event:{name}")
 
         await deck.set_screen("main")
-        assert order == ["rendered", "event:main"]
+        assert order == ["event:main", "rendered"]
 
     async def test_idempotent_does_not_emit_or_re_render(self, deck):
         """Re-setting the same screen emits nothing and re-renders nothing."""
