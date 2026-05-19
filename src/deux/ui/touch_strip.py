@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-import io
 import logging
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from PIL import Image
 
-from .._xml import safe_fromstring
+from ..render.background_layer import BackgroundLayer
 from .cards.base import Card
 from .cards.blank import BlankCard
 
@@ -58,9 +57,12 @@ class TouchStrip:
         self._panel_height = panel_height
         self._cards: list[Card] = [BlankCard() for _ in range(panel_count)]
         self._background_color = background_color
-        self._bg_svg: bytes | None = None
-        self._bg_svg_root: ET.Element | None = None
-        self._bg_tiles: list[Image.Image] | None = None
+        self._bg_layer = BackgroundLayer(
+            "touchstrip",
+            panel_count=panel_count,
+            panel_width=panel_width,
+            panel_height=panel_height,
+        )
 
     @property
     def panel_count(self) -> int:
@@ -142,9 +144,7 @@ class TouchStrip:
 
         Returns a shallow copy when tiles exist; external code cannot mutate internal state.
         """
-        if self._bg_tiles is None:
-            return None
-        return list(self._bg_tiles)
+        return self._bg_layer.tiles
 
     def bg_tile(self, index: int) -> Image.Image | None:
         """Return the cached background tile for panel *index*, or ``None``.
@@ -159,9 +159,7 @@ class TouchStrip:
         Image.Image or None
             The RGB tile image, or ``None`` if no background SVG is set.
         """
-        if self._bg_tiles is None or not 0 <= index < len(self._bg_tiles):
-            return None
-        return self._bg_tiles[index]
+        return self._bg_layer.tile(index)
 
     @property
     def bg_svg_root(self) -> ET.Element | None:
@@ -170,7 +168,12 @@ class TouchStrip:
         Used by the SVG-native pipeline to compose background layers
         with card SVGs at the vector level before rasterisation.
         """
-        return self._bg_svg_root
+        return self._bg_layer.svg_root
+
+    @property
+    def bg_layer(self) -> BackgroundLayer:
+        """The background layer managing SVG, tiles, and rasterisation."""
+        return self._bg_layer
 
     def set_background_svg(self, svg_data: bytes) -> None:
         """Set a background SVG for the entire touchstrip.
@@ -187,9 +190,7 @@ class TouchStrip:
         svg_data
             Raw SVG content as UTF-8 bytes.
         """
-        self._bg_svg = svg_data
-        self._bg_svg_root = safe_fromstring(svg_data)  # untrusted: user-supplied SVG
-        self._rasterize_and_slice()
+        self._bg_layer.set_svg(svg_data)
         for card in self._cards:
             card.mark_dirty()
 
@@ -217,9 +218,7 @@ class TouchStrip:
         All cards are marked dirty so they re-render without the
         background tiles.
         """
-        self._bg_svg = None
-        self._bg_svg_root = None
-        self._bg_tiles = None
+        self._bg_layer.clear()
         for card in self._cards:
             card.mark_dirty()
 
@@ -230,8 +229,8 @@ class TouchStrip:
         (such as the active stylesheet) has changed.  If no background
         SVG is set this is a no-op.
         """
-        if self._bg_svg is not None:
-            self._rasterize_and_slice()
+        if self._bg_layer.has_svg:
+            self._bg_layer.invalidate()
 
     async def set_background_svg_async(self, svg_data: bytes) -> None:
         """Async variant of :meth:`set_background_svg`.
@@ -244,9 +243,8 @@ class TouchStrip:
         svg_data
             Raw SVG content as UTF-8 bytes.
         """
-        self._bg_svg = svg_data
-        self._bg_svg_root = safe_fromstring(svg_data)
-        await asyncio.to_thread(self._rasterize_and_slice)
+        self._bg_layer.set_svg_deferred(svg_data)
+        await asyncio.to_thread(self._bg_layer.rasterize)
         for card in self._cards:
             card.mark_dirty()
 
@@ -256,43 +254,8 @@ class TouchStrip:
         Offloads the CPU-bound SVG rasterisation to a worker thread
         so the event loop stays responsive.
         """
-        if self._bg_svg is not None:
-            await asyncio.to_thread(self._rasterize_and_slice)
-
-    def _rasterize_and_slice(self) -> None:
-        """Rasterize the background SVG and slice into per-panel tiles.
-
-        The full-width image is cropped into ``panel_count`` tiles of
-        ``panel_width x panel_height`` each.
-        """
-        if self._bg_svg is None:
-            self._bg_tiles = None
-            return
-
-        from ..render.svg_rasterize import _svg_to_png
-
-        total_width = self._panel_width * self._panel_count
-        total_height = self._panel_height
-
-        png_data = _svg_to_png(self._bg_svg, total_width, total_height)
-        full_img = Image.open(io.BytesIO(png_data)).convert("RGB")
-
-        tiles: list[Image.Image] = []
-        for i in range(self._panel_count):
-            x0 = i * self._panel_width
-            x1 = x0 + self._panel_width
-            tile = full_img.crop((x0, 0, x1, total_height))
-            tiles.append(tile)
-
-        self._bg_tiles = tiles
-        logger.debug(
-            "Background SVG rasterized: %dx%d -> %d tiles of %dx%d",
-            total_width,
-            total_height,
-            self._panel_count,
-            self._panel_width,
-            self._panel_height,
-        )
+        if self._bg_layer.has_svg:
+            await asyncio.to_thread(self._bg_layer.rasterize)
 
     @property
     def any_dirty(self) -> bool:
