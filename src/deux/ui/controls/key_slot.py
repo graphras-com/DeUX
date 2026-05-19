@@ -102,7 +102,23 @@ class KeySlot:
         return handler
 
     async def dispatch(self, pressed: bool) -> None:
-        """Dispatch a press or release event through the registered handlers."""
+        """Dispatch a press or release event through the internal hook.
+
+        Subclasses should override :meth:`_dispatch_event` to customise
+        event handling without replacing the public entry point.
+        """
+        await self._dispatch_event(pressed)
+
+    async def _dispatch_event(self, pressed: bool) -> None:
+        """Internal dispatch hook — override in subclasses.
+
+        The default implementation calls the registered press/release handler.
+
+        Parameters
+        ----------
+        pressed : bool
+            ``True`` for a press event, ``False`` for a release event.
+        """
         handler = self._press_handler if pressed else self._release_handler
         if handler is not None:
             await handler()

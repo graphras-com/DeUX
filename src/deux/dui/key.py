@@ -328,12 +328,7 @@ class DuiKey(BindingMixin, KeySlot):
             background="black",
         )
 
-    @property
-    def has_dui_content(self) -> bool:
-        """Always ``True`` — this key is backed by a .dui package."""
-        return True
-
-    async def dispatch(self, pressed: bool) -> None:
+    async def _dispatch_event(self, pressed: bool) -> None:
         """Dispatch a key press/release through the event map.
 
         All matching handlers (simple and compound) are called.
@@ -350,7 +345,7 @@ class DuiKey(BindingMixin, KeySlot):
             for handler in handlers:
                 await handler()
         else:
-            await super().dispatch(pressed)
+            await super()._dispatch_event(pressed)
 
     async def start_busy(self) -> None:
         """Enter the busy state and start the spinner animation.

@@ -65,10 +65,10 @@ class TestDuiKeyIsKeySlot:
         key = DuiKey(spec)
         assert key.spec is spec
 
-    def test_has_dui_content(self):
+    def test_is_dui_key_instance(self):
         spec = _make_key_spec()
         key = DuiKey(spec)
-        assert key.has_dui_content is True
+        assert isinstance(key, DuiKey)
 
 
 class TestDuiKeyDataBinding:
