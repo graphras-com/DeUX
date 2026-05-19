@@ -261,7 +261,7 @@ class Card(ABC):
         *,
         metrics: RenderMetrics,
         card_index: int,
-        bg_tile: Image.Image | None,
+        bg_tile: bytes | None,
         background: str = "black",
         image_format: str = "JPEG",
     ) -> bytes:
@@ -284,8 +284,8 @@ class Card(ABC):
             Device metrics (panel dimensions, etc.).
         card_index : int
             The zero-based position of this card on the touch strip.
-        bg_tile : Image.Image or None
-            Cropped background tile for this card's panel, or ``None``.
+        bg_tile : bytes or None
+            PNG-encoded background tile for this panel, or ``None``.
         background : str, default="black"
             Fallback background colour.
         image_format : str, default="JPEG"
@@ -308,9 +308,18 @@ class Card(ABC):
         rendered = self.render()
         self.set_rendered(rendered)
 
+        # Convert PIL Image to PNG bytes for pyvips-based compositing.
+        card_bytes: bytes | None = None
+        if rendered is not None:
+            import io
+
+            buf = io.BytesIO()
+            rendered.save(buf, format="PNG")
+            card_bytes = buf.getvalue()
+
         return compose_card_with_background(
-            rendered,
-            bg_tile=bg_tile,
+            card_bytes,
+            bg_tile_bytes=bg_tile,
             background=background,
             panel_width=metrics.panel_width,
             panel_height=metrics.panel_height,

@@ -81,7 +81,7 @@ class DuiCard(BindingMixin, Card):
         self._spinner_frames: SpinnerFrames | None = None
         self._push_fn: PushFn | None = None
         self._panel_size: tuple[int, int] | None = None
-        self._bg_tile: Image.Image | None = None
+        self._bg_tile: bytes | None = None
         self._bg_svg_root: ET.Element | None = None
         self._card_index: int | None = None
 
@@ -117,17 +117,17 @@ class DuiCard(BindingMixin, Card):
         self._push_fn = push_fn
         self._panel_size = panel_size
 
-    def set_bg_tile(self, tile: Image.Image | None) -> None:
+    def set_bg_tile(self, tile: bytes | None) -> None:
         """Set the background tile for compositing spinner frames.
 
         When a touchstrip background SVG is active, the corresponding
-        pre-sliced tile is passed here so that spinner animations can
-        composite each frame onto the background.
+        pre-sliced tile (PNG bytes) is passed here so that spinner
+        animations can composite each frame onto the background.
 
         Parameters
         ----------
         tile
-            The RGB background tile, or ``None`` to clear.
+            PNG-encoded background tile bytes, or ``None`` to clear.
         """
         self._bg_tile = tile
 
@@ -214,7 +214,7 @@ class DuiCard(BindingMixin, Card):
         *,
         metrics: RenderMetrics,
         card_index: int,
-        bg_tile: Image.Image | None,
+        bg_tile: bytes | None,
         background: str = "black",
         image_format: str = "JPEG",
     ) -> bytes:

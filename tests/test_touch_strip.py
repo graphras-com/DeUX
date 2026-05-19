@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import io
+
 import pytest
 from PIL import Image
 
@@ -490,8 +492,11 @@ class TestTouchStripBackgroundSvg:
         assert ts.bg_tiles is not None
         assert len(ts.bg_tiles) == 4
         for tile in ts.bg_tiles:
-            assert tile.size == (200, 100)
-            assert tile.mode == "RGB"
+            assert isinstance(tile, bytes)
+            assert len(tile) > 0
+            # Verify the tile decodes to the expected size.
+            img = Image.open(io.BytesIO(tile))
+            assert img.size == (200, 100)
 
     def test_set_background_svg_marks_all_dirty(self):
         ts = TouchStrip(panel_count=4, panel_width=200, panel_height=100)
@@ -508,7 +513,9 @@ class TestTouchStripBackgroundSvg:
         ts.set_background_svg(self._make_svg())
         tile = ts.bg_tile(0)
         assert tile is not None
-        assert tile.size == (200, 100)
+        assert isinstance(tile, bytes)
+        img = Image.open(io.BytesIO(tile))
+        assert img.size == (200, 100)
 
     def test_bg_tile_returns_none_without_svg(self):
         ts = TouchStrip(panel_count=4, panel_width=200, panel_height=100)
@@ -549,7 +556,8 @@ class TestTouchStripBackgroundSvg:
         ts.set_background_svg(self._make_svg(width=200, height=50, fill="red"))
         tile = ts.bg_tile(0)
         assert tile is not None
-        r, g, b = tile.getpixel((50, 25))
+        img = Image.open(io.BytesIO(tile)).convert("RGB")
+        r, g, b = img.getpixel((50, 25))
         assert r > 200
         assert g < 50
         assert b < 50
@@ -571,11 +579,13 @@ class TestTouchStripBackgroundSvg:
         assert tile0 is not None and tile1 is not None
 
         # Tile 0 should be red
-        r, g, b = tile0.getpixel((50, 25))
+        img0 = Image.open(io.BytesIO(tile0)).convert("RGB")
+        r, g, b = img0.getpixel((50, 25))
         assert r > 200 and g < 50 and b < 50
 
         # Tile 1 should be blue
-        r, g, b = tile1.getpixel((50, 25))
+        img1 = Image.open(io.BytesIO(tile1)).convert("RGB")
+        r, g, b = img1.getpixel((50, 25))
         assert r < 50 and g < 50 and b > 200
 
 
@@ -627,7 +637,8 @@ class TestTouchStripAsyncRasterisation:
         assert ts.bg_tiles is not None
         assert len(ts.bg_tiles) == 4
         for tile in ts.bg_tiles:
-            assert tile.size == (200, 100)
+            img = Image.open(io.BytesIO(tile))
+            assert img.size == (200, 100)
 
     async def test_set_background_svg_async_marks_dirty(self):
         """set_background_svg_async should mark all cards dirty."""

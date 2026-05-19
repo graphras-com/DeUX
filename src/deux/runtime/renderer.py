@@ -8,15 +8,11 @@ of :class:`~deux.runtime.deck.Deck`.
 from __future__ import annotations
 
 import asyncio
-import io
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
-from PIL import Image
-
 from ..dui.key import DuiKey
 from ..render.key_renderer import render_blank_key
-from ..render.touch_renderer import compose_card_with_background
 
 if TYPE_CHECKING:
     from ..dui.animator import PushFn
@@ -248,18 +244,17 @@ class DeckRenderer:
                     y: int,
                     w: int,
                     h: int,
-                    tile: Image.Image | None,
+                    tile: bytes | None,
                 ) -> PushFn:
                     async def _push_card_frame(frame_bytes: bytes) -> None:
                         if tile is not None:
-                            # Decode the frame, composite onto the bg tile, re-encode
-                            # Offload CPU-bound PIL work to a thread to avoid
-                            # blocking the event loop.
+                            # Composite frame onto bg tile using pyvips.
+                            from ..render.touch_renderer import composite_frame_on_tile
+
                             def _compose(fb: bytes = frame_bytes) -> bytes:
-                                frame_img = Image.open(io.BytesIO(fb))
-                                return compose_card_with_background(
-                                    frame_img,
-                                    bg_tile=tile,
+                                return composite_frame_on_tile(
+                                    fb,
+                                    bg_tile_bytes=tile,
                                     panel_width=w,
                                     panel_height=h,
                                     image_format=(

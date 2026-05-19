@@ -8,12 +8,9 @@ and :class:`~deux.runtime.renderer.DeckRenderer`.
 
 from __future__ import annotations
 
-import io
 import logging
 import xml.etree.ElementTree as ET
 from typing import Literal
-
-from PIL import Image
 
 from .._xml import safe_fromstring
 
@@ -71,7 +68,7 @@ class BackgroundLayer:
         self._panel_count = panel_count
         self._panel_width = panel_width
         self._panel_height = panel_height
-        self._tiles: list[Image.Image] | None = None
+        self._tiles: list[bytes] | None = None
 
         # Key state
         self._key_size = key_size
@@ -98,8 +95,8 @@ class BackgroundLayer:
         return self._svg_root
 
     @property
-    def tiles(self) -> list[Image.Image] | None:
-        """Pre-sliced touchstrip tiles (shallow copy), or ``None``.
+    def tiles(self) -> list[bytes] | None:
+        """Pre-sliced touchstrip tiles as PNG bytes (shallow copy), or ``None``.
 
         Only meaningful for ``kind="touchstrip"``.
         """
@@ -107,7 +104,7 @@ class BackgroundLayer:
             return None
         return list(self._tiles)
 
-    def tile(self, index: int) -> Image.Image | None:
+    def tile(self, index: int) -> bytes | None:
         """Return the cached background tile for panel *index*, or ``None``.
 
         Parameters
@@ -117,8 +114,8 @@ class BackgroundLayer:
 
         Returns
         -------
-        Image.Image or None
-            The RGB tile image, or ``None`` if no background SVG is set
+        bytes or None
+            PNG-encoded tile bytes, or ``None`` if no background SVG is set
             or *index* is out of range.
         """
         if self._tiles is None or not 0 <= index < len(self._tiles):
@@ -225,8 +222,8 @@ class BackgroundLayer:
             self._rasterize_key()
 
     def _rasterize_touchstrip(self) -> None:
-        """Rasterize and slice a touchstrip background SVG."""
-        from .svg_rasterize import _svg_to_png
+        """Rasterize and slice a touchstrip background SVG using pyvips."""
+        from .svg_rasterize import _ensure_macos_lib_path, _svg_to_png
 
         assert self._svg is not None  # noqa: S101 — invariant
 
@@ -234,14 +231,20 @@ class BackgroundLayer:
         total_height = self._panel_height
 
         png_data = _svg_to_png(self._svg, total_width, total_height)
-        full_img = Image.open(io.BytesIO(png_data)).convert("RGB")
 
-        tiles: list[Image.Image] = []
+        _ensure_macos_lib_path()
+        import pyvips
+
+        full_img = pyvips.Image.new_from_buffer(png_data, "")
+        # Flatten alpha channel if present.
+        if full_img.hasalpha():
+            full_img = full_img.flatten(background=[0, 0, 0])
+
+        tiles: list[bytes] = []
         for i in range(self._panel_count):
             x0 = i * self._panel_width
-            x1 = x0 + self._panel_width
-            tile = full_img.crop((x0, 0, x1, total_height))
-            tiles.append(tile)
+            tile = full_img.crop(x0, 0, self._panel_width, total_height)
+            tiles.append(tile.write_to_buffer(".png"))
 
         self._tiles = tiles
         logger.debug(
@@ -255,13 +258,13 @@ class BackgroundLayer:
 
     def _rasterize_key(self) -> None:
         """Rasterize a key background SVG to encoded device bytes."""
-        from .key_renderer import _encode_image
-        from .svg_rasterize import _svg_to_png
+        from .svg_rasterize import _rasterize_svg
 
         assert self._svg is not None  # noqa: S101 — invariant
 
         key_w, key_h = self._key_size
-        png_data = _svg_to_png(self._svg, key_w, key_h)
-        img = Image.open(io.BytesIO(png_data)).convert("RGB")
-        self._key_image = _encode_image(img, image_format=self._key_image_format)
+        fmt = "jpeg" if self._key_image_format.upper() == "JPEG" else "bmp"
+        self._key_image = _rasterize_svg(
+            self._svg, key_w, key_h, output_format=fmt
+        )
         logger.debug("Key background SVG rasterized: %dx%d", key_w, key_h)
