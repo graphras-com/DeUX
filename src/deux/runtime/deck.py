@@ -3,37 +3,25 @@
 from __future__ import annotations
 
 import asyncio
-import io
 import logging
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, cast
 
-from PIL import Image
 from StreamDeck.DeviceManager import DeviceManager
 
 from .._errors import DeuxError
-from ..dui.key import DuiKey
-from ..render.key_renderer import render_blank_key
 from ..render.metrics import RenderMetrics
-from ..render.touch_renderer import compose_card_with_background
 from ._executor import get_executor, shutdown_executor
 from .async_event import AsyncEvent
 from .capabilities import DeviceCapabilities
 from .device_info import DeviceInfo
-from .events import (
-    DeckEvent,
-    EncoderPressEvent,
-    EncoderTurnEvent,
-    KeyEvent,
-    TouchEvent,
-)
+from .event_router import DeckEventRouter
+from .events import DeckEvent
+from .renderer import DeckRenderer
 from .transport import AsyncTransport
 
 if TYPE_CHECKING:
-    from ..dui.animator import PushFn
     from ..render.theme import Theme
-    from ..ui.cards.base import Card
-    from ..ui.controls.key_slot import KeySlot
     from ..ui.screen import Screen
 
 logger = logging.getLogger(__name__)
@@ -107,6 +95,9 @@ class Deck:
 
         self.on_brightness_changed = AsyncEvent()
         self.on_screen_changed = AsyncEvent()
+
+        self._renderer = DeckRenderer(self)
+        self._event_router = DeckEventRouter(self)
 
     async def start(self) -> None:
         """Discover the device by serial, open it, and start the event loop."""
@@ -330,14 +321,7 @@ class Deck:
         str
             CSS stylesheet string from the most specific theme.
         """
-        from ..render.theme import get_active_theme
-
-        screen = self._active_screen
-        if screen is not None and screen.theme is not None:
-            return screen.theme.css
-        if self._theme is not None:
-            return self._theme.css
-        return get_active_theme().css
+        return self._renderer._resolve_stylesheet()
 
     async def set_brightness(self, percent: int) -> None:
         """Set screen brightness.
@@ -425,9 +409,7 @@ class Deck:
         logger.info("Switching to screen: %s", name)
 
         # Apply the resolved theme cascade for this screen.
-        from ..render.svg_rasterize import set_svg_stylesheet
-
-        set_svg_stylesheet(self._resolve_stylesheet())
+        self._renderer.apply_theme()
 
         self._wire_refresh_callbacks()
 
@@ -466,50 +448,19 @@ class Deck:
 
     async def _render_all_keys(self) -> None:
         """Render and push all key images for the active screen."""
-        screen = self._current_screen()
-        if not self._device or not screen:
-            return
-
-        caps = self._caps
-        if caps is None:
-            return
-
-        metrics = self._metrics
-
-        if metrics is None:
-            return
-
-        for key_index in range(caps.key_count):
-            key_slot = screen.keys.get(key_index)
-            if key_slot and self._is_dui_key(key_slot):
-                await self._render_dui_key(key_slot, key_index)
-            else:
-                bg_image = screen.key_bg_image
-                if bg_image is not None:
-                    image_bytes = bg_image
-                else:
-                    image_bytes = render_blank_key(
-                        key_size=metrics.key_size,
-                        image_format=caps.key_image_format,
-                    )
-                async with self._device_lock:
-                    await self._exec_device_io(
-                        self._device.set_key_image,
-                        key_index,
-                        image_bytes,
-                    )
+        await self._renderer.render_all_keys()
 
     @staticmethod
-    def _is_dui_key(key_slot: KeySlot) -> bool:
+    def _is_dui_key(key_slot: Any) -> bool:
         """Check whether a key slot is a DuiKey."""
-        return isinstance(key_slot, DuiKey)
+        return DeckRenderer.is_dui_key(key_slot)
 
     @staticmethod
     def _is_animating(obj: Any) -> bool:
         """Check whether a card or key has an active spinner animation."""
-        return getattr(obj, "is_animating", False)
+        return DeckRenderer.is_animating(obj)
 
-    async def _render_dui_key(self, key_slot: KeySlot, key_index: int) -> None:
+    async def _render_dui_key(self, key_slot: Any, key_index: int) -> None:
         """Render a DuiKey and push to the device.
 
         Parameters
@@ -517,222 +468,17 @@ class Deck:
         key_slot
             The DuiKey to render.
         key_index
-            The screen slot the key is currently installed at.  This is
-            authoritative for routing (a single DuiKey may live on
-            multiple screens at different slots), so the spinner
-            ``push_fn`` is rewired on every render to capture the active
-            slot.
+            The screen slot the key is currently installed at.
         """
-        if not self._device:
-            return
-
-        dui_key = cast("DuiKey", key_slot)
-
-        # Skip rendering if a spinner animation is active
-        if self._is_animating(dui_key):
-            return
-
-        # Re-wire push_fn every render so a DuiKey reused across screens
-        # always animates at the slot of the currently active screen.
-        async def _push_key_frame(frame_bytes: bytes) -> None:
-            async with self._device_lock:
-                await self._exec_device_io(
-                    self._device.set_key_image,
-                    key_index,
-                    frame_bytes,
-                )
-
-        if self._caps is None:
-            return
-
-        dui_key.set_push_fn(_push_key_frame, key_size=self._caps.key_size)
-
-        image_bytes = dui_key.render_image(
-            key_size=self._caps.key_size,
-            image_format=self._caps.key_image_format,
-        )
-        dui_key.set_rendered_image(image_bytes)
-
-        async with self._device_lock:
-            await self._exec_device_io(
-                self._device.set_key_image,
-                key_index,
-                image_bytes,
-            )
+        await self._renderer.render_dui_key(key_slot, key_index)
 
     async def _render_touchscreen(self) -> None:
-        """Render and push each card panel individually to the device.
-
-        Uses the SVG-native pipeline for DuiCards: background
-        compositing happens at the SVG level, and each panel is
-        rasterised directly to device-ready bytes and pushed as a
-        per-panel update.
-
-        Non-DUI cards fall back to the legacy Pillow compositing path.
-        """
-        screen = self._current_screen()
-        if not self._device or not screen or not self._metrics:
-            return
-
-        if screen.touch_strip is None:
-            return
-
-        metrics = self._metrics
-        touch_strip = screen.touch_strip
-
-        from ..dui.card import DuiCard
-
-        bg_svg_root = touch_strip.bg_svg_root
-
-        for card_idx, card in enumerate(screen.cards):
-            x_pos = card_idx * metrics.panel_width
-            y_pos = 0
-
-            if isinstance(card, DuiCard):
-                # Set up background layer for SVG-level compositing
-                bg_tile = touch_strip.bg_tile(card_idx)
-                card.set_bg_tile(bg_tile)
-
-                if bg_svg_root is not None:
-                    card.set_background_layer(
-                        bg_svg_root,
-                        card_idx,
-                        metrics.panel_width,
-                        metrics.panel_height,
-                    )
-                else:
-                    card.clear_background_layer()
-
-                # Wire push_fn for spinner animations (per-panel update)
-                async def _make_push(
-                    x: int,
-                    y: int,
-                    w: int,
-                    h: int,
-                    tile: Image.Image | None,
-                ) -> PushFn:
-                    async def _push_card_frame(frame_bytes: bytes) -> None:
-                        if tile is not None:
-                            # Decode the frame, composite onto the bg tile, re-encode
-                            # Offload CPU-bound PIL work to a thread to avoid
-                            # blocking the event loop.
-                            def _compose(fb: bytes = frame_bytes) -> bytes:
-                                frame_img = Image.open(io.BytesIO(fb))
-                                return compose_card_with_background(
-                                    frame_img,
-                                    bg_tile=tile,
-                                    panel_width=w,
-                                    panel_height=h,
-                                    image_format=(
-                                        self._caps.touchscreen_image_format
-                                        if self._caps
-                                        else "JPEG"
-                                    ),
-                                )
-
-                            out_bytes = await asyncio.to_thread(_compose)
-                        else:
-                            out_bytes = frame_bytes
-                        async with self._device_lock:
-                            await self._exec_device_io(
-                                self._device.set_touchscreen_image,
-                                out_bytes,
-                                x,
-                                y,
-                                w,
-                                h,
-                            )
-
-                    return _push_card_frame
-
-                push_fn = await _make_push(
-                    x_pos,
-                    y_pos,
-                    metrics.panel_width,
-                    metrics.panel_height,
-                    bg_tile,
-                )
-                card.set_push_fn(
-                    push_fn, panel_size=(metrics.panel_width, metrics.panel_height)
-                )
-
-                # Skip re-rendering cards with active spinner animations
-                if self._is_animating(card):
-                    continue
-
-                await card.prepare_assets()
-
-                # SVG-native pipeline: render directly to device bytes.
-                # Offload CPU-bound rasterisation to a thread so the
-                # event loop stays responsive.
-                image_fmt = (
-                    self._caps.touchscreen_image_format if self._caps else "JPEG"
-                )
-                panel_bytes = await asyncio.to_thread(
-                    card.render_bytes,
-                    panel_width=metrics.panel_width,
-                    panel_height=metrics.panel_height,
-                    image_format=image_fmt,
-                    background=touch_strip.background_color,
-                )
-
-                # Also render a PIL image for caching (used by screenshot).
-                # Likewise offloaded because it involves SVG rasterisation.
-                img = await asyncio.to_thread(card.render)
-                card.set_rendered(img)
-
-            else:
-                # Non-DUI card: legacy path with Pillow compositing
-                await card.prepare_assets()
-                rendered = await asyncio.to_thread(card.render)
-                card.set_rendered(rendered)
-
-                bg_tile = touch_strip.bg_tile(card_idx)
-                panel_bytes = await asyncio.to_thread(
-                    compose_card_with_background,
-                    rendered,
-                    bg_tile=bg_tile,
-                    background=touch_strip.background_color,
-                    panel_width=metrics.panel_width,
-                    panel_height=metrics.panel_height,
-                    image_format=(
-                        self._caps.touchscreen_image_format if self._caps else "JPEG"
-                    ),
-                )
-
-            # Push per-panel update
-            async with self._device_lock:
-                await self._exec_device_io(
-                    self._device.set_touchscreen_image,
-                    panel_bytes,
-                    x_pos,
-                    y_pos,
-                    metrics.panel_width,
-                    metrics.panel_height,
-                )
+        """Render and push each card panel individually to the device."""
+        await self._renderer.render_touchscreen()
 
     async def _render_info_screen(self) -> None:
         """Render and push the info screen image (e.g. Neo)."""
-        screen = self._current_screen()
-        if not self._device or not screen:
-            return
-
-        info = screen.info_screen
-        if info is None:
-            return
-
-        image_bytes = info.render_bytes()
-
-        async with self._device_lock:
-            await self._exec_device_io(
-                self._device.set_screen_image,
-                image_bytes,
-                0,
-                0,
-                info.width,
-                info.height,
-            )
-        info.mark_clean()
+        await self._renderer.render_info_screen()
 
     async def refresh(self) -> None:
         """Re-render and push all dirty controls on the active screen.
@@ -832,51 +578,10 @@ class Deck:
                     await self._timeout_task
             self._closed_event.set()
 
-    async def _drain_card_callbacks(self, card: Card) -> None:
+    async def _drain_card_callbacks(self, card: Any) -> None:
         """Drain and await all pending callbacks queued on a card."""
-        for handler, args in card.drain_pending_callbacks():
-            await handler(*args)
+        await self._renderer.drain_card_callbacks(card)
 
     async def _dispatch(self, event: DeckEvent) -> None:
         """Dispatch a single event to the appropriate handler on the active screen."""
-        screen = self._current_screen()
-        if not screen:
-            return
-
-        if isinstance(event, KeyEvent):
-            key_slot = screen.keys.get(event.key)
-            if key_slot:
-                await key_slot.dispatch(event.pressed)
-                if key_slot.is_dirty:
-                    await self.refresh()
-
-        elif isinstance(event, EncoderTurnEvent):
-            encoder = screen.encoders.get(event.encoder)
-            if encoder:
-                await encoder.dispatch_turn(event.direction)
-            if screen.touch_strip is not None:
-                card = screen.touch_strip.card(event.encoder)
-                await card.dispatch_encoder_turn(event.direction)
-                await self._drain_card_callbacks(card)
-                if card.is_dirty:
-                    await self.refresh()
-
-        elif isinstance(event, EncoderPressEvent):
-            encoder = screen.encoders.get(event.encoder)
-            if encoder:
-                await encoder.dispatch_press(event.pressed)
-            if screen.touch_strip is not None:
-                card = screen.touch_strip.card(event.encoder)
-                if event.pressed:
-                    await card.dispatch_encoder_press()
-                else:
-                    await card.dispatch_encoder_release()
-                await self._drain_card_callbacks(card)
-                if card.is_dirty:
-                    await self.refresh()
-
-        elif isinstance(event, TouchEvent):
-            if screen.touch_strip is not None and self._metrics is not None:
-                zone = event.compute_zone(self._metrics)
-                card = screen.touch_strip.card(zone)
-                await card.dispatch_touch(event)
+        await self._event_router.dispatch(event)
