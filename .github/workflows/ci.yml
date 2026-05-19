@@ -77,7 +77,7 @@ jobs:
       coverage-target: ${{ vars.CI_PYTHON_COVERAGE_TARGET || 'deux' }}
       coverage-threshold: ${{ fromJSON(vars.CI_PYTHON_COVERAGE_THRESHOLD || '95') }}
       pytest-args: ${{ vars.CI_PYTHON_TEST_ARGS || 'tests/' }}
-      system-packages: ${{ vars.CI_PYTHON_SYSTEM_PACKAGES || 'libcairo2-dev libhidapi-dev' }}
+      system-packages: ${{ vars.CI_PYTHON_SYSTEM_PACKAGES || 'libcairo2-dev libhidapi-dev libvips-dev' }}
 
   secrets-scan:
     name: Secrets
