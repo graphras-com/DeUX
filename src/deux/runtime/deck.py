@@ -15,13 +15,8 @@ from ._executor import get_executor, shutdown_executor
 from .async_event import AsyncEvent
 from .capabilities import DeviceCapabilities
 from .device_info import DeviceInfo
-from .events import (
-    DeckEvent,
-    EncoderPressEvent,
-    EncoderTurnEvent,
-    KeyEvent,
-    TouchEvent,
-)
+from .event_router import DeckEventRouter
+from .events import DeckEvent
 from .renderer import DeckRenderer
 from .transport import AsyncTransport
 
@@ -102,6 +97,7 @@ class Deck:
         self.on_screen_changed = AsyncEvent()
 
         self._renderer = DeckRenderer(self)
+        self._event_router = DeckEventRouter(self)
 
     async def start(self) -> None:
         """Discover the device by serial, open it, and start the event loop."""
@@ -588,44 +584,4 @@ class Deck:
 
     async def _dispatch(self, event: DeckEvent) -> None:
         """Dispatch a single event to the appropriate handler on the active screen."""
-        screen = self._current_screen()
-        if not screen:
-            return
-
-        if isinstance(event, KeyEvent):
-            key_slot = screen.keys.get(event.key)
-            if key_slot:
-                await key_slot.dispatch(event.pressed)
-                if key_slot.is_dirty:
-                    await self.refresh()
-
-        elif isinstance(event, EncoderTurnEvent):
-            encoder = screen.encoders.get(event.encoder)
-            if encoder:
-                await encoder.dispatch_turn(event.direction)
-            if screen.touch_strip is not None:
-                card = screen.touch_strip.card(event.encoder)
-                await card.dispatch_encoder_turn(event.direction)
-                await self._drain_card_callbacks(card)
-                if card.is_dirty:
-                    await self.refresh()
-
-        elif isinstance(event, EncoderPressEvent):
-            encoder = screen.encoders.get(event.encoder)
-            if encoder:
-                await encoder.dispatch_press(event.pressed)
-            if screen.touch_strip is not None:
-                card = screen.touch_strip.card(event.encoder)
-                if event.pressed:
-                    await card.dispatch_encoder_press()
-                else:
-                    await card.dispatch_encoder_release()
-                await self._drain_card_callbacks(card)
-                if card.is_dirty:
-                    await self.refresh()
-
-        elif isinstance(event, TouchEvent):
-            if screen.touch_strip is not None and self._metrics is not None:
-                zone = event.compute_zone(self._metrics)
-                card = screen.touch_strip.card(zone)
-                await card.dispatch_touch(event)
+        await self._event_router.dispatch(event)
