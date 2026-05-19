@@ -12,6 +12,7 @@ from PIL import Image
 from StreamDeck.DeviceManager import DeviceManager
 
 from .._errors import DeuxError
+from ..dui.key import DuiKey
 from ..render.key_renderer import render_blank_key
 from ..render.metrics import RenderMetrics
 from ..render.touch_renderer import compose_card_with_background
@@ -30,7 +31,6 @@ from .transport import AsyncTransport
 
 if TYPE_CHECKING:
     from ..dui.animator import PushFn
-    from ..dui.key import DuiKey
     from ..render.theme import Theme
     from ..ui.cards.base import Card
     from ..ui.controls.key_slot import KeySlot
@@ -502,7 +502,7 @@ class Deck:
     @staticmethod
     def _is_dui_key(key_slot: KeySlot) -> bool:
         """Check whether a key slot is a DuiKey."""
-        return getattr(key_slot, "has_dui_content", False)
+        return isinstance(key_slot, DuiKey)
 
     @staticmethod
     def _is_animating(obj: Any) -> bool:
