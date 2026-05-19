@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .background_layer import BackgroundLayer
 from .context import RenderingContext
 from .defaults import (
     SurfaceBackgrounds,
@@ -40,6 +41,7 @@ from .touch_renderer import (
 _apply_default_theme()
 
 __all__ = [
+    "BackgroundLayer",
     "RenderingContext",
     "SurfaceBackgrounds",
     "Theme",

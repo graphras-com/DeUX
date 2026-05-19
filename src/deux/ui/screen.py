@@ -9,6 +9,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
+from ..render.background_layer import BackgroundLayer
 from .controls.encoder_slot import EncoderSlot
 from .controls.key_slot import KeySlot
 from .info_screen import InfoScreen
@@ -51,8 +52,11 @@ class Screen:
         self._keys: dict[int, KeySlot] = {}
         self._encoders: dict[int, EncoderSlot] = {}
         self._theme: Theme | None = None
-        self._key_bg_svg: bytes | None = None
-        self._key_bg_image: bytes | None = None
+        self._key_bg_layer = BackgroundLayer(
+            "key",
+            key_size=self._caps.key_size,
+            key_image_format=self._caps.key_image_format,
+        )
         self._key_bg_dirty: bool = False
 
         if self._caps.has_touchscreen and self._caps.dial_count > 0:
@@ -88,14 +92,9 @@ class Screen:
 
         Looks up the device's VID:PID in the bundled manifest and sets
         the touchscreen background SVG if one is available and no
-        background has been explicitly configured.  Only the SVG source
-        and parsed XML root are stored; PIL rasterisation is deferred
-        until the first render pass to avoid unnecessary work during
-        construction.  Failures are logged but never raised — defaults
-        are best-effort.
+        background has been explicitly configured.  Failures are logged
+        but never raised — defaults are best-effort.
         """
-        import xml.etree.ElementTree as ET  # noqa: N817
-
         from ..render.defaults import get_default_backgrounds
 
         try:
@@ -109,42 +108,23 @@ class Screen:
         if "touchscreen" in backgrounds and self._touch_strip is not None:
             try:
                 svg_data = backgrounds["touchscreen"]
-                self._touch_strip._bg_svg = svg_data
-                self._touch_strip._bg_svg_root = ET.fromstring(svg_data)  # noqa: S314 — trusted: bundled default backgrounds
-                self._touch_strip._rasterize_and_slice()
+                self._touch_strip.bg_layer.set_svg(svg_data, trusted=True)
             except Exception:
                 logger.debug("Failed to apply default touchscreen background", exc_info=True)
 
         if "key" in backgrounds:
             try:
-                self._key_bg_svg = backgrounds["key"]
-                self._rasterize_key_background()
+                svg_data = backgrounds["key"]
+                self._key_bg_layer.set_svg(svg_data, trusted=True)
             except Exception:
                 logger.debug("Failed to apply default key background", exc_info=True)
 
     def _rasterize_key_background(self) -> None:
-        """Rasterize the key background SVG into encoded image bytes.
+        """Re-rasterize the key background via the BackgroundLayer.
 
-        Uses the device's key size and image format to produce a ready-to-send
-        blank key image with the default background applied.  If no key
-        background SVG is set, clears the cached image.
+        If no key background SVG is set, this is a no-op.
         """
-        if self._key_bg_svg is None:
-            self._key_bg_image = None
-            return
-
-        from PIL import Image as PILImage
-
-        from ..render.key_renderer import _encode_image
-        from ..render.svg_rasterize import _svg_to_png
-
-        key_w, key_h = self._caps.key_size
-        png_data = _svg_to_png(self._key_bg_svg, key_w, key_h)
-        img = PILImage.open(io.BytesIO(png_data)).convert("RGB")
-        self._key_bg_image = _encode_image(
-            img, image_format=self._caps.key_image_format
-        )
-        logger.debug("Key background SVG rasterized: %dx%d", key_w, key_h)
+        self._key_bg_layer.invalidate()
 
     @property
     def key_bg_image(self) -> bytes | None:
@@ -156,7 +136,7 @@ class Screen:
             Encoded image bytes ready to push to the device, or ``None``
             if no default key background is configured.
         """
-        return self._key_bg_image
+        return self._key_bg_layer.key_image
 
     @property
     def key_bg_dirty(self) -> bool:
@@ -405,8 +385,8 @@ class Screen:
         """
         for key_slot in self._keys.values():
             key_slot.mark_dirty()
-        if self._key_bg_svg is not None:
-            self._rasterize_key_background()
+        if self._key_bg_layer.has_svg:
+            self._key_bg_layer.invalidate()
             self._key_bg_dirty = True
         if self._touch_strip is not None:
             self._touch_strip.invalidate_background()
