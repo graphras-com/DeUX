@@ -663,16 +663,36 @@ def _rasterize_svg(
     if fmt == "png":
         return png_bytes
 
-    # For JPEG and BMP we need to convert from PNG.
-    from PIL import Image
+    # Convert from PNG using pyvips where possible.
+    try:
+        _ensure_macos_lib_path()
+        import pyvips
 
-    img = Image.open(io.BytesIO(png_bytes)).convert("RGB")
-    buf = io.BytesIO()
-    if fmt == "jpeg":
-        img.save(buf, format="JPEG", quality=quality)
-    else:  # bmp
-        img.save(buf, format="BMP")
-    return buf.getvalue()
+        vimg = pyvips.Image.new_from_buffer(png_bytes, "")
+        # Flatten alpha onto white for JPEG (no transparency support).
+        if vimg.hasalpha():
+            vimg = vimg.flatten(background=[0, 0, 0])
+        if fmt == "jpeg":
+            return vimg.write_to_buffer(".jpg", Q=quality)
+        # BMP: pyvips doesn't support BMP natively, fall back to PIL.
+        from PIL import Image as _PILImage
+
+        buf = io.BytesIO(vimg.write_to_buffer(".png"))
+        img = _PILImage.open(buf).convert("RGB")
+        out = io.BytesIO()
+        img.save(out, format="BMP")
+        return out.getvalue()
+    except (OSError, ImportError):
+        # Fallback: PIL for both formats if pyvips unavailable.
+        from PIL import Image as _PILImage
+
+        img = _PILImage.open(io.BytesIO(png_bytes)).convert("RGB")
+        buf = io.BytesIO()
+        if fmt == "jpeg":
+            img.save(buf, format="JPEG", quality=quality)
+        else:
+            img.save(buf, format="BMP")
+        return buf.getvalue()
 
 
 def _resolve_and_rasterize(

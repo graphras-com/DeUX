@@ -14,9 +14,12 @@ import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
-from PIL import Image, ImageFont
+from PIL import ImageFont
+
+if TYPE_CHECKING:
+    from PIL import Image
 
 from .._xml import safe_fromstring
 from ..render.context import RenderingContext
@@ -58,45 +61,45 @@ def _find_element_by_id(root: ET.Element, element_id: str) -> ET.Element | None:
     return None
 
 
-def _image_to_data_uri(img: Image.Image, fmt: str = "PNG") -> str:
-    """Encode a PIL Image as a base64 data URI."""
-    buf = io.BytesIO()
-    img.save(buf, format=fmt)
-    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
-    mime = "image/png" if fmt == "PNG" else "image/jpeg"
+def _bytes_to_data_uri(data: bytes) -> str:
+    """Encode image bytes as a base64 data URI.
+
+    Detects format from the header bytes (PNG or JPEG).
+
+    Parameters
+    ----------
+    data : bytes
+        Raw image bytes (PNG or JPEG).
+
+    Returns
+    -------
+    str
+        A ``data:image/...;base64,...`` URI.
+    """
+    mime = "image/png" if data[:8] == b"\x89PNG\r\n\x1a\n" else "image/jpeg"
+    b64 = base64.b64encode(data).decode("ascii")
     return f"data:{mime};base64,{b64}"
 
 
-def _fit_image(
-    img: Image.Image, target_w: int, target_h: int, fit: ImageFit
-) -> Image.Image:
-    """Scale an image to fit within target dimensions using the specified mode."""
-    if target_w <= 0 or target_h <= 0:
-        return img
+def _fit_image_preserveAspectRatio(fit: ImageFit) -> str:
+    """Map an ImageFit enum to an SVG preserveAspectRatio value.
 
-    src_w, src_h = img.size
+    Parameters
+    ----------
+    fit : ImageFit
+        The fit mode from the binding spec.
 
+    Returns
+    -------
+    str
+        An SVG ``preserveAspectRatio`` attribute value.
+    """
     if fit == ImageFit.FILL:
-        return img.resize((target_w, target_h), Image.Resampling.LANCZOS)
-
+        return "none"
     if fit == ImageFit.CONTAIN:
-        ratio = min(target_w / src_w, target_h / src_h)
-        new_w = max(1, int(src_w * ratio))
-        new_h = max(1, int(src_h * ratio))
-        resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-        canvas = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
-        paste_x = (target_w - new_w) // 2
-        paste_y = (target_h - new_h) // 2
-        canvas.paste(resized, (paste_x, paste_y))
-        return canvas
-
-    ratio = max(target_w / src_w, target_h / src_h)
-    new_w = max(1, int(src_w * ratio))
-    new_h = max(1, int(src_h * ratio))
-    resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-    left = (new_w - target_w) // 2
-    top = (new_h - target_h) // 2
-    return resized.crop((left, top, left + target_w, top + target_h))
+        return "xMidYMid meet"
+    # COVER
+    return "xMidYMid slice"
 
 
 def _truncate_text(
@@ -999,26 +1002,25 @@ class SvgRenderer:
             if placeholder is not None:
                 placeholder.set("display", "none")
 
-        target_w = int(float(elem.get("width", "0")))
-        target_h = int(float(elem.get("height", "0")))
-
-        if isinstance(value, Image.Image):
-            img = value
-        elif isinstance(value, bytes):
-            img = Image.open(io.BytesIO(value))
+        if isinstance(value, bytes):
+            img_bytes = value
+        elif hasattr(value, "save"):
+            # Legacy PIL.Image.Image support — convert to PNG bytes.
+            buf = io.BytesIO()
+            value.save(buf, format="PNG")
+            img_bytes = buf.getvalue()
         else:
             logger.warning("Image binding: unsupported value type %s", type(value))
             return
 
-        if img.mode != "RGBA":
-            img = img.convert("RGBA")
-
-        if target_w > 0 and target_h > 0:
-            img = _fit_image(img, target_w, target_h, binding.fit)
-
-        data_uri = _image_to_data_uri(img)
+        # Embed as data URI and let SVG-level preserveAspectRatio handle fitting.
+        data_uri = _bytes_to_data_uri(img_bytes)
         elem.set("href", data_uri)
         elem.set(f"{{{_XLINK_NS}}}href", data_uri)
+
+        # Set preserveAspectRatio based on the binding's fit mode.
+        par = _fit_image_preserveAspectRatio(binding.fit)
+        elem.set("preserveAspectRatio", par)
 
     def _apply_visibility(self, elem: ET.Element, value: Any) -> None:
         """Toggle element visibility via the ``display`` attribute.
@@ -1387,8 +1389,7 @@ class SvgRenderer:
                 asset_name = href
 
             if asset_name and asset_name in self._spec.assets:
-                img = Image.open(io.BytesIO(self._spec.assets[asset_name]))
-                data_uri = _image_to_data_uri(img)
+                data_uri = _bytes_to_data_uri(self._spec.assets[asset_name])
                 elem.set("href", data_uri)
                 elem.set(f"{{{_XLINK_NS}}}href", data_uri)
 
@@ -1424,7 +1425,9 @@ class SvgRenderer:
             height = int(float(self._base_root.get("height", "98")))
 
         png_data = _svg_to_png(svg_data, width, height, ctx=self._rendering_ctx)
-        return Image.open(io.BytesIO(png_data)).convert("RGBA")
+        from PIL import Image as _PILImage
+
+        return _PILImage.open(io.BytesIO(png_data)).convert("RGBA")
 
 
 # ---------------------------------------------------------------------------

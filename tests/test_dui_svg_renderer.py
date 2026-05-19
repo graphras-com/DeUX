@@ -28,10 +28,10 @@ from deux.dui.schema import (
 )
 from deux.dui.svg_renderer import (
     SvgRenderer,
+    _bytes_to_data_uri,
     _find_font_file,
-    _fit_image,
+    _fit_image_preserveAspectRatio,
     _font_file_index,
-    _image_to_data_uri,
     _load_font,
     _resolve_font_attrs,
     _system_font_dirs,
@@ -166,42 +166,34 @@ class TestTextTruncation:
         assert len(large_result) <= len(small_result)
 
 
-class TestImageFit:
+class TestFitImagePreserveAspectRatio:
     def test_fill(self):
-        img = Image.new("RGB", (200, 100))
-        result = _fit_image(img, 50, 50, ImageFit.FILL)
-        assert result.size == (50, 50)
+        result = _fit_image_preserveAspectRatio(ImageFit.FILL)
+        assert result == "none"
 
     def test_contain(self):
-        img = Image.new("RGB", (200, 100))
-        result = _fit_image(img, 50, 50, ImageFit.CONTAIN)
-        assert result.size == (50, 50)
+        result = _fit_image_preserveAspectRatio(ImageFit.CONTAIN)
+        assert result == "xMidYMid meet"
 
     def test_cover(self):
-        img = Image.new("RGB", (200, 100))
-        result = _fit_image(img, 50, 50, ImageFit.COVER)
-        assert result.size == (50, 50)
-
-    def test_zero_target(self):
-        img = Image.new("RGB", (50, 50))
-        result = _fit_image(img, 0, 50, ImageFit.FILL)
-        assert result.size == (50, 50)
-
-    def test_contain_portrait(self):
-        img = Image.new("RGB", (100, 200))
-        result = _fit_image(img, 50, 50, ImageFit.CONTAIN)
-        assert result.size == (50, 50)
+        result = _fit_image_preserveAspectRatio(ImageFit.COVER)
+        assert result == "xMidYMid slice"
 
 
-class TestImageToDataUri:
+class TestBytesToDataUri:
     def test_png_format(self):
+        # Minimal valid PNG header
         img = Image.new("RGB", (10, 10), "red")
-        uri = _image_to_data_uri(img, "PNG")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        uri = _bytes_to_data_uri(buf.getvalue())
         assert uri.startswith("data:image/png;base64,")
 
     def test_jpeg_format(self):
         img = Image.new("RGB", (10, 10), "red")
-        uri = _image_to_data_uri(img, "JPEG")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG")
+        uri = _bytes_to_data_uri(buf.getvalue())
         assert uri.startswith("data:image/jpeg;base64,")
 
 

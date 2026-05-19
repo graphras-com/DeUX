@@ -7,8 +7,6 @@ import logging
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from PIL import Image
-
 from ..render.background_layer import BackgroundLayer
 from .cards.base import Card
 from .cards.blank import BlankCard
@@ -139,14 +137,14 @@ class TouchStrip:
         return self._panel_height
 
     @property
-    def bg_tiles(self) -> list[Image.Image] | None:
-        """Pre-sliced background tiles, or ``None`` if no background SVG is set.
+    def bg_tiles(self) -> list[bytes] | None:
+        """Pre-sliced background tiles as PNG bytes, or ``None`` if no background SVG is set.
 
         Returns a shallow copy when tiles exist; external code cannot mutate internal state.
         """
         return self._bg_layer.tiles
 
-    def bg_tile(self, index: int) -> Image.Image | None:
+    def bg_tile(self, index: int) -> bytes | None:
         """Return the cached background tile for panel *index*, or ``None``.
 
         Parameters
@@ -156,8 +154,8 @@ class TouchStrip:
 
         Returns
         -------
-        Image.Image or None
-            The RGB tile image, or ``None`` if no background SVG is set.
+        bytes or None
+            PNG-encoded tile bytes, or ``None`` if no background SVG is set.
         """
         return self._bg_layer.tile(index)
 
