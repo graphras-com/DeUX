@@ -7,6 +7,7 @@ BMP format (which pyvips does not support natively).
 from __future__ import annotations
 
 import io
+from typing import Any
 
 from ..render.svg_rasterize import _ensure_macos_lib_path
 
@@ -58,7 +59,7 @@ def render_key_image(
         else:
             # PIL Image — convert to PNG bytes first.
             buf = io.BytesIO()
-            icon.save(buf, format="PNG")  # type: ignore[union-attr]
+            icon.save(buf, format="PNG")  # type: ignore[attr-defined]
             icon_img = pyvips.Image.new_from_buffer(buf.getvalue(), "")
 
         if icon_img.width != key_w or icon_img.height != key_h:
@@ -100,7 +101,7 @@ def render_blank_key(
     return render_key_image(key_size=key_size, image_format=image_format)
 
 
-def _encode_image_bytes(vimg: object, image_format: str = "JPEG", quality: int = 90) -> bytes:
+def _encode_image_bytes(vimg: Any, image_format: str = "JPEG", quality: int = 90) -> bytes:
     """Encode a pyvips image in the specified format.
 
     Parameters
@@ -121,12 +122,12 @@ def _encode_image_bytes(vimg: object, image_format: str = "JPEG", quality: int =
     if fmt == "BMP":
         from PIL import Image as _PILImage
 
-        png_bytes = vimg.write_to_buffer(".png")  # type: ignore[union-attr]
+        png_bytes = vimg.write_to_buffer(".png")
         pil_img = _PILImage.open(io.BytesIO(png_bytes)).convert("RGB")
         buf = io.BytesIO()
         pil_img.save(buf, format="BMP")
         return buf.getvalue()
-    return vimg.write_to_buffer(".jpg", Q=quality)  # type: ignore[union-attr]
+    return vimg.write_to_buffer(".jpg", Q=quality)  # type: ignore[no-any-return]
 
 
 # Legacy alias for backward compatibility with internal imports.

@@ -673,7 +673,7 @@ def _rasterize_svg(
         if vimg.hasalpha():
             vimg = vimg.flatten(background=[0, 0, 0])
         if fmt == "jpeg":
-            return vimg.write_to_buffer(".jpg", Q=quality)
+            return vimg.write_to_buffer(".jpg", Q=quality)  # type: ignore[no-any-return]
         # BMP: pyvips doesn't support BMP natively, fall back to PIL.
         from PIL import Image as _PILImage
 

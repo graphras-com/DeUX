@@ -7,11 +7,12 @@ used as a fallback for BMP encoding (pyvips lacks native BMP support).
 from __future__ import annotations
 
 import io
+from typing import Any
 
 from ..render.svg_rasterize import _ensure_macos_lib_path
 
 
-def _to_vips(value: object) -> object:
+def _to_vips(value: object) -> Any:
     """Convert an image value (bytes or PIL Image) to a pyvips.Image.
 
     Parameters
@@ -30,11 +31,11 @@ def _to_vips(value: object) -> object:
         return pyvips.Image.new_from_buffer(value, "")
     # PIL Image — convert to PNG bytes.
     buf = io.BytesIO()
-    value.save(buf, format="PNG")  # type: ignore[union-attr]
+    value.save(buf, format="PNG")  # type: ignore[attr-defined]
     return pyvips.Image.new_from_buffer(buf.getvalue(), "")
 
 
-def _encode_vips_image(vimg: object, image_format: str, quality: int = 90) -> bytes:
+def _encode_vips_image(vimg: Any, image_format: str, quality: int = 90) -> bytes:
     """Encode a pyvips image to the requested format.
 
     Parameters
@@ -51,19 +52,19 @@ def _encode_vips_image(vimg: object, image_format: str, quality: int = 90) -> by
     bytes
         Encoded image bytes.
     """
-    import pyvips  # noqa: F401 — used implicitly via vimg method calls
+    import pyvips  # noqa: F401
 
     fmt = image_format.upper()
     if fmt == "BMP":
         # pyvips doesn't support BMP natively; use PIL for this one format.
         from PIL import Image as _PILImage
 
-        png_bytes = vimg.write_to_buffer(".png")  # type: ignore[union-attr]
+        png_bytes = vimg.write_to_buffer(".png")
         pil_img = _PILImage.open(io.BytesIO(png_bytes)).convert("RGB")
         buf = io.BytesIO()
         pil_img.save(buf, format="BMP")
         return buf.getvalue()
-    return vimg.write_to_buffer(".jpg", Q=quality)  # type: ignore[union-attr]
+    return vimg.write_to_buffer(".jpg", Q=quality)  # type: ignore[no-any-return]
 
 
 def composite_frame_on_tile(
