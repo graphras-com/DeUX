@@ -53,6 +53,7 @@ from typing import Protocol, runtime_checkable
 
 from .._errors import DeuxError
 from .._xml import safe_fromstring
+from .context import RenderingContext
 
 logger = logging.getLogger(__name__)
 
@@ -491,7 +492,13 @@ def _inject_stylesheet(svg_data: bytes, css: str) -> bytes:
 _AUTO_ORDER: tuple[str, ...] = ("pyvips", "cairo", "rsvg-cli")
 
 
-def _svg_to_png(svg_data: bytes, width: int, height: int) -> bytes:
+def _svg_to_png(
+    svg_data: bytes,
+    width: int,
+    height: int,
+    *,
+    ctx: RenderingContext | None = None,
+) -> bytes:
     """Convert SVG bytes to PNG bytes using the active backend.
 
     When the backend is ``"auto"`` (the default), tries each registered
@@ -501,6 +508,10 @@ def _svg_to_png(svg_data: bytes, width: int, height: int) -> bytes:
     :func:`set_svg_stylesheet`, it is applied before rasterisation.
     For the pyvips backend the stylesheet is passed natively; for all
     other backends it is injected as a ``<style>`` element.
+
+    When *ctx* is provided, its stylesheet and backend override the
+    module-level globals, allowing concurrent renders with different
+    themes.
 
     .. deprecated::
         Use :func:`_rasterize_svg` for new code.  This function is
@@ -514,6 +525,9 @@ def _svg_to_png(svg_data: bytes, width: int, height: int) -> bytes:
         Desired output width in pixels.
     height : int
         Desired output height in pixels.
+    ctx : RenderingContext or None, optional
+        Explicit rendering context.  When ``None``, falls back to
+        module-level globals.
 
     Returns
     -------
@@ -526,8 +540,12 @@ def _svg_to_png(svg_data: bytes, width: int, height: int) -> bytes:
         If no SVG renderer backend is available or the selected backend
         fails.
     """
-    backend_name = _active_backend or "auto"
-    css = _active_stylesheet
+    if ctx is not None:
+        backend_name = ctx.resolve_backend()
+        css = ctx.resolve_stylesheet()
+    else:
+        backend_name = _active_backend or "auto"
+        css = _active_stylesheet
     return _resolve_and_rasterize(backend_name, css, svg_data, width, height)
 
 
@@ -586,6 +604,7 @@ def _rasterize_svg(
     *,
     output_format: str = "png",
     quality: int = 90,
+    ctx: RenderingContext | None = None,
 ) -> bytes:
     """Rasterise SVG bytes directly to the requested image format.
 
@@ -594,6 +613,10 @@ def _rasterize_svg(
     direct JPEG output (currently pyvips).  For backends that only
     produce PNG, the PNG bytes are re-encoded via Pillow when a
     different format is requested.
+
+    When *ctx* is provided, its stylesheet and backend override the
+    module-level globals, allowing concurrent renders with different
+    themes.
 
     Parameters
     ----------
@@ -607,6 +630,9 @@ def _rasterize_svg(
         Target image format: ``"png"``, ``"jpeg"``, or ``"bmp"``.
     quality : int, default=90
         JPEG quality (ignored for other formats).
+    ctx : RenderingContext or None, optional
+        Explicit rendering context.  When ``None``, falls back to
+        module-level globals.
 
     Returns
     -------
@@ -624,8 +650,12 @@ def _rasterize_svg(
     if fmt not in ("png", "jpeg", "bmp"):
         raise ValueError(f"Unsupported output format: {output_format!r}")
 
-    backend_name = _active_backend or "auto"
-    css = _active_stylesheet
+    if ctx is not None:
+        backend_name = ctx.resolve_backend()
+        css = ctx.resolve_stylesheet()
+    else:
+        backend_name = _active_backend or "auto"
+        css = _active_stylesheet
 
     # Try to get PNG bytes first (the universal intermediate).
     png_bytes = _resolve_and_rasterize(backend_name, css, svg_data, width, height)
