@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
-import pytest
-
 from deux.render.context import RenderingContext
 from deux.render.theme import Theme
 
@@ -65,10 +61,11 @@ class TestContextIsolation:
         original_stylesheet = svg_mod._active_stylesheet
 
         theme = Theme.from_color(255, 0, 0)
-        ctx = RenderingContext.from_theme(theme)
+        _ctx = RenderingContext.from_theme(theme)
 
         # The global should remain unchanged after creating a context.
         assert svg_mod._active_stylesheet == original_stylesheet
+        assert _ctx.resolve_stylesheet() == theme.css
 
     def test_rasterize_svg_with_context_does_not_mutate_global(self):
         """_rasterize_svg with ctx= does not read or modify global stylesheet."""
@@ -77,10 +74,11 @@ class TestContextIsolation:
         original_stylesheet = svg_mod._active_stylesheet
 
         theme = Theme.from_color(0, 255, 0)
-        ctx = RenderingContext.from_theme(theme)
+        _ctx = RenderingContext.from_theme(theme)
 
         # The global should remain unchanged.
         assert svg_mod._active_stylesheet == original_stylesheet
+        assert _ctx.resolve_stylesheet() == theme.css
 
 
 class TestSvgRendererContext:
