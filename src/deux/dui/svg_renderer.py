@@ -19,6 +19,7 @@ from typing import Any, ClassVar
 from PIL import Image, ImageFont
 
 from .._xml import safe_fromstring
+from ..render.context import RenderingContext
 from .iconify import IconifyError, fetch_icon
 from .schema import (
     Binding,
@@ -466,6 +467,7 @@ class SvgRenderer:
         self._range_extents: dict[str, float] = {}
         self._target_width: int | None = None
         self._target_height: int | None = None
+        self._rendering_ctx: RenderingContext | None = None
 
         for name, binding in spec.bindings.items():
             if isinstance(binding, (TextBinding, VisibilityBinding, ColorBinding, CssClassBinding)):
@@ -597,6 +599,31 @@ class SvgRenderer:
         """
         self._target_width = width
         self._target_height = height
+
+    @property
+    def rendering_context(self) -> RenderingContext | None:
+        """The explicit rendering context, or ``None`` for global defaults.
+
+        Returns
+        -------
+        RenderingContext or None
+            The context set via :meth:`set_rendering_context`.
+        """
+        return self._rendering_ctx
+
+    def set_rendering_context(self, ctx: RenderingContext | None) -> None:
+        """Set an explicit rendering context for this renderer.
+
+        When set, the context's stylesheet and backend override the
+        module-level globals during rasterisation.  Pass ``None`` to
+        revert to the global defaults.
+
+        Parameters
+        ----------
+        ctx : RenderingContext or None
+            The rendering context to use, or ``None`` for defaults.
+        """
+        self._rendering_ctx = ctx
 
     def set_base_layer(
         self,
@@ -734,6 +761,7 @@ class SvgRenderer:
             height,
             output_format=output_format,
             quality=quality,
+            ctx=self._rendering_ctx,
         )
 
     def render_svg(self) -> str:
@@ -1395,7 +1423,7 @@ class SvgRenderer:
             width = int(float(self._base_root.get("width", "197")))
             height = int(float(self._base_root.get("height", "98")))
 
-        png_data = _svg_to_png(svg_data, width, height)
+        png_data = _svg_to_png(svg_data, width, height, ctx=self._rendering_ctx)
         return Image.open(io.BytesIO(png_data)).convert("RGBA")
 
 

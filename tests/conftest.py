@@ -10,6 +10,7 @@ from PIL import Image
 
 import deux.dui.repository as _repo_mod
 import deux.render.svg_rasterize as _svg_mod
+import deux.render.theme as _theme_mod
 from deux.render.metrics import RenderMetrics
 from deux.runtime.capabilities import (
     STREAM_DECK_PLUS,
@@ -24,6 +25,8 @@ from deux.ui.touch_strip import TouchStrip
 # (some examples set the backend at module level during collection).
 _PRISTINE_ACTIVE_BACKEND: str | None = _svg_mod._active_backend
 _PRISTINE_REGISTRY: dict[str, object] = _svg_mod._registry.copy()
+_PRISTINE_ACTIVE_STYLESHEET: str | None = _svg_mod._active_stylesheet
+_PRISTINE_ACTIVE_THEME = _theme_mod._active_theme
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -31,17 +34,22 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 def _reset_svg_backend():
-    """Reset SVG backend state before and after every test.
+    """Reset SVG backend and stylesheet state before and after every test.
 
     Restores the pristine state captured at conftest import time
     (before any test module imports that may call ``set_svg_backend``
-    at module level).
+    at module level).  Also resets ``_active_stylesheet`` and
+    ``_active_theme`` to prevent cross-test state bleed.
     """
     _svg_mod._active_backend = _PRISTINE_ACTIVE_BACKEND
     _svg_mod._registry = _PRISTINE_REGISTRY.copy()
+    _svg_mod._active_stylesheet = _PRISTINE_ACTIVE_STYLESHEET
+    _theme_mod._active_theme = _PRISTINE_ACTIVE_THEME
     yield
     _svg_mod._active_backend = _PRISTINE_ACTIVE_BACKEND
     _svg_mod._registry = _PRISTINE_REGISTRY.copy()
+    _svg_mod._active_stylesheet = _PRISTINE_ACTIVE_STYLESHEET
+    _theme_mod._active_theme = _PRISTINE_ACTIVE_THEME
 
 
 @pytest.fixture(autouse=True)

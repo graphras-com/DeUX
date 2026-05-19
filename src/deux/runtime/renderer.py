@@ -20,6 +20,7 @@ from ..render.touch_renderer import compose_card_with_background
 
 if TYPE_CHECKING:
     from ..dui.animator import PushFn
+    from ..render.context import RenderingContext
     from ..render.metrics import RenderMetrics
     from ..ui.cards.base import Card
     from ..ui.controls.key_slot import KeySlot
@@ -399,7 +400,51 @@ class DeckRenderer:
     # ------------------------------------------------------------------
 
     def apply_theme(self) -> None:
-        """Apply the resolved theme cascade to the SVG stylesheet."""
+        """Apply the resolved theme cascade to all renderers on the active screen.
+
+        Instead of mutating the module-level global stylesheet (which
+        races when multiple decks render concurrently), this builds an
+        explicit :class:`~deux.render.context.RenderingContext` and
+        pushes it to every :class:`~deux.dui.svg_renderer.SvgRenderer`
+        on the active screen's cards and keys.
+
+        The global stylesheet is also updated for backward compatibility
+        with code that reads it directly.
+        """
+        from ..render.context import RenderingContext
         from ..render.svg_rasterize import set_svg_stylesheet
 
-        set_svg_stylesheet(self._resolve_stylesheet())
+        css = self._resolve_stylesheet()
+
+        # Update global for backward compatibility / simple usage.
+        set_svg_stylesheet(css)
+
+        # Build per-deck context and push to all renderers.
+        ctx = RenderingContext(stylesheet=css)
+        self._apply_context_to_screen(ctx)
+
+    def _apply_context_to_screen(self, ctx: RenderingContext) -> None:
+        """Push a rendering context to every renderer on the active screen.
+
+        Parameters
+        ----------
+        ctx : RenderingContext
+            The context to propagate.
+        """
+        from ..dui.card import DuiCard
+        from ..dui.key import DuiKey
+
+        screen = self._deck._active_screen
+        if screen is None:
+            return
+
+        # Keys
+        for key_slot in screen.keys.values():
+            if isinstance(key_slot, DuiKey):
+                key_slot._renderer.set_rendering_context(ctx)
+
+        # Touchscreen cards
+        if screen.touch_strip is not None:
+            for card in screen.touch_strip.cards:
+                if isinstance(card, DuiCard):
+                    card._renderer.set_rendering_context(ctx)

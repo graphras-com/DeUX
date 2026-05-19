@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .context import RenderingContext
 from .defaults import (
     SurfaceBackgrounds,
     get_default_backgrounds,
@@ -39,6 +40,7 @@ from .touch_renderer import (
 _apply_default_theme()
 
 __all__ = [
+    "RenderingContext",
     "SurfaceBackgrounds",
     "Theme",
     "ImageFetchError",
