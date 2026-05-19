@@ -606,3 +606,63 @@ class TestTouchStripInvalidateBackground:
         ts = TouchStrip(panel_count=2, panel_width=100, panel_height=50)
         ts.invalidate_background()
         assert ts.bg_tiles is None
+
+
+class TestTouchStripAsyncRasterisation:
+    """Tests for async variants that offload rasterisation to a thread."""
+
+    @staticmethod
+    def _make_svg(width: int = 800, height: int = 100, fill: str = "red") -> bytes:
+        """Create a minimal solid-fill SVG for testing."""
+        return (
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">'
+            f'<rect width="{width}" height="{height}" fill="{fill}"/>'
+            f"</svg>"
+        ).encode()
+
+    async def test_set_background_svg_async_creates_tiles(self):
+        """set_background_svg_async should produce the same tiles as the sync variant."""
+        ts = TouchStrip(panel_count=4, panel_width=200, panel_height=100)
+        await ts.set_background_svg_async(self._make_svg())
+        assert ts.bg_tiles is not None
+        assert len(ts.bg_tiles) == 4
+        for tile in ts.bg_tiles:
+            assert tile.size == (200, 100)
+
+    async def test_set_background_svg_async_marks_dirty(self):
+        """set_background_svg_async should mark all cards dirty."""
+        ts = TouchStrip(panel_count=4, panel_width=200, panel_height=100)
+        for card in ts.cards:
+            card.mark_clean()
+        await ts.set_background_svg_async(self._make_svg())
+        assert ts.any_dirty is True
+
+    async def test_invalidate_background_async_rerasterizes(self):
+        """invalidate_background_async should re-slice the cached SVG."""
+        ts = TouchStrip(panel_count=2, panel_width=100, panel_height=50)
+        ts.set_background_svg(self._make_svg(width=200, height=50))
+        old_tiles = ts.bg_tiles
+        await ts.invalidate_background_async()
+        assert ts.bg_tiles is not None
+        assert ts.bg_tiles is not old_tiles
+
+    async def test_invalidate_background_async_noop_without_svg(self):
+        """invalidate_background_async is a no-op when no SVG is set."""
+        ts = TouchStrip(panel_count=2, panel_width=100, panel_height=50)
+        await ts.invalidate_background_async()
+        assert ts.bg_tiles is None
+
+    async def test_cancel_during_async_set_background(self):
+        """Cancelling during set_background_svg_async should not corrupt state."""
+        import asyncio
+
+        ts = TouchStrip(panel_count=2, panel_width=100, panel_height=50)
+        task = asyncio.create_task(
+            ts.set_background_svg_async(self._make_svg(width=200, height=50))
+        )
+        await asyncio.sleep(0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        # Should not raise on subsequent calls
+        ts.invalidate_background()

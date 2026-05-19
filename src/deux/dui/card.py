@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING, Any
@@ -446,17 +447,18 @@ class DuiCard(BindingMixin, Card):
 
         width, height = self._panel_size
         rendered_svg = self._renderer.render_svg()
-        self._spinner_frames = SpinnerFrames(
+        spinner_frames = SpinnerFrames(
             self._spec,
             width=width,
             height=height,
             rendered_svg=rendered_svg,
             bg_tile=self._bg_tile,
         )
+        self._spinner_frames = spinner_frames
 
         self._animator = SpinnerAnimator(
-            frames=self._spinner_frames.frames,
-            interval_ms=self._spinner_frames.interval_ms,
+            frames=await asyncio.to_thread(lambda: spinner_frames.frames),
+            interval_ms=spinner_frames.interval_ms,
             push_fn=self._push_fn,
         )
         await self._animator.start()

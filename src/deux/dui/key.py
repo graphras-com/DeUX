@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import warnings
 from typing import TYPE_CHECKING, Any
@@ -391,16 +392,17 @@ class DuiKey(BindingMixin, KeySlot):
 
         width, height = self._key_size
         rendered_svg = self._renderer.render_svg()
-        self._spinner_frames = SpinnerFrames(
+        spinner_frames = SpinnerFrames(
             self._spec,
             width=width,
             height=height,
             rendered_svg=rendered_svg,
         )
+        self._spinner_frames = spinner_frames
 
         self._animator = SpinnerAnimator(
-            frames=self._spinner_frames.frames,
-            interval_ms=self._spinner_frames.interval_ms,
+            frames=await asyncio.to_thread(lambda: spinner_frames.frames),
+            interval_ms=spinner_frames.interval_ms,
             push_fn=self._push_fn,
         )
         await self._animator.start()

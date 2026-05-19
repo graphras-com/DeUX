@@ -614,18 +614,23 @@ class Deck:
                     async def _push_card_frame(frame_bytes: bytes) -> None:
                         if tile is not None:
                             # Decode the frame, composite onto the bg tile, re-encode
-                            frame_img = Image.open(io.BytesIO(frame_bytes))
-                            out_bytes = compose_card_with_background(
-                                frame_img,
-                                bg_tile=tile,
-                                panel_width=w,
-                                panel_height=h,
-                                image_format=(
-                                    self._caps.touchscreen_image_format
-                                    if self._caps
-                                    else "JPEG"
-                                ),
-                            )
+                            # Offload CPU-bound PIL work to a thread to avoid
+                            # blocking the event loop.
+                            def _compose(fb: bytes = frame_bytes) -> bytes:
+                                frame_img = Image.open(io.BytesIO(fb))
+                                return compose_card_with_background(
+                                    frame_img,
+                                    bg_tile=tile,
+                                    panel_width=w,
+                                    panel_height=h,
+                                    image_format=(
+                                        self._caps.touchscreen_image_format
+                                        if self._caps
+                                        else "JPEG"
+                                    ),
+                                )
+
+                            out_bytes = await asyncio.to_thread(_compose)
                         else:
                             out_bytes = frame_bytes
                         async with self._device_lock:
@@ -657,29 +662,34 @@ class Deck:
 
                 await card.prepare_assets()
 
-                # SVG-native pipeline: render directly to device bytes
+                # SVG-native pipeline: render directly to device bytes.
+                # Offload CPU-bound rasterisation to a thread so the
+                # event loop stays responsive.
                 image_fmt = (
                     self._caps.touchscreen_image_format if self._caps else "JPEG"
                 )
-                panel_bytes = card.render_bytes(
+                panel_bytes = await asyncio.to_thread(
+                    card.render_bytes,
                     panel_width=metrics.panel_width,
                     panel_height=metrics.panel_height,
                     image_format=image_fmt,
                     background=touch_strip.background_color,
                 )
 
-                # Also render a PIL image for caching (used by screenshot)
-                img = card.render()
+                # Also render a PIL image for caching (used by screenshot).
+                # Likewise offloaded because it involves SVG rasterisation.
+                img = await asyncio.to_thread(card.render)
                 card.set_rendered(img)
 
             else:
                 # Non-DUI card: legacy path with Pillow compositing
                 await card.prepare_assets()
-                rendered = card.render()
+                rendered = await asyncio.to_thread(card.render)
                 card.set_rendered(rendered)
 
                 bg_tile = touch_strip.bg_tile(card_idx)
-                panel_bytes = compose_card_with_background(
+                panel_bytes = await asyncio.to_thread(
+                    compose_card_with_background,
                     rendered,
                     bg_tile=bg_tile,
                     background=touch_strip.background_color,
