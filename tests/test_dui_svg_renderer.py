@@ -1162,6 +1162,7 @@ _WRAP_SVG = (
      ' font-family="DejaVu Sans,Arial,sans-serif">'
     '<rect id="bg" width="106" height="106" fill="#000000"/>'
     '<text id="label" x="53" y="30" font-size="15" text-anchor="middle"'
+    ' font-family="DejaVu Sans,Arial,sans-serif"'
     ' fill="#ffffff">Placeholder</text>'
     "</svg>"
 )
