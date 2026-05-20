@@ -40,7 +40,6 @@ body:
         macOS 15.4
         Stream Deck+
         hidapi 0.14
-        cairo 1.18
     validations:
       required: true
   - type: textarea

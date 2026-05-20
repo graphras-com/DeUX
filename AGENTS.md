@@ -21,7 +21,7 @@ Avoid feature sprawl that ties implementations to specific hardware quirks. Inst
 uv sync --extra test        # uses uv.lock; Python 3.11+ required
 ```
 
-System deps (CI uses `libcairo2-dev libhidapi-dev`; on macOS: `brew install cairo hidapi`).
+System deps (CI uses `libhidapi-dev`; on macOS: `brew install hidapi`).
 
 ## Mandatory workflow — read this FIRST
 
@@ -125,5 +125,5 @@ CI runs: lint, build, typecheck, tests (3.11/3.12/3.13), gitleaks. All must pass
 
 - Ruff: line length 100, target py311, rules: E/W/F/I/B/UP/C4/SIM (B008 ignored)
 - `tests/*` ignores B011
-- mypy strict with `ignore_missing_imports` for `StreamDeck.*` and `cairosvg`
+- mypy strict with `ignore_missing_imports` for `StreamDeck.*`
 - Wheel packages from `src/deux` (src layout)
