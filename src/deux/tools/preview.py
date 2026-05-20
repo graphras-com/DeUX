@@ -61,22 +61,20 @@ _HEX_RE = re.compile(r"^#?([0-9a-fA-F]{6})$")
 class PreviewDeckDevice(Protocol):
     """Protocol for the low-level Stream Deck device used by the preview tool."""
 
-    DECK_VISUAL: bool
-
     def open(self) -> None: ...
     def close(self) -> None: ...
-    def reset(self) -> None: ...
-    def id(self) -> str | None: ...
-    def deck_type(self) -> str: ...
+    def show_logo(self) -> None: ...
+    @property
+    def family(self) -> str: ...
     def set_brightness(self, value: int) -> None: ...
     def set_key_image(self, key: int, image: bytes) -> None: ...
-    def set_touchscreen_image(
+    def set_partial_window_image(
         self,
-        image: bytes,
-        x_pos: int,
-        y_pos: int,
+        x: int,
+        y: int,
         width: int,
         height: int,
+        image: bytes,
     ) -> None: ...
 
 
@@ -455,21 +453,16 @@ def _find_and_open_device() -> PreviewDeckDevice:
 
     Prints an error and exits if no device is found.
     """
-    from StreamDeck.DeviceManager import DeviceManager
+    from deux.runtime.hid.discovery import enumerate_devices
 
-    devices = DeviceManager().enumerate()
+    devices = enumerate_devices()
     if not devices:
         print("ERROR: No Stream Deck devices found", file=sys.stderr)  # noqa: T201
         sys.exit(1)
 
-    visual = [d for d in devices if d.DECK_VISUAL]
-    if not visual:
-        print("ERROR: No visual Stream Deck devices found", file=sys.stderr)  # noqa: T201
-        sys.exit(1)
-
-    deck = cast("PreviewDeckDevice", visual[0])
+    deck = cast("PreviewDeckDevice", devices[0])
     deck.open()
-    logger.debug("Opened device: %s", deck.deck_type())
+    logger.debug("Opened device: %s", deck.family)
     return deck
 
 
@@ -526,12 +519,12 @@ async def push_to_device(
             await asyncio.wait_for(
                 loop.run_in_executor(
                     None,
-                    deck.set_touchscreen_image,
-                    touchstrip_bytes,
+                    deck.set_partial_window_image,
                     0,
                     0,
                     caps.touchscreen_width,
                     caps.touchscreen_height,
+                    touchstrip_bytes,
                 ),
                 timeout=_HID_WRITE_TIMEOUT,
             )
@@ -547,7 +540,7 @@ async def push_to_device(
             await _wait_for_interrupt()
     finally:
         await asyncio.wait_for(
-            loop.run_in_executor(None, deck.reset), timeout=_HID_WRITE_TIMEOUT
+            loop.run_in_executor(None, deck.show_logo), timeout=_HID_WRITE_TIMEOUT
         )
         await asyncio.wait_for(
             loop.run_in_executor(None, deck.close), timeout=_HID_WRITE_TIMEOUT
@@ -666,12 +659,12 @@ async def _watch_and_reload(
                     await asyncio.wait_for(
                         loop.run_in_executor(
                             None,
-                            deck.set_touchscreen_image,
-                            touchstrip_bytes,
+                            deck.set_partial_window_image,
                             0,
                             0,
                             caps.touchscreen_width,
                             caps.touchscreen_height,
+                            touchstrip_bytes,
                         ),
                         timeout=_HID_WRITE_TIMEOUT,
                     )

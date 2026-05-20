@@ -478,8 +478,8 @@ class TestPushToDevice:
         ]
         assert len(key_calls) == 1
         # Touchstrip pushed once (Stream Deck+ has touchscreen)
-        mock_streamdeck_device.set_touchscreen_image.assert_called_once()
-        mock_streamdeck_device.reset.assert_called_once()
+        mock_streamdeck_device.set_partial_window_image.assert_called_once()
+        mock_streamdeck_device.show_logo.assert_called_once()
         mock_streamdeck_device.close.assert_called_once()
 
     async def test_brightness_clamped(self, mock_streamdeck_device: MagicMock):
@@ -505,7 +505,7 @@ class TestPushToDevice:
     async def test_no_touchscreen_skips_touchstrip_push(
         self, mock_mini_device: MagicMock
     ):
-        """A device without a touchscreen does not call set_touchscreen_image."""
+        """A device without a touchscreen does not call set_partial_window_image."""
         from deux.tools.preview import push_to_device
 
         mock_mini_device.DECK_VISUAL = True
@@ -523,7 +523,7 @@ class TestPushToDevice:
         ):
             await push_to_device(args)
 
-        mock_mini_device.set_touchscreen_image.assert_not_called()
+        mock_mini_device.set_partial_window_image.assert_not_called()
 
 
 class TestMain:
@@ -577,13 +577,12 @@ class TestSvgToPngFit:
 
 class TestFindAndOpenDevice:
     def test_no_devices_exits(self, capsys: pytest.CaptureFixture[str]):
+        """Exit with error when no devices are found."""
         from deux.tools.preview import _find_and_open_device
 
-        mock_dm = MagicMock()
-        mock_dm.return_value.enumerate.return_value = []
         with patch(
-            "StreamDeck.DeviceManager.DeviceManager",
-            mock_dm,
+            "deux.runtime.hid.discovery.enumerate_devices",
+            return_value=[],
         ), pytest.raises(SystemExit):
             _find_and_open_device()
         assert "No Stream Deck devices found" in capsys.readouterr().err
@@ -591,27 +590,21 @@ class TestFindAndOpenDevice:
     def test_no_visual_devices_exits(self, capsys: pytest.CaptureFixture[str]):
         from deux.tools.preview import _find_and_open_device
 
-        device = MagicMock()
-        device.DECK_VISUAL = False
-        mock_dm = MagicMock()
-        mock_dm.return_value.enumerate.return_value = [device]
         with patch(
-            "StreamDeck.DeviceManager.DeviceManager",
-            mock_dm,
+            "deux.runtime.hid.discovery.enumerate_devices",
+            return_value=[],
         ), pytest.raises(SystemExit):
             _find_and_open_device()
-        assert "No visual Stream Deck devices found" in capsys.readouterr().err
+        assert "No Stream Deck devices found" in capsys.readouterr().err
 
     def test_opens_first_visual_device(self):
         from deux.tools.preview import _find_and_open_device
 
         device = MagicMock()
-        device.DECK_VISUAL = True
-        mock_dm = MagicMock()
-        mock_dm.return_value.enumerate.return_value = [device]
+        device.family = "Stream Deck +"
         with patch(
-            "StreamDeck.DeviceManager.DeviceManager",
-            mock_dm,
+            "deux.runtime.hid.discovery.enumerate_devices",
+            return_value=[device],
         ):
             result = _find_and_open_device()
         device.open.assert_called_once()

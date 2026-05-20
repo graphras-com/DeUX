@@ -7,8 +7,6 @@ import logging
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, cast
 
-from StreamDeck.DeviceManager import DeviceManager
-
 from .._errors import DeuxError
 from ..render.metrics import RenderMetrics
 from ._executor import get_executor, shutdown_executor
@@ -17,12 +15,15 @@ from .capabilities import DeviceCapabilities
 from .device_info import DeviceInfo
 from .event_router import DeckEventRouter
 from .events import DeckEvent, EncoderTurnEvent
+from .hid._ctypes_hidapi import HidApiError
+from .hid.discovery import enumerate_devices
 from .renderer import DeckRenderer
 from .transport import AsyncTransport
 
 if TYPE_CHECKING:
     from ..render.theme import Theme
     from ..ui.screen import Screen
+    from .hid.device import HidDevice
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +79,7 @@ class Deck:
         """
         self._serial_number = serial_number
         self._brightness = brightness
-        self._device: Any = None
+        self._device: HidDevice | None = None
         self._caps: DeviceCapabilities | None = None
         self._metrics: RenderMetrics | None = None
         self._transport: AsyncTransport | None = None
@@ -106,25 +107,20 @@ class Deck:
 
         loop = asyncio.get_running_loop()
 
-        devices = await loop.run_in_executor(get_executor(), DeviceManager().enumerate)
+        devices = await loop.run_in_executor(get_executor(), enumerate_devices)
 
         if not devices:
             raise DeckError("No Stream Deck devices found")
 
-        visual = [d for d in devices if d.DECK_VISUAL]
-        if not visual:
-            raise DeckError("No visual Stream Deck devices found")
-
-        target = None
-        for d in visual:
+        target: HidDevice | None = None
+        for d in devices:
             try:
                 await loop.run_in_executor(get_executor(), d.open)
-                serial = d.get_serial_number()
-                if serial == self._serial_number:
+                if d.serial_number == self._serial_number:
                     target = d
                     break
                 await loop.run_in_executor(get_executor(), d.close)
-            except Exception:
+            except HidApiError:
                 continue
         if target is None:
             raise DeckError(
@@ -132,7 +128,7 @@ class Deck:
             )
         self._device = target
 
-        await self._exec_device_io(self._device.reset)
+        await self._exec_device_io(self._device.show_logo)
         await self._exec_device_io(self._device.set_brightness, self._brightness)
 
         self._caps = DeviceCapabilities.from_device(self._device)
@@ -140,14 +136,14 @@ class Deck:
 
         logger.info(
             "Opened %s (serial: %s, firmware: %s, keys: %d, dials: %d)",
-            self._device.deck_type(),
-            self._device.get_serial_number(),
-            self._device.get_firmware_version(),
+            self._device.family,
+            self._device.serial_number,
+            self._device.firmware_version,
             self._caps.key_count,
             self._caps.dial_count,
         )
 
-        self._transport = AsyncTransport(self._device, loop, self._caps)
+        self._transport = AsyncTransport(self._device, self._caps)
         self._transport.start()
 
         self._running = True
@@ -181,11 +177,12 @@ class Deck:
 
         if self._device:
             try:
-                await self._exec_device_io(self._device.reset)
+                await self._exec_device_io(self._device.show_logo)
                 await self._exec_device_io(self._device.close)
-            except (HidWriteTimeout, Exception) as e:
+            except (HidWriteTimeout, HidApiError, Exception) as e:
                 logger.warning("Error closing device: %s", e)
 
+        self._device = None
         self._closed_event.set()
         shutdown_executor(wait=True)
         logger.info("Deck stopped")
@@ -245,7 +242,7 @@ class Deck:
         """HID device path, or ``None`` if not opened."""
         if self._device is None:
             return None
-        return cast("str | None", self._device.id())
+        return self._device.path.decode("utf-8", errors="replace")
 
     @property
     def is_connected(self) -> bool:
@@ -286,8 +283,8 @@ class Deck:
         caps = self.capabilities
         return DeviceInfo(
             deck_type=caps.deck_type,
-            serial=self._device.get_serial_number(),
-            firmware=self._device.get_firmware_version(),
+            serial=self._device.serial_number,
+            firmware=self._device.firmware_version,
             key_count=caps.key_count,
             key_layout=(caps.key_cols, caps.key_rows),
             encoder_count=caps.dial_count,

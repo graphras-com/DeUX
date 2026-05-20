@@ -279,7 +279,6 @@ dependencies = [
     { name = "platformdirs" },
     { name = "pyyaml" },
     { name = "resvg" },
-    { name = "streamdeck" },
 ]
 
 [package.optional-dependencies]
@@ -312,7 +311,6 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=6.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "resvg", git = "https://github.com/graphras-com/resvg-py.git?rev=main" },
-    { name = "streamdeck", specifier = ">=0.9.8" },
     { name = "types-pyyaml", marker = "extra == 'test'", specifier = ">=6.0" },
 ]
 provides-extras = ["docs", "test"]
@@ -976,15 +974,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
-]
-
-[[package]]
-name = "streamdeck"
-version = "0.9.8"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/f1/61/364567677f33b51fa335cc03bb41e256958b5a442aa64690f73869f77ee5/streamdeck-0.9.8.tar.gz", hash = "sha256:acee4ad207a40d4cc2256d3a4c22b9f591e3c390efbe515e439ce518b31d0125", size = 2557549, upload-time = "2025-09-24T00:11:22.097Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/5f/76/01e4ed79974c8416a5e90ebfe52656730846670191608bfced05fc218a3f/streamdeck-0.9.8-py3-none-any.whl", hash = "sha256:95c5a0a5349ff8ed5f0b7dcec1a955afc29122cf89e4b2797ced01ac8d61ff32", size = 32754, upload-time = "2025-09-24T00:11:10.428Z" },
 ]
 
 [[package]]

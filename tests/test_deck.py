@@ -642,7 +642,7 @@ class TestDeckRenderTouchscreen:
 
         await deck._render_touchscreen()
         # Per-panel rendering: one call per panel (4 panels on SD+)
-        assert mock_streamdeck_device.set_touchscreen_image.call_count == 4
+        assert mock_streamdeck_device.set_partial_window_image.call_count == 4
 
     async def test_renders_custom_cards(self, deck, mock_streamdeck_device):
         deck._device = mock_streamdeck_device
@@ -655,7 +655,7 @@ class TestDeckRenderTouchscreen:
 
         await deck._render_touchscreen()
         # Per-panel rendering: one call per panel (4 panels on SD+)
-        assert mock_streamdeck_device.set_touchscreen_image.call_count == 4
+        assert mock_streamdeck_device.set_partial_window_image.call_count == 4
 
 
 class TestDeckInfo:
@@ -703,23 +703,23 @@ class TestDeckCapabilities:
 
 class TestDeckStart:
     async def test_no_devices_found(self, deck):
-        with patch("deux.runtime.deck.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = []
+        with patch("deux.runtime.deck.enumerate_devices") as mock_enum:
+            mock_enum.return_value = []
             with pytest.raises(DeckError, match="No Stream Deck devices found"):
                 await deck.start()
 
     async def test_no_visual_devices(self, deck):
-        mock_dev = MagicMock()
-        mock_dev.DECK_VISUAL = False
-        with patch("deux.runtime.deck.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = [mock_dev]
-            with pytest.raises(DeckError, match="No visual Stream Deck devices found"):
+        """enumerate_devices only returns supported visual devices, so an empty
+        list means no visual devices were found."""
+        with patch("deux.runtime.deck.enumerate_devices") as mock_enum:
+            mock_enum.return_value = []
+            with pytest.raises(DeckError, match="No Stream Deck devices found"):
                 await deck.start()
 
     async def test_successful_start(self, mock_streamdeck_device):
         d = Deck(serial_number="TEST123")
-        with patch("deux.runtime.deck.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
+        with patch("deux.runtime.deck.enumerate_devices") as mock_enum:
+            mock_enum.return_value = [mock_streamdeck_device]
             await d.start()
             assert d._running is True
             assert d._device is mock_streamdeck_device
@@ -730,18 +730,18 @@ class TestDeckStart:
 
     async def test_already_running_noop(self, mock_streamdeck_device):
         d = Deck(serial_number="TEST123")
-        with patch("deux.runtime.deck.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
+        with patch("deux.runtime.deck.enumerate_devices") as mock_enum:
+            mock_enum.return_value = [mock_streamdeck_device]
             await d.start()
             await d.start()
-            assert mock_dm.return_value.enumerate.call_count == 1
+            assert mock_enum.call_count == 1
             await d.stop()
 
     async def test_start_serial_not_found(self, mock_streamdeck_device):
         d = Deck(serial_number="NOMATCH")
-        mock_streamdeck_device.get_serial_number.return_value = "OTHER"
-        with patch("deux.runtime.deck.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
+        mock_streamdeck_device.serial_number = "OTHER"
+        with patch("deux.runtime.deck.enumerate_devices") as mock_enum:
+            mock_enum.return_value = [mock_streamdeck_device]
             with pytest.raises(DeckError, match="No device with serial"):
                 await d.start()
 
@@ -753,19 +753,19 @@ class TestDeckStop:
 
     async def test_stop_closes_device(self, mock_streamdeck_device):
         d = Deck(serial_number="TEST123")
-        with patch("deux.runtime.deck.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
+        with patch("deux.runtime.deck.enumerate_devices") as mock_enum:
+            mock_enum.return_value = [mock_streamdeck_device]
             await d.start()
             await d.stop()
 
             assert d._running is False
-            mock_streamdeck_device.reset.assert_called()
+            mock_streamdeck_device.show_logo.assert_called()
             mock_streamdeck_device.close.assert_called()
 
     async def test_stop_sets_closed_event(self, mock_streamdeck_device):
         d = Deck(serial_number="TEST123")
-        with patch("deux.runtime.deck.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
+        with patch("deux.runtime.deck.enumerate_devices") as mock_enum:
+            mock_enum.return_value = [mock_streamdeck_device]
             await d.start()
             await d.stop()
             assert d._closed_event.is_set()
@@ -774,8 +774,8 @@ class TestDeckStop:
         """stop() handles errors during device close gracefully."""
         mock_streamdeck_device.close.side_effect = OSError("HID error")
         d = Deck(serial_number="TEST123")
-        with patch("deux.runtime.deck.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
+        with patch("deux.runtime.deck.enumerate_devices") as mock_enum:
+            mock_enum.return_value = [mock_streamdeck_device]
             await d.start()
             await d.stop()
 
@@ -783,8 +783,8 @@ class TestDeckStop:
 class TestDeckWaitClosed:
     async def test_wait_closed_resolves_after_stop(self, mock_streamdeck_device):
         d = Deck(serial_number="TEST123")
-        with patch("deux.runtime.deck.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
+        with patch("deux.runtime.deck.enumerate_devices") as mock_enum:
+            mock_enum.return_value = [mock_streamdeck_device]
             await d.start()
 
             async def stop_soon():
@@ -1045,20 +1045,20 @@ class TestDeckRenderCrossScreen:
         await deck._render_touchscreen()
         push_fn = shared_card._push_fn
         assert push_fn is not None
-        mock_streamdeck_device.set_touchscreen_image.reset_mock()
+        mock_streamdeck_device.set_partial_window_image.reset_mock()
         frame_a = _make_jpeg_frame(metrics.panel_width, metrics.panel_height)
         await push_fn(frame_a)
-        # set_touchscreen_image(frame_bytes, x, y, w, h)
-        assert mock_streamdeck_device.set_touchscreen_image.call_args.args[1] == expected_x(1)
+        # set_partial_window_image(x, y, w, h, frame_bytes)
+        assert mock_streamdeck_device.set_partial_window_image.call_args.args[0] == expected_x(1)
 
         deck._active_screen = screen_b
         await deck._render_touchscreen()
         push_fn = shared_card._push_fn
         assert push_fn is not None
-        mock_streamdeck_device.set_touchscreen_image.reset_mock()
+        mock_streamdeck_device.set_partial_window_image.reset_mock()
         frame_b = _make_jpeg_frame(metrics.panel_width, metrics.panel_height)
         await push_fn(frame_b)
-        assert mock_streamdeck_device.set_touchscreen_image.call_args.args[1] == expected_x(3)
+        assert mock_streamdeck_device.set_partial_window_image.call_args.args[0] == expected_x(3)
 
 
 class TestHidWriteTimeout:

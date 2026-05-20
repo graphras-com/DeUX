@@ -6,27 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from StreamDeck.Devices.StreamDeck import StreamDeck
-
-
-def _coerce_flip(value: object) -> tuple[bool, bool]:
-    """Coerce a device flip value to a typed ``(bool, bool)`` pair.
-
-    Parameters
-    ----------
-    value : object
-        The raw flip attribute from the device, expected to be a
-        two-element tuple.
-
-    Returns
-    -------
-    tuple[bool, bool]
-        A ``(horizontal_flip, vertical_flip)`` pair.  Returns
-        ``(False, False)`` when *value* is not a two-element tuple.
-    """
-    if isinstance(value, tuple) and len(value) == 2:
-        return (bool(value[0]), bool(value[1]))
-    return (False, False)
+    from .hid.device import HidDevice
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,53 +44,62 @@ class DeviceCapabilities:
     screen_flip: tuple[bool, bool]
     screen_rotation: int
     touch_key_count: int
+    lcd_width: int = 0
+    lcd_height: int = 0
 
     @classmethod
-    def from_device(cls, device: StreamDeck) -> DeviceCapabilities:
-        """Build capabilities from a connected (opened) device.
+    def from_device(cls, device: HidDevice) -> DeviceCapabilities:
+        """Build capabilities from a connected (opened) HID device.
+
+        Reads hardware information from the device's ``Get Unit Information``
+        feature report and derives all capabilities from the product ID and
+        self-reported geometry.
 
         Parameters
         ----------
-        device
-            An open ``StreamDeck`` device object.
+        device : HidDevice
+            An open :class:`~deux.runtime.hid.device.HidDevice`.
 
         Returns
         -------
         DeviceCapabilities
             A frozen :class:`DeviceCapabilities` instance.
         """
-        key_layout = device.key_layout()
+        key_layout = device.key_layout  # (cols, rows)
+        key_w, key_h = device.key_size
+        lcd_w, lcd_h = device.lcd_size
+        win_w, win_h = device.window_size
+        rotation = device.rotation.value
+
         return cls(
-            vendor_id=device.vendor_id(),
-            product_id=device.product_id(),
-            deck_type=device.DECK_TYPE,
-            key_count=device.key_count(),
+            vendor_id=device.vendor_id,
+            product_id=device.product_id,
+            deck_type=device.family,
+            key_count=device.key_count,
             key_cols=key_layout[0],
             key_rows=key_layout[1],
-            key_pixel_width=device.KEY_PIXEL_WIDTH,
-            key_pixel_height=device.KEY_PIXEL_HEIGHT,
-            key_image_format=device.KEY_IMAGE_FORMAT,
-            key_flip=_coerce_flip(device.KEY_FLIP),
-            key_rotation=device.KEY_ROTATION,
-            has_visual=device.DECK_VISUAL,
-            has_touch=getattr(device, "DECK_TOUCH", False),
-            dial_count=device.dial_count(),
-            touchscreen_width=device.TOUCHSCREEN_PIXEL_WIDTH,
-            touchscreen_height=device.TOUCHSCREEN_PIXEL_HEIGHT,
-            touchscreen_image_format=getattr(
-                device, "TOUCHSCREEN_IMAGE_FORMAT", ""
-            ),
-            touchscreen_flip=_coerce_flip(
-                getattr(device, "TOUCHSCREEN_FLIP", (False, False))
-            ),
-            touchscreen_rotation=getattr(device, "TOUCHSCREEN_ROTATION", 0),
-            has_screen=getattr(device, "SCREEN_PIXEL_WIDTH", 0) > 0,
-            screen_width=getattr(device, "SCREEN_PIXEL_WIDTH", 0),
-            screen_height=getattr(device, "SCREEN_PIXEL_HEIGHT", 0),
-            screen_image_format=getattr(device, "SCREEN_IMAGE_FORMAT", ""),
-            screen_flip=_coerce_flip(getattr(device, "SCREEN_FLIP", (False, False))),
-            screen_rotation=getattr(device, "SCREEN_ROTATION", 0),
-            touch_key_count=getattr(device, "TOUCH_KEY_COUNT", 0),
+            key_pixel_width=key_w,
+            key_pixel_height=key_h,
+            key_image_format="JPEG",
+            key_flip=(False, False),
+            key_rotation=rotation,
+            has_visual=True,
+            has_touch=device.has_touch,
+            dial_count=device.encoder_count,
+            touchscreen_width=win_w if device.has_touch else 0,
+            touchscreen_height=win_h if device.has_touch else 0,
+            touchscreen_image_format="JPEG" if device.has_touch else "",
+            touchscreen_flip=(False, False),
+            touchscreen_rotation=0,
+            has_screen=device.has_window and not device.has_touch,
+            screen_width=win_w if (device.has_window and not device.has_touch) else 0,
+            screen_height=win_h if (device.has_window and not device.has_touch) else 0,
+            screen_image_format="JPEG" if (device.has_window and not device.has_touch) else "",
+            screen_flip=(False, False),
+            screen_rotation=rotation if (device.has_window and not device.has_touch) else 0,
+            touch_key_count=device.sensor_count,
+            lcd_width=lcd_w,
+            lcd_height=lcd_h,
         )
 
     @property
@@ -166,4 +155,6 @@ STREAM_DECK_PLUS = DeviceCapabilities(
     screen_flip=(False, False),
     screen_rotation=0,
     touch_key_count=0,
+    lcd_width=800,
+    lcd_height=480,
 )
