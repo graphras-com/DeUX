@@ -263,8 +263,8 @@ class ResvgRasterizer:
             If ``resvg`` is not installed or SVG parsing/rendering fails.
         """
         try:
-            from resvg import render as _resvg_render  # type: ignore[import-untyped]
-            from resvg import usvg  # type: ignore[import-untyped]
+            from resvg import render as _resvg_render
+            from resvg import usvg
 
             # Set width/height on the SVG so resvg outputs at the
             # requested dimensions.  Preserve the original viewBox (or
