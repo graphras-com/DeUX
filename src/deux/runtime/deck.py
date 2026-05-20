@@ -423,6 +423,11 @@ class Deck:
         # prior to the first paint, avoiding a flash of defaults.
         await self.on_screen_changed.emit(name, self._screens)
 
+        # Force a full repaint: mark every control on the incoming screen
+        # dirty so the renderer does not skip cards/keys that were already
+        # rendered on a previous visit or shared with another screen.
+        target.mark_all_dirty()
+
         await self._render_all_keys()
         if self._active_screen.touch_strip is not None:
             await self._render_touchscreen()
