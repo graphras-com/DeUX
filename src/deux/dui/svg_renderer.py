@@ -1005,8 +1005,18 @@ class SvgRenderer:
         if isinstance(value, bytes):
             img_bytes = value
         else:
-            logger.warning("Image binding: unsupported value type %s", type(value))
-            return
+            # Accept PIL Image objects — encode to PNG bytes for embedding.
+            from PIL import Image as _PILImage
+
+            if isinstance(value, _PILImage.Image):
+                import io as _io
+
+                _buf = _io.BytesIO()
+                value.convert("RGBA").save(_buf, format="PNG")
+                img_bytes = _buf.getvalue()
+            else:
+                logger.warning("Image binding: unsupported value type %s", type(value))
+                return
 
         # Embed as data URI and let SVG-level preserveAspectRatio handle fitting.
         data_uri = _bytes_to_data_uri(img_bytes)
