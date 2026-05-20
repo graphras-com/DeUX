@@ -435,7 +435,13 @@ def _make_mock_streamdeck(caps: DeviceCapabilities) -> MagicMock:
 
     # ImageRotation enum value
     from deux.runtime.hid.protocol import ImageRotation
-    device.rotation = ImageRotation(caps.key_rotation) if caps.key_rotation in (0, 180, 270) else ImageRotation.NONE
+
+    rotation = (
+        ImageRotation(caps.key_rotation)
+        if caps.key_rotation in (0, 180, 270)
+        else ImageRotation.NONE
+    )
+    device.rotation = rotation
 
     # Unit info mock
     unit_info = MagicMock()

@@ -6,10 +6,9 @@ returning :class:`~deux.runtime.hid.device.HidDevice` instances.
 
 from __future__ import annotations
 
-from deux.runtime.hid._ctypes_hidapi import HidApiError, hid_enumerate, hid_init
+from deux.runtime.hid._ctypes_hidapi import hid_enumerate, hid_init
 from deux.runtime.hid.device import HidDevice
 from deux.runtime.hid.protocol import ELGATO_VID, SUPPORTED_PIDS
-
 
 _initialized = False
 

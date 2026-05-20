@@ -165,9 +165,8 @@ class AsyncTransport:
             The current key state snapshot.
         """
         for idx, pressed in enumerate(event.states):
-            if idx < len(self._prev_key_states):
-                if pressed == self._prev_key_states[idx]:
-                    continue
+            if idx < len(self._prev_key_states) and pressed == self._prev_key_states[idx]:
+                continue
             self._queue.put_nowait(KeyEvent(key=idx, pressed=pressed))
         self._prev_key_states = event.states
 
@@ -180,9 +179,8 @@ class AsyncTransport:
             The current encoder button state snapshot.
         """
         for idx, pressed in enumerate(event.states):
-            if idx < len(self._prev_encoder_states):
-                if pressed == self._prev_encoder_states[idx]:
-                    continue
+            if idx < len(self._prev_encoder_states) and pressed == self._prev_encoder_states[idx]:
+                continue
             self._queue.put_nowait(
                 EncoderPressEvent(encoder=idx, pressed=pressed)
             )

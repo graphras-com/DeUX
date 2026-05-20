@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable
 
 from deux.runtime._executor import get_executor
 from deux.runtime.hid._ctypes_hidapi import HidApiError

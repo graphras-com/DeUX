@@ -13,8 +13,6 @@ from __future__ import annotations
 import ctypes
 import ctypes.util
 import platform
-import struct
-import sys
 from ctypes import (
     POINTER,
     Structure,
@@ -25,7 +23,6 @@ from ctypes import (
     c_void_p,
     c_wchar_p,
 )
-from typing import Iterator
 
 
 class HidApiError(OSError):
@@ -292,7 +289,7 @@ def hid_open(path: bytes) -> int:
         err = lib.hid_error(None) or "unknown error"
         msg = f"Failed to open HID device at {path!r}: {err}"
         raise HidApiError(msg)
-    return handle
+    return int(handle)
 
 
 def hid_close(handle: int) -> None:
@@ -332,7 +329,7 @@ def hid_write(handle: int, data: bytes) -> int:
     if result < 0:
         err = lib.hid_error(handle) or "unknown error"
         raise HidApiError(f"hid_write failed: {err}")
-    return result
+    return int(result)
 
 
 def hid_read_timeout(handle: int, max_length: int, timeout_ms: int) -> bytes | None:
@@ -394,7 +391,7 @@ def hid_send_feature_report(handle: int, data: bytes) -> int:
     if result < 0:
         err = lib.hid_error(handle) or "unknown error"
         raise HidApiError(f"hid_send_feature_report failed: {err}")
-    return result
+    return int(result)
 
 
 def hid_get_feature_report(handle: int, report_id: int, max_length: int = 32) -> bytes:
@@ -421,7 +418,7 @@ def hid_get_feature_report(handle: int, report_id: int, max_length: int = 32) ->
     """
     lib = _load_library()
     buf = ctypes.create_string_buffer(max_length)
-    buf[0] = report_id
+    buf[0] = report_id.to_bytes(1, "little")
     result = lib.hid_get_feature_report(handle, buf, max_length)
     if result < 0:
         err = lib.hid_error(handle) or "unknown error"

@@ -38,7 +38,10 @@ import re
 import signal
 import sys
 from pathlib import Path
-from typing import Protocol, cast
+from typing import TYPE_CHECKING, Protocol, cast
+
+if TYPE_CHECKING:
+    from deux.runtime.hid.device import HidDevice
 
 from PIL import Image
 
@@ -485,7 +488,7 @@ async def push_to_device(
     deck = await loop.run_in_executor(None, _find_and_open_device)
 
     try:
-        caps = DeviceCapabilities.from_device(cast("object", deck))
+        caps = DeviceCapabilities.from_device(cast("HidDevice", deck))
         panel_width = (
             caps.touchscreen_width // caps.panel_count if caps.panel_count > 0 else 0
         )

@@ -10,7 +10,6 @@ from __future__ import annotations
 import struct
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import NamedTuple
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -444,7 +443,7 @@ def parse_firmware_version(data: bytes) -> str:
 _KEY_IMAGE_HEADER = 8  # report_id(1) + cmd(1) + key_idx(1) + done(1) + size(2) + idx(2)
 _FULL_SCREEN_HEADER = 8  # report_id(1) + cmd(1) + reserved(1) + done(1) + size(2) + idx(2)
 _WINDOW_HEADER = 8  # same layout as full screen
-_PARTIAL_WINDOW_HEADER = 16  # report_id(1) + cmd(1) + x(2) + y(2) + w(2) + h(2) + done(1) + idx(2) + size(2) + reserved(1)
+_PARTIAL_WINDOW_HEADER = 16  # report_id + cmd + x + y + w + h + done + idx + size + reserved
 _BACKGROUND_HEADER = 8  # report_id(1) + cmd(1) + bg_idx(1) + done(1) + chunk_idx(2) + size(2)
 
 

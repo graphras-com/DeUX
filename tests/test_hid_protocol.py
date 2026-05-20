@@ -50,7 +50,6 @@ from deux.runtime.hid.protocol import (
     parse_unit_info,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -338,7 +337,6 @@ class TestBuildKeyImageReports:
 
     def test_multi_chunk(self) -> None:
         """Large image spans multiple reports."""
-        chunk_cap = OUTPUT_REPORT_SIZE - 8
         data = bytes(range(256)) * 10  # 2560 bytes
         reports = build_key_image_reports(0, data)
         assert len(reports) >= 2
@@ -534,4 +532,4 @@ class TestConstants:
 
     def test_supported_pids_matches_rotation_keys(self) -> None:
         """SUPPORTED_PIDS is exactly the keys of PID_ROTATION."""
-        assert SUPPORTED_PIDS == frozenset(PID_ROTATION.keys())
+        assert frozenset(PID_ROTATION.keys()) == SUPPORTED_PIDS

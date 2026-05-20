@@ -6,7 +6,7 @@ All ``hid_*`` ctypes functions are mocked so no real hardware is needed.
 from __future__ import annotations
 
 import struct
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -17,7 +17,6 @@ from deux.runtime.hid.protocol import (
     ImageRotation,
     KeyStateEvent,
     ReportId,
-    UnitInfo,
 )
 
 # ---------------------------------------------------------------------------

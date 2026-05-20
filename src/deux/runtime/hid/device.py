@@ -7,8 +7,6 @@ feature report rather than being hardcoded per model.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from deux.runtime.hid._ctypes_hidapi import (
     HidApiError,
     HidDeviceInfo,
@@ -22,17 +20,14 @@ from deux.runtime.hid._ctypes_hidapi import (
 from deux.runtime.hid.protocol import (
     FEATURE_REPORT_SIZE,
     INPUT_REPORT_SIZE,
+    PID_ROTATION,
     ImageRotation,
     InputEvent,
-    PID_ROTATION,
     ReportId,
     UnitInfo,
     build_fill_key_color,
     build_fill_lcd_color,
     build_full_screen_reports,
-    build_get_firmware_version,
-    build_get_serial_number,
-    build_get_unit_info,
     build_key_image_reports,
     build_partial_window_reports,
     build_set_brightness,
@@ -44,7 +39,6 @@ from deux.runtime.hid.protocol import (
     parse_serial_number,
     parse_unit_info,
 )
-
 
 # ---------------------------------------------------------------------------
 # Device family names derived from PID

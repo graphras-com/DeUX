@@ -143,7 +143,8 @@ class DeckRenderer:
                 ) -> None:
                     async with deck._device_lock:
                         await deck._exec_device_io(
-                            deck._device.set_key_image, idx, frame_bytes
+                            deck._device.set_key_image,  # type: ignore[union-attr]
+                            idx, frame_bytes
                         )
 
                 dui_key.set_push_fn(_push_key_frame, key_size=caps.key_size)
@@ -180,7 +181,7 @@ class DeckRenderer:
         for key_index in sorted(key_images):
             async with deck._device_lock:
                 await deck._exec_device_io(
-                    deck._device.set_key_image,  # type: ignore[union-attr]
+                    deck._device.set_key_image,
                     key_index,
                     key_images[key_index],
                 )
@@ -214,7 +215,7 @@ class DeckRenderer:
         async def _push_key_frame(frame_bytes: bytes) -> None:
             async with deck._device_lock:
                 await deck._exec_device_io(
-                    deck._device.set_key_image,
+                    deck._device.set_key_image,  # type: ignore[union-attr]
                     key_index,
                     frame_bytes,
                 )
@@ -388,7 +389,7 @@ class DeckRenderer:
                 y_pos = 0
                 async with deck._device_lock:
                     await deck._exec_device_io(
-                        deck._device.set_partial_window_image,  # type: ignore[union-attr]
+                        deck._device.set_partial_window_image,
                         x_pos,
                         y_pos,
                         metrics.panel_width,
@@ -406,7 +407,7 @@ class DeckRenderer:
                     y_pos = 0
                     async with deck._device_lock:
                         await deck._exec_device_io(
-                            deck._device.set_partial_window_image,  # type: ignore[union-attr]
+                            deck._device.set_partial_window_image,
                             x_pos,
                             y_pos,
                             metrics.panel_width,
@@ -433,7 +434,7 @@ class DeckRenderer:
 
         async with deck._device_lock:
             await deck._exec_device_io(
-                deck._device.set_partial_window_image,  # type: ignore[union-attr]
+                deck._device.set_partial_window_image,
                 0,
                 0,
                 info.width,

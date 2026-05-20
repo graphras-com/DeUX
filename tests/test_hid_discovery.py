@@ -20,7 +20,6 @@ from deux.runtime.hid.discovery import (
 )
 from deux.runtime.hid.protocol import SUPPORTED_PIDS
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

@@ -5,9 +5,8 @@ Validates the async HID call wrapper and input polling loop.
 
 from __future__ import annotations
 
-import asyncio
 import time
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, PropertyMock
 
 import pytest
 
@@ -17,7 +16,6 @@ from deux.runtime.hid.transport import (
     async_hid_call,
     poll_input,
 )
-
 
 # ---------------------------------------------------------------------------
 # async_hid_call
