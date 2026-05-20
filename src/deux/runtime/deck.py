@@ -16,7 +16,7 @@ from .async_event import AsyncEvent
 from .capabilities import DeviceCapabilities
 from .device_info import DeviceInfo
 from .event_router import DeckEventRouter
-from .events import DeckEvent
+from .events import DeckEvent, EncoderTurnEvent
 from .renderer import DeckRenderer
 from .transport import AsyncTransport
 
@@ -500,9 +500,14 @@ class Deck:
         if not screen:
             return
 
-        await asyncio.gather(
-            *(self._drain_card_callbacks(card) for card in screen.cards)
-        )
+        # Only drain cards that actually have pending callbacks.
+        cards_with_pending = [
+            card for card in screen.cards if card._pending_callbacks
+        ]
+        if cards_with_pending:
+            await asyncio.gather(
+                *(self._drain_card_callbacks(card) for card in cards_with_pending)
+            )
 
         dirty_keys = [
             (key_index, key_slot)
@@ -562,7 +567,15 @@ class Deck:
             pass
 
     async def _event_loop(self) -> None:
-        """Dispatch transport events to the active screen handlers."""
+        """Dispatch transport events to the active screen handlers.
+
+        Encoder turn events are coalesced: when a turn event is
+        dequeued, any additional turn events for the same encoder
+        already waiting in the queue are merged into a single
+        dispatched event.  This prevents a backlog of redundant
+        renders when the user turns the encoder faster than the
+        render pipeline can keep up.
+        """
         if not self._transport:
             return
 
@@ -576,6 +589,12 @@ class Deck:
 
                 if not self._current_screen():
                     continue
+
+                # Coalesce consecutive encoder turn events for the
+                # same encoder so fast turns don't queue up behind
+                # slow renders.
+                if isinstance(event, EncoderTurnEvent):
+                    event = self._coalesce_encoder_turns(event)
 
                 try:
                     await self._dispatch(event)
@@ -596,6 +615,54 @@ class Deck:
     async def _drain_card_callbacks(self, card: Any) -> None:
         """Drain and await all pending callbacks queued on a card."""
         await self._renderer.drain_card_callbacks(card)
+
+    def _coalesce_encoder_turns(self, event: EncoderTurnEvent) -> EncoderTurnEvent:
+        """Merge queued encoder turn events for the same encoder.
+
+        Drains all pending :class:`EncoderTurnEvent` items from the
+        transport queue that target the same encoder as *event*,
+        summing their directions.  Non-matching events are re-queued
+        in their original order.
+
+        Parameters
+        ----------
+        event : EncoderTurnEvent
+            The initial encoder turn event just dequeued.
+
+        Returns
+        -------
+        EncoderTurnEvent
+            A single event whose ``direction`` is the sum of all
+            coalesced turns.  If no additional events were pending,
+            the original event is returned unchanged.
+        """
+        if self._transport is None:
+            return event
+
+        queue = self._transport.queue
+        direction = event.direction
+        requeue: list[DeckEvent] = []
+
+        while not queue.empty():
+            try:
+                pending = queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+            if (
+                isinstance(pending, EncoderTurnEvent)
+                and pending.encoder == event.encoder
+            ):
+                direction += pending.direction
+            else:
+                requeue.append(pending)
+
+        # Put back non-matching events in order.
+        for item in requeue:
+            queue.put_nowait(item)
+
+        if direction == event.direction:
+            return event
+        return EncoderTurnEvent(encoder=event.encoder, direction=direction)
 
     async def _dispatch(self, event: DeckEvent) -> None:
         """Dispatch a single event to the appropriate handler on the active screen."""
