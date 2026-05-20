@@ -35,7 +35,7 @@ on:
         description: Apt packages required before tests.
         required: false
         type: string
-        default: "libhidapi-dev libvips-dev"
+        default: "libhidapi-dev"
 
 jobs:
   pytest:

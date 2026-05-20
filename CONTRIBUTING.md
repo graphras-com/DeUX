@@ -8,8 +8,8 @@ you need to get started.
 - **Python 3.11+**
 - **[uv](https://docs.astral.sh/uv/)** for dependency management
 - **System libraries:**
-  - macOS: `brew install vips hidapi`
-  - Linux (Debian/Ubuntu): `sudo apt install libvips-dev libhidapi-dev`
+  - macOS: `brew install hidapi`
+  - Linux (Debian/Ubuntu): `sudo apt install libhidapi-dev`
 
 ## Setup
 

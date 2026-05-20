@@ -27,14 +27,13 @@ A high-level, asyncio-native Python library for Elgato Stream Deck devices. Defi
 
 - Python 3.11+
 - [HIDAPI](https://github.com/libusb/hidapi) (For USB HID communication)
-- [libvips](https://github.com/libvips/libvips) (For SVG rendering)
 
 ## Quick Start (macOS)
 
 Install system dependencies, clone the repo, and run the example:
 
 ```bash
-brew install hidapi vips
+brew install hidapi
 
 git clone https://github.com/graphras-com/DeUX.git
 cd DeUX
@@ -51,7 +50,7 @@ python examples/streamdeck.py
 Install system dependencies, clone the repo, and run the example:
 
 ```bash
-apt-get install libhidapi-dev libvips-dev
+apt-get install libhidapi-dev
 
 git clone https://github.com/graphras-com/DeUX.git
 cd DeUX
