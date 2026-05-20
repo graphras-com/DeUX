@@ -299,7 +299,7 @@ class DeckRenderer:
                 ) -> PushFn:
                     async def _push_card_frame(frame_bytes: bytes) -> None:
                         if tile is not None:
-                            # Composite frame onto bg tile using pyvips.
+                            # Composite frame onto bg tile.
                             from ..render.touch_renderer import composite_frame_on_tile
 
                             def _compose(fb: bytes = frame_bytes) -> bytes:

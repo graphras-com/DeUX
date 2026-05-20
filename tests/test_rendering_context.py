@@ -14,7 +14,6 @@ class TestRenderingContext:
         ctx = RenderingContext()
         assert ctx.theme is None
         assert ctx.stylesheet is None
-        assert ctx.backend_name is None
 
     def test_from_theme(self):
         """from_theme sets both theme and stylesheet."""
@@ -39,16 +38,6 @@ class TestRenderingContext:
         """Returns None when neither stylesheet nor theme is set."""
         ctx = RenderingContext()
         assert ctx.resolve_stylesheet() is None
-
-    def test_resolve_backend_explicit(self):
-        """Uses explicit backend_name when set."""
-        ctx = RenderingContext(backend_name="cairo")
-        assert ctx.resolve_backend() == "cairo"
-
-    def test_resolve_backend_default(self):
-        """Falls back to 'auto' when no backend set."""
-        ctx = RenderingContext()
-        assert ctx.resolve_backend() == "auto"
 
 
 class TestContextIsolation:

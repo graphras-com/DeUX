@@ -21,10 +21,7 @@ from deux.ui.controls.key_slot import KeySlot
 from deux.ui.screen import Screen
 from deux.ui.touch_strip import TouchStrip
 
-# Capture pristine state BEFORE any test modules are imported
-# (some examples set the backend at module level during collection).
-_PRISTINE_ACTIVE_BACKEND: str | None = _svg_mod._active_backend
-_PRISTINE_REGISTRY: dict[str, object] = _svg_mod._registry.copy()
+# Capture pristine state BEFORE any test modules are imported.
 _PRISTINE_ACTIVE_STYLESHEET: str | None = _svg_mod._active_stylesheet
 _PRISTINE_ACTIVE_THEME = _theme_mod._active_theme
 
@@ -33,21 +30,15 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(autouse=True)
-def _reset_svg_backend():
-    """Reset SVG backend and stylesheet state before and after every test.
+def _reset_svg_state():
+    """Reset SVG stylesheet state before and after every test.
 
-    Restores the pristine state captured at conftest import time
-    (before any test module imports that may call ``set_svg_backend``
-    at module level).  Also resets ``_active_stylesheet`` and
-    ``_active_theme`` to prevent cross-test state bleed.
+    Restores the pristine state captured at conftest import time.
+    Also resets ``_active_theme`` to prevent cross-test state bleed.
     """
-    _svg_mod._active_backend = _PRISTINE_ACTIVE_BACKEND
-    _svg_mod._registry = _PRISTINE_REGISTRY.copy()
     _svg_mod._active_stylesheet = _PRISTINE_ACTIVE_STYLESHEET
     _theme_mod._active_theme = _PRISTINE_ACTIVE_THEME
     yield
-    _svg_mod._active_backend = _PRISTINE_ACTIVE_BACKEND
-    _svg_mod._registry = _PRISTINE_REGISTRY.copy()
     _svg_mod._active_stylesheet = _PRISTINE_ACTIVE_STYLESHEET
     _theme_mod._active_theme = _PRISTINE_ACTIVE_THEME
 
