@@ -69,6 +69,7 @@ and logs actions to the console.  Press Ctrl+C to exit.
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import contextlib
 import datetime
@@ -100,7 +101,6 @@ from deux import (
     set_active_theme,
 )
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 log = logging.getLogger(__name__)
 
 # Resolve the directory holding example-specific .dui packages and image
@@ -1202,7 +1202,27 @@ async def run() -> None:
         await manager.wait_closed()
 
 def main() -> None:
-    """Entry point for ``python examples/streamdeck.py``."""
+    """Entry point for ``python examples/streamdeck.py``.
+
+    Supports ``--log-level`` to configure logging verbosity.
+    Logging is disabled by default (``CRITICAL``).
+
+    Examples
+    --------
+    ::
+
+        python examples/streamdeck.py --log-level DEBUG
+        python examples/streamdeck.py --log-level INFO
+    """
+    parser = argparse.ArgumentParser(description="Stream Deck demo app")
+    parser.add_argument(
+        "--log-level",
+        default="CRITICAL",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Set the logging level (default: CRITICAL, effectively disabled)",
+    )
+    args = parser.parse_args()
+    logging.basicConfig(level=args.log_level, format="%(levelname)s: %(message)s")
     try:
         asyncio.run(run())
     except KeyboardInterrupt:
