@@ -28,7 +28,7 @@ import contextlib
 import logging
 import random
 
-from deux import AsyncEvent
+from deux.runtime import AsyncEvent
 
 log = logging.getLogger(__name__)
 

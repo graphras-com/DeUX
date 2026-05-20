@@ -7,7 +7,7 @@ import io
 from PIL import Image
 
 from deux.render.key_renderer import (
-    _encode_image,
+    _encode_image_bytes,
     render_blank_key,
     render_key_image,
 )
@@ -189,12 +189,12 @@ class TestRenderBlankTouchscreen:
 class TestEncodeImage:
     def test_jpeg_default(self):
         img = Image.new("RGB", (10, 10), "red")
-        result = _encode_image(img)
+        result = _encode_image_bytes(img)
         assert result[:2] == b"\xff\xd8"
 
     def test_bmp_format(self):
         img = Image.new("RGB", (10, 10), "red")
-        result = _encode_image(img, image_format="BMP")
+        result = _encode_image_bytes(img, image_format="BMP")
         assert result[:2] == b"BM"
 
 
@@ -291,7 +291,7 @@ class TestComposeCardWithBackground:
         card = Image.new("RGBA", (PANEL_WIDTH, PANEL_HEIGHT), (0, 0, 0, 0))
         result = compose_card_with_background(
             card,
-            bg_tile=tile,
+            bg_tile_bytes=tile,
             panel_width=PANEL_WIDTH,
             panel_height=PANEL_HEIGHT,
         )
@@ -304,7 +304,7 @@ class TestComposeCardWithBackground:
         card = Image.new("RGBA", (PANEL_WIDTH, PANEL_HEIGHT), (255, 0, 0, 255))
         result = compose_card_with_background(
             card,
-            bg_tile=tile,
+            bg_tile_bytes=tile,
             panel_width=PANEL_WIDTH,
             panel_height=PANEL_HEIGHT,
         )
@@ -317,7 +317,7 @@ class TestComposeCardWithBackground:
         tile = Image.new("RGB", (PANEL_WIDTH, PANEL_HEIGHT), (0, 255, 0))
         result = compose_card_with_background(
             None,
-            bg_tile=tile,
+            bg_tile_bytes=tile,
             panel_width=PANEL_WIDTH,
             panel_height=PANEL_HEIGHT,
         )

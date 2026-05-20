@@ -465,21 +465,18 @@ class DeckRenderer:
     def apply_theme(self) -> None:
         """Apply the resolved theme cascade to all renderers on the active screen.
 
-        Instead of mutating the module-level global stylesheet (which
-        races when multiple decks render concurrently), this builds an
-        explicit :class:`~deux.render.context.RenderingContext` and
-        pushes it to every :class:`~deux.dui.svg_renderer.SvgRenderer`
-        on the active screen's cards and keys.
-
-        The global stylesheet is also updated for backward compatibility
-        with code that reads it directly.
+        Builds an explicit :class:`~deux.render.context.RenderingContext`
+        and pushes it to every :class:`~deux.dui.svg_renderer.SvgRenderer`
+        on the active screen's cards and keys.  The module-level global
+        stylesheet is also updated so that renderers without an explicit
+        context pick up the correct CSS.
         """
         from ..render.context import RenderingContext
         from ..render.svg_rasterize import set_svg_stylesheet
 
         css = self._resolve_stylesheet()
 
-        # Update global for backward compatibility / simple usage.
+        # Update global stylesheet for renderers without an explicit context.
         set_svg_stylesheet(css)
 
         # Build per-deck context and push to all renderers.

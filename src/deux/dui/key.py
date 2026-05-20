@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import warnings
 from typing import TYPE_CHECKING, Any
 
 from ..ui.controls.key_slot import KeySlot
@@ -16,8 +15,6 @@ from .spinner import SpinnerFrames
 from .svg_renderer import SvgRenderer
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from ..runtime.async_event import AsyncEvent
     from ..runtime.events import AsyncHandler
 
@@ -266,32 +263,6 @@ class DuiKey(BindingMixin, KeySlot):
             raise ValueError("min_val and max_val must not be equal")
         current_norm = float(self.get(name) or 0.0)
         return min_val + current_norm * (max_val - min_val)
-
-
-    def on_event(self, event_name: str) -> Callable[[AsyncHandler], AsyncHandler]:
-        """Deprecated alias for :meth:`on`.
-
-        .. deprecated:: 0.1
-            Use :meth:`on` instead. ``on_event`` will be removed in a
-            future release.
-
-        Parameters
-        ----------
-        event_name
-            Semantic event name from the manifest.
-
-        Returns
-        -------
-        Callable
-            A decorator that registers the handler and returns it unchanged.
-        """
-        warnings.warn(
-            "DuiKey.on_event() is deprecated, use DuiKey.on() instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.on(event_name)
-
 
     def render_image(
         self,

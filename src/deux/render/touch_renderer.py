@@ -10,7 +10,7 @@ import io
 from PIL import Image
 
 
-def _to_pil(value: object) -> Image.Image:
+def _to_pil(value: bytes | Image.Image) -> Image.Image:
     """Convert an image value (bytes or PIL Image) to a PIL Image.
 
     Parameters
@@ -22,15 +22,17 @@ def _to_pil(value: object) -> Image.Image:
     -------
     Image.Image
         A PIL Image instance.
+
+    Raises
+    ------
+    TypeError
+        If *value* is not bytes or a PIL Image.
     """
     if isinstance(value, bytes):
         return Image.open(io.BytesIO(value))
     if isinstance(value, Image.Image):
         return value
-    # Assume PIL-like object with save method.
-    buf = io.BytesIO()
-    value.save(buf, format="PNG")  # type: ignore[attr-defined]
-    return Image.open(io.BytesIO(buf.getvalue()))
+    raise TypeError(f"Unsupported image type: {type(value)}")
 
 
 def _encode_pil_image(img: Image.Image, image_format: str, quality: int = 90) -> bytes:
@@ -104,9 +106,8 @@ def composite_frame_on_tile(
 
 
 def compose_card_with_background(
-    card_bytes: bytes | object | None,
+    card_bytes: bytes | None,
     *,
-    bg_tile: bytes | None = None,
     bg_tile_bytes: bytes | None = None,
     background: str = "black",
     panel_width: int,
@@ -139,10 +140,8 @@ def compose_card_with_background(
     bytes
         Encoded image bytes for a single panel.
     """
-    # Support both parameter names for backward compatibility.
-    _tile = bg_tile_bytes or bg_tile
-    if _tile is not None:
-        base = _to_pil(_tile).convert("RGBA")
+    if bg_tile_bytes is not None:
+        base = _to_pil(bg_tile_bytes).convert("RGBA")
     else:
         r, g, b = _parse_color(background)
         base = Image.new("RGBA", (panel_width, panel_height), (r, g, b, 255))
@@ -155,14 +154,14 @@ def compose_card_with_background(
 
 
 def compose_touchstrip(
-    card_tiles: list[bytes | object | None],
+    card_tiles: list[bytes | None],
     *,
     touchscreen_width: int,
     touchscreen_height: int,
     panel_count: int,
     panel_width: int,
     background: str = "black",
-    bg_tiles: list[bytes | object] | None = None,
+    bg_tiles: list[bytes] | None = None,
     image_format: str = "JPEG",
 ) -> bytes:
     """Compose card images into a single touchscreen image.

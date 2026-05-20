@@ -211,12 +211,6 @@ class TestPackageExports:
         assert fi is fetch_image
         assert callable(clear_image_cache)
 
-    def test_root_package_exports(self):
-        import deux
-
-        assert hasattr(deux, "fetch_image")
-        assert hasattr(deux, "ImageFetchError")
-        assert hasattr(deux, "clear_image_cache")
 
 
 class TestImageSecurity:
