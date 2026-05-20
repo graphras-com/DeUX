@@ -307,17 +307,17 @@ class TestSvgToPngDispatch:
 
         class SuccessBackend:
             def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
-                calls.append("cairo")
+                calls.append("resvg")
                 return fake
 
         svg_mod._registry["pyvips"] = FailBackend("pyvips")  # type: ignore[assignment]
-        svg_mod._registry["resvg"] = FailBackend("resvg")  # type: ignore[assignment]
-        svg_mod._registry["cairo"] = SuccessBackend()  # type: ignore[assignment]
+        svg_mod._registry["cairo"] = FailBackend("cairo")  # type: ignore[assignment]
+        svg_mod._registry["resvg"] = SuccessBackend()  # type: ignore[assignment]
         set_svg_backend("auto")
 
         result = _svg_to_png(b"<svg/>", 10, 10)
         assert result == fake
-        assert calls == ["pyvips", "resvg", "cairo"]
+        assert calls == ["pyvips", "cairo", "resvg"]
 
     def test_auto_all_fail_raises(self):
         """Auto mode raises RasterizeError when all backends fail."""
@@ -588,8 +588,8 @@ class TestStylesheetDispatch:
                 return _fake_png(width, height)
 
         svg_mod._registry["pyvips"] = FailBackend()  # type: ignore[assignment]
-        svg_mod._registry["resvg"] = FailBackend()  # type: ignore[assignment]
-        svg_mod._registry["cairo"] = SpyBackend()  # type: ignore[assignment]
+        svg_mod._registry["cairo"] = FailBackend()  # type: ignore[assignment]
+        svg_mod._registry["resvg"] = SpyBackend()  # type: ignore[assignment]
         set_svg_backend("auto")
         set_svg_stylesheet(".fallback { color: green; }")
 

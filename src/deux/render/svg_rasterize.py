@@ -567,7 +567,7 @@ def _inject_stylesheet(svg_data: bytes, css: str) -> bytes:
 # Auto-fallback ordering
 # ---------------------------------------------------------------------------
 
-_AUTO_ORDER: tuple[str, ...] = ("pyvips", "resvg", "cairo", "rsvg-cli")
+_AUTO_ORDER: tuple[str, ...] = ("pyvips", "cairo", "resvg", "rsvg-cli")
 
 
 def _svg_to_png(
