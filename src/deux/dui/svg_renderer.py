@@ -1014,19 +1014,17 @@ class SvgRenderer:
                 with open(fp, "rb") as fh:
                     img_bytes = fh.read()
             else:
-                # In-memory PIL Image: force pixel decode and re-encode via pyvips.
-                import pyvips
-
+                # In-memory PIL Image: re-encode to PNG bytes.
                 try:
                     value.load()
                 except Exception:
                     logger.warning("Image binding: failed to load PIL Image")
                     return
-                rgba = value.convert("RGBA")
-                w, h = rgba.size
-                raw = rgba.tobytes()
-                vimg = pyvips.Image.new_from_memory(raw, w, h, 4, "uchar")
-                img_bytes = vimg.write_to_buffer(".png")
+                import io as _io
+
+                _buf = _io.BytesIO()
+                value.convert("RGBA").save(_buf, format="PNG")
+                img_bytes = _buf.getvalue()
         else:
             logger.warning("Image binding: unsupported value type %s", type(value))
             return

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import copy
+import io
 import logging
 import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING
 
+from PIL import Image
+
 from .._xml import safe_fromstring
-from ..render.svg_rasterize import _ensure_macos_lib_path
 from .svg_renderer import _find_element_by_id
 
 if TYPE_CHECKING:
@@ -52,7 +54,7 @@ class SpinnerFrames:
         height: int,
         image_format: str = "JPEG",
         rendered_svg: str | None = None,
-        bg_tile: bytes | None = None,
+        bg_tile: bytes | Image.Image | None = None,
     ) -> None:
         if spec.spinner is None:
             raise ValueError("PackageSpec has no spinner configuration")
@@ -202,16 +204,16 @@ class SpinnerFrames:
             logger.warning("No custom spinner frames found; returning blank frames")
             return self._blank_frames()
 
-        _ensure_macos_lib_path()
-        import pyvips
-
         frames: list[bytes] = []
         for key in frame_keys:
-            img = pyvips.Image.new_from_buffer(assets[key], "")
-            if img.width != self._width or img.height != self._height:
-                img = img.thumbnail_image(self._width, height=self._height, crop="centre")
-            png_data: bytes = img.write_to_buffer(".png")
-            frames.append(self._composite_on_bg(png_data))
+            frame_img: Image.Image = Image.open(io.BytesIO(assets[key]))
+            if frame_img.size != (self._width, self._height):
+                frame_img = frame_img.resize(
+                    (self._width, self._height), Image.Resampling.LANCZOS
+                )
+            buf = io.BytesIO()
+            frame_img.save(buf, format="PNG")
+            frames.append(self._composite_on_bg(buf.getvalue()))
         return frames
 
     def _load_gif_frames(self, data: bytes) -> list[bytes]:
@@ -228,23 +230,20 @@ class SpinnerFrames:
             Encoded image frames; falls back to blank frames if the GIF
             contains no frames.
         """
-        _ensure_macos_lib_path()
-        import pyvips
-
-        # Load all pages (frames) of the GIF.
-        img = pyvips.Image.new_from_buffer(data, "", n=-1)
-        frame_height = img.height // (img.get("n-pages") if img.get("n-pages") else 1)
-        n_pages = img.get("n-pages") if img.get("n-pages") else 1
+        gif = Image.open(io.BytesIO(data))
+        n_frames = getattr(gif, "n_frames", 1)
 
         frames: list[bytes] = []
-        for i in range(n_pages):
-            frame = img.crop(0, i * frame_height, img.width, frame_height)
-            if frame.width != self._width or frame.height != self._height:
-                frame = frame.thumbnail_image(
-                    self._width, height=self._height, crop="centre"
+        for i in range(n_frames):
+            gif.seek(i)
+            frame = gif.convert("RGBA")
+            if frame.size != (self._width, self._height):
+                frame = frame.resize(
+                    (self._width, self._height), Image.Resampling.LANCZOS
                 )
-            png_data: bytes = frame.write_to_buffer(".png")
-            frames.append(self._composite_on_bg(png_data))
+            buf = io.BytesIO()
+            frame.save(buf, format="PNG")
+            frames.append(self._composite_on_bg(buf.getvalue()))
 
         if not frames:
             logger.warning("Animated GIF has no frames; returning blank frames")
@@ -282,37 +281,26 @@ class SpinnerFrames:
         bytes
             Encoded image bytes in the instance's configured format.
         """
-        _ensure_macos_lib_path()
-        import pyvips
-
-        from ..render.touch_renderer import _to_vips
-
-        frame = pyvips.Image.new_from_buffer(png_data, "")
+        frame = Image.open(io.BytesIO(png_data)).convert("RGBA")
 
         if self._bg_tile is not None:
-            base = _to_vips(self._bg_tile)
-            if base.hasalpha():
-                base = base.flatten(background=[0, 0, 0])
-            if frame.hasalpha():
-                base = base.addalpha()
-                base = base.copy(interpretation="srgb")
-                frame = frame.copy(interpretation="srgb")
-                result = base.composite2(frame, "over")
-                result = result.flatten(background=[0, 0, 0])
+            if isinstance(self._bg_tile, bytes):
+                base = Image.open(io.BytesIO(self._bg_tile)).convert("RGBA")
             else:
-                result = frame
+                base = self._bg_tile.convert("RGBA")
+            result = Image.alpha_composite(base, frame)
         else:
-            result = frame.flatten(background=[0, 0, 0]) if frame.hasalpha() else frame
+            result = frame
 
-        return self._encode_vips(result)
+        return self._encode_pil(result)
 
-    def _encode_vips(self, vimg: object) -> bytes:
-        """Encode a pyvips image in the configured format.
+    def _encode_pil(self, img: Image.Image) -> bytes:
+        """Encode a PIL image in the configured format.
 
         Parameters
         ----------
-        vimg
-            A ``pyvips.Image`` instance.
+        img
+            A ``PIL.Image.Image`` instance.
 
         Returns
         -------
@@ -321,14 +309,14 @@ class SpinnerFrames:
         """
         from ..render.key_renderer import _encode_image_bytes
 
-        return _encode_image_bytes(vimg, self._image_format)
+        return _encode_image_bytes(img, self._image_format)
 
-    def _encode_tile(self, tile: bytes | object) -> bytes:
+    def _encode_tile(self, tile: bytes | Image.Image) -> bytes:
         """Re-encode a tile in the configured output format.
 
         Parameters
         ----------
-        tile
+        tile : bytes or Image.Image
             PNG-encoded tile bytes or a PIL Image.
 
         Returns
@@ -336,14 +324,11 @@ class SpinnerFrames:
         bytes
             Image bytes in the configured format.
         """
-        _ensure_macos_lib_path()
-
-        from ..render.touch_renderer import _to_vips
-
-        img = _to_vips(tile)
-        if img.hasalpha():
-            img = img.flatten(background=[0, 0, 0])
-        return self._encode_vips(img)
+        if isinstance(tile, bytes):
+            img = Image.open(io.BytesIO(tile)).convert("RGB")
+        else:
+            img = tile.convert("RGB")
+        return self._encode_pil(img)
 
     def _encode_blank(self) -> bytes:
         """Encode a solid black frame.
@@ -353,11 +338,8 @@ class SpinnerFrames:
         bytes
             Black frame in the configured format.
         """
-        _ensure_macos_lib_path()
-        import pyvips
-
-        img = pyvips.Image.black(self._width, self._height, bands=3)
-        return self._encode_vips(img)
+        img = Image.new("RGB", (self._width, self._height), (0, 0, 0))
+        return self._encode_pil(img)
 
     def _rasterise(self, root: ET.Element) -> bytes:
         """Rasterise an SVG element tree to encoded image bytes.

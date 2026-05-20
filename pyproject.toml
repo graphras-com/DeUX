@@ -30,10 +30,8 @@ classifiers = [
 dependencies = [
     "pillow>=12.0.0",
     "streamdeck>=0.9.8",
-    "cairosvg>=2.7.0",
     "pyyaml>=6.0",
     "platformdirs>=4.0",
-    "pyvips>=2.2.0",
     "defusedxml>=0.7.0",
     "resvg>=0.2.0",
 ]
@@ -100,8 +98,6 @@ strict = true
 [[tool.mypy.overrides]]
 module = [
     "StreamDeck.*",
-    "cairosvg",
-    "pyvips",
     "resvg",
     "resvg.*",
     "defusedxml",

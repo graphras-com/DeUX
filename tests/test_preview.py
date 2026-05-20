@@ -13,7 +13,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from PIL import Image
 
-from deux.render.svg_rasterize import RasterizeError
 from deux.runtime.capabilities import STREAM_DECK_PLUS
 
 if TYPE_CHECKING:
@@ -342,18 +341,6 @@ class TestParser:
         args = parse_args(["--verbose"])
         assert args.verbose is True
 
-    def test_renderer_default_auto(self):
-        args = parse_args([])
-        assert args.renderer == "auto"
-
-    def test_renderer_short_flag(self):
-        args = parse_args(["-r", "cairo"])
-        assert args.renderer == "cairo"
-
-    def test_renderer_long_flag(self):
-        args = parse_args(["--renderer", "pyvips"])
-        assert args.renderer == "pyvips"
-
     def test_build_parser_returns_parser(self):
         parser = build_parser()
         assert isinstance(parser, argparse.ArgumentParser)
@@ -587,62 +574,6 @@ class TestSvgToPngFit:
         img = Image.open(io.BytesIO(png_bytes))
         assert img.height <= 80
 
-    def test_cairosvg_fallback_to_rsvg(self):
-        """When the first backend fails, auto mode falls through to the next."""
-        svg = (
-            b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">'
-            b'<rect width="10" height="10" fill="red"/>'
-            b"</svg>"
-        )
-        fake_png = Image.new("RGB", (10, 10), "red")
-        buf = io.BytesIO()
-        fake_png.save(buf, format="PNG")
-        fake_png_bytes = buf.getvalue()
-
-        import deux.render.svg_rasterize as svg_mod
-
-        class FailBackend:
-            def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
-                raise RasterizeError("fail")
-
-        class SuccessBackend:
-            def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
-                return fake_png_bytes
-
-        old_registry = svg_mod._registry.copy()
-        old_active = svg_mod._active_backend
-        try:
-            svg_mod._registry["cairo"] = FailBackend()  # type: ignore[assignment]
-            svg_mod._registry["pyvips"] = SuccessBackend()  # type: ignore[assignment]
-            svg_mod._active_backend = None  # auto mode
-            result = _svg_to_png_fit(svg, 80, 80)
-            assert result == fake_png_bytes
-        finally:
-            svg_mod._registry = old_registry
-            svg_mod._active_backend = old_active
-
-    def test_no_renderer_raises(self):
-        """When all backends fail in auto mode, RasterizeError is raised."""
-        svg = b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>'
-
-        import deux.render.svg_rasterize as svg_mod
-
-        class FailBackend:
-            def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
-                raise RasterizeError("fail")
-
-        old_registry = svg_mod._registry.copy()
-        old_active = svg_mod._active_backend
-        try:
-            for name in list(svg_mod._registry):
-                svg_mod._registry[name] = FailBackend()  # type: ignore[assignment]
-            svg_mod._active_backend = None  # auto mode
-            with pytest.raises(RasterizeError):
-                _svg_to_png_fit(svg, 80, 80)
-        finally:
-            svg_mod._registry = old_registry
-            svg_mod._active_backend = old_active
-
 
 class TestFindAndOpenDevice:
     def test_no_devices_exits(self, capsys: pytest.CaptureFixture[str]):
@@ -850,26 +781,6 @@ class TestPushToDeviceWatch:
         mock_watch.assert_awaited_once()
 
 
-class TestMainRendererFlag:
-    """Tests that ``main()`` applies the ``--renderer`` flag."""
-
-    def test_main_sets_renderer(self):
-        """``--renderer`` flag calls ``set_svg_backend`` before running."""
-        with (
-            patch("deux.tools.preview.set_svg_backend") as mock_set,
-            patch("deux.tools.preview.push_to_device", new_callable=AsyncMock),
-        ):
-            main(["--renderer", "cairo"])
-            mock_set.assert_called_once_with("cairo")
-
-    def test_main_auto_skips_set(self):
-        """``--renderer auto`` (default) does not call ``set_svg_backend``."""
-        with (
-            patch("deux.tools.preview.set_svg_backend") as mock_set,
-            patch("deux.tools.preview.push_to_device", new_callable=AsyncMock),
-        ):
-            main([])
-            mock_set.assert_not_called()
 
 
 class TestComposeFullTouchstrip:

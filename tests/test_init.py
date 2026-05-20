@@ -195,12 +195,6 @@ class TestDeprecatedImports:
             _ = deux.RenderMetrics
             assert any(issubclass(x.category, DeprecationWarning) for x in w)
 
-    def test_deprecated_svg_rasterizer(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            _ = deux.SvgRasterizer
-            assert any(issubclass(x.category, DeprecationWarning) for x in w)
-
     def test_deprecated_list_devices(self):
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")

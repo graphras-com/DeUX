@@ -305,8 +305,7 @@ class DuiKey(BindingMixin, KeySlot):
         black background injected at the SVG level.  No Pillow resize
         or compositing is needed.
 
-        Falls back to the legacy Pillow path for BMP format since
-        pyvips does not support BMP output natively.
+        Falls back to the legacy Pillow path for BMP format.
 
         Parameters
         ----------

@@ -1,19 +1,17 @@
 """Touch-strip rendering for Stream Deck cards.
 
-Uses pyvips for all compositing and encoding operations. PIL is only
-used as a fallback for BMP encoding (pyvips lacks native BMP support).
+Uses Pillow for all compositing and encoding operations.
 """
 
 from __future__ import annotations
 
 import io
-from typing import Any
 
-from ..render.svg_rasterize import _ensure_macos_lib_path
+from PIL import Image
 
 
-def _to_vips(value: object) -> Any:
-    """Convert an image value (bytes or PIL Image) to a pyvips.Image.
+def _to_pil(value: object) -> Image.Image:
+    """Convert an image value (bytes or PIL Image) to a PIL Image.
 
     Parameters
     ----------
@@ -22,26 +20,26 @@ def _to_vips(value: object) -> Any:
 
     Returns
     -------
-    object
-        A ``pyvips.Image`` instance.
+    Image.Image
+        A PIL Image instance.
     """
-    import pyvips
-
     if isinstance(value, bytes):
-        return pyvips.Image.new_from_buffer(value, "")
-    # PIL Image — convert to PNG bytes.
+        return Image.open(io.BytesIO(value))
+    if isinstance(value, Image.Image):
+        return value
+    # Assume PIL-like object with save method.
     buf = io.BytesIO()
     value.save(buf, format="PNG")  # type: ignore[attr-defined]
-    return pyvips.Image.new_from_buffer(buf.getvalue(), "")
+    return Image.open(io.BytesIO(buf.getvalue()))
 
 
-def _encode_vips_image(vimg: Any, image_format: str, quality: int = 90) -> bytes:
-    """Encode a pyvips image to the requested format.
+def _encode_pil_image(img: Image.Image, image_format: str, quality: int = 90) -> bytes:
+    """Encode a PIL image to the requested format.
 
     Parameters
     ----------
-    vimg
-        A ``pyvips.Image`` instance.
+    img
+        A ``PIL.Image.Image`` instance.
     image_format : str
         Target format: ``"JPEG"`` or ``"BMP"``.
     quality : int, default=90
@@ -52,19 +50,14 @@ def _encode_vips_image(vimg: Any, image_format: str, quality: int = 90) -> bytes
     bytes
         Encoded image bytes.
     """
-    import pyvips  # noqa: F401
-
     fmt = image_format.upper()
+    buf = io.BytesIO()
+    rgb = img.convert("RGB")
     if fmt == "BMP":
-        # pyvips doesn't support BMP natively; use PIL for this one format.
-        from PIL import Image as _PILImage
-
-        png_bytes = vimg.write_to_buffer(".png")
-        pil_img = _PILImage.open(io.BytesIO(png_bytes)).convert("RGB")
-        buf = io.BytesIO()
-        pil_img.save(buf, format="BMP")
-        return buf.getvalue()
-    return vimg.write_to_buffer(".jpg", Q=quality)  # type: ignore[no-any-return]
+        rgb.save(buf, format="BMP")
+    else:
+        rgb.save(buf, format="JPEG", quality=quality)
+    return buf.getvalue()
 
 
 def composite_frame_on_tile(
@@ -75,7 +68,7 @@ def composite_frame_on_tile(
     panel_height: int,
     image_format: str = "JPEG",
 ) -> bytes:
-    """Composite a rendered frame onto a background tile using pyvips.
+    """Composite a rendered frame onto a background tile.
 
     Used for spinner animations where each frame must be composited
     onto the touchstrip background.
@@ -98,31 +91,16 @@ def composite_frame_on_tile(
     bytes
         Encoded composited image bytes.
     """
-    _ensure_macos_lib_path()
-    import pyvips
+    bg = Image.open(io.BytesIO(bg_tile_bytes)).convert("RGBA")
+    frame = Image.open(io.BytesIO(frame_bytes)).convert("RGBA")
 
-    bg = pyvips.Image.new_from_buffer(bg_tile_bytes, "")
-    frame = pyvips.Image.new_from_buffer(frame_bytes, "")
+    if bg.size != (panel_width, panel_height):
+        bg = bg.resize((panel_width, panel_height), Image.Resampling.LANCZOS)
+    if frame.size != (panel_width, panel_height):
+        frame = frame.resize((panel_width, panel_height), Image.Resampling.LANCZOS)
 
-    # Ensure both images are the right size.
-    if bg.width != panel_width or bg.height != panel_height:
-        bg = bg.thumbnail_image(panel_width, height=panel_height, crop="centre")
-    if frame.width != panel_width or frame.height != panel_height:
-        frame = frame.thumbnail_image(panel_width, height=panel_height, crop="centre")
-
-    # Composite frame over background using alpha if present.
-    if frame.hasalpha():
-        # Ensure bg has alpha for compositing.
-        if not bg.hasalpha():
-            bg = bg.addalpha()
-        bg = bg.copy(interpretation="srgb")
-        frame = frame.copy(interpretation="srgb")
-        result = bg.composite2(frame, "over")
-        result = result.flatten(background=[0, 0, 0])
-    else:
-        result = frame
-
-    return _encode_vips_image(result, image_format)
+    bg = Image.alpha_composite(bg, frame)
+    return _encode_pil_image(bg, image_format)
 
 
 def compose_card_with_background(
@@ -161,35 +139,19 @@ def compose_card_with_background(
     bytes
         Encoded image bytes for a single panel.
     """
-    _ensure_macos_lib_path()
-    import pyvips
-
     # Support both parameter names for backward compatibility.
     _tile = bg_tile_bytes or bg_tile
     if _tile is not None:
-        base = _to_vips(_tile)
-        if base.hasalpha():
-            base = base.flatten(background=[0, 0, 0])
+        base = _to_pil(_tile).convert("RGBA")
     else:
-        # Parse CSS colour name to RGB.
         r, g, b = _parse_color(background)
-        base = pyvips.Image.black(panel_width, panel_height, bands=3) + [r, g, b]
-        base = base.cast("uchar").copy(interpretation="srgb")
+        base = Image.new("RGBA", (panel_width, panel_height), (r, g, b, 255))
 
     if card_bytes is not None:
-        card = _to_vips(card_bytes)
-        if card.hasalpha():
-            if not base.hasalpha():
-                base = base.addalpha()
-            # Ensure compatible colourspace for compositing.
-            base = base.copy(interpretation="srgb")
-            card = card.copy(interpretation="srgb")
-            base = base.composite2(card, "over")
-            base = base.flatten(background=[0, 0, 0])
-        else:
-            base = card
+        card = _to_pil(card_bytes).convert("RGBA")
+        base = Image.alpha_composite(base, card)
 
-    return _encode_vips_image(base, image_format)
+    return _encode_pil_image(base, image_format)
 
 
 def compose_touchstrip(
@@ -232,12 +194,8 @@ def compose_touchstrip(
     bytes
         Encoded touchscreen image bytes.
     """
-    _ensure_macos_lib_path()
-    import pyvips
-
     r, g, b = _parse_color(background)
-    canvas = pyvips.Image.black(touchscreen_width, touchscreen_height, bands=3) + [r, g, b]
-    canvas = canvas.cast("uchar").copy(interpretation="srgb")
+    canvas = Image.new("RGBA", (touchscreen_width, touchscreen_height), (r, g, b, 255))
 
     for index, card_data in enumerate(card_tiles):
         if index >= panel_count:
@@ -247,35 +205,18 @@ def compose_touchstrip(
             bg_tiles[index] if bg_tiles is not None and index < len(bg_tiles) else None
         )
 
+        panel: Image.Image | None = None
         if tile_bytes is not None:
-            tile_img = _to_vips(tile_bytes)
-            if tile_img.hasalpha():
-                tile_img = tile_img.flatten(background=[r, g, b])
-            panel = tile_img
-        else:
-            panel = None
+            panel = _to_pil(tile_bytes).convert("RGBA")
 
         if card_data is not None:
-            card_img = _to_vips(card_data)
-            if panel is not None:
-                if card_img.hasalpha():
-                    if not panel.hasalpha():
-                        panel = panel.addalpha()
-                    panel = panel.copy(interpretation="srgb")
-                    card_img = card_img.copy(interpretation="srgb")
-                    panel = panel.composite2(card_img, "over")
-                    panel = panel.flatten(background=[r, g, b])
-                else:
-                    panel = card_img
-            else:
-                if card_img.hasalpha():
-                    card_img = card_img.flatten(background=[r, g, b])
-                panel = card_img
+            card_img = _to_pil(card_data).convert("RGBA")
+            panel = Image.alpha_composite(panel, card_img) if panel is not None else card_img
 
         if panel is not None:
-            canvas = canvas.insert(panel, x_offset, 0)
+            canvas.paste(panel, (x_offset, 0))
 
-    return _encode_vips_image(canvas, image_format)
+    return _encode_pil_image(canvas, image_format)
 
 
 def render_blank_touchscreen(
