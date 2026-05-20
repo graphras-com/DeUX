@@ -99,7 +99,6 @@ from deux import (
     Theme,
     add_dui_path,
     set_active_theme,
-    render,
 )
 
 log = logging.getLogger(__name__)
@@ -109,8 +108,6 @@ log = logging.getLogger(__name__)
 # by name (e.g. ``DuiCard("AudioCard")``).
 EXAMPLES_DIR = Path(__file__).resolve().parent
 add_dui_path(EXAMPLES_DIR)
-
-render.set_svg_backend("resvg")
 
 # ===========================================================================
 # Time helpers (used by TimerController)

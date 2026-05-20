@@ -1,10 +1,10 @@
 """Explicit rendering context to replace module-level mutable globals.
 
-A :class:`RenderingContext` bundles theme, stylesheet, backend, and
-cache references that were previously kept as module-level singletons.
-Passing a context through the rendering pipeline eliminates global
-state races when two ``DeckManager`` instances with different themes
-operate concurrently in the same process.
+A :class:`RenderingContext` bundles theme and stylesheet references that
+were previously kept as module-level singletons.  Passing a context
+through the rendering pipeline eliminates global state races when two
+``DeckManager`` instances with different themes operate concurrently in
+the same process.
 
 The module-level globals are preserved as *defaults* — when no explicit
 context is supplied, functions fall back to the existing global state
@@ -42,9 +42,6 @@ class RenderingContext:
         overrides the module-level ``_active_stylesheet`` in
         :mod:`~deux.render.svg_rasterize` for the duration of the
         render.
-    backend_name : str or None
-        SVG backend name override.  ``None`` means "use the global
-        active backend".
 
     Examples
     --------
@@ -59,7 +56,6 @@ class RenderingContext:
 
     theme: Theme | None = None
     stylesheet: str | None = None
-    backend_name: str | None = None
 
     @classmethod
     def from_theme(cls, theme: Theme) -> RenderingContext:
@@ -96,15 +92,3 @@ class RenderingContext:
         if self.theme is not None:
             return self.theme.css
         return None
-
-    def resolve_backend(self) -> str:
-        """Return the effective backend name.
-
-        Falls back to ``"auto"`` when no explicit backend is set.
-
-        Returns
-        -------
-        str
-            Backend name.
-        """
-        return self.backend_name or "auto"

@@ -8,9 +8,12 @@ and :class:`~deux.runtime.renderer.DeckRenderer`.
 
 from __future__ import annotations
 
+import io
 import logging
 import xml.etree.ElementTree as ET
 from typing import Literal
+
+from PIL import Image
 
 from .._xml import safe_fromstring
 
@@ -222,8 +225,8 @@ class BackgroundLayer:
             self._rasterize_key()
 
     def _rasterize_touchstrip(self) -> None:
-        """Rasterize and slice a touchstrip background SVG using pyvips."""
-        from .svg_rasterize import _ensure_macos_lib_path, _svg_to_png
+        """Rasterize and slice a touchstrip background SVG using Pillow."""
+        from .svg_rasterize import _svg_to_png
 
         assert self._svg is not None  # noqa: S101 — invariant
 
@@ -232,19 +235,15 @@ class BackgroundLayer:
 
         png_data = _svg_to_png(self._svg, total_width, total_height)
 
-        _ensure_macos_lib_path()
-        import pyvips
-
-        full_img = pyvips.Image.new_from_buffer(png_data, "")
-        # Flatten alpha channel if present.
-        if full_img.hasalpha():
-            full_img = full_img.flatten(background=[0, 0, 0])
+        full_img = Image.open(io.BytesIO(png_data)).convert("RGB")
 
         tiles: list[bytes] = []
         for i in range(self._panel_count):
             x0 = i * self._panel_width
-            tile = full_img.crop(x0, 0, self._panel_width, total_height)
-            tiles.append(tile.write_to_buffer(".png"))
+            tile = full_img.crop((x0, 0, x0 + self._panel_width, total_height))
+            buf = io.BytesIO()
+            tile.save(buf, format="PNG")
+            tiles.append(buf.getvalue())
 
         self._tiles = tiles
         logger.debug(

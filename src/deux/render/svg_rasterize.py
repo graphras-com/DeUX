@@ -1,42 +1,14 @@
-"""SVG-to-image rasterisation with a pluggable backend registry.
-
-Built-in backends: ``cairo`` (CairoSVG), ``pyvips``, ``resvg`` (pure-Rust,
-zero system dependencies), and ``rsvg-cli`` (subprocess).  Third-party
-backends can be registered at runtime via :func:`register_svg_backend`.
+"""SVG-to-image rasterisation using the resvg pure-Rust backend.
 
 An application-wide CSS stylesheet can be set via
 :func:`set_svg_stylesheet`.  It is applied to every SVG before
-rasterisation — natively for pyvips, or by injecting a ``<style>``
-element for other backends.
+rasterisation by injecting a ``<style>`` element.
 
 SVG document manipulation helpers are provided for the SVG-native
 render pipeline: :func:`set_svg_dimensions`, :func:`inject_background_rect`,
 :func:`compose_svg_layers`, and :func:`slice_background_viewbox`.  These
 allow sizing, background injection, and multi-layer compositing to happen
 entirely at the SVG (vector) level before a single rasterisation pass.
-
-Examples
---------
-Select a specific backend::
-
-    from deux import set_svg_backend
-    set_svg_backend("pyvips")
-
-Set a global CSS stylesheet::
-
-    from deux import set_svg_stylesheet
-    set_svg_stylesheet(\"\"\".text-primary { color: #ff0000; }\"\"\")
-
-Register a custom backend::
-
-    from deux import SvgRasterizer, register_svg_backend, set_svg_backend
-
-    class MyRasterizer:
-        def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
-            ...
-
-    register_svg_backend("custom", MyRasterizer())
-    set_svg_backend("custom")
 """
 
 from __future__ import annotations
@@ -44,12 +16,8 @@ from __future__ import annotations
 import copy
 import io
 import logging
-import os
-import platform
-import subprocess
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Protocol, runtime_checkable
 
 from .._errors import DeuxError
 from .._xml import safe_fromstring
@@ -57,405 +25,92 @@ from .context import RenderingContext
 
 logger = logging.getLogger(__name__)
 
-def _ensure_macos_lib_path() -> None:
-    """Set ``DYLD_FALLBACK_LIBRARY_PATH`` on macOS if Homebrew libs exist.
-
-    macOS SIP strips ``DYLD_*`` variables from child processes, so
-    Homebrew-installed C libraries (libcairo, libvips, etc.) are not
-    found by default.  This sets the fallback path once so that
-    ``cffi``/``ctypes`` can locate them.
-    """
-    if platform.system() == "Darwin":
-        brew_lib = Path("/opt/homebrew/lib")
-        if brew_lib.exists():
-            os.environ.setdefault("DYLD_FALLBACK_LIBRARY_PATH", str(brew_lib))
-
 
 class RasterizeError(DeuxError):
     """Raised when SVG rasterisation fails."""
 
 
-@runtime_checkable
-class SvgRasterizer(Protocol):
-    """Protocol for SVG-to-PNG rasterisation backends.
-
-    Any object that implements :meth:`rasterize` with the correct
-    signature can be used as a backend.
-    """
-
-    def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
-        """Convert raw SVG bytes to PNG bytes.
-
-        Parameters
-        ----------
-        svg_data : bytes
-            Raw SVG content.
-        width : int
-            Desired output width in pixels.
-        height : int
-            Desired output height in pixels.
-
-        Returns
-        -------
-        bytes
-            Rasterised PNG image bytes.
-
-        Raises
-        ------
-        RasterizeError
-            If rasterisation fails.
-        """
-        pass  # pragma: no cover
-
-
 # ---------------------------------------------------------------------------
-# Built-in backend implementations
+# Resvg rasteriser
 # ---------------------------------------------------------------------------
 
-
-class CairoRasterizer:
-    """SVG rasteriser using CairoSVG.
-
-    The ``cairosvg`` package is imported lazily on first call so that the
-    module can be imported even when CairoSVG is not installed.
-    """
-
-    def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
-        """Rasterise *svg_data* to PNG via ``cairosvg.svg2png``.
-
-        Parameters
-        ----------
-        svg_data : bytes
-            Raw SVG content.
-        width : int
-            Desired output width in pixels.
-        height : int
-            Desired output height in pixels.
-
-        Returns
-        -------
-        bytes
-            PNG image bytes.
-
-        Raises
-        ------
-        RasterizeError
-            If CairoSVG is not installed or the underlying C library
-            cannot be loaded.
-        """
-        try:
-            _ensure_macos_lib_path()
-
-            import cairosvg
-
-            result: bytes = cairosvg.svg2png(
-                bytestring=svg_data,
-                output_width=width,
-                output_height=height,
-            )
-            return result
-        except (OSError, ImportError) as exc:
-            raise RasterizeError(f"cairosvg unavailable: {exc}") from exc
-        except Exception as exc:
-            raise RasterizeError(f"cairosvg rasterisation failed: {exc}") from exc
+_SVG_NS = "http://www.w3.org/2000/svg"
+_XLINK_NS = "http://www.w3.org/1999/xlink"
 
 
-class PyvipsRasterizer:
-    """SVG rasteriser using pyvips.
-
-    The ``pyvips`` package is imported lazily on first call so that the
-    module can be imported even when pyvips is not installed.
-    """
-
-    def rasterize(
-        self,
-        svg_data: bytes,
-        width: int,
-        height: int,
-        *,
-        stylesheet: str | None = None,
-    ) -> bytes:
-        """Rasterise *svg_data* to PNG via ``pyvips``.
-
-        Parameters
-        ----------
-        svg_data : bytes
-            Raw SVG content.
-        width : int
-            Desired output width in pixels.
-        height : int
-            Desired output height in pixels.
-        stylesheet : str or None, optional
-            CSS stylesheet text to apply during rasterisation.  Passed
-            to ``pyvips.Image.svgload_buffer`` as the ``stylesheet``
-            parameter (requires librsvg >= 2.48).
-
-        Returns
-        -------
-        bytes
-            PNG image bytes.
-
-        Raises
-        ------
-        RasterizeError
-            If pyvips is not installed or SVG loading fails.
-        """
-        try:
-            _ensure_macos_lib_path()
-            import pyvips
-
-            # Suppress noisy libvips GLib messages (e.g. "threadpool completed")
-            # by raising the pyvips logger threshold to WARNING.
-            logging.getLogger("pyvips").setLevel(logging.WARNING)
-
-            load_kwargs: dict[str, str] = {}
-            if stylesheet is not None:
-                load_kwargs["stylesheet"] = stylesheet
-
-            image = pyvips.Image.svgload_buffer(svg_data, **load_kwargs)
-            # Scale to fit the requested dimensions.
-            h_scale = width / image.width
-            v_scale = height / image.height
-            image = image.resize(h_scale, vscale=v_scale)
-            png_bytes: bytes = image.write_to_buffer(".png")
-            return png_bytes
-        except (OSError, ImportError) as exc:
-            raise RasterizeError(f"pyvips unavailable: {exc}") from exc
-        except Exception as exc:
-            raise RasterizeError(f"pyvips rasterisation failed: {exc}") from exc
-
-
-class ResvgRasterizer:
-    """SVG rasteriser using the ``resvg`` pure-Rust Python binding.
-
-    The ``resvg`` package is imported lazily on first call so that the
-    module can be imported even when resvg is not installed.  resvg is a
-    pure-Rust SVG renderer with zero system dependencies — it ships as a
-    self-contained platform wheel.
+def _resvg_rasterize(svg_data: bytes, width: int, height: int) -> bytes:
+    """Rasterise SVG bytes to PNG via the ``resvg`` Rust binding.
 
     To control output dimensions, the SVG ``width`` and ``height``
     attributes are set to the requested size before parsing.  A
     ``viewBox`` is added (preserving the original design dimensions) if
     one is not already present, so the resvg engine performs
     vector-level scaling.
-    """
-
-    def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
-        """Rasterise *svg_data* to PNG via the ``resvg`` Rust binding.
-
-        Parameters
-        ----------
-        svg_data : bytes
-            Raw SVG content.
-        width : int
-            Desired output width in pixels.
-        height : int
-            Desired output height in pixels.
-
-        Returns
-        -------
-        bytes
-            PNG image bytes.
-
-        Raises
-        ------
-        RasterizeError
-            If ``resvg`` is not installed or SVG parsing/rendering fails.
-        """
-        try:
-            from resvg import render as _resvg_render
-            from resvg import usvg
-
-            # Set width/height on the SVG so resvg outputs at the
-            # requested dimensions.  Preserve the original viewBox (or
-            # synthesise one from the original width/height) so content
-            # scales correctly.
-            svg_text = svg_data.decode("utf-8")
-            root = safe_fromstring(svg_data)
-            if "viewBox" not in root.attrib:
-                orig_w = root.get("width", str(width))
-                orig_h = root.get("height", str(height))
-                # Strip non-numeric units (e.g. "100px" -> "100")
-                orig_w = "".join(c for c in orig_w if c.isdigit() or c == ".")
-                orig_h = "".join(c for c in orig_h if c.isdigit() or c == ".")
-                root.set("viewBox", f"0 0 {orig_w} {orig_h}")
-            root.set("width", str(width))
-            root.set("height", str(height))
-
-            ET.register_namespace("", _SVG_NS)
-            ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
-            svg_text = ET.tostring(root, encoding="unicode", xml_declaration=False)
-
-            opts = usvg.Options.default()
-            opts.load_system_fonts()
-            tree = usvg.Tree.from_str(svg_text, opts)
-
-            # Identity transform in row-major Affine format (a, b, c, d, e, f):
-            #   | a  b  c |   | 1  0  0 |
-            #   | d  e  f | = | 0  1  0 |
-            #   | 0  0  1 |   | 0  0  1 |
-            # Dimensions are baked into the SVG attributes.
-            png_bytes: bytes = _resvg_render(tree, (1.0, 0.0, 0.0, 0.0, 1.0, 0.0))
-            return png_bytes
-        except ImportError as exc:
-            raise RasterizeError(f"resvg unavailable: {exc}") from exc
-        except Exception as exc:
-            raise RasterizeError(f"resvg rasterisation failed: {exc}") from exc
-
-
-class RsvgCliRasterizer:
-    """SVG rasteriser using the ``rsvg-convert`` CLI tool."""
-
-    def rasterize(self, svg_data: bytes, width: int, height: int) -> bytes:
-        """Rasterise *svg_data* to PNG via the ``rsvg-convert`` subprocess.
-
-        Parameters
-        ----------
-        svg_data : bytes
-            Raw SVG content.
-        width : int
-            Desired output width in pixels.
-        height : int
-            Desired output height in pixels.
-
-        Returns
-        -------
-        bytes
-            PNG image bytes.
-
-        Raises
-        ------
-        RasterizeError
-            If ``rsvg-convert`` is not found or the subprocess fails.
-        """
-        try:
-            result = subprocess.run(
-                [
-                    "rsvg-convert",
-                    "--width",
-                    str(width),
-                    "--height",
-                    str(height),
-                    "--format",
-                    "png",
-                ],
-                input=svg_data,
-                capture_output=True,
-                check=True,
-                timeout=10,
-            )
-            return result.stdout
-        except (FileNotFoundError, subprocess.SubprocessError) as exc:
-            raise RasterizeError(f"rsvg-convert unavailable: {exc}") from exc
-
-
-# ---------------------------------------------------------------------------
-# Backend registry
-# ---------------------------------------------------------------------------
-
-_registry: dict[str, SvgRasterizer] = {}
-_active_backend: str | None = None
-_active_stylesheet: str | None = None
-
-
-def register_svg_backend(name: str, backend: SvgRasterizer) -> None:
-    """Register an SVG rasterisation backend.
 
     Parameters
     ----------
-    name : str
-        Unique name for the backend (e.g. ``"cairo"``, ``"pyvips"``).
-    backend : SvgRasterizer
-        An object implementing the :class:`SvgRasterizer` protocol.
+    svg_data : bytes
+        Raw SVG content.
+    width : int
+        Desired output width in pixels.
+    height : int
+        Desired output height in pixels.
+
+    Returns
+    -------
+    bytes
+        PNG image bytes.
 
     Raises
     ------
-    TypeError
-        If *backend* does not implement :class:`SvgRasterizer`.
-    """
-    if not isinstance(backend, SvgRasterizer):
-        raise TypeError(
-            f"backend must implement SvgRasterizer protocol, got {type(backend).__name__}"
-        )
-    _registry[name] = backend
-    logger.debug("Registered SVG backend %r", name)
-
-
-def set_svg_backend(name: str, *, verify: bool = True) -> None:
-    """Select the active SVG rasterisation backend by name.
-
-    By default, performs a smoke test to verify the backend can
-    rasterise a trivial SVG.  Pass ``verify=False`` to skip.
-
-    Parameters
-    ----------
-    name : str
-        Name of a previously registered backend, or ``"auto"`` to use
-        automatic fallback ordering.
-    verify : bool, default=True
-        When *True*, render a tiny SVG to confirm the backend works.
-        Raises :class:`RasterizeError` immediately if it does not.
-
-    Raises
-    ------
-    ValueError
-        If *name* is not ``"auto"`` and has not been registered.
     RasterizeError
-        If *verify* is True and the backend cannot rasterise.
+        If ``resvg`` is not installed or SVG parsing/rendering fails.
     """
-    global _active_backend  # noqa: PLW0603
-    if name != "auto" and name not in _registry:
-        raise ValueError(
-            f"Unknown SVG backend {name!r}. "
-            f"Registered backends: {', '.join(sorted(_registry)) or '(none)'}"
-        )
-    if verify and name != "auto":
-        _test_svg = (
-            b'<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1">'
-            b'<rect width="1" height="1"/></svg>'
-        )
-        _registry[name].rasterize(_test_svg, 1, 1)
-    _active_backend = name
-    logger.debug("Active SVG backend set to %r", name)
+    try:
+        from resvg import render as _resvg_render
+        from resvg import usvg
 
+        root = safe_fromstring(svg_data)
+        if "viewBox" not in root.attrib:
+            orig_w = root.get("width", str(width))
+            orig_h = root.get("height", str(height))
+            # Strip non-numeric units (e.g. "100px" -> "100")
+            orig_w = "".join(c for c in orig_w if c.isdigit() or c == ".")
+            orig_h = "".join(c for c in orig_h if c.isdigit() or c == ".")
+            root.set("viewBox", f"0 0 {orig_w} {orig_h}")
+        root.set("width", str(width))
+        root.set("height", str(height))
 
-def get_svg_backend() -> str:
-    """Return the name of the currently active SVG backend.
+        ET.register_namespace("", _SVG_NS)
+        ET.register_namespace("xlink", _XLINK_NS)
+        svg_text = ET.tostring(root, encoding="unicode", xml_declaration=False)
 
-    Returns
-    -------
-    str
-        ``"auto"`` when no explicit backend has been chosen, otherwise
-        the name passed to :func:`set_svg_backend`.
-    """
-    return _active_backend or "auto"
+        opts = usvg.Options.default()
+        opts.load_system_fonts()
+        tree = usvg.Tree.from_str(svg_text, opts)
 
-
-def list_svg_backends() -> list[str]:
-    """Return the names of all registered SVG backends.
-
-    Returns
-    -------
-    list[str]
-        Sorted list of registered backend names.
-    """
-    return sorted(_registry)
+        png_bytes: bytes = _resvg_render(tree, (1.0, 0.0, 0.0, 0.0, 1.0, 0.0))
+        return png_bytes
+    except ImportError as exc:
+        raise RasterizeError(f"resvg unavailable: {exc}") from exc
+    except Exception as exc:
+        raise RasterizeError(f"resvg rasterisation failed: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------
 # Application-wide CSS stylesheet
 # ---------------------------------------------------------------------------
 
+_active_stylesheet: str | None = None
+
 
 def set_svg_stylesheet(css: str | None) -> None:
     """Set an application-wide CSS stylesheet for SVG rasterisation.
 
-    The stylesheet is applied to every SVG before rasterisation.  When
-    the pyvips backend is active, the CSS is passed via the native
-    ``stylesheet`` parameter (requires librsvg >= 2.48).  For all other
-    backends the CSS is injected as a ``<style>`` element **before** any
-    existing ``<style>`` elements in the SVG, so that per-package styles
-    can override the application defaults.
+    The stylesheet is applied to every SVG before rasterisation by
+    injecting a ``<style>`` element **before** any existing ``<style>``
+    elements in the SVG, so that per-package styles can override the
+    application defaults.
 
     Pass ``None`` to clear the stylesheet.
 
@@ -470,9 +125,7 @@ def set_svg_stylesheet(css: str | None) -> None:
 
         from deux import set_svg_stylesheet
 
-        set_svg_stylesheet(\"\"\"
-            .text-primary { color: #ff0000; }
-        \"\"\")
+        set_svg_stylesheet(\"\"\".text-primary { color: #ff0000; }\"\"\")
     """
     global _active_stylesheet  # noqa: PLW0603
     _active_stylesheet = css
@@ -524,9 +177,6 @@ def load_svg_stylesheet(path: str | Path) -> None:
     set_svg_stylesheet(css)
 
 
-_SVG_NS = "http://www.w3.org/2000/svg"
-
-
 def _inject_stylesheet(svg_data: bytes, css: str) -> bytes:
     """Inject a ``<style>`` element into SVG bytes as the first child.
 
@@ -549,7 +199,7 @@ def _inject_stylesheet(svg_data: bytes, css: str) -> bytes:
     """
     # Register the SVG namespace so ET doesn't emit ns0: prefixes.
     ET.register_namespace("", _SVG_NS)
-    ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
+    ET.register_namespace("xlink", _XLINK_NS)
 
     root = safe_fromstring(svg_data)  # untrusted: may contain user SVG
 
@@ -564,10 +214,8 @@ def _inject_stylesheet(svg_data: bytes, css: str) -> bytes:
 
 
 # ---------------------------------------------------------------------------
-# Auto-fallback ordering
+# Public rasterisation entry points
 # ---------------------------------------------------------------------------
-
-_AUTO_ORDER: tuple[str, ...] = ("pyvips", "cairo", "resvg", "rsvg-cli")
 
 
 def _svg_to_png(
@@ -577,23 +225,14 @@ def _svg_to_png(
     *,
     ctx: RenderingContext | None = None,
 ) -> bytes:
-    """Convert SVG bytes to PNG bytes using the active backend.
-
-    When the backend is ``"auto"`` (the default), tries each registered
-    backend in order: pyvips -> cairo -> rsvg-cli.
+    """Convert SVG bytes to PNG bytes using resvg.
 
     If an application-wide stylesheet has been set via
-    :func:`set_svg_stylesheet`, it is applied before rasterisation.
-    For the pyvips backend the stylesheet is passed natively; for all
-    other backends it is injected as a ``<style>`` element.
+    :func:`set_svg_stylesheet`, it is injected as a ``<style>`` element
+    before rasterisation.
 
-    When *ctx* is provided, its stylesheet and backend override the
-    module-level globals, allowing concurrent renders with different
-    themes.
-
-    .. deprecated::
-        Use :func:`_rasterize_svg` for new code.  This function is
-        retained for backward compatibility.
+    When *ctx* is provided, its stylesheet overrides the module-level
+    global, allowing concurrent renders with different themes.
 
     Parameters
     ----------
@@ -615,64 +254,14 @@ def _svg_to_png(
     Raises
     ------
     RasterizeError
-        If no SVG renderer backend is available or the selected backend
-        fails.
+        If resvg is not available or rasterisation fails.
     """
-    if ctx is not None:
-        backend_name = ctx.resolve_backend()
-        css = ctx.resolve_stylesheet()
-    else:
-        backend_name = _active_backend or "auto"
-        css = _active_stylesheet
-    return _resolve_and_rasterize(backend_name, css, svg_data, width, height)
-
-
-def _rasterize_with_stylesheet(
-    backend: SvgRasterizer,
-    name: str,
-    svg_data: bytes,
-    width: int,
-    height: int,
-    css: str | None,
-) -> bytes:
-    """Rasterise SVG data, applying the stylesheet appropriately.
-
-    For the pyvips backend, the stylesheet is passed via the native
-    ``stylesheet`` keyword argument.  For all other backends the
-    stylesheet is injected as a ``<style>`` element into the SVG data.
-
-    Parameters
-    ----------
-    backend : SvgRasterizer
-        The rasterisation backend instance.
-    name : str
-        The registered name of the backend.
-    svg_data : bytes
-        Raw SVG content.
-    width : int
-        Desired output width in pixels.
-    height : int
-        Desired output height in pixels.
-    css : str or None
-        CSS stylesheet text, or ``None`` if no stylesheet is active.
-
-    Returns
-    -------
-    bytes
-        Rasterised PNG image bytes.
-    """
-    if css is not None and name == "pyvips" and isinstance(backend, PyvipsRasterizer):
-        return backend.rasterize(svg_data, width, height, stylesheet=css)
+    css = ctx.resolve_stylesheet() if ctx is not None else _active_stylesheet
 
     if css is not None:
         svg_data = _inject_stylesheet(svg_data, css)
 
-    return backend.rasterize(svg_data, width, height)
-
-
-# ---------------------------------------------------------------------------
-# Direct output-format rasterisation
-# ---------------------------------------------------------------------------
+    return _resvg_rasterize(svg_data, width, height)
 
 
 def _rasterize_svg(
@@ -686,15 +275,11 @@ def _rasterize_svg(
 ) -> bytes:
     """Rasterise SVG bytes directly to the requested image format.
 
-    This is the preferred entry point for the SVG-native pipeline.
-    It bypasses the PNG intermediate when the active backend supports
-    direct JPEG output (currently pyvips).  For backends that only
-    produce PNG, the PNG bytes are re-encoded via Pillow when a
+    Rasterises to PNG via resvg, then re-encodes via Pillow when a
     different format is requested.
 
-    When *ctx* is provided, its stylesheet and backend override the
-    module-level globals, allowing concurrent renders with different
-    themes.
+    When *ctx* is provided, its stylesheet overrides the module-level
+    global, allowing concurrent renders with different themes.
 
     Parameters
     ----------
@@ -720,7 +305,7 @@ def _rasterize_svg(
     Raises
     ------
     RasterizeError
-        If no SVG renderer backend is available or rasterisation fails.
+        If resvg is not available or rasterisation fails.
     ValueError
         If *output_format* is not one of ``"png"``, ``"jpeg"``, ``"bmp"``.
     """
@@ -728,121 +313,25 @@ def _rasterize_svg(
     if fmt not in ("png", "jpeg", "bmp"):
         raise ValueError(f"Unsupported output format: {output_format!r}")
 
-    if ctx is not None:
-        backend_name = ctx.resolve_backend()
-        css = ctx.resolve_stylesheet()
-    else:
-        backend_name = _active_backend or "auto"
-        css = _active_stylesheet
-
-    # Try to get PNG bytes first (the universal intermediate).
-    png_bytes = _resolve_and_rasterize(backend_name, css, svg_data, width, height)
+    png_bytes = _svg_to_png(svg_data, width, height, ctx=ctx)
 
     if fmt == "png":
         return png_bytes
 
-    # Convert from PNG using pyvips where possible.
-    try:
-        _ensure_macos_lib_path()
-        import pyvips
+    from PIL import Image as _PILImage
 
-        vimg = pyvips.Image.new_from_buffer(png_bytes, "")
-        # Flatten alpha onto white for JPEG (no transparency support).
-        if vimg.hasalpha():
-            vimg = vimg.flatten(background=[0, 0, 0])
-        if fmt == "jpeg":
-            return vimg.write_to_buffer(".jpg", Q=quality)  # type: ignore[no-any-return]
-        # BMP: pyvips doesn't support BMP natively, fall back to PIL.
-        from PIL import Image as _PILImage
-
-        buf = io.BytesIO(vimg.write_to_buffer(".png"))
-        img = _PILImage.open(buf).convert("RGB")
-        out = io.BytesIO()
-        img.save(out, format="BMP")
-        return out.getvalue()
-    except (OSError, ImportError):
-        # Fallback: PIL for both formats if pyvips unavailable.
-        from PIL import Image as _PILImage
-
-        img = _PILImage.open(io.BytesIO(png_bytes)).convert("RGB")
-        buf = io.BytesIO()
-        if fmt == "jpeg":
-            img.save(buf, format="JPEG", quality=quality)
-        else:
-            img.save(buf, format="BMP")
-        return buf.getvalue()
-
-
-def _resolve_and_rasterize(
-    backend_name: str,
-    css: str | None,
-    svg_data: bytes,
-    width: int,
-    height: int,
-) -> bytes:
-    """Select a backend and rasterise to PNG bytes.
-
-    Extracted from :func:`_svg_to_png` to share logic with
-    :func:`_rasterize_svg`.
-
-    Parameters
-    ----------
-    backend_name : str
-        Backend name or ``"auto"``.
-    css : str or None
-        Active CSS stylesheet text.
-    svg_data : bytes
-        Raw SVG content.
-    width : int
-        Desired output width in pixels.
-    height : int
-        Desired output height in pixels.
-
-    Returns
-    -------
-    bytes
-        PNG image bytes.
-
-    Raises
-    ------
-    RasterizeError
-        If no backend is available.
-    """
-    if backend_name != "auto":
-        backend = _registry[backend_name]
-        return _rasterize_with_stylesheet(backend, backend_name, svg_data, width, height, css)
-
-    errors: list[str] = []
-    for name in _AUTO_ORDER:
-        auto_backend = _registry.get(name)
-        if auto_backend is None:
-            continue
-        try:
-            return _rasterize_with_stylesheet(
-                auto_backend, name, svg_data, width, height, css
-            )
-        except RasterizeError as exc:
-            logger.debug("Backend %r failed: %s", name, exc)
-            errors.append(f"  - {name}: {exc}")
-
-    error_detail = "\n".join(errors) if errors else "  (no backends registered)"
-    raise RasterizeError(
-        "No SVG renderer available. Install one of:\n"
-        "  - Python package: pip install resvg  (recommended, no system deps)\n"
-        "  - System library: brew install cairo  (macOS) or apt install libcairo2 "
-        "(Linux)\n"
-        "  - CLI tool: apt install librsvg2-bin\n"
-        "  - Python package: pip install cairosvg\n"
-        "  - Python package: pip install pyvips\n"
-        "\nBackend errors:\n" + error_detail
-    )
+    img = _PILImage.open(io.BytesIO(png_bytes)).convert("RGB")
+    buf = io.BytesIO()
+    if fmt == "jpeg":
+        img.save(buf, format="JPEG", quality=quality)
+    else:
+        img.save(buf, format="BMP")
+    return buf.getvalue()
 
 
 # ---------------------------------------------------------------------------
 # SVG document manipulation helpers
 # ---------------------------------------------------------------------------
-
-_XLINK_NS = "http://www.w3.org/1999/xlink"
 
 
 def set_svg_dimensions(root: ET.Element, width: int, height: int) -> None:
@@ -964,13 +453,3 @@ def compose_svg_layers(
         wrapper.append(layer)
 
     return wrapper
-
-
-# ---------------------------------------------------------------------------
-# Register built-in backends at import time
-# ---------------------------------------------------------------------------
-
-register_svg_backend("cairo", CairoRasterizer())
-register_svg_backend("pyvips", PyvipsRasterizer())
-register_svg_backend("resvg", ResvgRasterizer())
-register_svg_backend("rsvg-cli", RsvgCliRasterizer())

@@ -308,7 +308,7 @@ class Card(ABC):
         rendered = self.render()
         self.set_rendered(rendered)
 
-        # Convert PIL Image to PNG bytes for pyvips-based compositing.
+        # Convert PIL Image to PNG bytes for compositing.
         card_bytes: bytes | None = None
         if rendered is not None:
             import io
