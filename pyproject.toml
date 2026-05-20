@@ -33,13 +33,16 @@ dependencies = [
     "pyyaml>=6.0",
     "platformdirs>=4.0",
     "defusedxml>=0.7.0",
-    "resvg>=0.2.0",
+    "resvg @ git+https://github.com/graphras-com/resvg-py.git@main",
 ]
 
 [project.urls]
 Homepage = "https://github.com/Graphras-com/DeUX"
 Repository = "https://github.com/Graphras-com/DeUX"
 Issues = "https://github.com/Graphras-com/DeUX/issues"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.version]
 source = "vcs"

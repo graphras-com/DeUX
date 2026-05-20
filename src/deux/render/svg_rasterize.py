@@ -18,10 +18,14 @@ import io
 import logging
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .._errors import DeuxError
 from .._xml import safe_fromstring
 from .context import RenderingContext
+
+if TYPE_CHECKING:
+    from PIL import Image
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +95,65 @@ def _resvg_rasterize(svg_data: bytes, width: int, height: int) -> bytes:
 
         png_bytes: bytes = _resvg_render(tree, (1.0, 0.0, 0.0, 0.0, 1.0, 0.0))
         return png_bytes
+    except ImportError as exc:
+        raise RasterizeError(f"resvg unavailable: {exc}") from exc
+    except Exception as exc:
+        raise RasterizeError(f"resvg rasterisation failed: {exc}") from exc
+
+
+def _resvg_rasterize_rgba(
+    svg_data: bytes, width: int, height: int
+) -> tuple[bytes, int, int]:
+    """Rasterise SVG bytes to raw RGBA pixels via the ``resvg`` Rust binding.
+
+    Uses :func:`resvg.render_rgba` to obtain the pixel buffer directly,
+    avoiding the PNG encode/decode round-trip incurred by
+    :func:`_resvg_rasterize`.
+
+    Parameters
+    ----------
+    svg_data : bytes
+        Raw SVG content.
+    width : int
+        Desired output width in pixels.
+    height : int
+        Desired output height in pixels.
+
+    Returns
+    -------
+    tuple[bytes, int, int]
+        A ``(rgba_bytes, width, height)`` tuple where *rgba_bytes*
+        contains ``width * height * 4`` pre-multiplied RGBA bytes.
+
+    Raises
+    ------
+    RasterizeError
+        If ``resvg`` is not installed or SVG parsing/rendering fails.
+    """
+    try:
+        from resvg import render_rgba as _resvg_render_rgba
+        from resvg import usvg
+
+        root = safe_fromstring(svg_data)
+        if "viewBox" not in root.attrib:
+            orig_w = root.get("width", str(width))
+            orig_h = root.get("height", str(height))
+            orig_w = "".join(c for c in orig_w if c.isdigit() or c == ".")
+            orig_h = "".join(c for c in orig_h if c.isdigit() or c == ".")
+            root.set("viewBox", f"0 0 {orig_w} {orig_h}")
+        root.set("width", str(width))
+        root.set("height", str(height))
+
+        ET.register_namespace("", _SVG_NS)
+        ET.register_namespace("xlink", _XLINK_NS)
+        svg_text = ET.tostring(root, encoding="unicode", xml_declaration=False)
+
+        opts = usvg.Options.default()
+        opts.load_system_fonts()
+        tree = usvg.Tree.from_str(svg_text, opts)
+
+        rgba_bytes, w, h = _resvg_render_rgba(tree, (1.0, 0.0, 0.0, 0.0, 1.0, 0.0))
+        return bytes(rgba_bytes), w, h
     except ImportError as exc:
         raise RasterizeError(f"resvg unavailable: {exc}") from exc
     except Exception as exc:
@@ -264,6 +327,61 @@ def _svg_to_png(
     return _resvg_rasterize(svg_data, width, height)
 
 
+def _svg_to_image(
+    svg_data: bytes,
+    width: int,
+    height: int,
+    *,
+    mode: str = "RGBA",
+    ctx: RenderingContext | None = None,
+) -> Image.Image:
+    """Convert SVG bytes to a PIL :class:`~PIL.Image.Image` without a PNG round-trip.
+
+    Uses :func:`_resvg_rasterize_rgba` to obtain raw RGBA pixels and
+    constructs a PIL Image via :func:`Image.frombuffer`, bypassing the
+    PNG encode/decode cycle that :func:`_svg_to_png` requires.
+
+    If an application-wide stylesheet has been set via
+    :func:`set_svg_stylesheet`, it is injected before rasterisation.
+
+    Parameters
+    ----------
+    svg_data : bytes
+        Raw SVG content.
+    width : int
+        Desired output width in pixels.
+    height : int
+        Desired output height in pixels.
+    mode : str, default="RGBA"
+        PIL image mode for the result (e.g. ``"RGBA"`` or ``"RGB"``).
+    ctx : RenderingContext or None, optional
+        Explicit rendering context.  When ``None``, falls back to
+        module-level globals.
+
+    Returns
+    -------
+    Image.Image
+        Rasterised image as a PIL Image in the requested *mode*.
+
+    Raises
+    ------
+    RasterizeError
+        If resvg is not available or rasterisation fails.
+    """
+    from PIL import Image
+
+    css = ctx.resolve_stylesheet() if ctx is not None else _active_stylesheet
+
+    if css is not None:
+        svg_data = _inject_stylesheet(svg_data, css)
+
+    rgba_bytes, w, h = _resvg_rasterize_rgba(svg_data, width, height)
+    img = Image.frombuffer("RGBA", (w, h), rgba_bytes, "raw", "RGBA", 0, 1)
+    if mode != "RGBA":
+        img = img.convert(mode)
+    return img
+
+
 def _rasterize_svg(
     svg_data: bytes,
     width: int,
@@ -275,8 +393,10 @@ def _rasterize_svg(
 ) -> bytes:
     """Rasterise SVG bytes directly to the requested image format.
 
-    Rasterises to PNG via resvg, then re-encodes via Pillow when a
-    different format is requested.
+    For PNG output, rasterises via resvg and returns the encoded PNG
+    bytes directly.  For JPEG and BMP, rasterises to raw RGBA pixels
+    (bypassing a PNG round-trip), converts to a PIL Image, and
+    re-encodes in the target format.
 
     When *ctx* is provided, its stylesheet overrides the module-level
     global, allowing concurrent renders with different themes.
@@ -313,14 +433,10 @@ def _rasterize_svg(
     if fmt not in ("png", "jpeg", "bmp"):
         raise ValueError(f"Unsupported output format: {output_format!r}")
 
-    png_bytes = _svg_to_png(svg_data, width, height, ctx=ctx)
-
     if fmt == "png":
-        return png_bytes
+        return _svg_to_png(svg_data, width, height, ctx=ctx)
 
-    from PIL import Image as _PILImage
-
-    img = _PILImage.open(io.BytesIO(png_bytes)).convert("RGB")
+    img = _svg_to_image(svg_data, width, height, mode="RGB", ctx=ctx)
     buf = io.BytesIO()
     if fmt == "jpeg":
         img.save(buf, format="JPEG", quality=quality)

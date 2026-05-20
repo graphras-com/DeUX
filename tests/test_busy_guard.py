@@ -45,6 +45,18 @@ def _fake_png(width: int = 120, height: int = 120) -> bytes:
     return buf.getvalue()
 
 
+def _fake_image(
+    svg_data: bytes,
+    width: int = 120,
+    height: int = 120,
+    *,
+    mode: str = "RGBA",
+    ctx: object = None,
+) -> Image.Image:
+    """Return a minimal valid PIL Image for mocking ``_svg_to_image``."""
+    return Image.new(mode, (width, height), "black")
+
+
 def _make_card_spec(
     spinner: SpinnerSpec | None = None,
     bindings: dict[str, Binding] | None = None,
@@ -132,8 +144,8 @@ class TestCardBusyState:
         assert card.is_dirty is False
 
     @patch(
-        "deux.render.svg_rasterize._svg_to_png",
-        side_effect=lambda b, w, h: _fake_png(w, h),
+        "deux.render.svg_rasterize._svg_to_image",
+        side_effect=_fake_image,
     )
     async def test_card_spinner_starts_and_stops(self, mock_raster):
         spinner = SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=4)
@@ -150,8 +162,8 @@ class TestCardBusyState:
         assert card.is_animating is False
 
     @patch(
-        "deux.render.svg_rasterize._svg_to_png",
-        side_effect=lambda b, w, h: _fake_png(w, h),
+        "deux.render.svg_rasterize._svg_to_image",
+        side_effect=_fake_image,
     )
     async def test_card_spinner_uses_rendered_svg(self, mock_raster):
         """Spinner frames should include current binding values."""
@@ -239,8 +251,8 @@ class TestKeyBusyState:
         assert key._dirty is False
 
     @patch(
-        "deux.render.svg_rasterize._svg_to_png",
-        side_effect=lambda b, w, h: _fake_png(w, h),
+        "deux.render.svg_rasterize._svg_to_image",
+        side_effect=_fake_image,
     )
     async def test_key_spinner_starts_and_stops(self, mock_raster):
         spinner = SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=4)
@@ -257,8 +269,8 @@ class TestKeyBusyState:
         assert key.is_animating is False
 
     @patch(
-        "deux.render.svg_rasterize._svg_to_png",
-        side_effect=lambda b, w, h: _fake_png(w, h),
+        "deux.render.svg_rasterize._svg_to_image",
+        side_effect=_fake_image,
     )
     async def test_key_spinner_uses_rendered_svg(self, mock_raster):
         """Spinner frames should include current binding values."""
@@ -391,8 +403,8 @@ class TestCancellationDuringRasterisation:
     """Verify that cancelling during offloaded rasterisation is handled."""
 
     @patch(
-        "deux.render.svg_rasterize._svg_to_png",
-        side_effect=lambda b, w, h: _fake_png(w, h),
+        "deux.render.svg_rasterize._svg_to_image",
+        side_effect=_fake_image,
     )
     async def test_card_cancel_during_spinner_start(self, mock_raster):
         """Cancelling the task that runs start_busy should not leave broken state."""
@@ -416,8 +428,8 @@ class TestCancellationDuringRasterisation:
         await card.finish_busy()
 
     @patch(
-        "deux.render.svg_rasterize._svg_to_png",
-        side_effect=lambda b, w, h: _fake_png(w, h),
+        "deux.render.svg_rasterize._svg_to_image",
+        side_effect=_fake_image,
     )
     async def test_key_cancel_during_spinner_start(self, mock_raster):
         """Cancelling the task that runs start_busy on a key should not leave broken state."""

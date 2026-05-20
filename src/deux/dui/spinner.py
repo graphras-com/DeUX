@@ -211,9 +211,7 @@ class SpinnerFrames:
                 frame_img = frame_img.resize(
                     (self._width, self._height), Image.Resampling.LANCZOS
                 )
-            buf = io.BytesIO()
-            frame_img.save(buf, format="PNG")
-            frames.append(self._composite_on_bg(buf.getvalue()))
+            frames.append(self._composite_on_bg(frame_img.convert("RGBA")))
         return frames
 
     def _load_gif_frames(self, data: bytes) -> list[bytes]:
@@ -241,9 +239,7 @@ class SpinnerFrames:
                 frame = frame.resize(
                     (self._width, self._height), Image.Resampling.LANCZOS
                 )
-            buf = io.BytesIO()
-            frame.save(buf, format="PNG")
-            frames.append(self._composite_on_bg(buf.getvalue()))
+            frames.append(self._composite_on_bg(frame))
 
         if not frames:
             logger.warning("Animated GIF has no frames; returning blank frames")
@@ -268,21 +264,19 @@ class SpinnerFrames:
             data = self._encode_blank()
         return [data] * self._spinner.frames
 
-    def _composite_on_bg(self, png_data: bytes) -> bytes:
+    def _composite_on_bg(self, frame: Image.Image) -> bytes:
         """Composite a frame onto the background tile if available.
 
         Parameters
         ----------
-        png_data : bytes
-            PNG-encoded frame data (may have alpha).
+        frame : Image.Image
+            RGBA frame image.
 
         Returns
         -------
         bytes
             Encoded image bytes in the instance's configured format.
         """
-        frame = Image.open(io.BytesIO(png_data)).convert("RGBA")
-
         if self._bg_tile is not None:
             if isinstance(self._bg_tile, bytes):
                 base = Image.open(io.BytesIO(self._bg_tile)).convert("RGBA")
@@ -354,11 +348,13 @@ class SpinnerFrames:
         bytes
             Image data encoded in the instance's configured format.
         """
-        from ..render.svg_rasterize import _svg_to_png
+        from ..render.svg_rasterize import _svg_to_image
 
         svg_bytes = ET.tostring(root, encoding="unicode", xml_declaration=True)
-        png_data = _svg_to_png(svg_bytes.encode("utf-8"), self._width, self._height)
-        return self._composite_on_bg(png_data)
+        frame = _svg_to_image(
+            svg_bytes.encode("utf-8"), self._width, self._height, mode="RGBA"
+        )
+        return self._composite_on_bg(frame)
 
     @staticmethod
     def _element_centre(elem: ET.Element) -> tuple[float, float]:

@@ -39,6 +39,18 @@ def _fake_png(width: int = 120, height: int = 120) -> bytes:
     return buf.getvalue()
 
 
+def _fake_image(
+    svg_data: bytes,
+    width: int = 120,
+    height: int = 120,
+    *,
+    mode: str = "RGBA",
+    ctx: object = None,
+) -> Image.Image:
+    """Return a minimal valid PIL Image for mocking ``_svg_to_image``."""
+    return Image.new(mode, (width, height), "black")
+
+
 def _make_spec(
     spinner: SpinnerSpec | None = None,
     assets: dict[str, bytes] | None = None,
@@ -55,7 +67,7 @@ def _make_spec(
 
 
 class TestRotation:
-    @patch("deux.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    @patch("deux.render.svg_rasterize._svg_to_image", side_effect=_fake_image)
     def test_rotation_generates_correct_frame_count(self, mock_raster):
         spec = _make_spec(
             spinner=SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=8)
@@ -84,7 +96,7 @@ class TestRotation:
 
 
 class TestPulse:
-    @patch("deux.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    @patch("deux.render.svg_rasterize._svg_to_image", side_effect=_fake_image)
     def test_pulse_generates_correct_frame_count(self, mock_raster):
         spec = _make_spec(
             spinner=SpinnerSpec(type=SpinnerType.PULSE, node="spinner", frames=6)
@@ -129,7 +141,7 @@ class TestCustom:
 
 
 class TestCaching:
-    @patch("deux.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    @patch("deux.render.svg_rasterize._svg_to_image", side_effect=_fake_image)
     def test_frames_are_cached_after_first_access(self, mock_raster):
         spec = _make_spec(
             spinner=SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=4)
@@ -143,7 +155,7 @@ class TestCaching:
 
 
 class TestRenderedSvg:
-    @patch("deux.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    @patch("deux.render.svg_rasterize._svg_to_image", side_effect=_fake_image)
     def test_rotation_uses_rendered_svg_when_provided(self, mock_raster):
         """When rendered_svg is passed, spinner frames use it instead of raw svg_source."""
         rendered = (
@@ -165,7 +177,7 @@ class TestRenderedSvg:
         first_call_svg: bytes = mock_raster.call_args_list[0][0][0]
         assert b"Updated Title" in first_call_svg
 
-    @patch("deux.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    @patch("deux.render.svg_rasterize._svg_to_image", side_effect=_fake_image)
     def test_pulse_uses_rendered_svg_when_provided(self, mock_raster):
         rendered = (
             '<svg id="TestCard" xmlns="http://www.w3.org/2000/svg" '
@@ -185,7 +197,7 @@ class TestRenderedSvg:
         first_call_svg: bytes = mock_raster.call_args_list[0][0][0]
         assert b"Rendered Content" in first_call_svg
 
-    @patch("deux.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    @patch("deux.render.svg_rasterize._svg_to_image", side_effect=_fake_image)
     def test_falls_back_to_svg_source_without_rendered(self, mock_raster):
         """Without rendered_svg, spinner uses the raw svg_source."""
         spec = _make_spec(
@@ -204,7 +216,7 @@ class TestErrors:
         with pytest.raises(ValueError, match="no spinner configuration"):
             SpinnerFrames(spec, width=120, height=120)
 
-    @patch("deux.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    @patch("deux.render.svg_rasterize._svg_to_image", side_effect=_fake_image)
     def test_blank_frames_fallback_for_missing_node(self, mock_raster):
         """When the spinner node ID doesn't exist in the SVG, return blank frames."""
         spec = _make_spec(
@@ -222,7 +234,7 @@ class TestErrors:
 class TestBackgroundNode:
     """Background node is shown (not animated) during spinner frames."""
 
-    @patch("deux.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    @patch("deux.render.svg_rasterize._svg_to_image", side_effect=_fake_image)
     def test_rotation_shows_background_node(self, mock_raster):
         """Rotation frames should unhide the background_node."""
         spec = _make_spec(
@@ -247,7 +259,7 @@ class TestBackgroundNode:
         assert bg is not None
         assert bg.get("display") is None
 
-    @patch("deux.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    @patch("deux.render.svg_rasterize._svg_to_image", side_effect=_fake_image)
     def test_rotation_background_node_not_rotated(self, mock_raster):
         """Background node must not receive a rotation transform."""
         spec = _make_spec(
@@ -270,7 +282,7 @@ class TestBackgroundNode:
         assert bg is not None
         assert "rotate" not in (bg.get("transform") or "")
 
-    @patch("deux.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    @patch("deux.render.svg_rasterize._svg_to_image", side_effect=_fake_image)
     def test_pulse_shows_background_node(self, mock_raster):
         """Pulse frames should unhide the background_node."""
         spec = _make_spec(
@@ -294,7 +306,7 @@ class TestBackgroundNode:
         # Background should not have opacity set
         assert bg.get("opacity") is None
 
-    @patch("deux.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    @patch("deux.render.svg_rasterize._svg_to_image", side_effect=_fake_image)
     def test_missing_background_node_no_error(self, mock_raster):
         """If background_node references a missing element, no crash occurs."""
         spec = _make_spec(
@@ -308,7 +320,7 @@ class TestBackgroundNode:
         sf = SpinnerFrames(spec, width=120, height=120)
         assert len(sf.frames) == 2
 
-    @patch("deux.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    @patch("deux.render.svg_rasterize._svg_to_image", side_effect=_fake_image)
     def test_no_background_node_works(self, mock_raster):
         """Spinner without background_node still works normally."""
         spec = _make_spec(
@@ -323,7 +335,7 @@ class TestBackgroundNode:
 class TestSpinnerWithBgTile:
     """Spinner frames composited onto a background tile."""
 
-    @patch("deux.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    @patch("deux.render.svg_rasterize._svg_to_image", side_effect=_fake_image)
     def test_rotation_with_bg_tile(self, mock_raster):
         tile = Image.new("RGB", (120, 120), (255, 0, 0))
         spec = _make_spec(
@@ -335,7 +347,7 @@ class TestSpinnerWithBgTile:
             img = Image.open(io.BytesIO(frame_bytes))
             assert img.size == (120, 120)
 
-    @patch("deux.render.svg_rasterize._svg_to_png", side_effect=lambda b, w, h: _fake_png(w, h))
+    @patch("deux.render.svg_rasterize._svg_to_image", side_effect=_fake_image)
     def test_pulse_with_bg_tile(self, mock_raster):
         tile = Image.new("RGB", (120, 120), (0, 255, 0))
         spec = _make_spec(
