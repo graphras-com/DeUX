@@ -395,6 +395,32 @@ class Screen:
         if self._info_screen is not None:
             self._info_screen.mark_dirty()
 
+    def collect_all_icons(self) -> set[str]:
+        """Collect all Iconify icon identifiers needed by this screen.
+
+        Iterates all DuiKey and DuiCard instances on this screen and
+        aggregates their :meth:`~deux.dui.svg_renderer.SvgRenderer.collect_icon_names`
+        results.
+
+        Returns
+        -------
+        set[str]
+            A set of ``"prefix:icon"`` strings used across all
+            keys and cards on this screen.
+        """
+        from ..dui.card import DuiCard
+        from ..dui.key import DuiKey
+
+        icons: set[str] = set()
+        for key_slot in self._keys.values():
+            if isinstance(key_slot, DuiKey):
+                icons.update(key_slot._renderer.collect_icon_names())
+        if self._touch_strip is not None:
+            for card in self._touch_strip.cards:
+                if isinstance(card, DuiCard):
+                    icons.update(card._renderer.collect_icon_names())
+        return icons
+
     def screenshot(self, directory: str | Path) -> list[Path]:
         """Save the current screen state as individual PNG files.
 

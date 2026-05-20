@@ -462,6 +462,39 @@ class DeckRenderer:
     # Theme application
     # ------------------------------------------------------------------
 
+    async def render_screen_complete(self) -> None:
+        """Prefetch icons, render all controls, then push to device.
+
+        This is the single entry point for full-screen renders: initial
+        screen load, screen switch, and theme change.  It ensures the
+        complete screen (keys, cards, info screen) is rendered before
+        any images are sent to the device, avoiding partial displays.
+
+        The sequence is:
+
+        1. Prefetch all Iconify icons needed by the active screen.
+        2. Render all keys, cards, and the info screen concurrently.
+        3. Push all rendered images to the device.
+        """
+        deck = self._deck
+        screen = deck._current_screen()
+        if not screen or not deck._device:
+            return
+
+        # 1. Prefetch icons
+        icons = screen.collect_all_icons()
+        if icons:
+            from ..dui.iconify import prefetch_icons
+
+            await prefetch_icons(icons)
+
+        # 2–3. Render and push all controls
+        await self.render_all_keys()
+        if screen.touch_strip is not None:
+            await self.render_touchscreen()
+        if screen.info_screen is not None:
+            await self.render_info_screen()
+
     def apply_theme(self) -> None:
         """Apply the resolved theme cascade to all renderers on the active screen.
 

@@ -316,6 +316,44 @@ class Deck:
     def theme(self, value: Theme | None) -> None:
         self._theme = value
 
+    async def set_theme(self, theme: Theme | None) -> None:
+        """Apply a new deck-level theme and re-render the active screen.
+
+        Sets the deck theme, applies the CSS cascade to all renderers,
+        marks every control dirty, and performs a complete re-render
+        (icon prefetch, render all, push all) so the display updates
+        atomically.
+
+        Parameters
+        ----------
+        theme : Theme or None
+            The theme to apply, or ``None`` to revert to the system
+            theme.
+        """
+        self._theme = theme
+        if self._active_screen is None:
+            return
+
+        self._renderer.apply_theme()
+        self._active_screen.mark_all_dirty()
+        await self._renderer.render_screen_complete()
+
+    async def preload_icons(self) -> None:
+        """Prefetch Iconify icons for all registered screens.
+
+        Collects every icon identifier across all screens and fetches
+        them concurrently, warming the in-memory and disk caches.
+        Call this after all screens have been set up (keys and cards
+        installed) to avoid network latency on first render.
+        """
+        from ..dui.iconify import prefetch_icons
+
+        all_icons: set[str] = set()
+        for screen in self._screens.values():
+            all_icons.update(screen.collect_all_icons())
+        if all_icons:
+            await prefetch_icons(all_icons)
+
     def _resolve_stylesheet(self) -> str:
         """Resolve the effective CSS stylesheet for the active screen.
 
@@ -428,11 +466,7 @@ class Deck:
         # rendered on a previous visit or shared with another screen.
         target.mark_all_dirty()
 
-        await self._render_all_keys()
-        if self._active_screen.touch_strip is not None:
-            await self._render_touchscreen()
-        if self._active_screen.info_screen is not None:
-            await self._render_info_screen()
+        await self._renderer.render_screen_complete()
 
     def _wire_refresh_callbacks(self) -> None:
         """Register ``self.refresh`` on every key and card of the active screen.
