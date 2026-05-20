@@ -1,12 +1,15 @@
-"""Async bridge between Stream Deck callbacks and the deux event loop."""
+"""Async bridge between HID input polling and the deux event loop.
+
+Replaces the callback-based ``AsyncTransport`` with a polling-based
+approach that reads input reports from the device at a configurable
+interval and translates them into :class:`DeckEvent` objects.
+"""
 
 from __future__ import annotations
 
 import asyncio
 import logging
 from typing import TYPE_CHECKING
-
-from StreamDeck.Devices.StreamDeck import DialEventType, TouchscreenEventType
 
 from .events import (
     DeckEvent,
@@ -16,78 +19,56 @@ from .events import (
     KeyEvent,
     TouchEvent,
 )
+from .hid.protocol import (
+    EncoderButtonEvent,
+    EncoderRotateEvent,
+    InputEvent,
+    KeyStateEvent,
+    TouchFlickEvent,
+    TouchPressEvent,
+    TouchTapEvent,
+)
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
-    from StreamDeck.Devices.StreamDeck import StreamDeck
-
     from .capabilities import DeviceCapabilities
+    from .hid.device import HidDevice
 
 logger = logging.getLogger(__name__)
 
-
-def _coerce_int(value: object, default: int = 0) -> int:
-    """Convert a callback payload value to ``int``.
-
-    Parameters
-    ----------
-    value : object
-        The raw value from the device callback payload.
-    default : int, default=0
-        Fallback returned when *value* is not an ``int``.
-
-    Returns
-    -------
-    int
-        *value* if it is an ``int``, otherwise *default*.
-    """
-    return value if isinstance(value, int) else default
-
-
-def _optional_int(value: object) -> int | None:
-    """Convert a callback payload value to an optional ``int``.
-
-    Parameters
-    ----------
-    value : object
-        The raw value from the device callback payload.
-
-    Returns
-    -------
-    int or None
-        *value* if it is an ``int``, otherwise ``None``.
-    """
-    return value if isinstance(value, int) else None
+#: Default HID input poll interval in milliseconds.
+_DEFAULT_POLL_MS = 50
 
 
 class AsyncTransport:
-    """Bridge sync streamdeck callbacks into an asyncio event queue.
+    """Poll-based async bridge from HID input reports to deck events.
 
-    Conditionally registers dial and touchscreen callbacks only when
-    the device supports those features.
+    Reads input reports from the device in a background task and
+    translates them into :class:`DeckEvent` objects on an asyncio queue.
 
     Parameters
     ----------
-    device
-        An open Stream Deck device.
-    loop
-        The running asyncio event loop.
-    caps
-        Device capabilities (used to determine which callbacks to register).
+    device : HidDevice
+        An open HID device.
+    caps : DeviceCapabilities or None
+        Device capabilities (used to determine which events to process).
+    poll_interval_ms : int, default=50
+        HID read timeout per poll cycle in milliseconds.
     """
 
     def __init__(
         self,
-        device: StreamDeck,
-        loop: asyncio.AbstractEventLoop,
+        device: HidDevice,
         caps: DeviceCapabilities | None = None,
+        poll_interval_ms: int = _DEFAULT_POLL_MS,
     ) -> None:
         self._device = device
-        self._loop = loop
         self._caps = caps
+        self._poll_interval_ms = poll_interval_ms
         self._queue: asyncio.Queue[DeckEvent] = asyncio.Queue()
         self._running = False
+        self._poll_task: asyncio.Task[None] | None = None
+        self._prev_key_states: tuple[bool, ...] = ()
+        self._prev_encoder_states: tuple[bool, ...] = ()
 
     @property
     def queue(self) -> asyncio.Queue[DeckEvent]:
@@ -95,108 +76,126 @@ class AsyncTransport:
         return self._queue
 
     def start(self) -> None:
-        """Register callbacks on the low-level device."""
+        """Start the input polling background task."""
         self._running = True
-        self._device.set_key_callback(self._on_key)
-
-        if self._caps is None or self._caps.has_encoders:
-            self._device.set_dial_callback(self._on_encoder)
-        if self._caps is None or self._caps.has_touchscreen:
-            self._device.set_touchscreen_callback(self._on_touch)
+        self._poll_task = asyncio.create_task(
+            self._poll_loop(), name="deux-hid-poll"
+        )
 
     def stop(self) -> None:
-        """Unregister callbacks."""
+        """Stop polling."""
         self._running = False
-        self._device.set_key_callback(None)
+        if self._poll_task and not self._poll_task.done():
+            self._poll_task.cancel()
 
-        if self._caps is None or self._caps.has_encoders:
-            self._device.set_dial_callback(None)
-        if self._caps is None or self._caps.has_touchscreen:
-            self._device.set_touchscreen_callback(None)
+    async def _poll_loop(self) -> None:
+        """Background task: poll HID input and enqueue events."""
+        from ._executor import get_executor
+        from .hid._ctypes_hidapi import HidApiError
 
-    def _enqueue(self, event: DeckEvent) -> None:
-        """Thread-safe: put an event onto the asyncio queue."""
-        if not self._running:
-            return
-        self._loop.call_soon_threadsafe(self._queue.put_nowait, event)
+        loop = asyncio.get_running_loop()
+        executor = get_executor()
 
-    def _on_key(self, deck: StreamDeck, key: int, pressed: bool) -> None:
-        """Handle a physical key press/release callback.
-
-        Parameters
-        ----------
-        deck : StreamDeck
-            The device that generated the event.
-        key : int
-            Zero-based key index.
-        pressed : bool
-            ``True`` on key-down, ``False`` on key-up.
-        """
         try:
-            self._enqueue(KeyEvent(key=key, pressed=pressed))
+            while self._running and self._device.is_open:
+                try:
+                    event = await loop.run_in_executor(
+                        executor,
+                        self._device.read_input,
+                        self._poll_interval_ms,
+                    )
+                except HidApiError:
+                    logger.warning("HID device disconnected during poll")
+                    break
+
+                if event is not None:
+                    self._translate_event(event)
+        except asyncio.CancelledError:
+            pass
         except Exception:
-            logger.exception("Error in key callback (key=%d)", key)
+            logger.exception("HID poll loop crashed")
 
-    def _on_encoder(
-        self, deck: StreamDeck, encoder: int, event: DialEventType, value: object
-    ) -> None:
-        """Handle an encoder push or turn callback.
+    def _translate_event(self, event: InputEvent) -> None:
+        """Translate a HID input event into DeckEvent(s) on the queue.
 
         Parameters
         ----------
-        deck : StreamDeck
-            The device that generated the event.
-        encoder : int
-            Zero-based encoder index.
-        event : DialEventType
-            Whether the dial was pushed or turned.
-        value : object
-            ``bool`` for push events, ``int`` direction for turn events.
+        event : InputEvent
+            A parsed HID input event.
         """
-        try:
-            if event == DialEventType.PUSH:
-                self._enqueue(EncoderPressEvent(encoder=encoder, pressed=bool(value)))
-            elif event == DialEventType.TURN:
-                direction = value if isinstance(value, int) else 0
-                self._enqueue(EncoderTurnEvent(encoder=encoder, direction=direction))
-        except Exception:
-            logger.exception("Error in encoder callback (encoder=%d)", encoder)
-
-    def _on_touch(
-        self,
-        deck: StreamDeck,
-        evt_type: TouchscreenEventType,
-        value: Mapping[str, object],
-    ) -> None:
-        """Handle a touchscreen interaction callback.
-
-        Parameters
-        ----------
-        deck : StreamDeck
-            The device that generated the event.
-        evt_type : TouchscreenEventType
-            The kind of touch (short, long, or drag).
-        value : Mapping[str, object]
-            Touch coordinates (``x``, ``y``, and optionally ``x_out``, ``y_out``).
-        """
-        try:
-            if evt_type == TouchscreenEventType.SHORT:
-                event_type = EventType.TOUCH_SHORT
-            elif evt_type == TouchscreenEventType.LONG:
-                event_type = EventType.TOUCH_LONG
-            elif evt_type == TouchscreenEventType.DRAG:
-                event_type = EventType.TOUCH_DRAG
-            else:
-                return
-
-            self._enqueue(
+        if isinstance(event, KeyStateEvent):
+            self._handle_key_state(event)
+        elif isinstance(event, TouchTapEvent):
+            self._queue.put_nowait(
                 TouchEvent(
-                    event_type=event_type,
-                    x=_coerce_int(value.get("x", 0)),
-                    y=_coerce_int(value.get("y", 0)),
-                    x_out=_optional_int(value.get("x_out")),
-                    y_out=_optional_int(value.get("y_out")),
+                    event_type=EventType.TOUCH_SHORT,
+                    x=event.x,
+                    y=event.y,
                 )
             )
-        except Exception:
-            logger.exception("Error in touch callback")
+        elif isinstance(event, TouchPressEvent):
+            self._queue.put_nowait(
+                TouchEvent(
+                    event_type=EventType.TOUCH_LONG,
+                    x=event.x,
+                    y=event.y,
+                )
+            )
+        elif isinstance(event, TouchFlickEvent):
+            self._queue.put_nowait(
+                TouchEvent(
+                    event_type=EventType.TOUCH_DRAG,
+                    x=event.start_x,
+                    y=event.start_y,
+                    x_out=event.end_x,
+                    y_out=event.end_y,
+                )
+            )
+        elif isinstance(event, EncoderButtonEvent):
+            self._handle_encoder_buttons(event)
+        elif isinstance(event, EncoderRotateEvent):
+            self._handle_encoder_rotate(event)
+
+    def _handle_key_state(self, event: KeyStateEvent) -> None:
+        """Emit KeyEvents for keys that changed state.
+
+        Parameters
+        ----------
+        event : KeyStateEvent
+            The current key state snapshot.
+        """
+        for idx, pressed in enumerate(event.states):
+            if idx < len(self._prev_key_states) and pressed == self._prev_key_states[idx]:
+                continue
+            self._queue.put_nowait(KeyEvent(key=idx, pressed=pressed))
+        self._prev_key_states = event.states
+
+    def _handle_encoder_buttons(self, event: EncoderButtonEvent) -> None:
+        """Emit EncoderPressEvents for encoders that changed state.
+
+        Parameters
+        ----------
+        event : EncoderButtonEvent
+            The current encoder button state snapshot.
+        """
+        for idx, pressed in enumerate(event.states):
+            if idx < len(self._prev_encoder_states) and pressed == self._prev_encoder_states[idx]:
+                continue
+            self._queue.put_nowait(
+                EncoderPressEvent(encoder=idx, pressed=pressed)
+            )
+        self._prev_encoder_states = event.states
+
+    def _handle_encoder_rotate(self, event: EncoderRotateEvent) -> None:
+        """Emit EncoderTurnEvents for encoders that rotated.
+
+        Parameters
+        ----------
+        event : EncoderRotateEvent
+            The rotation ticks snapshot.
+        """
+        for idx, ticks in enumerate(event.ticks):
+            if ticks != 0:
+                self._queue.put_nowait(
+                    EncoderTurnEvent(encoder=idx, direction=ticks)
+                )

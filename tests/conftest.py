@@ -395,7 +395,7 @@ def sample_widget_image():
 
 
 def _make_mock_streamdeck(caps: DeviceCapabilities) -> MagicMock:
-    """Create a MagicMock mimicking a StreamDeck device from capabilities.
+    """Create a MagicMock mimicking an HidDevice from capabilities.
 
     Parameters
     ----------
@@ -409,46 +409,62 @@ def _make_mock_streamdeck(caps: DeviceCapabilities) -> MagicMock:
         to match *caps*.
     """
     device = MagicMock()
-    device.DECK_TYPE = caps.deck_type
-    device.DECK_VISUAL = caps.has_visual
-    device.DECK_TOUCH = caps.has_touch
-    device.KEY_PIXEL_WIDTH = caps.key_pixel_width
-    device.KEY_PIXEL_HEIGHT = caps.key_pixel_height
-    device.KEY_IMAGE_FORMAT = caps.key_image_format
-    device.KEY_FLIP = list(caps.key_flip)
-    device.KEY_ROTATION = caps.key_rotation
-    device.TOUCHSCREEN_PIXEL_WIDTH = caps.touchscreen_width
-    device.TOUCHSCREEN_PIXEL_HEIGHT = caps.touchscreen_height
-    device.TOUCHSCREEN_IMAGE_FORMAT = caps.touchscreen_image_format
-    device.TOUCHSCREEN_FLIP = list(caps.touchscreen_flip)
-    device.TOUCHSCREEN_ROTATION = caps.touchscreen_rotation
-    device.SCREEN_PIXEL_WIDTH = caps.screen_width
-    device.SCREEN_PIXEL_HEIGHT = caps.screen_height
-    device.SCREEN_IMAGE_FORMAT = caps.screen_image_format
-    device.SCREEN_FLIP = list(caps.screen_flip)
-    device.SCREEN_ROTATION = caps.screen_rotation
-    device.TOUCH_KEY_COUNT = caps.touch_key_count
 
-    device.deck_type.return_value = caps.deck_type
-    device.vendor_id.return_value = caps.vendor_id
-    device.product_id.return_value = caps.product_id
-    device.get_serial_number.return_value = "TEST123"
-    device.get_firmware_version.return_value = "1.0.0"
-    device.key_count.return_value = caps.key_count
-    device.key_layout.return_value = (caps.key_cols, caps.key_rows)
-    device.dial_count.return_value = caps.dial_count
+    # Properties matching HidDevice interface
+    device.vendor_id = caps.vendor_id
+    device.product_id = caps.product_id
+    device.family = caps.deck_type
+    device.serial_number = "TEST123"
+    device.firmware_version = "1.0.0"
+    device.key_count = caps.key_count
+    device.key_layout = (caps.key_cols, caps.key_rows)
+    device.key_size = (caps.key_pixel_width, caps.key_pixel_height)
+    device.lcd_size = (getattr(caps, "lcd_width", 0), getattr(caps, "lcd_height", 0))
+    device.has_window = caps.has_touch or caps.has_screen
+    device.window_size = (
+        (caps.touchscreen_width, caps.touchscreen_height) if caps.has_touch
+        else (caps.screen_width, caps.screen_height) if caps.has_screen
+        else (0, 0)
+    )
+    device.has_touch = caps.has_touch
+    device.has_encoders = caps.has_encoders
+    device.encoder_count = caps.dial_count
+    device.sensor_count = caps.touch_key_count
+    device.is_open = True
+    device.path = b"/dev/mock_streamdeck"
 
+    # ImageRotation enum value
+    from deux.runtime.hid.protocol import ImageRotation
+
+    rotation = (
+        ImageRotation(caps.key_rotation)
+        if caps.key_rotation in (0, 180, 270)
+        else ImageRotation.NONE
+    )
+    device.rotation = rotation
+
+    # Unit info mock
+    unit_info = MagicMock()
+    unit_info.rows = caps.key_rows
+    unit_info.cols = caps.key_cols
+    unit_info.key_width = caps.key_pixel_width
+    unit_info.key_height = caps.key_pixel_height
+    unit_info.lcd_width = getattr(caps, "lcd_width", 0)
+    unit_info.lcd_height = getattr(caps, "lcd_height", 0)
+    device.unit_info = unit_info
+
+    # Methods matching HidDevice interface
     device.open.return_value = None
     device.close.return_value = None
-    device.reset.return_value = None
+    device.show_logo.return_value = None
     device.set_brightness.return_value = None
     device.set_key_image.return_value = None
-    device.set_touchscreen_image.return_value = None
-    device.set_screen_image.return_value = None
-
-    device.set_key_callback.return_value = None
-    device.set_dial_callback.return_value = None
-    device.set_touchscreen_callback.return_value = None
+    device.set_full_screen_image.return_value = None
+    device.set_window_image.return_value = None
+    device.set_partial_window_image.return_value = None
+    device.fill_lcd_color.return_value = None
+    device.fill_key_color.return_value = None
+    device.read_input.return_value = None
 
     return device
 

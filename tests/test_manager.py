@@ -6,54 +6,53 @@ import asyncio
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from deux.runtime.hid.protocol import ImageRotation
 from deux.runtime.manager import DeckManager
 
 
 def _make_raw_device(
     deck_type: str = "Stream Deck +",
     serial: str = "MGR_DEV1",
-    visual: bool = True,
 ) -> MagicMock:
-    """Create a mock raw device for enumeration."""
+    """Create a mock HidDevice for enumeration.
+
+    Parameters
+    ----------
+    deck_type : str
+        Device family name.
+    serial : str
+        Device serial number.
+
+    Returns
+    -------
+    MagicMock
+        A mock matching the HidDevice interface.
+    """
     d = MagicMock()
-    d.DECK_TYPE = deck_type
-    d.DECK_VISUAL = visual
-    d.DECK_TOUCH = True
-    d.KEY_PIXEL_WIDTH = 120
-    d.KEY_PIXEL_HEIGHT = 120
-    d.KEY_IMAGE_FORMAT = "JPEG"
-    d.KEY_FLIP = [False, False]
-    d.KEY_ROTATION = 0
-    d.TOUCHSCREEN_PIXEL_WIDTH = 800
-    d.TOUCHSCREEN_PIXEL_HEIGHT = 100
-    d.TOUCHSCREEN_IMAGE_FORMAT = "JPEG"
-    d.TOUCHSCREEN_FLIP = [False, False]
-    d.TOUCHSCREEN_ROTATION = 0
-    d.SCREEN_PIXEL_WIDTH = 0
-    d.SCREEN_PIXEL_HEIGHT = 0
-    d.SCREEN_IMAGE_FORMAT = ""
-    d.SCREEN_FLIP = [False, False]
-    d.SCREEN_ROTATION = 0
-    d.TOUCH_KEY_COUNT = 0
+    d.family = deck_type
+    d.serial_number = serial
+    d.firmware_version = "1.0.0"
+    d.key_count = 8
+    d.key_layout = (4, 2)
+    d.encoder_count = 4
+    d.key_size = (120, 120)
+    d.window_size = (800, 100)
+    d.lcd_size = (800, 480)
+    d.has_touch = True
+    d.has_window = True
+    d.sensor_count = 0
+    d.vendor_id = 0x0FD9
+    d.product_id = 0x0084
+    d.rotation = ImageRotation.NONE
+    d.path = f"/dev/hid/{serial}".encode()
+    d.is_open = False
 
-    d.deck_type.return_value = deck_type
-    d.get_serial_number.return_value = serial
-    d.get_firmware_version.return_value = "1.0.0"
-    d.key_count.return_value = 8
-    d.key_layout.return_value = (4, 2)
-    d.dial_count.return_value = 4
-
-    d.id.return_value = f"/dev/hid/{serial}"
     d.open.return_value = None
     d.close.return_value = None
-    d.reset.return_value = None
+    d.show_logo.return_value = None
     d.set_brightness.return_value = None
     d.set_key_image.return_value = None
-    d.set_touchscreen_image.return_value = None
-    d.set_screen_image.return_value = None
-    d.set_key_callback.return_value = None
-    d.set_dial_callback.return_value = None
-    d.set_touchscreen_callback.return_value = None
+    d.set_partial_window_image.return_value = None
     return d
 
 
@@ -128,8 +127,8 @@ class TestDeckManagerLifecycle:
         async def handler(deck):
             pass
 
-        with patch("deux.runtime.manager.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = []
+        with patch("deux.runtime.manager.enumerate_devices") as mock_dm:
+            mock_dm.return_value = []
             await m.start()
             assert m._running is True
             await asyncio.sleep(0.1)
@@ -140,8 +139,8 @@ class TestDeckManagerLifecycle:
     async def test_start_already_running(self):
         m = DeckManager(poll_interval=0.05)
 
-        with patch("deux.runtime.manager.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = []
+        with patch("deux.runtime.manager.enumerate_devices") as mock_dm:
+            mock_dm.return_value = []
             await m.start()
             await m.start()
             await m.stop()
@@ -151,8 +150,8 @@ class TestDeckManagerLifecycle:
         await m.stop()
 
     async def test_context_manager(self):
-        with patch("deux.runtime.manager.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = []
+        with patch("deux.runtime.manager.enumerate_devices") as mock_dm:
+            mock_dm.return_value = []
             async with DeckManager(poll_interval=0.05) as m:
                 assert m._running is True
             assert m._running is False
@@ -169,10 +168,10 @@ class TestDeckManagerScanOnce:
 
         dev = _make_raw_device(serial="SCAN1")
 
-        with patch("deux.runtime.manager.DeviceManager") as mgr_dm:
-            mgr_dm.return_value.enumerate.return_value = [dev]
-            with patch("deux.runtime.deck.DeviceManager") as deck_dm:
-                deck_dm.return_value.enumerate.return_value = [dev]
+        with patch("deux.runtime.manager.enumerate_devices") as mgr_dm:
+            mgr_dm.return_value = [dev]
+            with patch("deux.runtime.deck.enumerate_devices") as deck_dm:
+                deck_dm.return_value = [dev]
                 await m._scan_once()
 
         assert len(connected_decks) == 1
@@ -196,8 +195,8 @@ class TestDeckManagerScanOnce:
         mock_deck.device_path = "/dev/hid/GONE1"
         m._decks["GONE1"] = mock_deck
 
-        with patch("deux.runtime.manager.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = []
+        with patch("deux.runtime.manager.enumerate_devices") as mock_dm:
+            mock_dm.return_value = []
             await m._scan_once()
 
         assert "GONE1" not in m._decks
@@ -219,8 +218,8 @@ class TestDeckManagerScanOnce:
 
         dev = _make_raw_device(serial="EXISTING")
 
-        with patch("deux.runtime.manager.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = [dev]
+        with patch("deux.runtime.manager.enumerate_devices") as mock_dm:
+            mock_dm.return_value = [dev]
             await m._scan_once()
 
         assert connect_count == 0
@@ -235,8 +234,8 @@ class TestDeckManagerScanOnce:
 
         dev_mini = _make_raw_device(deck_type="Stream Deck Mini", serial="MINI1")
 
-        with patch("deux.runtime.manager.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = [dev_mini]
+        with patch("deux.runtime.manager.enumerate_devices") as mock_dm:
+            mock_dm.return_value = [dev_mini]
             await m._scan_once()
 
         assert connected_types == []
@@ -251,8 +250,8 @@ class TestDeckManagerScanOnce:
 
         dev = _make_raw_device(serial="UNWANTED")
 
-        with patch("deux.runtime.manager.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = [dev]
+        with patch("deux.runtime.manager.enumerate_devices") as mock_dm:
+            mock_dm.return_value = [dev]
             await m._scan_once()
 
         assert connected_serials == []
@@ -260,8 +259,8 @@ class TestDeckManagerScanOnce:
     async def test_scan_enumeration_failure(self):
         m = DeckManager(poll_interval=10.0)
 
-        with patch("deux.runtime.manager.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.side_effect = OSError("HID error")
+        with patch("deux.runtime.manager.enumerate_devices") as mock_dm:
+            mock_dm.side_effect = OSError("HID error")
             await m._scan_once()
 
     async def test_scan_device_open_error_skipped(self):
@@ -274,8 +273,8 @@ class TestDeckManagerScanOnce:
         dev = _make_raw_device(serial="BAD_OPEN")
         dev.open.side_effect = OSError("HID error")
 
-        with patch("deux.runtime.manager.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = [dev]
+        with patch("deux.runtime.manager.enumerate_devices") as mock_dm:
+            mock_dm.return_value = [dev]
             await m._scan_once()
 
         assert m._decks == {}
@@ -296,8 +295,8 @@ class TestDeckManagerScanOnce:
         dev = _make_raw_device(serial="PERM_ERR")
         dev.open.side_effect = PermissionError("Permission denied")
 
-        with patch("deux.runtime.manager.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = [dev]
+        with patch("deux.runtime.manager.enumerate_devices") as mock_dm:
+            mock_dm.return_value = [dev]
 
             # First scan — should log at INFO level
             with caplog.at_level(logging.DEBUG, logger="deux.runtime.manager"):
@@ -353,8 +352,8 @@ class TestDeckManagerDisconnectInfoError:
         mock_deck.device_path = "/dev/hid/FALLBACK1"
         m._decks["FALLBACK1"] = mock_deck
 
-        with patch("deux.runtime.manager.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = []
+        with patch("deux.runtime.manager.enumerate_devices") as mock_dm:
+            mock_dm.return_value = []
             await m._scan_once()
 
         assert len(disconnected) == 1
@@ -373,10 +372,10 @@ class TestDeckManagerConnectHandlerError:
 
         dev = _make_raw_device(serial="ERR1")
 
-        with patch("deux.runtime.manager.DeviceManager") as mgr_dm:
-            mgr_dm.return_value.enumerate.return_value = [dev]
-            with patch("deux.runtime.deck.DeviceManager") as deck_dm:
-                deck_dm.return_value.enumerate.return_value = [dev]
+        with patch("deux.runtime.manager.enumerate_devices") as mgr_dm:
+            mgr_dm.return_value = [dev]
+            with patch("deux.runtime.deck.enumerate_devices") as deck_dm:
+                deck_dm.return_value = [dev]
                 await m._scan_once()
 
         assert "ERR1" in m._decks
@@ -396,24 +395,24 @@ class TestDeckManagerReconnect:
 
         dev = _make_raw_device(serial="RECON1")
 
-        with patch("deux.runtime.manager.DeviceManager") as mgr_dm:
-            mgr_dm.return_value.enumerate.return_value = [dev]
-            with patch("deux.runtime.deck.DeviceManager") as deck_dm:
-                deck_dm.return_value.enumerate.return_value = [dev]
+        with patch("deux.runtime.manager.enumerate_devices") as mgr_dm:
+            mgr_dm.return_value = [dev]
+            with patch("deux.runtime.deck.enumerate_devices") as deck_dm:
+                deck_dm.return_value = [dev]
                 await m._scan_once()
 
         assert connected_serials == ["RECON1"]
 
-        with patch("deux.runtime.manager.DeviceManager") as mgr_dm:
-            mgr_dm.return_value.enumerate.return_value = []
+        with patch("deux.runtime.manager.enumerate_devices") as mgr_dm:
+            mgr_dm.return_value = []
             await m._scan_once()
 
         assert "RECON1" not in m._decks
 
-        with patch("deux.runtime.manager.DeviceManager") as mgr_dm:
-            mgr_dm.return_value.enumerate.return_value = [dev]
-            with patch("deux.runtime.deck.DeviceManager") as deck_dm:
-                deck_dm.return_value.enumerate.return_value = [dev]
+        with patch("deux.runtime.manager.enumerate_devices") as mgr_dm:
+            mgr_dm.return_value = [dev]
+            with patch("deux.runtime.deck.enumerate_devices") as deck_dm:
+                deck_dm.return_value = [dev]
                 await m._scan_once()
 
         assert connected_serials == ["RECON1", "RECON1"]
@@ -437,16 +436,16 @@ class TestDeckManagerReconnect:
 
         dev = _make_raw_device(serial="NOREC1")
 
-        with patch("deux.runtime.manager.DeviceManager") as mgr_dm:
-            mgr_dm.return_value.enumerate.return_value = [dev]
-            with patch("deux.runtime.deck.DeviceManager") as deck_dm:
-                deck_dm.return_value.enumerate.return_value = [dev]
+        with patch("deux.runtime.manager.enumerate_devices") as mgr_dm:
+            mgr_dm.return_value = [dev]
+            with patch("deux.runtime.deck.enumerate_devices") as deck_dm:
+                deck_dm.return_value = [dev]
                 await m._scan_once()
 
         assert "NOREC1" in m._decks
 
-        with patch("deux.runtime.manager.DeviceManager") as mgr_dm:
-            mgr_dm.return_value.enumerate.return_value = []
+        with patch("deux.runtime.manager.enumerate_devices") as mgr_dm:
+            mgr_dm.return_value = []
             await m._scan_once()
 
         assert disconnected == ["NOREC1"]
@@ -467,8 +466,8 @@ class TestDeckManagerReconnect:
         mock_deck.device_path = "/dev/hid/DISC_ERR"
         m._decks["DISC_ERR"] = mock_deck
 
-        with patch("deux.runtime.manager.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = []
+        with patch("deux.runtime.manager.enumerate_devices") as mock_dm:
+            mock_dm.return_value = []
             await m._scan_once()
 
         assert "DISC_ERR" not in m._decks
@@ -485,8 +484,8 @@ class TestPathSerialCache:
 
         dev = _make_raw_device(serial="CACHE1")
 
-        with patch("deux.runtime.manager.DeviceManager") as mgr_dm:
-            mgr_dm.return_value.enumerate.return_value = [dev]
+        with patch("deux.runtime.manager.enumerate_devices") as mgr_dm:
+            mgr_dm.return_value = [dev]
             await m._scan_once()
 
         assert dev.open.call_count == 1
@@ -496,23 +495,21 @@ class TestPathSerialCache:
         # Reset and scan again — should use cache, no open/close
         dev.open.reset_mock()
         dev.close.reset_mock()
-        dev.get_serial_number.reset_mock()
 
-        with patch("deux.runtime.manager.DeviceManager") as mgr_dm:
-            mgr_dm.return_value.enumerate.return_value = [dev]
+        with patch("deux.runtime.manager.enumerate_devices") as mgr_dm:
+            mgr_dm.return_value = [dev]
             await m._scan_once()
 
         assert dev.open.call_count == 0
         assert dev.close.call_count == 0
-        assert dev.get_serial_number.call_count == 0
 
     async def test_cache_invalidated_on_disconnect(self):
         """Cache entry removed when device path disappears."""
         m = DeckManager(poll_interval=10.0)
         m._path_serial_cache["/dev/hid/GONE"] = "GONE_SERIAL"
 
-        with patch("deux.runtime.manager.DeviceManager") as mgr_dm:
-            mgr_dm.return_value.enumerate.return_value = []
+        with patch("deux.runtime.manager.enumerate_devices") as mgr_dm:
+            mgr_dm.return_value = []
             await m._scan_once()
 
         assert "/dev/hid/GONE" not in m._path_serial_cache
@@ -524,8 +521,8 @@ class TestPathSerialCache:
         dev = _make_raw_device(serial="FAIL1")
         dev.open.side_effect = OSError("USB busy")
 
-        with patch("deux.runtime.manager.DeviceManager") as mgr_dm:
-            mgr_dm.return_value.enumerate.return_value = [dev]
+        with patch("deux.runtime.manager.enumerate_devices") as mgr_dm:
+            mgr_dm.return_value = [dev]
             await m._scan_once()
 
         assert "/dev/hid/FAIL1" not in m._path_serial_cache

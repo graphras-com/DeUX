@@ -308,7 +308,7 @@ class TestRenderScreenComplete:
         deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
         deck._device = MagicMock()
         deck._device.set_key_image.return_value = None
-        deck._device.set_touchscreen_image.return_value = None
+        deck._device.set_partial_window_image.return_value = None
         return deck
 
     async def test_render_screen_complete_calls_prefetch(self):
@@ -376,7 +376,7 @@ class TestDeckSetScreenIntegration:
         deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
         deck._device = MagicMock()
         deck._device.set_key_image.return_value = None
-        deck._device.set_touchscreen_image.return_value = None
+        deck._device.set_partial_window_image.return_value = None
         deck.screen("main")
 
         with patch.object(
@@ -403,7 +403,7 @@ class TestDeckSetTheme:
         deck._metrics = RenderMetrics(STREAM_DECK_PLUS)
         deck._device = MagicMock()
         deck._device.set_key_image.return_value = None
-        deck._device.set_touchscreen_image.return_value = None
+        deck._device.set_partial_window_image.return_value = None
 
         deck.screen("main")
         deck._active_screen = deck._screens["main"]

@@ -29,7 +29,7 @@ class TestDeviceCapabilitiesConstants:
         caps = STREAM_DECK_MINI
         assert caps.key_count == 6
         assert caps.key_pixel_width == 80
-        assert caps.key_image_format == "BMP"
+        assert caps.key_image_format == "BMP"  # legacy constant preserves original format
         assert caps.dial_count == 0
 
     def test_stream_deck_neo(self):
@@ -95,7 +95,7 @@ class TestDeviceCapabilitiesFromDevice:
         assert caps.deck_type == "Stream Deck Mini"
         assert caps.key_count == 6
         assert caps.key_pixel_width == 80
-        assert caps.key_image_format == "BMP"
+        assert caps.key_image_format == "JPEG"
         assert caps.dial_count == 0
 
     def test_from_mock_neo(self, mock_neo_device):

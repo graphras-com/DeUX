@@ -143,7 +143,8 @@ class DeckRenderer:
                 ) -> None:
                     async with deck._device_lock:
                         await deck._exec_device_io(
-                            deck._device.set_key_image, idx, frame_bytes
+                            deck._device.set_key_image,  # type: ignore[union-attr]
+                            idx, frame_bytes
                         )
 
                 dui_key.set_push_fn(_push_key_frame, key_size=caps.key_size)
@@ -214,7 +215,7 @@ class DeckRenderer:
         async def _push_key_frame(frame_bytes: bytes) -> None:
             async with deck._device_lock:
                 await deck._exec_device_io(
-                    deck._device.set_key_image,
+                    deck._device.set_key_image,  # type: ignore[union-attr]
                     key_index,
                     frame_bytes,
                 )
@@ -320,12 +321,12 @@ class DeckRenderer:
                             out_bytes = frame_bytes
                         async with deck._device_lock:
                             await deck._exec_device_io(
-                                deck._device.set_touchscreen_image,
-                                out_bytes,
+                                deck._device.set_partial_window_image,  # type: ignore[union-attr]
                                 x,
                                 y,
                                 w,
                                 h,
+                                out_bytes,
                             )
 
                     return _push_card_frame
@@ -388,12 +389,12 @@ class DeckRenderer:
                 y_pos = 0
                 async with deck._device_lock:
                     await deck._exec_device_io(
-                        deck._device.set_touchscreen_image,
-                        panel_bytes,
+                        deck._device.set_partial_window_image,
                         x_pos,
                         y_pos,
                         metrics.panel_width,
                         metrics.panel_height,
+                        panel_bytes,
                     )
             else:
                 results = await asyncio.gather(
@@ -406,12 +407,12 @@ class DeckRenderer:
                     y_pos = 0
                     async with deck._device_lock:
                         await deck._exec_device_io(
-                            deck._device.set_touchscreen_image,
-                            panel_bytes,
+                            deck._device.set_partial_window_image,
                             x_pos,
                             y_pos,
                             metrics.panel_width,
                             metrics.panel_height,
+                            panel_bytes,
                         )
 
     # ------------------------------------------------------------------
@@ -433,12 +434,12 @@ class DeckRenderer:
 
         async with deck._device_lock:
             await deck._exec_device_io(
-                deck._device.set_screen_image,
-                image_bytes,
+                deck._device.set_partial_window_image,
                 0,
                 0,
                 info.width,
                 info.height,
+                image_bytes,
             )
         info.mark_clean()
 

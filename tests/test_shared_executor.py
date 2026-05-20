@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 
 from deux.runtime._executor import get_executor, shutdown_executor
 from deux.runtime.deck import Deck
+from deux.runtime.hid.protocol import ImageRotation
 from deux.runtime.manager import DeckManager
 
 
@@ -51,8 +52,8 @@ class TestDeckUsesSharedExecutor:
     async def test_deck_stop_calls_shutdown_wait_true(self, mock_streamdeck_device):
         """stop() shuts down the shared executor with wait=True."""
         d = Deck(serial_number="TEST123")
-        with patch("deux.runtime.deck.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = [mock_streamdeck_device]
+        with patch("deux.runtime.deck.enumerate_devices") as mock_enum:
+            mock_enum.return_value = [mock_streamdeck_device]
             await d.start()
 
         with patch("deux.runtime.deck.shutdown_executor") as mock_shutdown:
@@ -72,8 +73,8 @@ class TestDeckManagerUsesSharedExecutor:
         """stop() shuts down the shared executor with wait=True."""
         m = DeckManager(poll_interval=0.05)
 
-        with patch("deux.runtime.manager.DeviceManager") as mock_dm:
-            mock_dm.return_value.enumerate.return_value = []
+        with patch("deux.runtime.manager.enumerate_devices") as mock_enum:
+            mock_enum.return_value = []
             await m.start()
 
         with patch("deux.runtime.manager.shutdown_executor") as mock_shutdown:
@@ -96,37 +97,28 @@ class TestMultiDeckThreadLeak:
         decks: list[Deck] = []
         for i in range(4):
             dev = MagicMock()
-            dev.DECK_VISUAL = True
-            dev.DECK_TOUCH = True
-            dev.DECK_TYPE = "Stream Deck +"
-            dev.KEY_PIXEL_WIDTH = 120
-            dev.KEY_PIXEL_HEIGHT = 120
-            dev.KEY_IMAGE_FORMAT = "JPEG"
-            dev.KEY_FLIP = [False, False]
-            dev.KEY_ROTATION = 0
-            dev.TOUCHSCREEN_PIXEL_WIDTH = 800
-            dev.TOUCHSCREEN_PIXEL_HEIGHT = 100
-            dev.TOUCHSCREEN_IMAGE_FORMAT = "JPEG"
-            dev.TOUCHSCREEN_FLIP = [False, False]
-            dev.TOUCHSCREEN_ROTATION = 0
-            dev.SCREEN_PIXEL_WIDTH = 0
-            dev.SCREEN_PIXEL_HEIGHT = 0
-            dev.SCREEN_IMAGE_FORMAT = ""
-            dev.SCREEN_FLIP = [False, False]
-            dev.SCREEN_ROTATION = 0
-            dev.TOUCH_KEY_COUNT = 0
             serial = f"LEAK_TEST_{i}"
-            dev.get_serial_number.return_value = serial
-            dev.get_firmware_version.return_value = "1.0.0"
-            dev.deck_type.return_value = "Stream Deck +"
-            dev.key_count.return_value = 8
-            dev.key_layout.return_value = (4, 2)
-            dev.dial_count.return_value = 4
-            dev.id.return_value = f"/dev/hid/{serial}"
+            dev.family = "Stream Deck +"
+            dev.serial_number = serial
+            dev.firmware_version = "1.0.0"
+            dev.key_count = 8
+            dev.key_layout = (4, 2)
+            dev.encoder_count = 4
+            dev.key_size = (120, 120)
+            dev.window_size = (800, 100)
+            dev.lcd_size = (800, 480)
+            dev.has_touch = True
+            dev.has_window = True
+            dev.sensor_count = 0
+            dev.vendor_id = 0x0FD9
+            dev.product_id = 0x0084
+            dev.rotation = ImageRotation.NONE
+            dev.path = f"/dev/hid/{serial}".encode()
+            dev.is_open = False
 
             d = Deck(serial_number=serial)
-            with patch("deux.runtime.deck.DeviceManager") as dm:
-                dm.return_value.enumerate.return_value = [dev]
+            with patch("deux.runtime.deck.enumerate_devices") as dm:
+                dm.return_value = [dev]
                 await d.start()
             decks.append(d)
 

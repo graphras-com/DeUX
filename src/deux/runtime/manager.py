@@ -8,14 +8,15 @@ from collections.abc import Callable
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
-from StreamDeck.DeviceManager import DeviceManager
-
 from ._executor import get_executor, shutdown_executor
 from .deck import Deck, DeckError
 from .device_info import DeviceInfo
+from .hid._ctypes_hidapi import HidApiError
+from .hid.discovery import enumerate_devices
 
 if TYPE_CHECKING:
     from .events import AsyncHandler
+    from .hid.device import HidDevice
 
 logger = logging.getLogger(__name__)
 
@@ -235,13 +236,11 @@ class DeckManager:
 
         try:
             devices = await loop.run_in_executor(
-                get_executor(), DeviceManager().enumerate
+                get_executor(), enumerate_devices
             )
-        except Exception:
+        except (HidApiError, Exception):
             logger.debug("Device enumeration failed")
             return
-
-        visual = [d for d in devices if d.DECK_VISUAL]
 
         managed_paths: dict[str, str] = {}
         for serial, deck in self._decks.items():
@@ -250,11 +249,11 @@ class DeckManager:
                 managed_paths[path] = serial
 
         connected_serials: set[str] = set()
-        device_by_serial: dict[str, Any] = {}
+        device_by_serial: dict[str, HidDevice] = {}
 
         current_paths: set[str] = set()
-        for d in visual:
-            dev_path = d.id()
+        for d in devices:
+            dev_path = d.path.decode("utf-8", errors="replace")
             current_paths.add(dev_path)
             if dev_path in managed_paths:
                 connected_serials.add(managed_paths[dev_path])
@@ -266,13 +265,12 @@ class DeckManager:
                 continue
             try:
                 await loop.run_in_executor(get_executor(), d.open)
-                serial = d.get_serial_number()
+                serial = d.serial_number
                 connected_serials.add(serial)
                 device_by_serial[serial] = d
                 self._path_serial_cache[dev_path] = serial
                 await loop.run_in_executor(get_executor(), d.close)
-            except Exception:
-                dev_path = d.id()
+            except (HidApiError, Exception):
                 if dev_path not in self._failed_probe_paths:
                     self._failed_probe_paths.add(dev_path)
                     logger.info(
@@ -324,7 +322,7 @@ class DeckManager:
             raw_device = device_by_serial.get(serial)
             if raw_device is None:
                 continue
-            device_type = raw_device.DECK_TYPE
+            device_type = raw_device.family
 
             for filters, handler in self._connect_handlers:
                 if filters["serial"] is not None and filters["serial"] != serial:
