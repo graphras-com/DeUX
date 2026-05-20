@@ -290,8 +290,12 @@ class ResvgRasterizer:
             opts.load_system_fonts()
             tree = usvg.Tree.from_str(svg_text, opts)
 
-            # Identity transform — dimensions are baked into the SVG.
-            png_bytes: bytes = _resvg_render(tree, (1.0, 0.0, 0.0, 1.0, 0.0, 0.0))
+            # Identity transform in row-major Affine format (a, b, c, d, e, f):
+            #   | a  b  c |   | 1  0  0 |
+            #   | d  e  f | = | 0  1  0 |
+            #   | 0  0  1 |   | 0  0  1 |
+            # Dimensions are baked into the SVG attributes.
+            png_bytes: bytes = _resvg_render(tree, (1.0, 0.0, 0.0, 0.0, 1.0, 0.0))
             return png_bytes
         except ImportError as exc:
             raise RasterizeError(f"resvg unavailable: {exc}") from exc
