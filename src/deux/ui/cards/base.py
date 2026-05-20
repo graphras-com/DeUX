@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import warnings
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
@@ -267,16 +266,10 @@ class Card(ABC):
     ) -> bytes:
         """Render the card to encoded image bytes for a touchscreen panel.
 
-        The base implementation uses the legacy Pillow compositing path:
-        it calls :meth:`render` and composites the result onto the
-        background tile.  Subclasses (e.g.
-        :class:`~deux.dui.card.DuiCard`) override this to use their
-        native rendering pipeline.
-
-        .. deprecated::
-            Non-DUI cards using this legacy rendering path are
-            deprecated.  Migrate to :class:`~deux.dui.card.DuiCard`
-            for SVG-native rendering.
+        The base implementation uses Pillow compositing: it calls
+        :meth:`render` and composites the result onto the background tile.
+        Subclasses (e.g. :class:`~deux.dui.card.DuiCard`) override this
+        to use their native rendering pipeline.
 
         Parameters
         ----------
@@ -297,13 +290,6 @@ class Card(ABC):
             Encoded image bytes ready to send to the device.
         """
         from ...render.touch_renderer import compose_card_with_background
-
-        warnings.warn(
-            f"{type(self).__name__} uses the legacy Pillow rendering path. "
-            "Migrate to DuiCard for SVG-native rendering.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
 
         rendered = self.render()
         self.set_rendered(rendered)

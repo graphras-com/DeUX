@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import warnings
-
 import pytest
 
 import deux
@@ -169,41 +167,6 @@ class TestPublicAPI:
 
         assert CardController is not None
         assert KeyController is not None
-
-
-class TestDeprecatedImports:
-    """Deprecated symbols still importable from deux with a warning."""
-
-    def test_deprecated_async_event(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            from deux import AsyncEvent  # noqa: F401
-
-            # __getattr__ only fires on attribute access, not cached imports
-            _ = deux.AsyncEvent
-            assert any(issubclass(x.category, DeprecationWarning) for x in w)
-
-    def test_deprecated_device_capabilities(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            _ = deux.DeviceCapabilities
-            assert any(issubclass(x.category, DeprecationWarning) for x in w)
-
-    def test_deprecated_render_metrics(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            _ = deux.RenderMetrics
-            assert any(issubclass(x.category, DeprecationWarning) for x in w)
-
-    def test_deprecated_list_devices(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            _ = deux.list_devices
-            assert any(issubclass(x.category, DeprecationWarning) for x in w)
-
-    def test_unknown_attribute_raises(self):
-        with pytest.raises(AttributeError, match="no attribute"):
-            _ = deux.nonexistent_symbol
 
 
 class TestDeuxErrorHierarchy:

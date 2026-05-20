@@ -12,7 +12,7 @@ from PIL import Image
 
 def render_key_image(
     key_size: tuple[int, int],
-    icon: bytes | object | None = None,
+    icon: bytes | Image.Image | None = None,
     background: str = "black",
     image_format: str = "JPEG",
 ) -> bytes:
@@ -53,10 +53,7 @@ def render_key_image(
         elif isinstance(icon, Image.Image):
             icon_img = icon
         else:
-            # Assume PIL-like object with save method.
-            buf = io.BytesIO()
-            icon.save(buf, format="PNG")  # type: ignore[attr-defined]
-            icon_img = Image.open(io.BytesIO(buf.getvalue()))
+            raise TypeError(f"Unsupported icon type: {type(icon)}")
 
         if icon_img.size != (key_w, key_h):
             icon_img = icon_img.resize((key_w, key_h), Image.Resampling.LANCZOS)
@@ -114,26 +111,3 @@ def _encode_image_bytes(img: Image.Image, image_format: str = "JPEG", quality: i
     else:
         img.convert("RGB").save(buf, format="JPEG", quality=quality)
     return buf.getvalue()
-
-
-def _encode_image(img: object, image_format: str = "JPEG", quality: int = 90) -> bytes:
-    """Encode an image (PIL) to device bytes.
-
-    Parameters
-    ----------
-    img
-        A PIL.Image.Image instance.
-    image_format : str, default="JPEG"
-        Target format (``"JPEG"`` or ``"BMP"``).
-    quality : int, default=90
-        JPEG quality (ignored for BMP).
-
-    Returns
-    -------
-    bytes
-        Raw encoded image bytes.
-    """
-    if isinstance(img, Image.Image):
-        return _encode_image_bytes(img, image_format, quality)
-
-    raise TypeError(f"Unsupported image type: {type(img)}")

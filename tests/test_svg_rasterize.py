@@ -154,13 +154,6 @@ class TestPublicExports:
         assert callable(get_svg_stylesheet)
         assert callable(load_svg_stylesheet)
 
-    def test_toplevel_exports_stylesheet(self):
-        """deux.__init__ exports stylesheet API via deprecated path."""
-        import deux
-
-        assert callable(deux.set_svg_stylesheet)
-        assert callable(deux.get_svg_stylesheet)
-        assert callable(deux.load_svg_stylesheet)
 
 
 class TestSvgStylesheet:

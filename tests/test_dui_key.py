@@ -240,19 +240,6 @@ class TestDuiKeyEvents:
 
         assert handler is not None
 
-    def test_on_event_deprecated_alias(self):
-        spec = _make_key_spec(
-            events=(EventMapping(name="activate", source="key_press"),),
-        )
-        key = DuiKey(spec)
-
-        with pytest.warns(DeprecationWarning, match="use DuiKey.on"):
-            @key.on_event("activate")
-            async def handler():
-                pass
-
-        assert handler is not None
-
     def test_bind_event(self):
         spec = _make_key_spec(
             events=(EventMapping(name="activate", source="key_press"),),

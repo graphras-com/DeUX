@@ -43,7 +43,7 @@ from typing import Protocol, cast
 
 from PIL import Image
 
-from deux.render.key_renderer import _encode_image
+from deux.render.key_renderer import _encode_image_bytes
 from deux.render.svg_rasterize import _svg_to_png
 from deux.runtime.capabilities import DeviceCapabilities
 from deux.runtime.deck import _HID_WRITE_TIMEOUT
@@ -200,7 +200,7 @@ def compose_key_image(
         canvas.paste(svg_img, (x, y), svg_img)
     else:
         canvas.paste(svg_img, (x, y))
-    return _encode_image(canvas)
+    return _encode_image_bytes(canvas)
 
 
 def compose_card_image(
@@ -255,7 +255,7 @@ def compose_touchstrip(
             break
         if card_image is not None:
             img.paste(card_image, (index * panel_width, 0))
-    return _encode_image(img)
+    return _encode_image_bytes(img)
 
 
 def compose_full_touchstrip(
@@ -290,7 +290,7 @@ def compose_full_touchstrip(
         canvas.paste(svg_img, (x, y), svg_img)
     else:
         canvas.paste(svg_img, (x, y))
-    return _encode_image(canvas)
+    return _encode_image_bytes(canvas)
 
 
 def build_parser() -> argparse.ArgumentParser:
