@@ -28,7 +28,7 @@ from __future__ import annotations
 from .animator import SpinnerAnimator
 from .card import DuiCard
 from .event_map import EventMap
-from .iconify import IconifyError, fetch_icon
+from .iconify import IconifyError, fetch_icon, prefetch_icons
 from .iconify import clear_cache as clear_iconify_cache
 from .key import DuiKey
 from .loader import PackageError, load_all_packages, load_package
@@ -110,6 +110,7 @@ __all__ = [
     "list_dui_packages",
     "load_all_packages",
     "load_package",
+    "prefetch_icons",
     "remove_dui_path",
     "resolve_dui",
 ]

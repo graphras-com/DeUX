@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import builtins
 import copy
 import functools
 import io
@@ -627,6 +628,43 @@ class SvgRenderer:
             The rendering context to use, or ``None`` for defaults.
         """
         self._rendering_ctx = ctx
+
+    def collect_icon_names(self) -> builtins.set[str]:
+        """Return all Iconify icon identifiers needed by this renderer.
+
+        Scans bindings for :class:`IconifyBinding` defaults and current
+        values, as well as :class:`ListBinding` items prefixed with
+        ``icon:``.  The result includes both default and currently-bound
+        icon names so that a caller can prefetch everything before the
+        first render.
+
+        Returns
+        -------
+        set[str]
+            A set of ``"prefix:icon"`` strings.
+        """
+        icons: set[str] = set()
+        for name, binding in self._spec.bindings.items():
+            if isinstance(binding, IconifyBinding):
+                # Collect default
+                if binding.default:
+                    icons.add(str(binding.default))
+                # Collect current value
+                val = self._values.get(name)
+                if val and val != binding.default:
+                    icons.add(str(val))
+            elif isinstance(binding, ListBinding):
+                # Collect icon items from defaults
+                for item in binding.default_items:
+                    if isinstance(item, str) and item.startswith("icon:"):
+                        icons.add(item[5:])
+                # Collect icon items from current value
+                val = self._values.get(name)
+                if isinstance(val, dict):
+                    for item in val.get("items", []):
+                        if isinstance(item, str) and item.startswith("icon:"):
+                            icons.add(item[5:])
+        return icons
 
     def set_base_layer(
         self,

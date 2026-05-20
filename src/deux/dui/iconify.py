@@ -14,6 +14,7 @@ a process restart retries previously-failed icons.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import os
@@ -23,6 +24,7 @@ import tempfile
 import threading
 import urllib.error
 import urllib.request
+from collections.abc import Iterable
 from pathlib import Path
 from typing import cast
 
@@ -249,6 +251,42 @@ def fetch_icon(name: str) -> str:
 
     logger.debug("Fetched Iconify icon '%s' (%d bytes)", key, len(body))
     return body
+
+
+async def prefetch_icons(names: Iterable[str]) -> dict[str, str | None]:
+    """Fetch multiple Iconify icons concurrently, warming the cache.
+
+    Each icon is fetched in a separate thread via
+    :func:`asyncio.to_thread`, so network I/O runs in parallel without
+    blocking the event loop.  Icons that are already cached (in memory
+    or on disk) return immediately.
+
+    Parameters
+    ----------
+    names : Iterable[str]
+        Icon identifiers in ``"prefix:icon"`` form (e.g.
+        ``"mdi:play"``).  Duplicates are deduplicated automatically.
+
+    Returns
+    -------
+    dict[str, str | None]
+        Mapping of icon name to SVG string on success, or ``None`` for
+        icons that failed to load (404, network error, malformed name).
+    """
+    unique = dict.fromkeys(names)  # deduplicate, preserve order
+    if not unique:
+        return {}
+
+    async def _fetch_one(name: str) -> tuple[str, str | None]:
+        try:
+            svg = await asyncio.to_thread(fetch_icon, name)
+            return (name, svg)
+        except (IconifyError, Exception):
+            logger.debug("Prefetch failed for icon '%s'", name, exc_info=True)
+            return (name, None)
+
+    results = await asyncio.gather(*[_fetch_one(n) for n in unique])
+    return dict(results)
 
 
 def clear_cache(*, persistent: bool = False) -> None:

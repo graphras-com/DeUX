@@ -98,7 +98,6 @@ from deux import (
     DuiKey,
     Theme,
     add_dui_path,
-    set_active_theme,
 )
 
 log = logging.getLogger(__name__)
@@ -683,10 +682,7 @@ class DashboardController(CardController):
         """Generate and apply a random theme on encoder hold."""
         if self._deck is None:
             return
-        set_active_theme(Theme.from_random())
-        screen = self._deck.active_screen
-        if screen is not None:
-            screen.mark_all_dirty()
+        await self._deck.set_theme(Theme.from_random())
         log.info("Applied new random theme")
 
     async def _clock_loop(self) -> None:

@@ -178,21 +178,18 @@ class TestDeckSetPage:
 
     async def test_calls_render(self, deck):
         deck.screen("main")
-        deck._render_all_keys = AsyncMock()
-        deck._render_touchscreen = AsyncMock()
+        deck._renderer.render_screen_complete = AsyncMock()
 
         await deck.set_screen("main")
-        deck._render_all_keys.assert_awaited_once()
-        deck._render_touchscreen.assert_awaited_once()
+        deck._renderer.render_screen_complete.assert_awaited_once()
 
     async def test_emits_event_before_render(self, deck):
         """on_screen_changed fires before rendering so bind handlers can seed values."""
         deck.screen("main")
-        deck._render_all_keys = AsyncMock()
-        deck._render_touchscreen = AsyncMock()
+        deck._renderer.render_screen_complete = AsyncMock()
 
         order: list[str] = []
-        deck._render_all_keys.side_effect = lambda: order.append("rendered")
+        deck._renderer.render_screen_complete.side_effect = lambda: order.append("rendered")
 
         @deck.on_screen_changed
         async def _on(name: str, screens: dict) -> None:
