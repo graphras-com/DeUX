@@ -25,6 +25,7 @@ from deux.tools.preview import (
     build_parser,
     collect_svg_paths,
     compose_card_image,
+    compose_display_image,
     compose_full_touchstrip,
     compose_key_image,
     compose_touchstrip,
@@ -33,6 +34,7 @@ from deux.tools.preview import (
     main,
     parse_args,
     parse_hex_color,
+    render_display,
     render_preview,
 )
 
@@ -897,3 +899,119 @@ class TestCollectSvgPathsTouchstrip:
         paths = collect_svg_paths(args)
         assert paths[0] == k
         assert paths[-1] == ts
+
+
+class TestParserDisplay:
+    """Tests for the ``--display`` CLI flag."""
+
+    def test_display_default_none(self):
+        args = parse_args([])
+        assert args.display is None
+
+    def test_display_accepts_path(self, tmp_path: Path):
+        p = tmp_path / "lcd.svg"
+        args = parse_args(["--display", str(p)])
+        assert args.display == p
+
+    def test_display_conflicts_with_key(self, tmp_path: Path):
+        d = tmp_path / "lcd.svg"
+        k = tmp_path / "k.svg"
+        with pytest.raises(SystemExit):
+            parse_args(["--display", str(d), "--key0", str(k)])
+
+    def test_display_conflicts_with_card(self, tmp_path: Path):
+        d = tmp_path / "lcd.svg"
+        c = tmp_path / "c.svg"
+        with pytest.raises(SystemExit):
+            parse_args(["--display", str(d), "--card0", str(c)])
+
+    def test_display_conflicts_with_touchstrip(self, tmp_path: Path):
+        d = tmp_path / "lcd.svg"
+        ts = tmp_path / "ts.svg"
+        with pytest.raises(SystemExit):
+            parse_args(["--display", str(d), "--touchstrip", str(ts)])
+
+
+class TestComposeDisplayImage:
+    """Tests for compose_display_image."""
+
+    def test_output_size_matches_lcd(self, square_svg: Path):
+        from deux.tools.preview import compose_display_image
+
+        img = load_svg(square_svg, 800, 480)
+        jpeg = compose_display_image(img, (800, 480))
+        decoded = Image.open(io.BytesIO(jpeg))
+        assert decoded.size == (800, 480)
+
+    def test_custom_background(self, square_svg: Path):
+        from deux.tools.preview import compose_display_image
+
+        img = load_svg(square_svg, 800, 480)
+        jpeg = compose_display_image(img, (800, 480), background="#ff0000")
+        decoded = Image.open(io.BytesIO(jpeg))
+        assert decoded.size == (800, 480)
+
+
+class TestRenderDisplay:
+    """Tests for render_display."""
+
+    def test_renders_at_lcd_size(self, square_svg: Path):
+        from deux.tools.preview import render_display
+
+        jpeg = render_display(square_svg, (800, 480))
+        decoded = Image.open(io.BytesIO(jpeg))
+        assert decoded.size == (800, 480)
+
+    def test_missing_file_exits(self, tmp_path: Path):
+        from deux.tools.preview import render_display
+
+        with pytest.raises(SystemExit):
+            render_display(tmp_path / "nonexistent.svg", (800, 480))
+
+    def test_custom_background(self, square_svg: Path):
+        from deux.tools.preview import render_display
+
+        jpeg = render_display(square_svg, (800, 480), background="#00ff00")
+        decoded = Image.open(io.BytesIO(jpeg))
+        assert decoded.size == (800, 480)
+
+
+class TestCollectSvgPathsDisplay:
+    """Tests for collect_svg_paths with --display."""
+
+    def test_includes_display_path(self, tmp_path: Path):
+        d = tmp_path / "lcd.svg"
+        args = parse_args(["--display", str(d)])
+        paths = collect_svg_paths(args)
+        assert d in paths
+
+
+class TestPushToDeviceDisplay:
+    """Tests for push_to_device with --display."""
+
+    async def test_display_pushes_full_screen(
+        self, mock_streamdeck_device: MagicMock, square_svg: Path
+    ):
+        from deux.tools.preview import push_to_device
+
+        mock_streamdeck_device.DECK_VISUAL = True
+        args = parse_args(["--display", str(square_svg)])
+
+        with (
+            patch(
+                "deux.tools.preview._find_and_open_device",
+                return_value=mock_streamdeck_device,
+            ),
+            patch(
+                "deux.tools.preview._wait_for_interrupt",
+                new_callable=AsyncMock,
+            ),
+        ):
+            await push_to_device(args)
+
+        mock_streamdeck_device.set_full_screen_image.assert_called_once()
+        # Should NOT push individual keys or touchstrip
+        mock_streamdeck_device.set_key_image.assert_not_called()
+        mock_streamdeck_device.set_partial_window_image.assert_not_called()
+        mock_streamdeck_device.show_logo.assert_called_once()
+        mock_streamdeck_device.close.assert_called_once()

@@ -71,6 +71,7 @@ class PreviewDeckDevice(Protocol):
     def family(self) -> str: ...
     def set_brightness(self, value: int) -> None: ...
     def set_key_image(self, key: int, image: bytes) -> None: ...
+    def set_full_screen_image(self, image: bytes) -> None: ...
     def set_partial_window_image(
         self,
         x: int,
@@ -348,6 +349,37 @@ def compose_full_touchstrip(
     return _encode_image_bytes(canvas)
 
 
+def compose_display_image(
+    svg_img: Image.Image,
+    lcd_size: tuple[int, int],
+    background: str = "black",
+) -> bytes:
+    """Place *svg_img* edge-to-edge on a full-LCD canvas.
+
+    Parameters
+    ----------
+    svg_img : Image.Image
+        Pre-rasterised SVG image to composite onto the LCD canvas.
+    lcd_size : tuple[int, int]
+        ``(width, height)`` of the device's full LCD.
+    background : str, default="black"
+        Canvas fill colour (any PIL-compatible colour string).
+
+    Returns
+    -------
+    bytes
+        JPEG-encoded image bytes ready for ``set_full_screen_image``.
+    """
+    canvas = Image.new("RGB", lcd_size, background)
+    x = (lcd_size[0] - svg_img.width) // 2
+    y = (lcd_size[1] - svg_img.height) // 2
+    if svg_img.mode == "RGBA":
+        canvas.paste(svg_img, (x, y), svg_img)
+    else:
+        canvas.paste(svg_img, (x, y))
+    return _encode_image_bytes(canvas)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the ``argparse`` parser for the preview tool.
 
@@ -381,6 +413,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="SVG",
         help="SVG file for the full touchstrip (mutually exclusive with --cardN)",
+    )
+    parser.add_argument(
+        "--display",
+        type=Path,
+        default=None,
+        metavar="SVG",
+        help=(
+            "SVG file to render at the full LCD resolution and push as a single"
+            " full-screen image (mutually exclusive with --keyN/--cardN/--touchstrip)"
+        ),
     )
     parser.add_argument(
         "-b",
@@ -433,6 +475,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         Parsed arguments with key/card paths, brightness, background, etc.
     """
     args = build_parser().parse_args(argv)
+
+    # --display is mutually exclusive with all other image flags.
+    if args.display is not None:
+        conflicts: list[str] = []
+        for i in range(_MAX_KEY_SLOTS):
+            if getattr(args, f"key{i}") is not None:
+                conflicts.append(f"--key{i}")
+        for i in range(_MAX_CARD_SLOTS):
+            if getattr(args, f"card{i}") is not None:
+                conflicts.append(f"--card{i}")
+        if args.touchstrip is not None:
+            conflicts.append("--touchstrip")
+        if conflicts:
+            build_parser().error(
+                f"--display cannot be used together with {conflicts[0]}"
+            )
 
     # --touchstrip is mutually exclusive with --cardN flags.
     if args.touchstrip is not None:
@@ -502,6 +560,36 @@ async def push_to_device(
             ),
             timeout=_HID_WRITE_TIMEOUT,
         )
+
+        display_svg: Path | None = getattr(args, "display", None)
+        if display_svg is not None:
+            lcd_size = (caps.lcd_width, caps.lcd_height)
+            bg: str = getattr(args, "background", None) or "black"
+            jpeg = render_display(display_svg, lcd_size, background=bg)
+            await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    deck.set_full_screen_image,
+                    jpeg,
+                ),
+                timeout=_HID_WRITE_TIMEOUT,
+            )
+
+            if args.watch:
+                print(  # noqa: T201
+                    "Display preview pushed — watching for changes (Ctrl+C to exit)",
+                    file=sys.stderr,
+                )
+                await _watch_and_reload_display(
+                    args, deck, caps, display_svg, poll_interval
+                )
+            else:
+                print(  # noqa: T201
+                    "Display preview pushed — press Ctrl+C to exit",
+                    file=sys.stderr,
+                )
+                await _wait_for_interrupt()
+            return
 
         key_images, touchstrip_bytes = render_preview(args, caps)
 
@@ -585,6 +673,9 @@ def collect_svg_paths(args: argparse.Namespace) -> list[Path]:
     ts: Path | None = getattr(args, "touchstrip", None)
     if ts is not None:
         paths.append(ts)
+    display: Path | None = getattr(args, "display", None)
+    if display is not None:
+        paths.append(display)
     return paths
 
 
@@ -677,7 +768,68 @@ async def _watch_and_reload(
         loop.remove_signal_handler(signal.SIGINT)
 
 
+async def _watch_and_reload_display(
+    args: argparse.Namespace,
+    deck: PreviewDeckDevice,
+    caps: DeviceCapabilities,
+    display_svg: Path,
+    poll_interval: float,
+) -> None:
+    """Poll the display SVG for changes and re-push to *deck* on modification.
 
+    Runs until SIGINT (Ctrl+C) is received.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed CLI arguments.
+    deck : PreviewDeckDevice
+        Open device to push images to.
+    caps : DeviceCapabilities
+        Capabilities of the connected device.
+    display_svg : Path
+        Path to the display SVG file to watch.
+    poll_interval : float
+        File poll interval in seconds.
+    """
+    loop = asyncio.get_running_loop()
+    stop = asyncio.Event()
+    loop.add_signal_handler(signal.SIGINT, stop.set)
+
+    last_mtime = get_mtimes([display_svg])
+
+    try:
+        while not stop.is_set():
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=poll_interval)
+                break
+            except TimeoutError:
+                pass
+
+            current_mtime = get_mtimes([display_svg])
+            if current_mtime != last_mtime:
+                logger.info("Detected change: %s", display_svg)
+                print("Reloading display SVG...", file=sys.stderr)  # noqa: T201
+                last_mtime = current_mtime
+                try:
+                    lcd_size = (caps.lcd_width, caps.lcd_height)
+                    background: str = getattr(args, "background", None) or "black"
+                    jpeg = render_display(display_svg, lcd_size, background=background)
+                except Exception as exc:
+                    print(f"Render error: {exc}", file=sys.stderr)  # noqa: T201
+                    continue
+
+                await asyncio.wait_for(
+                    loop.run_in_executor(
+                        None,
+                        deck.set_full_screen_image,
+                        jpeg,
+                    ),
+                    timeout=_HID_WRITE_TIMEOUT,
+                )
+                print("Display preview updated", file=sys.stderr)  # noqa: T201
+    finally:
+        loop.remove_signal_handler(signal.SIGINT)
 
 def render_preview(
     args: argparse.Namespace,
@@ -733,6 +885,68 @@ def render_preview(
             img.height,
         )
         return key_images, touchstrip_bytes
+
+    panel_width = caps.touchscreen_width // caps.panel_count
+    panel_size = (panel_width, caps.touchscreen_height)
+    card_images: list[Image.Image | None] = [None] * caps.panel_count
+
+    for i in range(caps.panel_count):
+        svg_path: Path | None = getattr(args, f"card{i}", None)
+        if svg_path is not None:
+            if not svg_path.exists():
+                print(f"ERROR: Card SVG not found: {svg_path}", file=sys.stderr)  # noqa: T201
+                sys.exit(1)
+            img = load_svg(svg_path, *panel_size)
+            card_images[i] = compose_card_image(img, panel_size, background=background)
+            logger.info(
+                "Rendered card %d from %s (%dx%d)", i, svg_path, img.width, img.height
+            )
+
+    touchstrip_bytes = compose_touchstrip(
+        card_images,
+        touchscreen_width=caps.touchscreen_width,
+        touchscreen_height=caps.touchscreen_height,
+        panel_count=caps.panel_count,
+        panel_width=panel_width,
+        background=background,
+    )
+    return key_images, touchstrip_bytes
+
+
+def render_display(
+    svg_path: Path,
+    lcd_size: tuple[int, int],
+    background: str = "black",
+) -> bytes:
+    """Rasterise a single SVG at the full LCD resolution.
+
+    Parameters
+    ----------
+    svg_path : Path
+        Path to the SVG file.
+    lcd_size : tuple[int, int]
+        ``(width, height)`` of the device's full LCD.
+    background : str, default="black"
+        Canvas fill colour.
+
+    Returns
+    -------
+    bytes
+        JPEG-encoded image at *lcd_size* ready for ``set_full_screen_image``.
+    """
+    if not svg_path.exists():
+        print(f"ERROR: Display SVG not found: {svg_path}", file=sys.stderr)  # noqa: T201
+        sys.exit(1)
+    img = load_svg(svg_path, *lcd_size)
+    logger.info(
+        "Rendered display from %s (%dx%d -> %dx%d)",
+        svg_path,
+        img.width,
+        img.height,
+        lcd_size[0],
+        lcd_size[1],
+    )
+    return compose_display_image(img, lcd_size, background=background)
 
     panel_width = caps.touchscreen_width // caps.panel_count
     panel_size = (panel_width, caps.touchscreen_height)
