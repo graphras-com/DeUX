@@ -9,8 +9,8 @@ uv sync --extra test     # primary install — uses pinned uv.lock; Python 3.11+
 ```
 
 System libraries (required for HID + SVG rasterisation):
-- macOS: `brew install cairo hidapi`
-- Linux (Debian/Ubuntu): `sudo apt install libcairo2-dev libhidapi-dev`
+- macOS: `brew install hidapi`
+- Linux (Debian/Ubuntu): `sudo apt install libhidapi-dev`
 
 ## Quality gate (must pass before commit)
 
@@ -38,7 +38,7 @@ python examples/streamdeck.py
 - **Never commit directly to `main`.** Branch with prefix matching the change type: `feat/`, `fix/`, `docs/`, `refactor/`, `test/`, `chore/`. Push and open a PR via `gh pr create`.
 - **NumPy-style docstrings** are mandatory on all public modules, classes, methods, functions (and non-obvious private helpers / complex test fixtures). Sections: Parameters, Returns, Raises (when relevant), Side effects (when relevant). The mkdocstrings docs build relies on this format — see `mkdocs.yml`.
 - Ruff config: line length 100, target py311, rules E/W/F/I/B/UP/C4/SIM with B008 ignored. `tests/*` ignores B011.
-- mypy is strict; `StreamDeck.*` and `cairosvg` are the only allowed `ignore_missing_imports` overrides.
+- mypy is strict; `StreamDeck.*` is the only allowed `ignore_missing_imports` override.
 
 ## Architecture
 
@@ -47,7 +47,7 @@ Single package `src/deux` (src layout, Hatchling build). Five subpackages with s
 - **`runtime/`** — device session: `DeckManager` is the **only public entry point**. It owns discovery (`discovery.py`), hot-plug polling, auto-reconnect, and creates `Deck` instances. `Deck` wraps one device, holds `DeviceCapabilities` (auto-detected from hardware), and uses `AsyncTransport` to bridge the synchronous `StreamDeck` library callbacks onto the asyncio loop. Events flow as typed `DeckEvent` subclasses (`KeyEvent`, `EncoderPressEvent`, `EncoderTurnEvent`, `TouchEvent`).
 - **`ui/`** — declarative layout primitives attached to a `Deck`: `Screen` is a named layout containing `KeySlot`s, `EncoderSlot`s, an optional `TouchStrip` of `Card`s, and an optional `InfoScreen`. Screens swap atomically via `deck.set_screen(name)`. Slots expose decorator-based handlers (`@key.on_press`, `@encoder.on_turn`, etc.). Available slots/zones are gated by `DeviceCapabilities` — accessing absent hardware raises `DeckError`.
 - **`dui/`** — the `.dui` package format: a directory containing `layout.svg` + `manifest.yaml`. `loader.load_package()` parses + validates into a `PackageSpec` (`schema.py`); `DuiCard` / `DuiKey` (`card.py`, `key.py`) wrap a spec to render via `SvgRenderer` and dispatch declared events through `EventMap`. Bindings are typed (text, image, visibility, color, range, slider, toggle, iconify) and drive SVG node attributes at render time. `animator.py` + `spinner.py` handle async spinner refresh; `iconify.py` fetches Iconify icons.
-- **`render/`** — pure-image layer: `key_renderer`, `screen_renderer`, `touch_renderer`, `svg_rasterize` (CairoSVG-backed), `image_fetch` (caching HTTP loader), and `metrics.py` which derives panel/touch-strip geometry from capabilities.
+- **`render/`** — pure-image layer: `key_renderer`, `screen_renderer`, `touch_renderer`, `svg_rasterize`, `image_fetch` (caching HTTP loader), and `metrics.py` which derives panel/touch-strip geometry from capabilities.
 - **`tools/`** — CLIs invoked as `python -m deux.tools.preview` and `python -m deux.tools.verify` (preview SVGs on a connected deck with optional `--watch`; verify a `.dui` package or a directory of packages with optional `--strict` / `--index`).
 
 Public surface is whatever `deux/__init__.py` re-exports — keep `__all__` accurate when you add or rename symbols.
