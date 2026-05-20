@@ -42,7 +42,8 @@ from deux.dui.svg_renderer import (
 _BASIC_SVG = (
     '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="100" height="50">'
     '<rect id="bg" width="100" height="50" fill="#000000"/>'
-    '<text id="label" x="10" y="30" font-size="12" fill="#ffffff">Hello</text>'
+    '<text id="label" x="10" y="30" font-family="DejaVu Sans"'
+    ' font-size="12" fill="#ffffff">Hello</text>'
     "</svg>"
 )
 
@@ -1158,7 +1159,7 @@ class TestSvgRendererToggleRender:
 
 _WRAP_SVG = (
     '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="106" height="106"'
-    ' font-family="Arial,sans-serif">'
+     ' font-family="DejaVu Sans,Arial,sans-serif">'
     '<rect id="bg" width="106" height="106" fill="#000000"/>'
     '<text id="label" x="53" y="30" font-size="15" text-anchor="middle"'
     ' fill="#ffffff">Placeholder</text>'
@@ -1168,7 +1169,7 @@ _WRAP_SVG = (
 _WRAP_SVG_FONT_ON_TEXT = (
     '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="100" height="100">'
     '<rect id="bg" width="100" height="100" fill="#000000"/>'
-    '<text id="label" x="50" y="20" font-size="12" font-family="Helvetica,sans-serif"'
+    '<text id="label" x="50" y="20" font-size="12" font-family="DejaVu Sans,Helvetica,sans-serif"'
     ' fill="#ffffff">Text</text>'
     "</svg>"
 )
@@ -1192,7 +1193,7 @@ class TestResolveFontAttrs:
 
         elem = _find_element_by_id(root, "label")
         family, size = _resolve_font_attrs(root, elem)
-        assert family == "Helvetica"
+        assert family == "DejaVu Sans"
         assert size == 12.0
 
     def test_font_inherited_from_svg_root(self):
@@ -1203,7 +1204,7 @@ class TestResolveFontAttrs:
 
         elem = _find_element_by_id(root, "label")
         family, size = _resolve_font_attrs(root, elem)
-        assert family == "Arial"
+        assert family == "DejaVu Sans"
         assert size == 15.0
 
     def test_font_defaults_when_missing(self):
@@ -1919,7 +1920,8 @@ class TestIconifyBindingRendering:
 _SPINNER_VISIBLE_SVG = (
     '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="100" height="50">'
     '<rect id="bg" width="100" height="50" fill="#000000"/>'
-    '<text id="label" x="10" y="30" font-size="12" fill="#ffffff">Hello</text>'
+    '<text id="label" x="10" y="30" font-family="DejaVu Sans"'
+    ' font-size="12" fill="#ffffff">Hello</text>'
     '<rect id="spinner_bg" x="65" y="5" width="30" height="30" fill="#333333"/>'
     '<rect id="spinner" x="70" y="10" width="20" height="20" fill="#ff0000"/>'
     "</svg>"
@@ -1928,7 +1930,8 @@ _SPINNER_VISIBLE_SVG = (
 _SPINNER_HIDDEN_SVG = (
     '<svg id="test" xmlns="http://www.w3.org/2000/svg" width="100" height="50">'
     '<rect id="bg" width="100" height="50" fill="#000000"/>'
-    '<text id="label" x="10" y="30" font-size="12" fill="#ffffff">Hello</text>'
+    '<text id="label" x="10" y="30" font-family="DejaVu Sans"'
+    ' font-size="12" fill="#ffffff">Hello</text>'
     '<rect id="spinner" x="70" y="10" width="20" height="20" '
     'display="none" fill="#ff0000"/>'
     "</svg>"
