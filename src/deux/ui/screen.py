@@ -445,7 +445,9 @@ class Screen:
         # Touch-strip cards
         if self._touch_strip is not None:
             for index, card in enumerate(self._touch_strip.cards):
-                card_img = card.rendered
+                # Render on demand; fall back to the last cached image
+                # when the card does not support on-demand rendering.
+                card_img = card.render() or card.rendered
                 if card_img is None:
                     continue
                 buf = io.BytesIO()

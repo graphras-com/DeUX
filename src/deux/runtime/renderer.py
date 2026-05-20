@@ -345,6 +345,10 @@ class DeckRenderer:
                 if self.is_animating(card):
                     continue
 
+            # Only render cards that actually need updating.
+            if not card.is_dirty:
+                continue
+
             cards_to_render.append((card_idx, card, bg_tile))
 
         # Phase 2: prepare assets and render all cards concurrently
@@ -367,12 +371,19 @@ class DeckRenderer:
             return (cidx, panel_bytes)
 
         if cards_to_render:
-            results = await asyncio.gather(
-                *[_render_card(cidx, crd, tile) for cidx, crd, tile in cards_to_render]
-            )
-
-            # Phase 3: push all panels to device sequentially
-            for cidx, panel_bytes in sorted(results, key=lambda r: r[0]):
+            if len(cards_to_render) == 1:
+                # Fast path: render and push a single dirty card without
+                # the overhead of asyncio.gather.
+                cidx, crd, tile = cards_to_render[0]
+                await crd.prepare_assets()
+                panel_bytes = await asyncio.to_thread(
+                    crd.render_panel_bytes,
+                    metrics=metrics,
+                    card_index=cidx,
+                    bg_tile=tile,
+                    background=touch_strip.background_color,
+                    image_format=image_fmt,
+                )
                 x_pos = cidx * metrics.panel_width
                 y_pos = 0
                 async with deck._device_lock:
@@ -384,6 +395,24 @@ class DeckRenderer:
                         metrics.panel_width,
                         metrics.panel_height,
                     )
+            else:
+                results = await asyncio.gather(
+                    *[_render_card(cidx, crd, tile) for cidx, crd, tile in cards_to_render]
+                )
+
+                # Phase 3: push all panels to device sequentially
+                for cidx, panel_bytes in sorted(results, key=lambda r: r[0]):
+                    x_pos = cidx * metrics.panel_width
+                    y_pos = 0
+                    async with deck._device_lock:
+                        await deck._exec_device_io(
+                            deck._device.set_touchscreen_image,
+                            panel_bytes,
+                            x_pos,
+                            y_pos,
+                            metrics.panel_width,
+                            metrics.panel_height,
+                        )
 
     # ------------------------------------------------------------------
     # Info-screen rendering

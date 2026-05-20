@@ -249,9 +249,7 @@ class DuiCard(BindingMixin, Card):
             background=background,
         )
 
-        # Also render a PIL image for caching (used by screenshot).
-        img = self.render()
-        self.set_rendered(img)
+        self.mark_clean()
 
         return panel_bytes
 
