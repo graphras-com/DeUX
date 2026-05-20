@@ -500,12 +500,19 @@ class Deck:
         if not screen:
             return
 
-        for card in screen.cards:
-            await self._drain_card_callbacks(card)
+        await asyncio.gather(
+            *(self._drain_card_callbacks(card) for card in screen.cards)
+        )
 
-        for key_index, key_slot in screen.keys.items():
-            if key_slot.is_dirty and self._is_dui_key(key_slot):
-                await self._render_dui_key(key_slot, key_index)
+        dirty_keys = [
+            (key_index, key_slot)
+            for key_index, key_slot in screen.keys.items()
+            if key_slot.is_dirty and self._is_dui_key(key_slot)
+        ]
+        if dirty_keys:
+            await asyncio.gather(
+                *(self._render_dui_key(ks, ki) for ki, ks in dirty_keys)
+            )
 
         if screen.key_bg_dirty:
             await self._render_all_keys()

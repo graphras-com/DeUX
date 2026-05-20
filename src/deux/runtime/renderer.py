@@ -105,7 +105,12 @@ class DeckRenderer:
     # ------------------------------------------------------------------
 
     async def render_all_keys(self) -> None:
-        """Render and push all key images for the active screen."""
+        """Render and push all key images for the active screen.
+
+        Key images are rendered concurrently (CPU-bound work offloaded
+        to threads), then pushed to the device sequentially to avoid
+        visible one-by-one delays.
+        """
         deck = self._deck
         screen = deck._current_screen()
         if not deck._device or not screen:
@@ -119,25 +124,66 @@ class DeckRenderer:
         if metrics is None:
             return
 
+        # Phase 1: render all key images concurrently
+        key_images: dict[int, bytes] = {}
+        render_tasks: list[asyncio.Task[tuple[int, bytes]]] = []
+
         for key_index in range(caps.key_count):
             key_slot = screen.keys.get(key_index)
             if key_slot and self.is_dui_key(key_slot):
-                await self.render_dui_key(key_slot, key_index)
+                dui_key = cast("DuiKey", key_slot)
+
+                # Skip keys with active spinner animation
+                if self.is_animating(dui_key):
+                    continue
+
+                # Wire push_fn for animations (needs to happen on main thread)
+                async def _push_key_frame(
+                    frame_bytes: bytes, idx: int = key_index
+                ) -> None:
+                    async with deck._device_lock:
+                        await deck._exec_device_io(
+                            deck._device.set_key_image, idx, frame_bytes
+                        )
+
+                dui_key.set_push_fn(_push_key_frame, key_size=caps.key_size)
+
+                async def _render_key(
+                    dk: DuiKey = dui_key, idx: int = key_index
+                ) -> tuple[int, bytes]:
+                    img = await asyncio.to_thread(
+                        dk.render_image,
+                        key_size=caps.key_size,
+                        image_format=caps.key_image_format,
+                    )
+                    dk.set_rendered_image(img)
+                    return (idx, img)
+
+                render_tasks.append(asyncio.ensure_future(_render_key()))
             else:
                 bg_image = screen.key_bg_image
                 if bg_image is not None:
-                    image_bytes = bg_image
+                    key_images[key_index] = bg_image
                 else:
-                    image_bytes = render_blank_key(
+                    key_images[key_index] = render_blank_key(
                         key_size=metrics.key_size,
                         image_format=caps.key_image_format,
                     )
-                async with deck._device_lock:
-                    await deck._exec_device_io(
-                        deck._device.set_key_image,
-                        key_index,
-                        image_bytes,
-                    )
+
+        # Await all concurrent renders
+        if render_tasks:
+            results = await asyncio.gather(*render_tasks)
+            for idx, img in results:
+                key_images[idx] = img
+
+        # Phase 2: push all key images to device
+        for key_index in sorted(key_images):
+            async with deck._device_lock:
+                await deck._exec_device_io(
+                    deck._device.set_key_image,
+                    key_index,
+                    key_images[key_index],
+                )
 
     async def render_dui_key(self, key_slot: KeySlot, key_index: int) -> None:
         """Render a DuiKey and push to the device.
@@ -178,7 +224,8 @@ class DeckRenderer:
 
         dui_key.set_push_fn(_push_key_frame, key_size=deck._caps.key_size)
 
-        image_bytes = dui_key.render_image(
+        image_bytes = await asyncio.to_thread(
+            dui_key.render_image,
             key_size=deck._caps.key_size,
             image_format=deck._caps.key_image_format,
         )
@@ -219,9 +266,10 @@ class DeckRenderer:
 
         bg_svg_root = touch_strip.bg_svg_root
 
+        # Phase 1: set up cards (push_fn wiring, background layers)
+        cards_to_render: list[tuple[int, Card, bytes | None]] = []
+
         for card_idx, card in enumerate(screen.cards):
-            x_pos = card_idx * metrics.panel_width
-            y_pos = 0
             bg_tile = touch_strip.bg_tile(card_idx)
 
             if isinstance(card, DuiCard):
@@ -239,6 +287,9 @@ class DeckRenderer:
                     card.clear_background_layer()
 
                 # Wire push_fn for spinner animations (per-panel update)
+                x_pos = card_idx * metrics.panel_width
+                y_pos = 0
+
                 async def _make_push(
                     x: int,
                     y: int,
@@ -294,32 +345,45 @@ class DeckRenderer:
                 if self.is_animating(card):
                     continue
 
-            await card.prepare_assets()
+            cards_to_render.append((card_idx, card, bg_tile))
 
-            image_fmt = (
-                deck._caps.touchscreen_image_format if deck._caps else "JPEG"
-            )
+        # Phase 2: prepare assets and render all cards concurrently
+        image_fmt = (
+            deck._caps.touchscreen_image_format if deck._caps else "JPEG"
+        )
 
-            # Unified rendering: each card type implements render_panel_bytes
+        async def _render_card(
+            cidx: int, crd: Card, tile: bytes | None
+        ) -> tuple[int, bytes]:
+            await crd.prepare_assets()
             panel_bytes = await asyncio.to_thread(
-                card.render_panel_bytes,
+                crd.render_panel_bytes,
                 metrics=metrics,
-                card_index=card_idx,
-                bg_tile=bg_tile,
+                card_index=cidx,
+                bg_tile=tile,
                 background=touch_strip.background_color,
                 image_format=image_fmt,
             )
+            return (cidx, panel_bytes)
 
-            # Push per-panel update
-            async with deck._device_lock:
-                await deck._exec_device_io(
-                    deck._device.set_touchscreen_image,
-                    panel_bytes,
-                    x_pos,
-                    y_pos,
-                    metrics.panel_width,
-                    metrics.panel_height,
-                )
+        if cards_to_render:
+            results = await asyncio.gather(
+                *[_render_card(cidx, crd, tile) for cidx, crd, tile in cards_to_render]
+            )
+
+            # Phase 3: push all panels to device sequentially
+            for cidx, panel_bytes in sorted(results, key=lambda r: r[0]):
+                x_pos = cidx * metrics.panel_width
+                y_pos = 0
+                async with deck._device_lock:
+                    await deck._exec_device_io(
+                        deck._device.set_touchscreen_image,
+                        panel_bytes,
+                        x_pos,
+                        y_pos,
+                        metrics.panel_width,
+                        metrics.panel_height,
+                    )
 
     # ------------------------------------------------------------------
     # Info-screen rendering
