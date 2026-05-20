@@ -13,8 +13,6 @@ import logging
 import xml.etree.ElementTree as ET
 from typing import Literal
 
-from PIL import Image
-
 from .._xml import safe_fromstring
 
 logger = logging.getLogger(__name__)
@@ -226,16 +224,14 @@ class BackgroundLayer:
 
     def _rasterize_touchstrip(self) -> None:
         """Rasterize and slice a touchstrip background SVG using Pillow."""
-        from .svg_rasterize import _svg_to_png
+        from .svg_rasterize import _svg_to_image
 
         assert self._svg is not None  # noqa: S101 — invariant
 
         total_width = self._panel_width * self._panel_count
         total_height = self._panel_height
 
-        png_data = _svg_to_png(self._svg, total_width, total_height)
-
-        full_img = Image.open(io.BytesIO(png_data)).convert("RGB")
+        full_img = _svg_to_image(self._svg, total_width, total_height, mode="RGB")
 
         tiles: list[bytes] = []
         for i in range(self._panel_count):

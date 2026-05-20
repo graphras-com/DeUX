@@ -6,7 +6,6 @@ import base64
 import builtins
 import copy
 import functools
-import io
 import logging
 import math
 import os
@@ -1458,7 +1457,7 @@ class SvgRenderer:
         Image.Image
             An RGBA :class:`~PIL.Image.Image`.
         """
-        from ..render.svg_rasterize import _svg_to_png
+        from ..render.svg_rasterize import _svg_to_image
 
         if self._target_width is not None and self._target_height is not None:
             width = self._target_width
@@ -1467,10 +1466,7 @@ class SvgRenderer:
             width = int(float(self._base_root.get("width", "197")))
             height = int(float(self._base_root.get("height", "98")))
 
-        png_data = _svg_to_png(svg_data, width, height, ctx=self._rendering_ctx)
-        from PIL import Image as _PILImage
-
-        return _PILImage.open(io.BytesIO(png_data)).convert("RGBA")
+        return _svg_to_image(svg_data, width, height, mode="RGBA", ctx=self._rendering_ctx)
 
 
 # ---------------------------------------------------------------------------

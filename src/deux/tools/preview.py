@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import io
 import logging
 import re
 import signal
@@ -155,6 +154,62 @@ def _svg_to_png_fit(svg_data: bytes, max_width: int, max_height: int) -> bytes:
     return _svg_to_png(svg_data, max_width, max_height)
 
 
+def _svg_to_image_fit(
+    svg_data: bytes, max_width: int, max_height: int
+) -> Image.Image:
+    """Rasterise SVG bytes to a PIL RGBA Image fitted within a bounding box.
+
+    Preserves the SVG's intrinsic aspect ratio.  Uses the raw-RGBA path
+    to avoid a PNG encode/decode round-trip.
+
+    Parameters
+    ----------
+    svg_data : bytes
+        Raw SVG content (UTF-8).
+    max_width : int
+        Maximum width of the output image.
+    max_height : int
+        Maximum height of the output image.
+
+    Returns
+    -------
+    Image.Image
+        An RGBA PIL Image fitted within the bounding box.
+
+    Raises
+    ------
+    RasterizeError
+        If no SVG renderer backend is available.
+    """
+    import re as _re
+
+    from .._xml import safe_fromstring
+    from ..render.svg_rasterize import _svg_to_image
+
+    out_w, out_h = max_width, max_height
+    try:
+        root = safe_fromstring(svg_data)
+        w_attr = root.get("width", "")
+        h_attr = root.get("height", "")
+        w_match = _re.match(r"([\d.]+)", w_attr)
+        h_match = _re.match(r"([\d.]+)", h_attr)
+        if w_match and h_match:
+            svg_w = float(w_match.group(1))
+            svg_h = float(h_match.group(1))
+            if svg_w > 0 and svg_h > 0:
+                scale = min(max_width / svg_w, max_height / svg_h)
+                out_w = max(1, int(svg_w * scale))
+                out_h = max(1, int(svg_h * scale))
+    except Exception:
+        logger.debug(
+            "Failed to parse SVG intrinsic dimensions; using fallback raster size %dx%d.",
+            max_width,
+            max_height,
+        )
+
+    return _svg_to_image(svg_data, out_w, out_h, mode="RGBA")
+
+
 def load_svg(path: Path, max_width: int, max_height: int) -> Image.Image:
     """Load an SVG file and return a PIL Image fitted to *max_width* x *max_height*.
 
@@ -163,8 +218,7 @@ def load_svg(path: Path, max_width: int, max_height: int) -> Image.Image:
     *max_height* tall.
     """
     svg_data = path.read_bytes()
-    png_bytes = _svg_to_png_fit(svg_data, max_width, max_height)
-    img = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
+    img = _svg_to_image_fit(svg_data, max_width, max_height)
     img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
     return img
 
