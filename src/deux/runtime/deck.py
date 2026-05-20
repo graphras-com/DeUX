@@ -153,6 +153,11 @@ class Deck:
         self._running = True
         self._closed_event.clear()
 
+        # Publish the initial brightness so that any later bind_range()
+        # call can seed from the event's last_value without waiting for
+        # an explicit set_brightness().
+        await self.on_brightness_changed.emit(self._brightness)
+
         self._event_task = asyncio.create_task(
             self._event_loop(), name="deux-events"
         )
@@ -413,13 +418,16 @@ class Deck:
 
         self._wire_refresh_callbacks()
 
+        # Emit *before* rendering so that bind() handlers listening to
+        # on_screen_changed can seed card values (e.g. the nav pager)
+        # prior to the first paint, avoiding a flash of defaults.
+        await self.on_screen_changed.emit(name, self._screens)
+
         await self._render_all_keys()
         if self._active_screen.touch_strip is not None:
             await self._render_touchscreen()
         if self._active_screen.info_screen is not None:
             await self._render_info_screen()
-
-        await self.on_screen_changed.emit(name, self._screens)
 
     def _wire_refresh_callbacks(self) -> None:
         """Register ``self.refresh`` on every key and card of the active screen.
