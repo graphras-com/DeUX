@@ -101,6 +101,8 @@ module = [
     "StreamDeck.*",
     "cairosvg",
     "pyvips",
+    "resvg",
+    "resvg.*",
     "defusedxml",
     "defusedxml.*",
 ]

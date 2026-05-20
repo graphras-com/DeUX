@@ -13,6 +13,7 @@ from deux.render.svg_rasterize import (
     CairoRasterizer,
     PyvipsRasterizer,
     RasterizeError,
+    ResvgRasterizer,
     RsvgCliRasterizer,
     SvgRasterizer,
     _inject_stylesheet,
@@ -59,6 +60,7 @@ class TestRegistry:
         names = list_svg_backends()
         assert "cairo" in names
         assert "pyvips" in names
+        assert "resvg" in names
         assert "rsvg-cli" in names
 
     def test_default_backend_is_auto(self):
@@ -184,6 +186,77 @@ class TestPyvipsRasterizer:
             rasterizer.rasterize(b"<svg/>", 10, 10)
 
 
+class TestResvgRasterizer:
+    """Tests for the resvg (pure-Rust) backend."""
+
+    _SVG = (
+        b'<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">'
+        b'<rect width="100" height="100" fill="red"/></svg>'
+    )
+
+    def test_resvg_success(self):
+        """ResvgRasterizer delegates to resvg.render via usvg.Tree."""
+        fake = _fake_png(20, 20)
+        mock_usvg = MagicMock()
+        mock_tree = MagicMock()
+        mock_usvg.Options.default.return_value = mock_usvg
+        mock_usvg.Tree.from_str.return_value = mock_tree
+
+        mock_render = MagicMock(return_value=fake)
+        mock_resvg_mod = MagicMock()
+        mock_resvg_mod.usvg = mock_usvg
+
+        with patch.dict("sys.modules", {"resvg": mock_resvg_mod, "resvg.usvg": mock_usvg}):
+            # Patch the lazy imports inside rasterize()
+            mock_resvg_mod.render = mock_render
+            mock_resvg_mod.usvg = mock_usvg
+
+            rasterizer = ResvgRasterizer()
+            result = rasterizer.rasterize(self._SVG, 20, 20)
+
+        assert result == fake
+        mock_usvg.load_system_fonts.assert_called_once()
+        mock_usvg.Tree.from_str.assert_called_once()
+        mock_render.assert_called_once()
+
+    def test_resvg_import_error(self):
+        """ResvgRasterizer raises RasterizeError when resvg is missing."""
+        rasterizer = ResvgRasterizer()
+        with patch.dict("sys.modules", {"resvg": None}), \
+             pytest.raises(RasterizeError, match="resvg unavailable"):
+            rasterizer.rasterize(self._SVG, 10, 10)
+
+    def test_resvg_preserves_viewbox(self):
+        """ResvgRasterizer preserves existing viewBox when resizing."""
+        svg_with_vb = (
+            b'<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"'
+            b' viewBox="0 0 100 100"><rect width="100" height="100" fill="blue"/></svg>'
+        )
+        fake = _fake_png(50, 50)
+        mock_usvg = MagicMock()
+        mock_tree = MagicMock()
+        mock_usvg.Options.default.return_value = mock_usvg
+        mock_usvg.Tree.from_str.return_value = mock_tree
+        mock_render = MagicMock(return_value=fake)
+        mock_resvg_mod = MagicMock()
+        mock_resvg_mod.render = mock_render
+        mock_resvg_mod.usvg = mock_usvg
+
+        with patch.dict("sys.modules", {"resvg": mock_resvg_mod, "resvg.usvg": mock_usvg}):
+            rasterizer = ResvgRasterizer()
+            rasterizer.rasterize(svg_with_vb, 50, 50)
+
+        # Check that from_str was called with SVG that has viewBox="0 0 100 100"
+        svg_arg = mock_usvg.Tree.from_str.call_args[0][0]
+        assert 'viewBox="0 0 100 100"' in svg_arg
+        assert 'width="50"' in svg_arg
+        assert 'height="50"' in svg_arg
+
+    def test_resvg_registered(self):
+        """resvg backend is registered at import time."""
+        assert "resvg" in list_svg_backends()
+
+
 class TestRsvgCliRasterizer:
     """Tests for the rsvg-convert CLI backend."""
 
@@ -238,12 +311,13 @@ class TestSvgToPngDispatch:
                 return fake
 
         svg_mod._registry["pyvips"] = FailBackend("pyvips")  # type: ignore[assignment]
+        svg_mod._registry["resvg"] = FailBackend("resvg")  # type: ignore[assignment]
         svg_mod._registry["cairo"] = SuccessBackend()  # type: ignore[assignment]
         set_svg_backend("auto")
 
         result = _svg_to_png(b"<svg/>", 10, 10)
         assert result == fake
-        assert calls == ["pyvips", "cairo"]
+        assert calls == ["pyvips", "resvg", "cairo"]
 
     def test_auto_all_fail_raises(self):
         """Auto mode raises RasterizeError when all backends fail."""
@@ -514,6 +588,7 @@ class TestStylesheetDispatch:
                 return _fake_png(width, height)
 
         svg_mod._registry["pyvips"] = FailBackend()  # type: ignore[assignment]
+        svg_mod._registry["resvg"] = FailBackend()  # type: ignore[assignment]
         svg_mod._registry["cairo"] = SpyBackend()  # type: ignore[assignment]
         set_svg_backend("auto")
         set_svg_stylesheet(".fallback { color: green; }")
