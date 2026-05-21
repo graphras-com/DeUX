@@ -77,7 +77,7 @@ ignore = ["B008"]
 test = [
     "pytest>=9.0.3",
     "pytest-asyncio>=0.24",
-    "pytest-cov>=6.0",
+    "pytest-cov>=7.1.0",
     "types-PyYAML>=6.0",
 ]
 
