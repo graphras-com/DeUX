@@ -190,18 +190,23 @@ class Deck:
         logger.info("Deck stopped")
 
     def _detach_all_cards(self) -> None:
-        """Unsubscribe all AsyncEvent handlers on every DuiCard across all screens.
+        """Unsubscribe deck-owned AsyncEvent handlers on every DuiCard across all screens.
 
-        Prevents handler accumulation across reconnect cycles.
+        Only removes bindings to this deck's own events (e.g.
+        ``on_brightness_changed``, ``on_screen_changed``), preserving
+        service-owned bindings established in controller ``__init__``.
+        This prevents handler accumulation across reconnect cycles
+        without breaking reactive bindings to external services.
         """
         from ..dui.card import DuiCard
 
+        deck_events = (self.on_brightness_changed, self.on_screen_changed)
         for screen in self._screens.values():
             if screen.touch_strip is None:
                 continue
             for card in screen.touch_strip.cards:
                 if isinstance(card, DuiCard):
-                    card.detach()
+                    card.detach_events(*deck_events)
 
     async def wait_closed(self) -> None:
         """Block until the deck is closed (e.g. by stop() or disconnect)."""
