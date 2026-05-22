@@ -180,7 +180,10 @@ class Deck:
                 try:
                     await self._exec_device_io(self._device.show_logo)
                     await self._exec_device_io(self._device.close)
-                except (HidWriteTimeout, HidApiError, Exception) as e:
+                except Exception as e:
+                    # Intentional catch-all: shutdown must never raise.
+                    # Covers HidWriteTimeout/HidApiError plus any transport,
+                    # OS, or backend-specific errors surfaced during close.
                     logger.warning("Error closing device: %s", e)
             else:
                 logger.debug("Device already closed; skipping show_logo/close")
