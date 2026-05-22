@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, cast
 from ..dui.key import DuiKey
 from ..render.key_renderer import render_blank_key
 from ..render.profiler import RenderProfiler
+from ..render.touch_renderer import composite_frame_on_tile
 
 if TYPE_CHECKING:
     from ..dui.animator import PushFn
@@ -264,6 +265,163 @@ class DeckRenderer:
     # Touchscreen rendering
     # ------------------------------------------------------------------
 
+    def _touchscreen_image_format(self) -> str:
+        """Return the touchscreen image format for the active device.
+
+        Returns
+        -------
+        str
+            Image format string (e.g. ``"JPEG"``) from device
+            capabilities, defaulting to ``"JPEG"`` if unavailable.
+        """
+        caps = self._deck._caps
+        return caps.touchscreen_image_format if caps else "JPEG"
+
+    def _make_card_push_fn(
+        self,
+        card_idx: int,
+        panel_width: int,
+        panel_height: int,
+        bg_tile: bytes | None,
+    ) -> PushFn:
+        """Build a ``push_fn`` that delivers a single panel frame to the device.
+
+        Used to wire spinner animations into per-panel updates.  The
+        returned coroutine optionally composites the frame onto the
+        provided background tile before pushing it to the device under
+        the deck's I/O lock.
+
+        Parameters
+        ----------
+        card_idx : int
+            Index of the card on the touch strip (0-based).
+        panel_width, panel_height : int
+            Panel dimensions in pixels.
+        bg_tile : bytes | None
+            Optional encoded background tile for compositing.
+
+        Returns
+        -------
+        PushFn
+            Async callable accepting raw frame bytes for the panel.
+        """
+        deck = self._deck
+        x_pos = card_idx * panel_width
+        y_pos = 0
+        image_fmt = self._touchscreen_image_format()
+
+        async def _push_card_frame(frame_bytes: bytes) -> None:
+            if bg_tile is not None:
+                out_bytes = await asyncio.to_thread(
+                    composite_frame_on_tile,
+                    frame_bytes,
+                    bg_tile_bytes=bg_tile,
+                    panel_width=panel_width,
+                    panel_height=panel_height,
+                    image_format=image_fmt,
+                )
+            else:
+                out_bytes = frame_bytes
+            async with deck._device_lock:
+                await deck._exec_device_io(
+                    deck._device.set_partial_window_image,  # type: ignore[union-attr]
+                    x_pos,
+                    y_pos,
+                    panel_width,
+                    panel_height,
+                    out_bytes,
+                )
+
+        return _push_card_frame
+
+    async def _setup_card(
+        self,
+        card_idx: int,
+        card: Card,
+        bg_tile: bytes | None,
+        bg_svg_root: Any,
+        panel_width: int,
+        panel_height: int,
+    ) -> bool:
+        """Configure a card's background layer and animation push hook.
+
+        For :class:`DuiCard` instances, this installs the background
+        tile, wires (or clears) the SVG background layer, and registers
+        a ``push_fn`` for spinner animations.
+
+        Parameters
+        ----------
+        card_idx : int
+            Index of the card on the touch strip.
+        card : Card
+            The card to set up.
+        bg_tile : bytes | None
+            Encoded background tile for this card slot, if any.
+        bg_svg_root : Any
+            Touch strip's root SVG element for background compositing,
+            or ``None`` if no background is configured.
+        panel_width, panel_height : int
+            Panel dimensions in pixels.
+
+        Returns
+        -------
+        bool
+            ``True`` if the card should be rendered this cycle (i.e. it
+            is dirty and not currently animating); ``False`` otherwise.
+        """
+        from ..dui.card import DuiCard
+
+        if isinstance(card, DuiCard):
+            card.set_bg_tile(bg_tile)
+
+            if bg_svg_root is not None:
+                card.set_background_layer(
+                    bg_svg_root,
+                    card_idx,
+                    panel_width,
+                    panel_height,
+                )
+            else:
+                card.clear_background_layer()
+
+            push_fn = self._make_card_push_fn(
+                card_idx, panel_width, panel_height, bg_tile
+            )
+            card.set_push_fn(push_fn, panel_size=(panel_width, panel_height))
+
+            if self.is_animating(card):
+                return False
+
+        return card.is_dirty
+
+    async def _push_card(
+        self, card_idx: int, panel_bytes: bytes, panel_width: int, panel_height: int
+    ) -> None:
+        """Push a rendered panel to the touchscreen at the given slot.
+
+        The caller is responsible for holding the deck's device lock.
+
+        Parameters
+        ----------
+        card_idx : int
+            Index of the card on the touch strip (0-based).
+        panel_bytes : bytes
+            Encoded panel image to send to the device.
+        panel_width, panel_height : int
+            Panel dimensions in pixels.
+        """
+        deck = self._deck
+        x_pos = card_idx * panel_width
+        y_pos = 0
+        await deck._exec_device_io(
+            deck._device.set_partial_window_image,  # type: ignore[union-attr]
+            x_pos,
+            y_pos,
+            panel_width,
+            panel_height,
+            panel_bytes,
+        )
+
     async def render_touchscreen(self) -> None:
         """Render and push each card panel individually to the device.
 
@@ -283,108 +441,35 @@ class DeckRenderer:
 
         metrics = deck._metrics
         touch_strip = screen.touch_strip
-
-        from ..dui.card import DuiCard
-
         bg_svg_root = touch_strip.bg_svg_root
 
         # Phase 1: set up cards (push_fn wiring, background layers)
         cards_to_render: list[tuple[int, Card, bytes | None]] = []
-
         for card_idx, card in enumerate(screen.cards):
             bg_tile = touch_strip.bg_tile(card_idx)
+            should_render = await self._setup_card(
+                card_idx,
+                card,
+                bg_tile,
+                bg_svg_root,
+                metrics.panel_width,
+                metrics.panel_height,
+            )
+            if should_render:
+                cards_to_render.append((card_idx, card, bg_tile))
 
-            if isinstance(card, DuiCard):
-                # Set up background layer for SVG-level compositing
-                card.set_bg_tile(bg_tile)
-
-                if bg_svg_root is not None:
-                    card.set_background_layer(
-                        bg_svg_root,
-                        card_idx,
-                        metrics.panel_width,
-                        metrics.panel_height,
-                    )
-                else:
-                    card.clear_background_layer()
-
-                # Wire push_fn for spinner animations (per-panel update)
-                x_pos = card_idx * metrics.panel_width
-                y_pos = 0
-
-                async def _make_push(
-                    x: int,
-                    y: int,
-                    w: int,
-                    h: int,
-                    tile: bytes | None,
-                ) -> PushFn:
-                    async def _push_card_frame(frame_bytes: bytes) -> None:
-                        if tile is not None:
-                            # Composite frame onto bg tile.
-                            from ..render.touch_renderer import composite_frame_on_tile
-
-                            def _compose(fb: bytes = frame_bytes) -> bytes:
-                                return composite_frame_on_tile(
-                                    fb,
-                                    bg_tile_bytes=tile,
-                                    panel_width=w,
-                                    panel_height=h,
-                                    image_format=(
-                                        deck._caps.touchscreen_image_format
-                                        if deck._caps
-                                        else "JPEG"
-                                    ),
-                                )
-
-                            out_bytes = await asyncio.to_thread(_compose)
-                        else:
-                            out_bytes = frame_bytes
-                        async with deck._device_lock:
-                            await deck._exec_device_io(
-                                deck._device.set_partial_window_image,  # type: ignore[union-attr]
-                                x,
-                                y,
-                                w,
-                                h,
-                                out_bytes,
-                            )
-
-                    return _push_card_frame
-
-                push_fn = await _make_push(
-                    x_pos,
-                    y_pos,
-                    metrics.panel_width,
-                    metrics.panel_height,
-                    bg_tile,
-                )
-                card.set_push_fn(
-                    push_fn, panel_size=(metrics.panel_width, metrics.panel_height)
-                )
-
-                # Skip re-rendering cards with active spinner animations
-                if self.is_animating(card):
-                    continue
-
-            # Only render cards that actually need updating.
-            if not card.is_dirty:
-                continue
-
-            cards_to_render.append((card_idx, card, bg_tile))
-
-        # Phase 2: prepare assets and render all cards concurrently
-        # Frame budget: skip render+push if called too soon after the last
-        # render.  The push_fn wiring above must still run every call so
-        # that spinner animations target the correct panel slot.
+        # Phase 2: frame budget.  push_fn wiring above must still run on
+        # every call so that spinner animations target the correct slot,
+        # but actual render/push is throttled.
         now = time.perf_counter()
         if now - self._last_touch_render < self._MIN_TOUCH_INTERVAL:
             return
         self._last_touch_render = now
 
-        image_fmt = (
-            deck._caps.touchscreen_image_format if deck._caps else "JPEG"
-        )
+        if not cards_to_render:
+            return
+
+        image_fmt = self._touchscreen_image_format()
 
         async def _render_card(
             cidx: int, crd: Card, tile: bytes | None
@@ -400,59 +485,23 @@ class DeckRenderer:
             )
             return (cidx, panel_bytes)
 
-        if cards_to_render:
-            prof = RenderProfiler("render_touchscreen")
-            if len(cards_to_render) == 1:
-                # Fast path: render and push a single dirty card without
-                # the overhead of asyncio.gather.
-                cidx, crd, tile = cards_to_render[0]
-                with prof.step("prepare_assets"):
-                    await crd.prepare_assets()
-                with prof.step("render_card"):
-                    panel_bytes = await asyncio.to_thread(
-                        crd.render_panel_bytes,
-                        metrics=metrics,
-                        card_index=cidx,
-                        bg_tile=tile,
-                        background=touch_strip.background_color,
-                        image_format=image_fmt,
-                    )
-                x_pos = cidx * metrics.panel_width
-                y_pos = 0
-                with prof.step("push_to_device"):
-                    async with deck._device_lock:
-                        await deck._exec_device_io(
-                            deck._device.set_partial_window_image,
-                            x_pos,
-                            y_pos,
-                            metrics.panel_width,
-                            metrics.panel_height,
-                            panel_bytes,
-                        )
-                prof.finish()
-                prof.log()
-            else:
-                with prof.step("render_cards"):
-                    results = await asyncio.gather(
-                        *[_render_card(cidx, crd, tile) for cidx, crd, tile in cards_to_render]
-                    )
+        # Phase 3: render all dirty cards concurrently, then push under a
+        # single device lock.  A single card still benefits from this
+        # path: asyncio.gather of one task adds negligible overhead.
+        prof = RenderProfiler("render_touchscreen")
+        with prof.step("render_cards"):
+            results = await asyncio.gather(
+                *[_render_card(cidx, crd, tile) for cidx, crd, tile in cards_to_render]
+            )
 
-                # Phase 3: push all panels to device under a single lock
-                with prof.step("push_to_device"):
-                    async with deck._device_lock:
-                        for cidx, panel_bytes in sorted(results, key=lambda r: r[0]):
-                            x_pos = cidx * metrics.panel_width
-                            y_pos = 0
-                            await deck._exec_device_io(
-                                deck._device.set_partial_window_image,
-                                x_pos,
-                                y_pos,
-                                metrics.panel_width,
-                                metrics.panel_height,
-                                panel_bytes,
-                            )
-                prof.finish()
-                prof.log()
+        with prof.step("push_to_device"):
+            async with deck._device_lock:
+                for cidx, panel_bytes in sorted(results, key=lambda r: r[0]):
+                    await self._push_card(
+                        cidx, panel_bytes, metrics.panel_width, metrics.panel_height
+                    )
+        prof.finish()
+        prof.log()
 
     # ------------------------------------------------------------------
     # Info-screen rendering

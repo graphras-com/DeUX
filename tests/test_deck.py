@@ -658,6 +658,114 @@ class TestDeckRenderTouchscreen:
         assert mock_streamdeck_device.set_partial_window_image.call_count == 4
 
 
+class TestDeckRendererTouchHelpers:
+    """Unit tests for the extracted touchscreen helpers on DeckRenderer."""
+
+    async def test_touchscreen_image_format_defaults_to_jpeg(self, deck):
+        """Returns JPEG when capabilities are absent."""
+        deck._caps = None
+        assert deck._renderer._touchscreen_image_format() == "JPEG"
+
+    async def test_touchscreen_image_format_uses_caps(self, deck):
+        """Returns the format declared by the device capabilities."""
+        deck._caps = STREAM_DECK_PLUS
+        assert (
+            deck._renderer._touchscreen_image_format()
+            == STREAM_DECK_PLUS.touchscreen_image_format
+        )
+
+    async def test_push_card_invokes_device_io_with_offset(
+        self, deck, mock_streamdeck_device
+    ):
+        """`_push_card` computes ``x = card_idx * panel_width`` and dispatches."""
+        deck._device = mock_streamdeck_device
+        payload = b"frame-bytes"
+        await deck._renderer._push_card(2, payload, PANEL_WIDTH, PANEL_HEIGHT)
+        mock_streamdeck_device.set_partial_window_image.assert_called_once_with(
+            2 * PANEL_WIDTH, 0, PANEL_WIDTH, PANEL_HEIGHT, payload
+        )
+
+    async def test_make_card_push_fn_pushes_frame_without_bg_tile(
+        self, deck, mock_streamdeck_device
+    ):
+        """Without a bg tile, the frame bytes are forwarded as-is."""
+        deck._device = mock_streamdeck_device
+        deck._caps = STREAM_DECK_PLUS
+        push_fn = deck._renderer._make_card_push_fn(
+            1, PANEL_WIDTH, PANEL_HEIGHT, bg_tile=None
+        )
+        frame = b"raw-frame"
+        await push_fn(frame)
+        mock_streamdeck_device.set_partial_window_image.assert_called_once_with(
+            PANEL_WIDTH, 0, PANEL_WIDTH, PANEL_HEIGHT, frame
+        )
+
+    async def test_make_card_push_fn_composites_when_bg_tile_present(
+        self, deck, mock_streamdeck_device
+    ):
+        """With a bg tile, the frame is composited before being pushed."""
+        deck._device = mock_streamdeck_device
+        deck._caps = STREAM_DECK_PLUS
+        bg_tile = _make_jpeg_frame(PANEL_WIDTH, PANEL_HEIGHT)
+        push_fn = deck._renderer._make_card_push_fn(
+            0, PANEL_WIDTH, PANEL_HEIGHT, bg_tile=bg_tile
+        )
+        frame = _make_jpeg_frame(PANEL_WIDTH, PANEL_HEIGHT)
+        with patch(
+            "deux.runtime.renderer.composite_frame_on_tile",
+            return_value=b"composited",
+        ) as mock_compose:
+            await push_fn(frame)
+        mock_compose.assert_called_once()
+        mock_streamdeck_device.set_partial_window_image.assert_called_once_with(
+            0, 0, PANEL_WIDTH, PANEL_HEIGHT, b"composited"
+        )
+
+    async def test_setup_card_non_dui_card_returns_dirty_flag(self, deck):
+        """Non-DUI cards skip background wiring and return ``is_dirty``."""
+        card = _TestCard()
+        # Force dirty=False to verify it propagates.
+        card._dirty = False  # type: ignore[attr-defined]
+        should_render = await deck._renderer._setup_card(
+            0, card, None, None, PANEL_WIDTH, PANEL_HEIGHT
+        )
+        assert should_render is False
+
+    async def test_setup_card_dui_card_animating_returns_false(self, deck):
+        """A DuiCard with an active animation is not re-rendered."""
+        from deux.dui.card import DuiCard
+
+        card = MagicMock(spec=DuiCard)
+        card.is_animating = True
+        card.is_dirty = True
+        should_render = await deck._renderer._setup_card(
+            0, card, None, None, PANEL_WIDTH, PANEL_HEIGHT
+        )
+        # Background layer cleared (no bg_svg_root) and push_fn wired.
+        card.set_bg_tile.assert_called_once_with(None)
+        card.clear_background_layer.assert_called_once()
+        card.set_push_fn.assert_called_once()
+        assert should_render is False
+
+    async def test_setup_card_dui_card_wires_bg_layer(self, deck):
+        """A non-animating DuiCard wires the SVG background and reports dirty."""
+        from deux.dui.card import DuiCard
+
+        card = MagicMock(spec=DuiCard)
+        card.is_animating = False
+        card.is_dirty = True
+        bg_root = object()
+        should_render = await deck._renderer._setup_card(
+            3, card, b"tile", bg_root, PANEL_WIDTH, PANEL_HEIGHT
+        )
+        card.set_bg_tile.assert_called_once_with(b"tile")
+        card.set_background_layer.assert_called_once_with(
+            bg_root, 3, PANEL_WIDTH, PANEL_HEIGHT
+        )
+        card.clear_background_layer.assert_not_called()
+        assert should_render is True
+
+
 class TestDeckInfo:
     def test_no_device_raises(self, deck):
         with pytest.raises(DeckError, match="Device not opened"):
