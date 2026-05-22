@@ -281,12 +281,6 @@ class DeckRenderer:
         if screen.touch_strip is None:
             return
 
-        # Frame budget: skip if called too soon after the last render
-        now = time.perf_counter()
-        if now - self._last_touch_render < self._MIN_TOUCH_INTERVAL:
-            return
-        self._last_touch_render = now
-
         metrics = deck._metrics
         touch_strip = screen.touch_strip
 
@@ -380,6 +374,14 @@ class DeckRenderer:
             cards_to_render.append((card_idx, card, bg_tile))
 
         # Phase 2: prepare assets and render all cards concurrently
+        # Frame budget: skip render+push if called too soon after the last
+        # render.  The push_fn wiring above must still run every call so
+        # that spinner animations target the correct panel slot.
+        now = time.perf_counter()
+        if now - self._last_touch_render < self._MIN_TOUCH_INTERVAL:
+            return
+        self._last_touch_render = now
+
         image_fmt = (
             deck._caps.touchscreen_image_format if deck._caps else "JPEG"
         )
