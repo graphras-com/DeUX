@@ -16,6 +16,7 @@ from __future__ import annotations
 import copy
 import io
 import logging
+import threading
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -48,8 +49,6 @@ _XLINK_NS = "http://www.w3.org/1999/xlink"
 # change during a process lifetime.  The Options object is !Send in
 # Rust, so it cannot be shared across threads — we use thread-local
 # storage to give each thread its own cached instance.
-import threading
-
 _thread_local = threading.local()
 
 

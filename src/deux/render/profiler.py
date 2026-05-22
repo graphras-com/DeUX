@@ -25,8 +25,8 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Generator
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ class RenderProfiler:
         return self._active
 
     @property
-    def steps(self) -> list[tuple[str, float, "RenderProfiler | None"]]:
+    def steps(self) -> list[tuple[str, float, RenderProfiler | None]]:
         """Recorded steps as ``(name, elapsed_ms, child_profiler)`` tuples."""
         return list(self._steps)
 
