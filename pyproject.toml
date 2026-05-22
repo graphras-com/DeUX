@@ -77,13 +77,13 @@ ignore = ["B008"]
 test = [
     "pytest>=9.0.3",
     "pytest-asyncio>=0.24",
-    "pytest-cov>=6.0",
+    "pytest-cov>=7.1.0",
     "types-PyYAML>=6.0",
 ]
 
 docs = [
     "mkdocs-material>=9.5",
-    "mkdocstrings[python]>=0.25",
+    "mkdocstrings[python]>=1.0.4",
     "mkdocs-gen-files>=0.5",
     "mkdocs-literate-nav>=0.6",
     "pylint>=3.0",
