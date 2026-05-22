@@ -16,6 +16,7 @@ from __future__ import annotations
 import copy
 import io
 import logging
+import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -28,6 +29,7 @@ if TYPE_CHECKING:
     from PIL import Image
 
 logger = logging.getLogger(__name__)
+_perf_logger = logging.getLogger("deux.render.profiler")
 
 
 class RasterizeError(DeuxError):
@@ -321,10 +323,14 @@ def _svg_to_png(
     """
     css = ctx.resolve_stylesheet() if ctx is not None else _active_stylesheet
 
+    t0 = time.perf_counter()
     if css is not None:
         svg_data = _inject_stylesheet(svg_data, css)
 
-    return _resvg_rasterize(svg_data, width, height)
+    result = _resvg_rasterize(svg_data, width, height)
+    elapsed = (time.perf_counter() - t0) * 1000.0
+    _perf_logger.debug("_svg_to_png %dx%d %.1fms", width, height, elapsed)
+    return result
 
 
 def _svg_to_image(
@@ -372,6 +378,7 @@ def _svg_to_image(
 
     css = ctx.resolve_stylesheet() if ctx is not None else _active_stylesheet
 
+    t0 = time.perf_counter()
     if css is not None:
         svg_data = _inject_stylesheet(svg_data, css)
 
@@ -379,6 +386,8 @@ def _svg_to_image(
     img = Image.frombuffer("RGBA", (w, h), rgba_bytes, "raw", "RGBA", 0, 1)
     if mode != "RGBA":
         img = img.convert(mode)
+    elapsed = (time.perf_counter() - t0) * 1000.0
+    _perf_logger.debug("_svg_to_image %dx%d mode=%s %.1fms", width, height, mode, elapsed)
     return img
 
 
@@ -433,16 +442,22 @@ def _rasterize_svg(
     if fmt not in ("png", "jpeg", "bmp"):
         raise ValueError(f"Unsupported output format: {output_format!r}")
 
-    if fmt == "png":
-        return _svg_to_png(svg_data, width, height, ctx=ctx)
+    t0 = time.perf_counter()
 
-    img = _svg_to_image(svg_data, width, height, mode="RGB", ctx=ctx)
-    buf = io.BytesIO()
-    if fmt == "jpeg":
-        img.save(buf, format="JPEG", quality=quality)
+    if fmt == "png":
+        result = _svg_to_png(svg_data, width, height, ctx=ctx)
     else:
-        img.save(buf, format="BMP")
-    return buf.getvalue()
+        img = _svg_to_image(svg_data, width, height, mode="RGB", ctx=ctx)
+        buf = io.BytesIO()
+        if fmt == "jpeg":
+            img.save(buf, format="JPEG", quality=quality)
+        else:
+            img.save(buf, format="BMP")
+        result = buf.getvalue()
+
+    elapsed = (time.perf_counter() - t0) * 1000.0
+    _perf_logger.debug("_rasterize_svg %dx%d fmt=%s %.1fms", width, height, fmt, elapsed)
+    return result
 
 
 # ---------------------------------------------------------------------------

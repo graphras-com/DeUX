@@ -6,8 +6,12 @@ Uses Pillow for all image compositing and encoding operations.
 from __future__ import annotations
 
 import io
+import logging
+import time
 
 from PIL import Image
+
+_perf_logger = logging.getLogger("deux.render.profiler")
 
 
 def render_key_image(
@@ -42,6 +46,7 @@ def render_key_image(
     """
     from .touch_renderer import _parse_color
 
+    t0 = time.perf_counter()
     key_w, key_h = key_size
     r, g, b = _parse_color(background)
     img = Image.new("RGB", (key_w, key_h), (r, g, b))
@@ -63,7 +68,10 @@ def render_key_image(
         else:
             img = icon_img.convert("RGB")
 
-    return _encode_image_bytes(img, image_format)
+    result = _encode_image_bytes(img, image_format)
+    elapsed = (time.perf_counter() - t0) * 1000.0
+    _perf_logger.debug("render_key_image %dx%d fmt=%s %.1fms", key_w, key_h, image_format, elapsed)
+    return result
 
 
 def render_blank_key(
