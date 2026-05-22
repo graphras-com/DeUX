@@ -774,46 +774,57 @@ def _parse_region(name: str, raw: dict[str, Any]) -> Region:
     )
 
 
-def load_package(path: str | Path, *, strict: bool = True) -> PackageSpec:
-    """Load a .dui package directory into a validated PackageSpec.
+def _load_manifest(pkg_dir: Path) -> dict[str, Any]:
+    """Read and parse ``manifest.yaml`` from a package directory.
 
     Parameters
     ----------
-    path
-        Path to the ``.dui`` directory.
-    strict : bool, default=True
-        When ``True``, unknown manifest keys raise :exc:`PackageError`.
-        Set to ``False`` for forward-compatible loading that only warns.
+    pkg_dir : Path
+        Directory containing the ``.dui`` package.
 
     Returns
     -------
-    PackageSpec
-        A frozen :class:`PackageSpec` ready to be used by
-        :class:`~deux.dui.card.DuiCard` or
-        :class:`~deux.dui.key.DuiKey`.
+    dict[str, Any]
+        Parsed manifest mapping.
 
     Raises
     ------
     PackageError
-        If the package is invalid or incomplete.
+        If the manifest is missing, not valid YAML, or not a mapping.
     """
-    pkg_dir = Path(path)
-    if not pkg_dir.is_dir():
-        raise PackageError(f"Package path is not a directory: {pkg_dir}")
-
     manifest_path = pkg_dir / "manifest.yaml"
     if not manifest_path.exists():
         raise PackageError(f"Missing manifest.yaml in {pkg_dir}")
 
     try:
         with manifest_path.open("r", encoding="utf-8") as f:
-            manifest: dict[str, Any] = yaml.safe_load(f)
+            manifest: Any = yaml.safe_load(f)
     except yaml.YAMLError as exc:
         raise PackageError(f"Invalid YAML in manifest: {exc}") from exc
 
     if not isinstance(manifest, dict):
         raise PackageError("manifest.yaml must be a YAML mapping")
+    return manifest
 
+
+def _parse_core_manifest(manifest: dict[str, Any]) -> tuple[str, PackageType, int, str]:
+    """Validate and extract the required core manifest fields.
+
+    Parameters
+    ----------
+    manifest : dict[str, Any]
+        Parsed manifest mapping.
+
+    Returns
+    -------
+    tuple[str, PackageType, int, str]
+        ``(name, package_type, version, layout_file)``.
+
+    Raises
+    ------
+    PackageError
+        If any required field is missing or invalid.
+    """
     name = manifest.get("name")
     if not name or not isinstance(name, str):
         raise PackageError("manifest.yaml missing or invalid 'name'")
@@ -839,24 +850,30 @@ def load_package(path: str | Path, *, strict: bool = True) -> PackageSpec:
     if not layout_file or not isinstance(layout_file, str):
         raise PackageError("manifest.yaml missing or invalid 'layout'")
 
-    layout_path = pkg_dir / layout_file
-    if not layout_path.exists():
-        raise PackageError(f"Layout file not found: {layout_path}")
+    return name, pkg_type, version, layout_file
 
-    svg_source = layout_path.read_text(encoding="utf-8")
-    svg_ids = _find_svg_ids(svg_source)
 
-    # ── Optional metadata fields ──────────────────────────────────────
-    unknown_keys = set(manifest.keys()) - KNOWN_MANIFEST_KEYS
-    if unknown_keys:
-        if strict:
-            raise PackageError(
-                f"Package '{name}': unknown manifest keys: {sorted(unknown_keys)}"
-            )
-        logger.warning(
-            "Package '%s': unknown manifest keys: %s", name, sorted(unknown_keys)
-        )
+def _parse_metadata(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Validate and extract optional metadata fields from the manifest.
 
+    Parameters
+    ----------
+    manifest : dict[str, Any]
+        Parsed manifest mapping.
+
+    Returns
+    -------
+    dict[str, Any]
+        Mapping of metadata field names to their validated values, suitable
+        for splatting into the :class:`PackageSpec` constructor. Keys:
+        ``description``, ``author``, ``license``, ``tags``, ``category``,
+        ``url``, ``icon``, ``min_deux``, ``device``.
+
+    Raises
+    ------
+    PackageError
+        If any metadata field has an invalid type or value.
+    """
     description = manifest.get("description")
     if description is not None and not isinstance(description, str):
         raise PackageError("'description' must be a string")
@@ -913,6 +930,93 @@ def load_package(path: str | Path, *, strict: bool = True) -> PackageSpec:
                 )
         device = tuple(raw_device)
 
+    return {
+        "description": description,
+        "author": author,
+        "license": pkg_license,
+        "tags": tags,
+        "category": category,
+        "url": url,
+        "icon": icon,
+        "min_deux": min_deux,
+        "device": device,
+    }
+
+
+def _validate_binding_nodes(
+    binding_name: str, binding: Binding, svg_ids: set[str]
+) -> None:
+    """Ensure that all SVG node references in a binding exist.
+
+    Parameters
+    ----------
+    binding_name : str
+        Name of the binding (for error messages).
+    binding : Binding
+        Parsed binding to validate.
+    svg_ids : set[str]
+        Set of element IDs available in the layout SVG.
+
+    Raises
+    ------
+    PackageError
+        If a referenced node is not present in *svg_ids*.
+    """
+    if isinstance(binding, ToggleBinding):
+        if binding.node_on not in svg_ids:
+            raise PackageError(
+                f"Binding '{binding_name}' references node_on '{binding.node_on}' "
+                f"which does not exist in the SVG. "
+                f"Available ids: {sorted(svg_ids)}"
+            )
+        if binding.node_off not in svg_ids:
+            raise PackageError(
+                f"Binding '{binding_name}' references node_off '{binding.node_off}' "
+                f"which does not exist in the SVG. "
+                f"Available ids: {sorted(svg_ids)}"
+            )
+        return
+
+    if binding.node not in svg_ids:
+        raise PackageError(
+            f"Binding '{binding_name}' references node '{binding.node}' "
+            f"which does not exist in the SVG. "
+            f"Available ids: {sorted(svg_ids)}"
+        )
+    if (
+        isinstance(binding, ImageBinding)
+        and binding.placeholder_node
+        and binding.placeholder_node not in svg_ids
+    ):
+        raise PackageError(
+            f"Binding '{binding_name}' references placeholder_node "
+            f"'{binding.placeholder_node}' which does not exist in the SVG"
+        )
+
+
+def _parse_bindings(
+    manifest: dict[str, Any], svg_ids: set[str]
+) -> dict[str, Binding]:
+    """Parse and validate the ``bindings`` section of the manifest.
+
+    Parameters
+    ----------
+    manifest : dict[str, Any]
+        Parsed manifest mapping.
+    svg_ids : set[str]
+        Set of element IDs available in the layout SVG, used to validate
+        node references.
+
+    Returns
+    -------
+    dict[str, Binding]
+        Mapping of binding name to parsed :class:`Binding` instance.
+
+    Raises
+    ------
+    PackageError
+        If the section is malformed or any binding is invalid.
+    """
     bindings: dict[str, Binding] = {}
     raw_bindings = manifest.get("bindings", {})
     if raw_bindings and not isinstance(raw_bindings, dict):
@@ -921,37 +1025,29 @@ def load_package(path: str | Path, *, strict: bool = True) -> PackageSpec:
         if not isinstance(binding_raw, dict):
             raise PackageError(f"Binding '{binding_name}' must be a mapping")
         binding = _parse_binding(binding_name, binding_raw)
-        if isinstance(binding, ToggleBinding):
-            if binding.node_on not in svg_ids:
-                raise PackageError(
-                    f"Binding '{binding_name}' references node_on '{binding.node_on}' "
-                    f"which does not exist in the SVG. "
-                    f"Available ids: {sorted(svg_ids)}"
-                )
-            if binding.node_off not in svg_ids:
-                raise PackageError(
-                    f"Binding '{binding_name}' references node_off '{binding.node_off}' "
-                    f"which does not exist in the SVG. "
-                    f"Available ids: {sorted(svg_ids)}"
-                )
-        else:
-            if binding.node not in svg_ids:
-                raise PackageError(
-                    f"Binding '{binding_name}' references node '{binding.node}' "
-                    f"which does not exist in the SVG. "
-                    f"Available ids: {sorted(svg_ids)}"
-                )
-            if (
-                isinstance(binding, ImageBinding)
-                and binding.placeholder_node
-                and binding.placeholder_node not in svg_ids
-            ):
-                raise PackageError(
-                    f"Binding '{binding_name}' references placeholder_node "
-                    f"'{binding.placeholder_node}' which does not exist in the SVG"
-                )
+        _validate_binding_nodes(binding_name, binding, svg_ids)
         bindings[binding_name] = binding
+    return bindings
 
+
+def _parse_events(manifest: dict[str, Any]) -> list[EventMapping]:
+    """Parse and validate the ``events`` section of the manifest.
+
+    Parameters
+    ----------
+    manifest : dict[str, Any]
+        Parsed manifest mapping.
+
+    Returns
+    -------
+    list[EventMapping]
+        Ordered list of validated :class:`EventMapping` instances.
+
+    Raises
+    ------
+    PackageError
+        If the section is malformed, an entry is invalid, or names duplicate.
+    """
     events: list[EventMapping] = []
     raw_events = manifest.get("events", [])
     if raw_events and not isinstance(raw_events, list):
@@ -965,7 +1061,27 @@ def load_package(path: str | Path, *, strict: bool = True) -> PackageSpec:
             raise PackageError(f"Duplicate event name '{event.name}'")
         seen_names.add(event.name)
         events.append(event)
+    return events
 
+
+def _parse_regions(manifest: dict[str, Any]) -> list[Region]:
+    """Parse and validate the ``regions`` section of the manifest.
+
+    Parameters
+    ----------
+    manifest : dict[str, Any]
+        Parsed manifest mapping.
+
+    Returns
+    -------
+    list[Region]
+        Ordered list of validated :class:`Region` instances.
+
+    Raises
+    ------
+    PackageError
+        If the section is malformed or any region is invalid.
+    """
     regions: list[Region] = []
     raw_regions = manifest.get("regions", {})
     if raw_regions and not isinstance(raw_regions, dict):
@@ -973,33 +1089,24 @@ def load_package(path: str | Path, *, strict: bool = True) -> PackageSpec:
     for region_name, region_raw in (raw_regions or {}).items():
         if not isinstance(region_raw, dict):
             raise PackageError(f"Region '{region_name}' must be a mapping")
-        region = _parse_region(region_name, region_raw)
-        regions.append(region)
+        regions.append(_parse_region(region_name, region_raw))
+    return regions
 
-    # ── Spinner ───────────────────────────────────────────────────────
-    spinner: SpinnerSpec | None = None
-    raw_spinner = manifest.get("spinner")
-    if raw_spinner is not None:
-        if not isinstance(raw_spinner, dict):
-            raise PackageError("'spinner' must be a mapping")
-        spinner = _parse_spinner(raw_spinner)
 
-        # Validate spinner node exists in SVG (for rotation/pulse)
-        if spinner.node is not None and spinner.node not in svg_ids:
-            raise PackageError(
-                f"Spinner references node '{spinner.node}' "
-                f"which does not exist in the SVG. "
-                f"Available ids: {sorted(svg_ids)}"
-            )
+def _load_assets(pkg_dir: Path) -> dict[str, bytes]:
+    """Load every file under ``<pkg_dir>/assets`` into memory.
 
-        # Validate background_node exists in SVG if specified
-        if spinner.background_node is not None and spinner.background_node not in svg_ids:
-            raise PackageError(
-                f"Spinner references background_node '{spinner.background_node}' "
-                f"which does not exist in the SVG. "
-                f"Available ids: {sorted(svg_ids)}"
-            )
+    Parameters
+    ----------
+    pkg_dir : Path
+        Package directory containing an optional ``assets`` subdirectory.
 
+    Returns
+    -------
+    dict[str, bytes]
+        Mapping of asset path (relative to ``assets/``, using ``/``
+        separators on POSIX) to raw bytes. Empty if the directory is absent.
+    """
     assets: dict[str, bytes] = {}
     assets_dir = pkg_dir / "assets"
     if assets_dir.is_dir():
@@ -1007,9 +1114,57 @@ def load_package(path: str | Path, *, strict: bool = True) -> PackageSpec:
             if asset_file.is_file():
                 rel = str(asset_file.relative_to(assets_dir))
                 assets[rel] = asset_file.read_bytes()
+    return assets
 
-    # Validate custom spinner frames exist in assets
-    if spinner is not None and spinner.type == SpinnerType.CUSTOM:
+
+def _parse_and_validate_spinner(
+    manifest: dict[str, Any], svg_ids: set[str], assets: dict[str, bytes]
+) -> SpinnerSpec | None:
+    """Parse the ``spinner`` section and validate referenced nodes/assets.
+
+    Parameters
+    ----------
+    manifest : dict[str, Any]
+        Parsed manifest mapping.
+    svg_ids : set[str]
+        Set of element IDs available in the layout SVG.
+    assets : dict[str, bytes]
+        Loaded asset catalog, used to verify custom spinner frames.
+
+    Returns
+    -------
+    SpinnerSpec | None
+        Validated spinner specification, or ``None`` if no spinner is
+        configured.
+
+    Raises
+    ------
+    PackageError
+        If the spinner is malformed, references missing SVG ids, or its
+        ``custom`` type lacks the required asset files.
+    """
+    raw_spinner = manifest.get("spinner")
+    if raw_spinner is None:
+        return None
+    if not isinstance(raw_spinner, dict):
+        raise PackageError("'spinner' must be a mapping")
+    spinner = _parse_spinner(raw_spinner)
+
+    if spinner.node is not None and spinner.node not in svg_ids:
+        raise PackageError(
+            f"Spinner references node '{spinner.node}' "
+            f"which does not exist in the SVG. "
+            f"Available ids: {sorted(svg_ids)}"
+        )
+
+    if spinner.background_node is not None and spinner.background_node not in svg_ids:
+        raise PackageError(
+            f"Spinner references background_node '{spinner.background_node}' "
+            f"which does not exist in the SVG. "
+            f"Available ids: {sorted(svg_ids)}"
+        )
+
+    if spinner.type == SpinnerType.CUSTOM:
         has_gif = "spinner.gif" in assets
         frame_keys = sorted(k for k in assets if k.startswith("spinner/frame_"))
         if not has_gif and not frame_keys:
@@ -1018,6 +1173,83 @@ def load_package(path: str | Path, *, strict: bool = True) -> PackageSpec:
                 "or frame images in 'assets/spinner/' "
                 "(e.g. 'spinner/frame_00.png', 'spinner/frame_01.png', ...)"
             )
+
+    return spinner
+
+
+def _check_unknown_keys(manifest: dict[str, Any], name: str, strict: bool) -> None:
+    """Warn or fail on top-level keys that are not part of the schema.
+
+    Parameters
+    ----------
+    manifest : dict[str, Any]
+        Parsed manifest mapping.
+    name : str
+        Package name (for log/error messages).
+    strict : bool
+        When ``True``, raise on unknown keys; otherwise log a warning.
+
+    Raises
+    ------
+    PackageError
+        If unknown keys are present and *strict* is ``True``.
+    """
+    unknown_keys = set(manifest.keys()) - KNOWN_MANIFEST_KEYS
+    if not unknown_keys:
+        return
+    if strict:
+        raise PackageError(
+            f"Package '{name}': unknown manifest keys: {sorted(unknown_keys)}"
+        )
+    logger.warning(
+        "Package '%s': unknown manifest keys: %s", name, sorted(unknown_keys)
+    )
+
+
+def load_package(path: str | Path, *, strict: bool = True) -> PackageSpec:
+    """Load a .dui package directory into a validated PackageSpec.
+
+    Parameters
+    ----------
+    path
+        Path to the ``.dui`` directory.
+    strict : bool, default=True
+        When ``True``, unknown manifest keys raise :exc:`PackageError`.
+        Set to ``False`` for forward-compatible loading that only warns.
+
+    Returns
+    -------
+    PackageSpec
+        A frozen :class:`PackageSpec` ready to be used by
+        :class:`~deux.dui.card.DuiCard` or
+        :class:`~deux.dui.key.DuiKey`.
+
+    Raises
+    ------
+    PackageError
+        If the package is invalid or incomplete.
+    """
+    pkg_dir = Path(path)
+    if not pkg_dir.is_dir():
+        raise PackageError(f"Package path is not a directory: {pkg_dir}")
+
+    manifest = _load_manifest(pkg_dir)
+    name, pkg_type, version, layout_file = _parse_core_manifest(manifest)
+
+    layout_path = pkg_dir / layout_file
+    if not layout_path.exists():
+        raise PackageError(f"Layout file not found: {layout_path}")
+    svg_source = layout_path.read_text(encoding="utf-8")
+    svg_ids = _find_svg_ids(svg_source)
+
+    _check_unknown_keys(manifest, name, strict)
+
+    metadata = _parse_metadata(manifest)
+    bindings = _parse_bindings(manifest, svg_ids)
+    events = _parse_events(manifest)
+    regions = _parse_regions(manifest)
+    assets = _load_assets(pkg_dir)
+    spinner = _parse_and_validate_spinner(manifest, svg_ids, assets)
 
     logger.info(
         "Loaded .dui package '%s' (%s, %d bindings, %d events)",
@@ -1037,15 +1269,7 @@ def load_package(path: str | Path, *, strict: bool = True) -> PackageSpec:
         regions=tuple(regions),
         assets=assets,
         spinner=spinner,
-        description=description,
-        author=author,
-        license=pkg_license,
-        tags=tags,
-        category=category,
-        url=url,
-        icon=icon,
-        min_deux=min_deux,
-        device=device,
+        **metadata,
     )
 
 
