@@ -92,15 +92,17 @@ class CardController:
     async def on_detach(self) -> None:
         """Hook invoked from the app's ``on_disconnect`` callback.
 
-        The default implementation calls :meth:`~deux.DuiCard.detach`
-        to unsubscribe all ``AsyncEvent`` handlers wired via
-        :meth:`~deux.DuiCard.bind`, :meth:`~deux.DuiCard.bind_range`,
-        or :meth:`~deux.DuiCard.bind_many`.  Override to add additional
-        teardown logic, but call ``await super().on_detach()`` to
-        preserve the unsubscription behaviour.
+        The default implementation is a no-op.  Override to cancel
+        background tasks or perform additional teardown.
+
+        .. note::
+
+           Deck-owned event subscriptions (e.g. ``on_brightness_changed``)
+           are cleaned up automatically by :meth:`Deck.stop` via
+           :meth:`~deux.DuiCard.detach_events`.  Service-owned bindings
+           established in ``__init__`` are deliberately preserved so that
+           they survive reconnect cycles without re-wiring.
         """
-        if hasattr(self, "card"):
-            self.card.detach()
 
 
 class KeyController:
@@ -135,11 +137,9 @@ class KeyController:
         """Hook invoked from the app's ``on_disconnect`` callback.
 
         The default implementation calls :meth:`~deux.DuiKey.detach`
-        to unsubscribe all ``AsyncEvent`` handlers wired via
-        :meth:`~deux.DuiKey.bind`, :meth:`~deux.DuiKey.bind_range`,
-        or :meth:`~deux.DuiKey.bind_many`.  Override to add additional
-        teardown logic, but call ``await super().on_detach()`` to
-        preserve the unsubscription behaviour.
+        to unsubscribe all ``AsyncEvent`` handlers.  Override to add
+        additional teardown logic, but call ``await super().on_detach()``
+        to preserve the unsubscription behaviour.
         """
         if hasattr(self, "key"):
             self.key.detach()
