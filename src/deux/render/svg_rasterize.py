@@ -28,6 +28,7 @@ from .context import RenderingContext
 
 if TYPE_CHECKING:
     from PIL import Image
+    from resvg import usvg as _usvg_mod
 
 logger = logging.getLogger(__name__)
 _perf_logger = logging.getLogger("deux.render.profiler")
@@ -52,7 +53,7 @@ _XLINK_NS = "http://www.w3.org/1999/xlink"
 _thread_local = threading.local()
 
 
-def _get_usvg_opts() -> object:
+def _get_usvg_opts() -> _usvg_mod.Options:
     """Return a thread-local cached :class:`usvg.Options` with system fonts loaded.
 
     The options object is created lazily on first call per thread and
@@ -62,8 +63,7 @@ def _get_usvg_opts() -> object:
     Returns
     -------
     usvg.Options
-        Reusable options instance (typed as ``object`` to avoid import
-        at module level).
+        Reusable options instance.
     """
     opts = getattr(_thread_local, "usvg_opts", None)
     if opts is None:
