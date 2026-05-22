@@ -43,6 +43,39 @@ class RasterizeError(DeuxError):
 _SVG_NS = "http://www.w3.org/2000/svg"
 _XLINK_NS = "http://www.w3.org/1999/xlink"
 
+# Per-thread cached usvg options with system fonts pre-loaded.  Font
+# discovery is expensive (filesystem scan) and the result doesn't
+# change during a process lifetime.  The Options object is !Send in
+# Rust, so it cannot be shared across threads — we use thread-local
+# storage to give each thread its own cached instance.
+import threading
+
+_thread_local = threading.local()
+
+
+def _get_usvg_opts() -> object:
+    """Return a thread-local cached :class:`usvg.Options` with system fonts loaded.
+
+    The options object is created lazily on first call per thread and
+    reused for all subsequent rasterisations on that thread, avoiding
+    the cost of rescanning system fonts on every render.
+
+    Returns
+    -------
+    usvg.Options
+        Reusable options instance (typed as ``object`` to avoid import
+        at module level).
+    """
+    opts = getattr(_thread_local, "usvg_opts", None)
+    if opts is None:
+        from resvg import usvg
+
+        opts = usvg.Options.default()
+        opts.load_system_fonts()
+        _thread_local.usvg_opts = opts
+        logger.debug("usvg Options created and system fonts loaded (thread-local cache)")
+    return opts
+
 
 def _resvg_rasterize(svg_data: bytes, width: int, height: int) -> bytes:
     """Rasterise SVG bytes to PNG via the ``resvg`` Rust binding.
@@ -74,7 +107,6 @@ def _resvg_rasterize(svg_data: bytes, width: int, height: int) -> bytes:
     """
     try:
         from resvg import render as _resvg_render
-        from resvg import usvg
 
         root = safe_fromstring(svg_data)
         if "viewBox" not in root.attrib:
@@ -91,9 +123,9 @@ def _resvg_rasterize(svg_data: bytes, width: int, height: int) -> bytes:
         ET.register_namespace("xlink", _XLINK_NS)
         svg_text = ET.tostring(root, encoding="unicode", xml_declaration=False)
 
-        opts = usvg.Options.default()
-        opts.load_system_fonts()
-        tree = usvg.Tree.from_str(svg_text, opts)
+        from resvg import usvg
+
+        tree = usvg.Tree.from_str(svg_text, _get_usvg_opts())
 
         png_bytes: bytes = _resvg_render(tree, (1.0, 0.0, 0.0, 0.0, 1.0, 0.0))
         return png_bytes
@@ -134,7 +166,6 @@ def _resvg_rasterize_rgba(
     """
     try:
         from resvg import render_rgba as _resvg_render_rgba
-        from resvg import usvg
 
         root = safe_fromstring(svg_data)
         if "viewBox" not in root.attrib:
@@ -150,9 +181,9 @@ def _resvg_rasterize_rgba(
         ET.register_namespace("xlink", _XLINK_NS)
         svg_text = ET.tostring(root, encoding="unicode", xml_declaration=False)
 
-        opts = usvg.Options.default()
-        opts.load_system_fonts()
-        tree = usvg.Tree.from_str(svg_text, opts)
+        from resvg import usvg
+
+        tree = usvg.Tree.from_str(svg_text, _get_usvg_opts())
 
         rgba_bytes, w, h = _resvg_render_rgba(tree, (1.0, 0.0, 0.0, 0.0, 1.0, 0.0))
         return bytes(rgba_bytes), w, h
