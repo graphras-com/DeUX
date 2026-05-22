@@ -430,13 +430,13 @@ def _neo_key_positions() -> list[tuple[int, int]]:
 def _plus_key_positions() -> list[tuple[int, int]]:
     """Return (x, y) for each key on Plus (800x480, 4x2, 120x120).
 
-    Layout: L=12 (rounded from 11.5), H_gap=99, T=11, V_gap=40.
+    Layout: L=12 (rounded from 11.5), H_gap=99, T=11, V_gap=39.
     """
     positions: list[tuple[int, int]] = []
     for row in range(2):
         for col in range(4):
             x = 12 + col * (120 + 99)
-            y = 11 + row * (120 + 40)
+            y = 11 + row * (120 + 39)
             positions.append((x, y))
     return positions
 
