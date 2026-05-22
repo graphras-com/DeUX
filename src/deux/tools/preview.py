@@ -476,22 +476,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """
     args = build_parser().parse_args(argv)
 
-    # --display is mutually exclusive with all other image flags.
-    if args.display is not None:
-        conflicts: list[str] = []
-        for i in range(_MAX_KEY_SLOTS):
-            if getattr(args, f"key{i}") is not None:
-                conflicts.append(f"--key{i}")
-        for i in range(_MAX_CARD_SLOTS):
-            if getattr(args, f"card{i}") is not None:
-                conflicts.append(f"--card{i}")
-        if args.touchstrip is not None:
-            conflicts.append("--touchstrip")
-        if conflicts:
-            build_parser().error(
-                f"--display cannot be used together with {conflicts[0]}"
-            )
-
     # --touchstrip is mutually exclusive with --cardN flags.
     if args.touchstrip is not None:
         card_flags = [
@@ -574,22 +558,6 @@ async def push_to_device(
                 ),
                 timeout=_HID_WRITE_TIMEOUT,
             )
-
-            if args.watch:
-                print(  # noqa: T201
-                    "Display preview pushed — watching for changes (Ctrl+C to exit)",
-                    file=sys.stderr,
-                )
-                await _watch_and_reload_display(
-                    args, deck, caps, display_svg, poll_interval
-                )
-            else:
-                print(  # noqa: T201
-                    "Display preview pushed — press Ctrl+C to exit",
-                    file=sys.stderr,
-                )
-                await _wait_for_interrupt()
-            return
 
         key_images, touchstrip_bytes = render_preview(args, caps)
 
@@ -730,6 +698,27 @@ async def _watch_and_reload(
                     file=sys.stderr,
                 )
                 last_mtimes = current_mtimes
+
+                # Re-push display background if present and changed.
+                display_svg: Path | None = getattr(args, "display", None)
+                if display_svg is not None:
+                    try:
+                        lcd_size = (caps.lcd_width, caps.lcd_height)
+                        background: str = getattr(args, "background", None) or "black"
+                        jpeg = render_display(display_svg, lcd_size, background=background)
+                    except Exception as exc:
+                        print(f"Display render error: {exc}", file=sys.stderr)  # noqa: T201
+                        continue
+
+                    await asyncio.wait_for(
+                        loop.run_in_executor(
+                            None,
+                            deck.set_full_screen_image,
+                            jpeg,
+                        ),
+                        timeout=_HID_WRITE_TIMEOUT,
+                    )
+
                 try:
                     key_images, touchstrip_bytes = render_preview(args, caps)
                 except Exception as exc:
@@ -767,69 +756,6 @@ async def _watch_and_reload(
     finally:
         loop.remove_signal_handler(signal.SIGINT)
 
-
-async def _watch_and_reload_display(
-    args: argparse.Namespace,
-    deck: PreviewDeckDevice,
-    caps: DeviceCapabilities,
-    display_svg: Path,
-    poll_interval: float,
-) -> None:
-    """Poll the display SVG for changes and re-push to *deck* on modification.
-
-    Runs until SIGINT (Ctrl+C) is received.
-
-    Parameters
-    ----------
-    args : argparse.Namespace
-        Parsed CLI arguments.
-    deck : PreviewDeckDevice
-        Open device to push images to.
-    caps : DeviceCapabilities
-        Capabilities of the connected device.
-    display_svg : Path
-        Path to the display SVG file to watch.
-    poll_interval : float
-        File poll interval in seconds.
-    """
-    loop = asyncio.get_running_loop()
-    stop = asyncio.Event()
-    loop.add_signal_handler(signal.SIGINT, stop.set)
-
-    last_mtime = get_mtimes([display_svg])
-
-    try:
-        while not stop.is_set():
-            try:
-                await asyncio.wait_for(stop.wait(), timeout=poll_interval)
-                break
-            except TimeoutError:
-                pass
-
-            current_mtime = get_mtimes([display_svg])
-            if current_mtime != last_mtime:
-                logger.info("Detected change: %s", display_svg)
-                print("Reloading display SVG...", file=sys.stderr)  # noqa: T201
-                last_mtime = current_mtime
-                try:
-                    lcd_size = (caps.lcd_width, caps.lcd_height)
-                    background: str = getattr(args, "background", None) or "black"
-                    jpeg = render_display(display_svg, lcd_size, background=background)
-                except Exception as exc:
-                    print(f"Render error: {exc}", file=sys.stderr)  # noqa: T201
-                    continue
-
-                await asyncio.wait_for(
-                    loop.run_in_executor(
-                        None,
-                        deck.set_full_screen_image,
-                        jpeg,
-                    ),
-                    timeout=_HID_WRITE_TIMEOUT,
-                )
-                print("Display preview updated", file=sys.stderr)  # noqa: T201
-    finally:
-        loop.remove_signal_handler(signal.SIGINT)
 
 def render_preview(
     args: argparse.Namespace,

@@ -913,23 +913,26 @@ class TestParserDisplay:
         args = parse_args(["--display", str(p)])
         assert args.display == p
 
-    def test_display_conflicts_with_key(self, tmp_path: Path):
+    def test_display_combines_with_key(self, tmp_path: Path):
         d = tmp_path / "lcd.svg"
         k = tmp_path / "k.svg"
-        with pytest.raises(SystemExit):
-            parse_args(["--display", str(d), "--key0", str(k)])
+        args = parse_args(["--display", str(d), "--key0", str(k)])
+        assert args.display == d
+        assert args.key0 == k
 
-    def test_display_conflicts_with_card(self, tmp_path: Path):
+    def test_display_combines_with_card(self, tmp_path: Path):
         d = tmp_path / "lcd.svg"
         c = tmp_path / "c.svg"
-        with pytest.raises(SystemExit):
-            parse_args(["--display", str(d), "--card0", str(c)])
+        args = parse_args(["--display", str(d), "--card0", str(c)])
+        assert args.display == d
+        assert args.card0 == c
 
-    def test_display_conflicts_with_touchstrip(self, tmp_path: Path):
+    def test_display_combines_with_touchstrip(self, tmp_path: Path):
         d = tmp_path / "lcd.svg"
         ts = tmp_path / "ts.svg"
-        with pytest.raises(SystemExit):
-            parse_args(["--display", str(d), "--touchstrip", str(ts)])
+        args = parse_args(["--display", str(d), "--touchstrip", str(ts)])
+        assert args.display == d
+        assert args.touchstrip == ts
 
 
 class TestComposeDisplayImage:
@@ -1010,8 +1013,33 @@ class TestPushToDeviceDisplay:
             await push_to_device(args)
 
         mock_streamdeck_device.set_full_screen_image.assert_called_once()
-        # Should NOT push individual keys or touchstrip
-        mock_streamdeck_device.set_key_image.assert_not_called()
-        mock_streamdeck_device.set_partial_window_image.assert_not_called()
         mock_streamdeck_device.show_logo.assert_called_once()
         mock_streamdeck_device.close.assert_called_once()
+
+    async def test_display_with_key_overlay(
+        self, mock_streamdeck_device: MagicMock, square_svg: Path
+    ):
+        """Display pushed first, then key images overlaid on top."""
+        from deux.tools.preview import push_to_device
+
+        mock_streamdeck_device.DECK_VISUAL = True
+        args = parse_args([
+            "--display", str(square_svg),
+            "--key0", str(square_svg),
+        ])
+
+        with (
+            patch(
+                "deux.tools.preview._find_and_open_device",
+                return_value=mock_streamdeck_device,
+            ),
+            patch(
+                "deux.tools.preview._wait_for_interrupt",
+                new_callable=AsyncMock,
+            ),
+        ):
+            await push_to_device(args)
+
+        mock_streamdeck_device.set_full_screen_image.assert_called_once()
+        mock_streamdeck_device.set_key_image.assert_called_once()
+        mock_streamdeck_device.show_logo.assert_called_once()
