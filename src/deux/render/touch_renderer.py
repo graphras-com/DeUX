@@ -6,8 +6,12 @@ Uses Pillow for all compositing and encoding operations.
 from __future__ import annotations
 
 import io
+import logging
+import time
 
 from PIL import Image
+
+_perf_logger = logging.getLogger("deux.render.profiler")
 
 
 def _to_pil(value: bytes | Image.Image) -> Image.Image:
@@ -93,6 +97,7 @@ def composite_frame_on_tile(
     bytes
         Encoded composited image bytes.
     """
+    t0 = time.perf_counter()
     bg = Image.open(io.BytesIO(bg_tile_bytes)).convert("RGBA")
     frame = Image.open(io.BytesIO(frame_bytes)).convert("RGBA")
 
@@ -102,7 +107,12 @@ def composite_frame_on_tile(
         frame = frame.resize((panel_width, panel_height), Image.Resampling.LANCZOS)
 
     bg = Image.alpha_composite(bg, frame)
-    return _encode_pil_image(bg, image_format)
+    result = _encode_pil_image(bg, image_format)
+    elapsed = (time.perf_counter() - t0) * 1000.0
+    _perf_logger.debug(
+        "composite_frame_on_tile %dx%d %.1fms", panel_width, panel_height, elapsed
+    )
+    return result
 
 
 def compose_card_with_background(
@@ -193,6 +203,7 @@ def compose_touchstrip(
     bytes
         Encoded touchscreen image bytes.
     """
+    t0 = time.perf_counter()
     r, g, b = _parse_color(background)
     canvas = Image.new("RGBA", (touchscreen_width, touchscreen_height), (r, g, b, 255))
 
@@ -215,7 +226,13 @@ def compose_touchstrip(
         if panel is not None:
             canvas.paste(panel, (x_offset, 0))
 
-    return _encode_pil_image(canvas, image_format)
+    result = _encode_pil_image(canvas, image_format)
+    elapsed = (time.perf_counter() - t0) * 1000.0
+    _perf_logger.debug(
+        "compose_touchstrip %dx%d panels=%d %.1fms",
+        touchscreen_width, touchscreen_height, panel_count, elapsed,
+    )
+    return result
 
 
 def render_blank_touchscreen(
