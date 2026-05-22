@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import io
 import logging
+import time
 import xml.etree.ElementTree as ET
 from typing import Literal
 
 from .._xml import safe_fromstring
 
 logger = logging.getLogger(__name__)
+_perf_logger = logging.getLogger("deux.render.profiler")
 
 
 class BackgroundLayer:
@@ -228,6 +230,7 @@ class BackgroundLayer:
 
         assert self._svg is not None  # noqa: S101 — invariant
 
+        t0 = time.perf_counter()
         total_width = self._panel_width * self._panel_count
         total_height = self._panel_height
 
@@ -242,6 +245,11 @@ class BackgroundLayer:
             tiles.append(buf.getvalue())
 
         self._tiles = tiles
+        elapsed = (time.perf_counter() - t0) * 1000.0
+        _perf_logger.debug(
+            "_rasterize_touchstrip %dx%d -> %d tiles %.1fms",
+            total_width, total_height, self._panel_count, elapsed,
+        )
         logger.debug(
             "Background SVG rasterized: %dx%d -> %d tiles of %dx%d",
             total_width,
@@ -257,9 +265,12 @@ class BackgroundLayer:
 
         assert self._svg is not None  # noqa: S101 — invariant
 
+        t0 = time.perf_counter()
         key_w, key_h = self._key_size
         fmt = "jpeg" if self._key_image_format.upper() == "JPEG" else "bmp"
         self._key_image = _rasterize_svg(
             self._svg, key_w, key_h, output_format=fmt
         )
+        elapsed = (time.perf_counter() - t0) * 1000.0
+        _perf_logger.debug("_rasterize_key %dx%d fmt=%s %.1fms", key_w, key_h, fmt, elapsed)
         logger.debug("Key background SVG rasterized: %dx%d", key_w, key_h)

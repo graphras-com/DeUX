@@ -16,6 +16,8 @@ from __future__ import annotations
 import copy
 import io
 import logging
+import threading
+import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -26,8 +28,10 @@ from .context import RenderingContext
 
 if TYPE_CHECKING:
     from PIL import Image
+    from resvg import usvg as _usvg_mod
 
 logger = logging.getLogger(__name__)
+_perf_logger = logging.getLogger("deux.render.profiler")
 
 
 class RasterizeError(DeuxError):
@@ -40,6 +44,36 @@ class RasterizeError(DeuxError):
 
 _SVG_NS = "http://www.w3.org/2000/svg"
 _XLINK_NS = "http://www.w3.org/1999/xlink"
+
+# Per-thread cached usvg options with system fonts pre-loaded.  Font
+# discovery is expensive (filesystem scan) and the result doesn't
+# change during a process lifetime.  The Options object is !Send in
+# Rust, so it cannot be shared across threads — we use thread-local
+# storage to give each thread its own cached instance.
+_thread_local = threading.local()
+
+
+def _get_usvg_opts() -> _usvg_mod.Options:
+    """Return a thread-local cached :class:`usvg.Options` with system fonts loaded.
+
+    The options object is created lazily on first call per thread and
+    reused for all subsequent rasterisations on that thread, avoiding
+    the cost of rescanning system fonts on every render.
+
+    Returns
+    -------
+    usvg.Options
+        Reusable options instance.
+    """
+    opts = getattr(_thread_local, "usvg_opts", None)
+    if opts is None:
+        from resvg import usvg
+
+        opts = usvg.Options.default()
+        opts.load_system_fonts()
+        _thread_local.usvg_opts = opts
+        logger.debug("usvg Options created and system fonts loaded (thread-local cache)")
+    return opts
 
 
 def _resvg_rasterize(svg_data: bytes, width: int, height: int) -> bytes:
@@ -72,7 +106,6 @@ def _resvg_rasterize(svg_data: bytes, width: int, height: int) -> bytes:
     """
     try:
         from resvg import render as _resvg_render
-        from resvg import usvg
 
         root = safe_fromstring(svg_data)
         if "viewBox" not in root.attrib:
@@ -89,9 +122,9 @@ def _resvg_rasterize(svg_data: bytes, width: int, height: int) -> bytes:
         ET.register_namespace("xlink", _XLINK_NS)
         svg_text = ET.tostring(root, encoding="unicode", xml_declaration=False)
 
-        opts = usvg.Options.default()
-        opts.load_system_fonts()
-        tree = usvg.Tree.from_str(svg_text, opts)
+        from resvg import usvg
+
+        tree = usvg.Tree.from_str(svg_text, _get_usvg_opts())
 
         png_bytes: bytes = _resvg_render(tree, (1.0, 0.0, 0.0, 0.0, 1.0, 0.0))
         return png_bytes
@@ -132,7 +165,6 @@ def _resvg_rasterize_rgba(
     """
     try:
         from resvg import render_rgba as _resvg_render_rgba
-        from resvg import usvg
 
         root = safe_fromstring(svg_data)
         if "viewBox" not in root.attrib:
@@ -148,9 +180,9 @@ def _resvg_rasterize_rgba(
         ET.register_namespace("xlink", _XLINK_NS)
         svg_text = ET.tostring(root, encoding="unicode", xml_declaration=False)
 
-        opts = usvg.Options.default()
-        opts.load_system_fonts()
-        tree = usvg.Tree.from_str(svg_text, opts)
+        from resvg import usvg
+
+        tree = usvg.Tree.from_str(svg_text, _get_usvg_opts())
 
         rgba_bytes, w, h = _resvg_render_rgba(tree, (1.0, 0.0, 0.0, 0.0, 1.0, 0.0))
         return bytes(rgba_bytes), w, h
@@ -321,10 +353,14 @@ def _svg_to_png(
     """
     css = ctx.resolve_stylesheet() if ctx is not None else _active_stylesheet
 
+    t0 = time.perf_counter()
     if css is not None:
         svg_data = _inject_stylesheet(svg_data, css)
 
-    return _resvg_rasterize(svg_data, width, height)
+    result = _resvg_rasterize(svg_data, width, height)
+    elapsed = (time.perf_counter() - t0) * 1000.0
+    _perf_logger.debug("_svg_to_png %dx%d %.1fms", width, height, elapsed)
+    return result
 
 
 def _svg_to_image(
@@ -372,6 +408,7 @@ def _svg_to_image(
 
     css = ctx.resolve_stylesheet() if ctx is not None else _active_stylesheet
 
+    t0 = time.perf_counter()
     if css is not None:
         svg_data = _inject_stylesheet(svg_data, css)
 
@@ -379,6 +416,8 @@ def _svg_to_image(
     img = Image.frombuffer("RGBA", (w, h), rgba_bytes, "raw", "RGBA", 0, 1)
     if mode != "RGBA":
         img = img.convert(mode)
+    elapsed = (time.perf_counter() - t0) * 1000.0
+    _perf_logger.debug("_svg_to_image %dx%d mode=%s %.1fms", width, height, mode, elapsed)
     return img
 
 
@@ -433,16 +472,22 @@ def _rasterize_svg(
     if fmt not in ("png", "jpeg", "bmp"):
         raise ValueError(f"Unsupported output format: {output_format!r}")
 
-    if fmt == "png":
-        return _svg_to_png(svg_data, width, height, ctx=ctx)
+    t0 = time.perf_counter()
 
-    img = _svg_to_image(svg_data, width, height, mode="RGB", ctx=ctx)
-    buf = io.BytesIO()
-    if fmt == "jpeg":
-        img.save(buf, format="JPEG", quality=quality)
+    if fmt == "png":
+        result = _svg_to_png(svg_data, width, height, ctx=ctx)
     else:
-        img.save(buf, format="BMP")
-    return buf.getvalue()
+        img = _svg_to_image(svg_data, width, height, mode="RGB", ctx=ctx)
+        buf = io.BytesIO()
+        if fmt == "jpeg":
+            img.save(buf, format="JPEG", quality=quality)
+        else:
+            img.save(buf, format="BMP")
+        result = buf.getvalue()
+
+    elapsed = (time.perf_counter() - t0) * 1000.0
+    _perf_logger.debug("_rasterize_svg %dx%d fmt=%s %.1fms", width, height, fmt, elapsed)
+    return result
 
 
 # ---------------------------------------------------------------------------
