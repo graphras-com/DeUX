@@ -106,6 +106,10 @@ class AsyncTransport:
                     )
                 except HidApiError:
                     logger.warning("HID device disconnected during poll")
+                    # Nullify the handle immediately so no other async
+                    # task can call into a stale OS handle (which causes
+                    # SIGABRT / Trace/BPT trap on macOS).
+                    self._device._handle = None  # noqa: SLF001
                     break
 
                 if event is not None:

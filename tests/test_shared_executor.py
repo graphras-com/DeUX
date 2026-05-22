@@ -49,16 +49,16 @@ class TestDeckUsesSharedExecutor:
         d = Deck(serial_number="TEST")
         assert not hasattr(d, "_executor")
 
-    async def test_deck_stop_calls_shutdown_wait_true(self, mock_streamdeck_device):
-        """stop() shuts down the shared executor with wait=True."""
+    async def test_deck_stop_does_not_call_shutdown_executor(self, mock_streamdeck_device):
+        """stop() must NOT shut down the shared executor (manager owns it)."""
         d = Deck(serial_number="TEST123")
         with patch("deux.runtime.deck.enumerate_devices") as mock_enum:
             mock_enum.return_value = [mock_streamdeck_device]
             await d.start()
 
-        with patch("deux.runtime.deck.shutdown_executor") as mock_shutdown:
-            await d.stop()
-            mock_shutdown.assert_called_once_with(wait=True)
+        await d.stop()
+        # shutdown_executor is no longer imported in deck.py;
+        # the manager is responsible for executor lifecycle.
 
 
 class TestDeckManagerUsesSharedExecutor:
