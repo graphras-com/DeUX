@@ -184,12 +184,55 @@ def _get_default_font_family() -> str:
         return _DEFAULT_FONT_FAMILY
 
 
-def _resolve_font_attrs(root: ET.Element, elem: ET.Element) -> tuple[str, float]:
+def _build_parent_map(root: ET.Element) -> dict[ET.Element, ET.Element]:
+    """Build a child-to-parent mapping for an SVG tree.
+
+    Walks the tree once and returns a dictionary mapping every child
+    element to its parent.  Use this when multiple lookups against the
+    same tree are required so the O(N) walk is amortised across all
+    callers.
+
+    Parameters
+    ----------
+    root : ET.Element
+        The SVG document root to walk.
+
+    Returns
+    -------
+    dict[ET.Element, ET.Element]
+        Mapping of each child element to its parent element.
+    """
+    parent_map: dict[ET.Element, ET.Element] = {}
+    for parent in root.iter():
+        for child in parent:
+            parent_map[child] = parent
+    return parent_map
+
+
+def _resolve_font_attrs(
+    root: ET.Element,
+    elem: ET.Element,
+    parent_map: dict[ET.Element, ET.Element] | None = None,
+) -> tuple[str, float]:
     """Resolve font-family and font-size from an SVG element and its ancestors.
 
     Walks from *elem* up through the SVG tree to find ``font-family``
     and ``font-size`` attributes.  Falls back to sensible defaults if
     neither the element nor any ancestor declares them.
+
+    Parameters
+    ----------
+    root : ET.Element
+        The SVG document root.  Used to build the parent map when one
+        is not supplied.
+    elem : ET.Element
+        The element whose font attributes are being resolved.
+    parent_map : dict[ET.Element, ET.Element] or None, optional
+        Pre-built child-to-parent mapping for *root*.  When omitted,
+        the map is rebuilt on every call (O(N) per call).  Callers that
+        resolve fonts for multiple elements against the same tree
+        should build the map once via :func:`_build_parent_map` and
+        pass it in to avoid an O(N*M) cost.
 
     Returns
     -------
@@ -199,10 +242,8 @@ def _resolve_font_attrs(root: ET.Element, elem: ET.Element) -> tuple[str, float]
     family: str | None = None
     size: float | None = None
 
-    parent_map: dict[ET.Element, ET.Element] = {}
-    for parent in root.iter():
-        for child in parent:
-            parent_map[child] = parent
+    if parent_map is None:
+        parent_map = _build_parent_map(root)
 
     current: ET.Element | None = elem
     while current is not None:
@@ -471,6 +512,14 @@ class SvgRenderer:
         self._target_width: int | None = None
         self._target_height: int | None = None
         self._rendering_ctx: RenderingContext | None = None
+        # Per-render cache of the child→parent map for the currently rendered
+        # tree.  Populated lazily by :meth:`_get_parent_map` during a render
+        # pass and reset to ``None`` between renders so that mutations done by
+        # bindings (e.g. wrapped-text ``<tspan>`` children) don't poison later
+        # renders.  Caching it here keeps font-attribute resolution at O(N)
+        # per render instead of O(N*M) for M text bindings.
+        self._parent_map_root: ET.Element | None = None
+        self._parent_map_cache: dict[ET.Element, ET.Element] | None = None
 
         for name, binding in spec.bindings.items():
             if isinstance(binding, (TextBinding, VisibilityBinding, ColorBinding, CssClassBinding)):
@@ -712,6 +761,39 @@ class SvgRenderer:
         """
         self._base_root = copy.deepcopy(self._original_root)
 
+    def _get_parent_map(self, root: ET.Element) -> dict[ET.Element, ET.Element]:
+        """Return a cached child→parent map for *root* for the current render.
+
+        The map is rebuilt only when *root* differs from the previously
+        cached tree (i.e. at the start of a new render pass).  Subsequent
+        calls within the same render reuse the cached map, avoiding the
+        O(N) walk per text-binding that was the dominant cost of dense
+        cards with multiple text bindings.
+
+        Parameters
+        ----------
+        root : ET.Element
+            The root of the SVG tree currently being rendered.
+
+        Returns
+        -------
+        dict[ET.Element, ET.Element]
+            Mapping of each child element to its parent element.
+        """
+        if self._parent_map_root is not root or self._parent_map_cache is None:
+            self._parent_map_root = root
+            self._parent_map_cache = _build_parent_map(root)
+        return self._parent_map_cache
+
+    def _reset_parent_map_cache(self) -> None:
+        """Drop the cached parent map.
+
+        Called at the start of each render so that the map is rebuilt
+        for the freshly cloned tree.
+        """
+        self._parent_map_root = None
+        self._parent_map_cache = None
+
     def render(self) -> Image.Image:
         """Rasterise the SVG with current binding values to a PIL Image.
 
@@ -724,6 +806,7 @@ class SvgRenderer:
             native dimensions.
         """
         root = copy.deepcopy(self._base_root)
+        self._reset_parent_map_cache()
 
         for name, binding in self._spec.bindings.items():
             value = self._values.get(name)
@@ -773,6 +856,7 @@ class SvgRenderer:
         )
 
         root = copy.deepcopy(self._base_root)
+        self._reset_parent_map_cache()
 
         for name, binding in self._spec.bindings.items():
             value = self._values.get(name)
@@ -816,6 +900,7 @@ class SvgRenderer:
             SVG markup as a Unicode string.
         """
         root = copy.deepcopy(self._base_root)
+        self._reset_parent_map_cache()
 
         for name, binding in self._spec.bindings.items():
             value = self._values.get(name)
@@ -960,7 +1045,7 @@ class SvgRenderer:
             return
 
         if binding.max_width is not None:
-            family, size_f = _resolve_font_attrs(root, elem)
+            family, size_f = _resolve_font_attrs(root, elem, self._get_parent_map(root))
             font = _load_font(family, int(size_f))
             text = _truncate_text(text, binding.max_width, binding.overflow, font=font)
         elem.text = text
@@ -978,7 +1063,7 @@ class SvgRenderer:
         attribute so that ``text-anchor`` alignment is respected on
         every line.
         """
-        family, size_f = _resolve_font_attrs(root, elem)
+        family, size_f = _resolve_font_attrs(root, elem, self._get_parent_map(root))
         font = _load_font(family, int(size_f))
 
         line_height = binding.line_height or (size_f * _DEFAULT_LINE_HEIGHT_RATIO)
