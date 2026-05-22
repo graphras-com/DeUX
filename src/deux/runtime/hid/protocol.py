@@ -334,7 +334,7 @@ def parse_input_report(data: bytes) -> InputEvent | None:
         if len(payload) < 2:
             return None
         content_type = payload[0]
-        encoder_data = payload[1:]
+        encoder_data = payload[1:payload_len]
         if content_type == EncoderEventType.BUTTON:
             states = tuple(b != 0 for b in encoder_data)
             return EncoderButtonEvent(states=states)

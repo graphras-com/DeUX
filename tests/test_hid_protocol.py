@@ -177,6 +177,32 @@ class TestParseInputReportEncoder:
         data = _build_input(InputCommand.ENCODER, b"\x00")
         assert parse_input_report(data) is None
 
+    def test_button_event_ignores_trailing_padding(self) -> None:
+        """EncoderButtonEvent only uses payload_len bytes, ignoring HID padding."""
+        encoder_payload = bytes([EncoderEventType.BUTTON, 0x01, 0x00, 0x00, 0x01])
+        padding = b"\x00" * 50
+        data = _build_input(
+            InputCommand.ENCODER,
+            encoder_payload + padding,
+            payload_len=len(encoder_payload),
+        )
+        evt = parse_input_report(data)
+        assert isinstance(evt, EncoderButtonEvent)
+        assert evt.states == (True, False, False, True)
+
+    def test_rotate_event_ignores_trailing_padding(self) -> None:
+        """EncoderRotateEvent only uses payload_len bytes, ignoring HID padding."""
+        encoder_payload = bytes([EncoderEventType.ROTATE]) + struct.pack("bb", 1, -1)
+        padding = b"\x00" * 50
+        data = _build_input(
+            InputCommand.ENCODER,
+            encoder_payload + padding,
+            payload_len=len(encoder_payload),
+        )
+        evt = parse_input_report(data)
+        assert isinstance(evt, EncoderRotateEvent)
+        assert evt.ticks == (1, -1)
+
     def test_unknown_encoder_type_returns_none(self) -> None:
         """Unknown encoder content_type returns None."""
         payload = bytes([0xFF, 0x00, 0x00])

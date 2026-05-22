@@ -13,12 +13,15 @@ from .image_fetch import ImageFetchError, fetch_image
 from .image_fetch import clear_cache as clear_image_cache
 from .key_renderer import render_blank_key, render_key_image
 from .metrics import RenderMetrics
+from .profiler import RenderProfiler, render_profiler
 from .screen_renderer import render_info_screen
 from .svg_rasterize import (
     RasterizeError,
+    clear_svg_cache,
     get_svg_stylesheet,
     load_svg_stylesheet,
     set_svg_stylesheet,
+    svg_cache_stats,
 )
 from .theme import (
     Theme,
@@ -43,7 +46,9 @@ __all__ = [
     "ImageFetchError",
     "RasterizeError",
     "RenderMetrics",
+    "RenderProfiler",
     "clear_image_cache",
+    "clear_svg_cache",
     "compose_touchstrip",
     "fetch_image",
     "get_active_theme",
@@ -56,6 +61,8 @@ __all__ = [
     "render_blank_touchscreen",
     "render_info_screen",
     "render_key_image",
+    "render_profiler",
     "set_active_theme",
     "set_svg_stylesheet",
+    "svg_cache_stats",
 ]
