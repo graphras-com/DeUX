@@ -43,8 +43,12 @@ class DeckRenderer:
         rendering.
     """
 
+    #: Minimum interval between touchscreen renders in seconds (~60 fps).
+    _MIN_TOUCH_INTERVAL: float = 1.0 / 60.0
+
     def __init__(self, deck: Deck) -> None:
         self._deck = deck
+        self._last_touch_render: float = 0.0
 
     # ------------------------------------------------------------------
     # Helpers
@@ -181,10 +185,10 @@ class DeckRenderer:
             for idx, img in results:
                 key_images[idx] = img
 
-        # Phase 2: push all key images to device
+        # Phase 2: push all key images to device under a single lock
         with prof.step("push_phase"):
-            for key_index in sorted(key_images):
-                async with deck._device_lock:
+            async with deck._device_lock:
+                for key_index in sorted(key_images):
                     await deck._exec_device_io(
                         deck._device.set_key_image,
                         key_index,
@@ -216,6 +220,10 @@ class DeckRenderer:
 
         # Skip rendering if a spinner animation is active
         if self.is_animating(dui_key):
+            return
+
+        # Skip rendering if the key content has not changed
+        if not dui_key.is_dirty:
             return
 
         # Re-wire push_fn every render so a DuiKey reused across screens
@@ -366,6 +374,14 @@ class DeckRenderer:
             cards_to_render.append((card_idx, card, bg_tile))
 
         # Phase 2: prepare assets and render all cards concurrently
+        # Frame budget: skip render+push if called too soon after the last
+        # render.  The push_fn wiring above must still run every call so
+        # that spinner animations target the correct panel slot.
+        now = time.perf_counter()
+        if now - self._last_touch_render < self._MIN_TOUCH_INTERVAL:
+            return
+        self._last_touch_render = now
+
         image_fmt = (
             deck._caps.touchscreen_image_format if deck._caps else "JPEG"
         )
@@ -421,12 +437,12 @@ class DeckRenderer:
                         *[_render_card(cidx, crd, tile) for cidx, crd, tile in cards_to_render]
                     )
 
-                # Phase 3: push all panels to device sequentially
+                # Phase 3: push all panels to device under a single lock
                 with prof.step("push_to_device"):
-                    for cidx, panel_bytes in sorted(results, key=lambda r: r[0]):
-                        x_pos = cidx * metrics.panel_width
-                        y_pos = 0
-                        async with deck._device_lock:
+                    async with deck._device_lock:
+                        for cidx, panel_bytes in sorted(results, key=lambda r: r[0]):
+                            x_pos = cidx * metrics.panel_width
+                            y_pos = 0
                             await deck._exec_device_io(
                                 deck._device.set_partial_window_image,
                                 x_pos,

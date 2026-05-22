@@ -14,11 +14,13 @@ entirely at the SVG (vector) level before a single rasterisation pass.
 from __future__ import annotations
 
 import copy
+import hashlib
 import io
 import logging
 import threading
 import time
 import xml.etree.ElementTree as ET
+from collections import OrderedDict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -36,6 +38,132 @@ _perf_logger = logging.getLogger("deux.render.profiler")
 
 class RasterizeError(DeuxError):
     """Raised when SVG rasterisation fails."""
+
+
+# ---------------------------------------------------------------------------
+# SVG rasterisation cache
+# ---------------------------------------------------------------------------
+
+#: Maximum number of rasterised images to keep in the LRU cache.
+_SVG_CACHE_MAX_SIZE: int = 128
+
+_svg_image_cache: OrderedDict[tuple[bytes, int, int, str], bytes] = OrderedDict()
+_svg_image_cache_lock = threading.Lock()
+
+#: Cache hit/miss counters for diagnostics.
+_svg_cache_hits: int = 0
+_svg_cache_misses: int = 0
+
+
+def _svg_cache_key(
+    svg_data: bytes, width: int, height: int, mode_or_fmt: str, css: str | None
+) -> tuple[bytes, int, int, str]:
+    """Compute a cache key from SVG content, dimensions, and output mode.
+
+    Uses SHA-256 to hash the SVG data and optional CSS stylesheet,
+    producing a compact, collision-resistant key suitable for the
+    rasterisation cache.
+
+    Parameters
+    ----------
+    svg_data : bytes
+        Raw SVG content.
+    width : int
+        Desired output width in pixels.
+    height : int
+        Desired output height in pixels.
+    mode_or_fmt : str
+        PIL image mode (e.g. ``"RGB"``) or output format (e.g. ``"jpeg"``).
+    css : str or None
+        CSS stylesheet text, or ``None`` if no stylesheet is active.
+
+    Returns
+    -------
+    tuple[bytes, int, int, str]
+        A ``(content_hash, width, height, mode_or_fmt)`` tuple.
+    """
+    h = hashlib.sha256(svg_data)
+    if css is not None:
+        h.update(css.encode("utf-8"))
+    return (h.digest(), width, height, mode_or_fmt)
+
+
+def _svg_cache_get(key: tuple[bytes, int, int, str]) -> bytes | None:
+    """Look up a cached rasterisation result.
+
+    Moves the entry to the end of the LRU on hit.
+
+    Parameters
+    ----------
+    key : tuple[bytes, int, int, str]
+        Cache key from :func:`_svg_cache_key`.
+
+    Returns
+    -------
+    bytes or None
+        Cached image bytes, or ``None`` on a miss.
+    """
+    global _svg_cache_hits  # noqa: PLW0603
+    with _svg_image_cache_lock:
+        value = _svg_image_cache.get(key)
+        if value is not None:
+            _svg_image_cache.move_to_end(key)
+            _svg_cache_hits += 1
+            return value
+    return None
+
+
+def _svg_cache_put(key: tuple[bytes, int, int, str], value: bytes) -> None:
+    """Store a rasterisation result in the cache.
+
+    Evicts the least-recently-used entry when the cache exceeds
+    :data:`_SVG_CACHE_MAX_SIZE`.
+
+    Parameters
+    ----------
+    key : tuple[bytes, int, int, str]
+        Cache key from :func:`_svg_cache_key`.
+    value : bytes
+        Serialised image bytes to cache.
+    """
+    global _svg_cache_misses  # noqa: PLW0603
+    with _svg_image_cache_lock:
+        _svg_image_cache[key] = value
+        _svg_image_cache.move_to_end(key)
+        _svg_cache_misses += 1
+        while len(_svg_image_cache) > _SVG_CACHE_MAX_SIZE:
+            _svg_image_cache.popitem(last=False)
+
+
+def clear_svg_cache() -> None:
+    """Clear the SVG rasterisation cache.
+
+    Removes all cached rasterised images and resets the hit/miss
+    counters.  Call this after changing the global stylesheet or
+    theme to ensure stale images are not served.
+    """
+    global _svg_cache_hits, _svg_cache_misses  # noqa: PLW0603
+    with _svg_image_cache_lock:
+        _svg_image_cache.clear()
+        _svg_cache_hits = 0
+        _svg_cache_misses = 0
+    logger.debug("SVG rasterisation cache cleared")
+
+
+def svg_cache_stats() -> dict[str, int]:
+    """Return SVG rasterisation cache statistics.
+
+    Returns
+    -------
+    dict[str, int]
+        Dictionary with ``"size"``, ``"hits"``, and ``"misses"`` keys.
+    """
+    with _svg_image_cache_lock:
+        return {
+            "size": len(_svg_image_cache),
+            "hits": _svg_cache_hits,
+            "misses": _svg_cache_misses,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -223,7 +351,10 @@ def set_svg_stylesheet(css: str | None) -> None:
         set_svg_stylesheet(\"\"\".text-primary { color: #ff0000; }\"\"\")
     """
     global _active_stylesheet  # noqa: PLW0603
+    if css == _active_stylesheet:
+        return
     _active_stylesheet = css
+    clear_svg_cache()
     logger.debug(
         "SVG stylesheet %s",
         "cleared" if css is None else f"set ({len(css)} chars)",
@@ -409,10 +540,28 @@ def _svg_to_image(
     css = ctx.resolve_stylesheet() if ctx is not None else _active_stylesheet
 
     t0 = time.perf_counter()
+
+    # Check cache before rasterising
+    cache_key = _svg_cache_key(svg_data, width, height, f"image:{mode}", css)
+    cached = _svg_cache_get(cache_key)
+    if cached is not None:
+        img = Image.frombuffer("RGBA", (width, height), cached, "raw", "RGBA", 0, 1)
+        if mode != "RGBA":
+            img = img.convert(mode)
+        elapsed = (time.perf_counter() - t0) * 1000.0
+        _perf_logger.debug(
+            "_svg_to_image %dx%d mode=%s %.1fms (cached)", width, height, mode, elapsed
+        )
+        return img
+
     if css is not None:
         svg_data = _inject_stylesheet(svg_data, css)
 
     rgba_bytes, w, h = _resvg_rasterize_rgba(svg_data, width, height)
+
+    # Cache the raw RGBA bytes for future lookups
+    _svg_cache_put(cache_key, rgba_bytes)
+
     img = Image.frombuffer("RGBA", (w, h), rgba_bytes, "raw", "RGBA", 0, 1)
     if mode != "RGBA":
         img = img.convert(mode)
@@ -472,6 +621,15 @@ def _rasterize_svg(
     if fmt not in ("png", "jpeg", "bmp"):
         raise ValueError(f"Unsupported output format: {output_format!r}")
 
+    css = ctx.resolve_stylesheet() if ctx is not None else _active_stylesheet
+    cache_key = _svg_cache_key(svg_data, width, height, f"raster:{fmt}:{quality}", css)
+    cached = _svg_cache_get(cache_key)
+    if cached is not None:
+        _perf_logger.debug(
+            "_rasterize_svg %dx%d fmt=%s %.1fms (cached)", width, height, fmt, 0.0
+        )
+        return cached
+
     t0 = time.perf_counter()
 
     if fmt == "png":
@@ -484,6 +642,8 @@ def _rasterize_svg(
         else:
             img.save(buf, format="BMP")
         result = buf.getvalue()
+
+    _svg_cache_put(cache_key, result)
 
     elapsed = (time.perf_counter() - t0) * 1000.0
     _perf_logger.debug("_rasterize_svg %dx%d fmt=%s %.1fms", width, height, fmt, elapsed)
