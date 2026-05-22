@@ -351,6 +351,8 @@ def set_svg_stylesheet(css: str | None) -> None:
         set_svg_stylesheet(\"\"\".text-primary { color: #ff0000; }\"\"\")
     """
     global _active_stylesheet  # noqa: PLW0603
+    if css == _active_stylesheet:
+        return
     _active_stylesheet = css
     clear_svg_cache()
     logger.debug(
