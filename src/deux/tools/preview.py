@@ -475,7 +475,7 @@ _KEY_POSITIONS: dict[tuple[int, int], list[tuple[int, int]]] = {
 # Touchstrip / window rectangle (x, y, w, h) keyed by (lcd_width, lcd_height).
 # Only devices with a touchstrip have entries here.
 _TOUCHSTRIP_RECT: dict[tuple[int, int], tuple[int, int, int, int]] = {
-    (800, 480): (0, 380, 800, 100),
+    (800, 480): (0, 379, 800, 100),
     (1280, 800): (40, 674, 1200, 100),
 }
 
