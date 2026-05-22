@@ -989,6 +989,77 @@ class TestCollectSvgPathsDisplay:
         assert d in paths
 
 
+class TestRenderCompositeDisplay:
+    """Tests for render_composite_display."""
+
+    def test_output_size_matches_lcd(self, square_svg: Path):
+        from deux.tools.preview import render_composite_display
+
+        args = parse_args(["--display", str(square_svg)])
+        caps = STREAM_DECK_PLUS
+        jpeg = render_composite_display(args, caps)
+        decoded = Image.open(io.BytesIO(jpeg))
+        assert decoded.size == (800, 480)
+
+    def test_with_key_overlay(self, square_svg: Path):
+        from deux.tools.preview import render_composite_display
+
+        args = parse_args(["--display", str(square_svg), "--key0", str(square_svg)])
+        caps = STREAM_DECK_PLUS
+        jpeg = render_composite_display(args, caps)
+        decoded = Image.open(io.BytesIO(jpeg))
+        assert decoded.size == (800, 480)
+
+    def test_with_touchstrip_overlay(self, square_svg: Path):
+        from deux.tools.preview import render_composite_display
+
+        args = parse_args([
+            "--display", str(square_svg),
+            "--touchstrip", str(square_svg),
+        ])
+        caps = STREAM_DECK_PLUS
+        jpeg = render_composite_display(args, caps)
+        decoded = Image.open(io.BytesIO(jpeg))
+        assert decoded.size == (800, 480)
+
+    def test_missing_key_svg_exits(self, square_svg: Path, tmp_path: Path):
+        from deux.tools.preview import render_composite_display
+
+        missing = tmp_path / "nope.svg"
+        args = parse_args(["--display", str(square_svg), "--key0", str(missing)])
+        with pytest.raises(SystemExit):
+            render_composite_display(args, STREAM_DECK_PLUS)
+
+
+class TestKeyPositions:
+    """Tests for pixel layout tables."""
+
+    def test_classic_count(self):
+        from deux.tools.preview import _KEY_POSITIONS
+
+        assert len(_KEY_POSITIONS[(480, 272)]) == 15  # 5x3
+
+    def test_xl_count(self):
+        from deux.tools.preview import _KEY_POSITIONS
+
+        assert len(_KEY_POSITIONS[(1024, 600)]) == 32  # 8x4
+
+    def test_neo_count(self):
+        from deux.tools.preview import _KEY_POSITIONS
+
+        assert len(_KEY_POSITIONS[(480, 320)]) == 8  # 4x2
+
+    def test_plus_count(self):
+        from deux.tools.preview import _KEY_POSITIONS
+
+        assert len(_KEY_POSITIONS[(800, 480)]) == 8  # 4x2
+
+    def test_plus_xl_count(self):
+        from deux.tools.preview import _KEY_POSITIONS
+
+        assert len(_KEY_POSITIONS[(1280, 800)]) == 36  # 9x4
+
+
 class TestPushToDeviceDisplay:
     """Tests for push_to_device with --display."""
 
@@ -1019,7 +1090,7 @@ class TestPushToDeviceDisplay:
     async def test_display_with_key_overlay(
         self, mock_streamdeck_device: MagicMock, square_svg: Path
     ):
-        """Display pushed first, then key images overlaid on top."""
+        """Display + key composited into single full-screen push."""
         from deux.tools.preview import push_to_device
 
         mock_streamdeck_device.DECK_VISUAL = True
@@ -1040,6 +1111,7 @@ class TestPushToDeviceDisplay:
         ):
             await push_to_device(args)
 
+        # Composite mode: only set_full_screen_image, no individual key pushes.
         mock_streamdeck_device.set_full_screen_image.assert_called_once()
-        mock_streamdeck_device.set_key_image.assert_called_once()
+        mock_streamdeck_device.set_key_image.assert_not_called()
         mock_streamdeck_device.show_logo.assert_called_once()

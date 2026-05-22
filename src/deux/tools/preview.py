@@ -380,6 +380,226 @@ def compose_display_image(
     return _encode_image_bytes(canvas)
 
 
+# ---------------------------------------------------------------------------
+# Pixel layout tables — key (x, y) positions on the full LCD, keyed by
+# (lcd_width, lcd_height).  Extracted from official Elgato device SVGs.
+# ---------------------------------------------------------------------------
+
+def _classic_key_positions() -> list[tuple[int, int]]:
+    """Return (x, y) for each key on Classic (480x272, 5x3, 72x72).
+
+    Layout: L=11, T=5, H_gap=25, V_gap=25.
+    """
+    positions: list[tuple[int, int]] = []
+    for row in range(3):
+        for col in range(5):
+            x = 11 + col * (72 + 25)
+            y = 5 + row * (72 + 25)
+            positions.append((x, y))
+    return positions
+
+
+def _xl_key_positions() -> list[tuple[int, int]]:
+    """Return (x, y) for each key on XL (1024x600, 8x4, 96x96).
+
+    Layout: L=16, T=47, H_gap=32, V_gap=39.
+    """
+    positions: list[tuple[int, int]] = []
+    for row in range(4):
+        for col in range(8):
+            x = 16 + col * (96 + 32)
+            y = 47 + row * (96 + 39)
+            positions.append((x, y))
+    return positions
+
+
+def _neo_key_positions() -> list[tuple[int, int]]:
+    """Return (x, y) for each key on Neo (480x320, 4x2, 96x96).
+
+    Layout: L=3, T=9, H_gap=30, V_gap=30.
+    """
+    positions: list[tuple[int, int]] = []
+    for row in range(2):
+        for col in range(4):
+            x = 3 + col * (96 + 30)
+            y = 9 + row * (96 + 30)
+            positions.append((x, y))
+    return positions
+
+
+def _plus_key_positions() -> list[tuple[int, int]]:
+    """Return (x, y) for each key on Plus (800x480, 4x2, 120x120).
+
+    Layout: L=12 (rounded from 11.5), H_gap=99, T=12, V_gap=40.
+    """
+    positions: list[tuple[int, int]] = []
+    for row in range(2):
+        for col in range(4):
+            x = 12 + col * (120 + 99)
+            y = 12 + row * (120 + 40)
+            positions.append((x, y))
+    return positions
+
+
+def _plus_xl_key_positions() -> list[tuple[int, int]]:
+    """Return (x, y) for each key on Plus XL (1280x800, 9x4, 112x112).
+
+    Layout: L=11, T=32, alternating H_gaps 31/32, V_gaps 32/30/32.
+    """
+    h_offsets = [11]
+    gap_pattern = [31, 32, 31, 32, 31, 32, 31, 32]
+    for i in range(8):
+        h_offsets.append(h_offsets[-1] + 112 + gap_pattern[i])
+
+    v_offsets = [32]
+    v_gaps = [32, 30, 32]
+    for i in range(3):
+        v_offsets.append(v_offsets[-1] + 112 + v_gaps[i])
+
+    positions: list[tuple[int, int]] = []
+    for row in range(4):
+        for col in range(9):
+            positions.append((h_offsets[col], v_offsets[row]))
+    return positions
+
+
+# Key positions keyed by (lcd_width, lcd_height).
+_KEY_POSITIONS: dict[tuple[int, int], list[tuple[int, int]]] = {
+    (480, 272): _classic_key_positions(),
+    (1024, 600): _xl_key_positions(),
+    (480, 320): _neo_key_positions(),
+    (800, 480): _plus_key_positions(),
+    (1280, 800): _plus_xl_key_positions(),
+}
+
+# Touchstrip / window rectangle (x, y, w, h) keyed by (lcd_width, lcd_height).
+# Only devices with a touchstrip have entries here.
+_TOUCHSTRIP_RECT: dict[tuple[int, int], tuple[int, int, int, int]] = {
+    (800, 480): (0, 380, 800, 100),
+    (1280, 800): (40, 674, 1200, 100),
+}
+
+# Neo info display window position.
+_NEO_WINDOW_RECT: tuple[int, int, int, int] = (116, 262, 248, 58)
+
+
+def render_composite_display(
+    args: argparse.Namespace,
+    caps: DeviceCapabilities,
+) -> bytes:
+    """Render *all* layers into a single full-LCD composite image.
+
+    Layers (bottom to top):
+
+    1. ``--display`` SVG rasterised at full LCD resolution (background).
+    2. Individual ``--keyN`` SVGs pasted at their pixel positions.
+    3. ``--touchstrip`` or ``--cardN`` SVGs pasted at the touchstrip region.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed CLI arguments.
+    caps : DeviceCapabilities
+        Capabilities of the connected device.
+
+    Returns
+    -------
+    bytes
+        JPEG-encoded full-LCD image ready for ``set_full_screen_image``.
+
+    Raises
+    ------
+    SystemExit
+        If a referenced SVG file does not exist.
+    """
+    background: str = getattr(args, "background", None) or "black"
+    lcd_size = (caps.lcd_width, caps.lcd_height)
+
+    # Layer 0: display background
+    display_svg: Path | None = getattr(args, "display", None)
+    if display_svg is not None and display_svg.exists():
+        img = load_svg(display_svg, *lcd_size)
+        canvas = Image.new("RGB", lcd_size, background)
+        x = (lcd_size[0] - img.width) // 2
+        y = (lcd_size[1] - img.height) // 2
+        if img.mode == "RGBA":
+            canvas.paste(img, (x, y), img)
+        else:
+            canvas.paste(img, (x, y))
+    else:
+        canvas = Image.new("RGB", lcd_size, background)
+
+    # Layer 1: key images
+    key_positions = _KEY_POSITIONS.get(lcd_size, [])
+    key_size = (caps.key_pixel_width, caps.key_pixel_height)
+    for i in range(min(caps.key_count, len(key_positions))):
+        svg_path: Path | None = getattr(args, f"key{i}", None)
+        if svg_path is not None:
+            if not svg_path.exists():
+                print(f"ERROR: Key SVG not found: {svg_path}", file=sys.stderr)  # noqa: T201
+                sys.exit(1)
+            img = load_svg(svg_path, *key_size)
+            key_canvas = Image.new("RGB", key_size, background)
+            kx = (key_size[0] - img.width) // 2
+            ky = (key_size[1] - img.height) // 2
+            if img.mode == "RGBA":
+                key_canvas.paste(img, (kx, ky), img)
+            else:
+                key_canvas.paste(img, (kx, ky))
+            pos = key_positions[i]
+            canvas.paste(key_canvas, pos)
+            logger.info("Composited key %d at (%d, %d)", i, pos[0], pos[1])
+
+    # Layer 2: touchstrip / cards
+    ts_rect = _TOUCHSTRIP_RECT.get(lcd_size)
+    if ts_rect is not None:
+        ts_x, ts_y, ts_w, ts_h = ts_rect
+        touchstrip_svg: Path | None = getattr(args, "touchstrip", None)
+        if touchstrip_svg is not None:
+            if not touchstrip_svg.exists():
+                print(  # noqa: T201
+                    f"ERROR: Touchstrip SVG not found: {touchstrip_svg}",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            img = load_svg(touchstrip_svg, ts_w, ts_h)
+            ts_canvas = Image.new("RGB", (ts_w, ts_h), background)
+            tx = (ts_w - img.width) // 2
+            ty = (ts_h - img.height) // 2
+            if img.mode == "RGBA":
+                ts_canvas.paste(img, (tx, ty), img)
+            else:
+                ts_canvas.paste(img, (tx, ty))
+            canvas.paste(ts_canvas, (ts_x, ts_y))
+            logger.info("Composited touchstrip at (%d, %d)", ts_x, ts_y)
+        else:
+            # Try individual cards
+            panel_count = caps.panel_count
+            if panel_count > 0:
+                panel_w = ts_w // panel_count
+                for i in range(panel_count):
+                    card_path: Path | None = getattr(args, f"card{i}", None)
+                    if card_path is not None:
+                        if not card_path.exists():
+                            print(  # noqa: T201
+                                f"ERROR: Card SVG not found: {card_path}",
+                                file=sys.stderr,
+                            )
+                            sys.exit(1)
+                        img = load_svg(card_path, panel_w, ts_h)
+                        card_canvas = Image.new("RGB", (panel_w, ts_h), background)
+                        cx = (panel_w - img.width) // 2
+                        cy = (ts_h - img.height) // 2
+                        if img.mode == "RGBA":
+                            card_canvas.paste(img, (cx, cy), img)
+                        else:
+                            card_canvas.paste(img, (cx, cy))
+                        canvas.paste(card_canvas, (ts_x + i * panel_w, ts_y))
+                        logger.info("Composited card %d at (%d, %d)", i, ts_x + i * panel_w, ts_y)
+
+    return _encode_image_bytes(canvas)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the ``argparse`` parser for the preview tool.
 
@@ -420,8 +640,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="SVG",
         help=(
-            "SVG file to render at the full LCD resolution and push as a single"
-            " full-screen image (mutually exclusive with --keyN/--cardN/--touchstrip)"
+            "SVG file to render at the full LCD resolution as the background layer."
+            " When combined with --keyN/--cardN/--touchstrip, all layers are"
+            " composited into a single full-screen image"
         ),
     )
     parser.add_argument(
@@ -547,9 +768,8 @@ async def push_to_device(
 
         display_svg: Path | None = getattr(args, "display", None)
         if display_svg is not None:
-            lcd_size = (caps.lcd_width, caps.lcd_height)
-            bg: str = getattr(args, "background", None) or "black"
-            jpeg = render_display(display_svg, lcd_size, background=bg)
+            # Composite mode: all layers merged into one full-screen image.
+            jpeg = render_composite_display(args, caps)
             await asyncio.wait_for(
                 loop.run_in_executor(
                     None,
@@ -558,35 +778,36 @@ async def push_to_device(
                 ),
                 timeout=_HID_WRITE_TIMEOUT,
             )
+        else:
+            # Legacy mode: push keys and touchstrip individually.
+            key_images, touchstrip_bytes = render_preview(args, caps)
 
-        key_images, touchstrip_bytes = render_preview(args, caps)
+            for key_index in range(caps.key_count):
+                jpeg = key_images.get(key_index)
+                if jpeg is not None:
+                    await asyncio.wait_for(
+                        loop.run_in_executor(
+                            None,
+                            deck.set_key_image,
+                            key_index,
+                            jpeg,
+                        ),
+                        timeout=_HID_WRITE_TIMEOUT,
+                    )
 
-        for key_index in range(caps.key_count):
-            jpeg = key_images.get(key_index)
-            if jpeg is not None:
+            if caps.has_touchscreen:
                 await asyncio.wait_for(
                     loop.run_in_executor(
                         None,
-                        deck.set_key_image,
-                        key_index,
-                        jpeg,
+                        deck.set_partial_window_image,
+                        0,
+                        0,
+                        caps.touchscreen_width,
+                        caps.touchscreen_height,
+                        touchstrip_bytes,
                     ),
                     timeout=_HID_WRITE_TIMEOUT,
                 )
-
-        if caps.has_touchscreen:
-            await asyncio.wait_for(
-                loop.run_in_executor(
-                    None,
-                    deck.set_partial_window_image,
-                    0,
-                    0,
-                    caps.touchscreen_width,
-                    caps.touchscreen_height,
-                    touchstrip_bytes,
-                ),
-                timeout=_HID_WRITE_TIMEOUT,
-            )
 
         if args.watch:
             print(  # noqa: T201
@@ -699,15 +920,13 @@ async def _watch_and_reload(
                 )
                 last_mtimes = current_mtimes
 
-                # Re-push display background if present and changed.
                 display_svg: Path | None = getattr(args, "display", None)
                 if display_svg is not None:
+                    # Composite mode: single full-screen image.
                     try:
-                        lcd_size = (caps.lcd_width, caps.lcd_height)
-                        background: str = getattr(args, "background", None) or "black"
-                        jpeg = render_display(display_svg, lcd_size, background=background)
+                        jpeg = render_composite_display(args, caps)
                     except Exception as exc:
-                        print(f"Display render error: {exc}", file=sys.stderr)  # noqa: T201
+                        print(f"Render error: {exc}", file=sys.stderr)  # noqa: T201
                         continue
 
                     await asyncio.wait_for(
@@ -718,39 +937,40 @@ async def _watch_and_reload(
                         ),
                         timeout=_HID_WRITE_TIMEOUT,
                     )
+                else:
+                    # Legacy mode: push keys and touchstrip individually.
+                    try:
+                        key_images, touchstrip_bytes = render_preview(args, caps)
+                    except Exception as exc:
+                        print(f"Render error: {exc}", file=sys.stderr)  # noqa: T201
+                        continue
 
-                try:
-                    key_images, touchstrip_bytes = render_preview(args, caps)
-                except Exception as exc:
-                    print(f"Render error: {exc}", file=sys.stderr)  # noqa: T201
-                    continue
+                    for key_index in range(caps.key_count):
+                        jpeg = key_images.get(key_index)
+                        if jpeg is not None:
+                            await asyncio.wait_for(
+                                loop.run_in_executor(
+                                    None,
+                                    deck.set_key_image,
+                                    key_index,
+                                    jpeg,
+                                ),
+                                timeout=_HID_WRITE_TIMEOUT,
+                            )
 
-                for key_index in range(caps.key_count):
-                    jpeg = key_images.get(key_index)
-                    if jpeg is not None:
+                    if caps.has_touchscreen:
                         await asyncio.wait_for(
                             loop.run_in_executor(
                                 None,
-                                deck.set_key_image,
-                                key_index,
-                                jpeg,
+                                deck.set_partial_window_image,
+                                0,
+                                0,
+                                caps.touchscreen_width,
+                                caps.touchscreen_height,
+                                touchstrip_bytes,
                             ),
                             timeout=_HID_WRITE_TIMEOUT,
                         )
-
-                if caps.has_touchscreen:
-                    await asyncio.wait_for(
-                        loop.run_in_executor(
-                            None,
-                            deck.set_partial_window_image,
-                            0,
-                            0,
-                            caps.touchscreen_width,
-                            caps.touchscreen_height,
-                            touchstrip_bytes,
-                        ),
-                        timeout=_HID_WRITE_TIMEOUT,
-                    )
                 _ = panel_width  # carried for symmetry; geometry comes from caps
                 print("Preview updated", file=sys.stderr)  # noqa: T201
     finally:
