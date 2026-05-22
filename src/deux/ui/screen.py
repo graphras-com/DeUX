@@ -95,29 +95,36 @@ class Screen:
         background has been explicitly configured.  Failures are logged
         but never raised — defaults are best-effort.
         """
+        import xml.etree.ElementTree as ET
+
         from ..render.defaults import get_default_backgrounds
+        from ..render.svg_rasterize import RasterizeError
 
         try:
             backgrounds = get_default_backgrounds(
                 self._caps.vendor_id, self._caps.product_id
             )
         except Exception:
-            logger.debug("Could not load default backgrounds", exc_info=True)
+            logger.warning("Could not load default backgrounds", exc_info=True)
             return
 
         if "touchscreen" in backgrounds and self._touch_strip is not None:
             try:
                 svg_data = backgrounds["touchscreen"]
                 self._touch_strip.bg_layer.set_svg(svg_data, trusted=True)
-            except Exception:
-                logger.debug("Failed to apply default touchscreen background", exc_info=True)
+            except (ET.ParseError, RasterizeError, OSError):
+                logger.warning(
+                    "Failed to apply default touchscreen background", exc_info=True
+                )
 
         if "key" in backgrounds:
             try:
                 svg_data = backgrounds["key"]
                 self._key_bg_layer.set_svg(svg_data, trusted=True)
-            except Exception:
-                logger.debug("Failed to apply default key background", exc_info=True)
+            except (ET.ParseError, RasterizeError, OSError):
+                logger.warning(
+                    "Failed to apply default key background", exc_info=True
+                )
 
     def _rasterize_key_background(self) -> None:
         """Re-rasterize the key background via the BackgroundLayer.

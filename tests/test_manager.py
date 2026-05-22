@@ -338,7 +338,9 @@ class TestDeckManagerDecks:
 
 class TestDeckManagerDisconnectInfoError:
     async def test_disconnect_info_error_fallback(self):
-        """When deck.info raises, a fallback DeviceInfo is used."""
+        """When deck.info raises ``DeckError``, a fallback DeviceInfo is used."""
+        from deux.runtime.deck import DeckError
+
         m = DeckManager(poll_interval=10.0)
         disconnected = []
 
@@ -348,7 +350,9 @@ class TestDeckManagerDisconnectInfoError:
 
         mock_deck = MagicMock()
         mock_deck.stop = AsyncMock()
-        type(mock_deck).info = property(lambda self: (_ for _ in ()).throw(Exception("no device")))
+        type(mock_deck).info = property(
+            lambda self: (_ for _ in ()).throw(DeckError("no device"))
+        )
         mock_deck.device_path = "/dev/hid/FALLBACK1"
         m._decks["FALLBACK1"] = mock_deck
 
