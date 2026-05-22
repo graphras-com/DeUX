@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 
 # Generated version file
-src/deckui/_version.py
+src/deux/_version.py
 
 # C extensions
 *.so

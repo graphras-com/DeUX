@@ -274,6 +274,29 @@ class BindingMixin:
                 event.unsubscribe(handler)
         self._subscriptions.clear()
 
+    def detach_events(self, *events: Any) -> None:
+        """Unsubscribe only handlers bound to specific :class:`AsyncEvent` instances.
+
+        Use this for partial teardown — e.g. removing bindings to a
+        dying ``Deck``'s events while preserving service-owned bindings
+        that were established in the controller's ``__init__``.
+
+        Parameters
+        ----------
+        *events
+            One or more :class:`AsyncEvent` objects whose subscriptions
+            should be removed.
+        """
+        targets = set(events)
+        remaining: list[tuple[Any, Any]] = []
+        for event, handler in self._subscriptions:
+            if event in targets:
+                with suppress(ValueError):
+                    event.unsubscribe(handler)
+            else:
+                remaining.append((event, handler))
+        self._subscriptions = remaining
+
     def forward(
         self,
         event_name: str,

@@ -769,3 +769,74 @@ class TestDuiKeyDetach:
             assert event.subscriber_count == 1
             key.detach()
             assert event.subscriber_count == 0
+
+
+class TestDetachEvents:
+    """Verify that detach_events() selectively removes handlers."""
+
+    def _card(self) -> DuiCard:
+        spec = _card_spec(
+            bindings={
+                "title": TextBinding(node="title", default=""),
+                "bar": RangeBinding(node="bar", default=0.0),
+            }
+        )
+        return DuiCard(spec)
+
+    async def test_detach_events_removes_only_targeted_event(self):
+        """detach_events() removes subscriptions to the specified event only."""
+        card = self._card()
+        deck_event = AsyncEvent()
+        svc_event = AsyncEvent()
+        card.bind("title", deck_event)
+        card.bind("title", svc_event)
+        assert deck_event.subscriber_count == 1
+        assert svc_event.subscriber_count == 1
+
+        card.detach_events(deck_event)
+
+        assert deck_event.subscriber_count == 0
+        assert svc_event.subscriber_count == 1
+
+    async def test_detach_events_preserves_unrelated_subscriptions(self):
+        """Subscriptions to non-targeted events remain intact after detach_events()."""
+        card = self._card()
+        event_a = AsyncEvent()
+        event_b = AsyncEvent()
+        card.bind("title", event_a)
+        card.bind_range("bar", event_b, min_val=0, max_val=100)
+
+        card.detach_events(event_a)
+
+        assert event_a.subscriber_count == 0
+        assert event_b.subscriber_count == 1
+        # Full detach still cleans up the rest.
+        card.detach()
+        assert event_b.subscriber_count == 0
+
+    async def test_detach_events_noop_for_unknown_event(self):
+        """detach_events() with an unrelated event does nothing."""
+        card = self._card()
+        event = AsyncEvent()
+        other = AsyncEvent()
+        card.bind("title", event)
+
+        card.detach_events(other)
+
+        assert event.subscriber_count == 1
+
+    async def test_detach_events_multiple_targets(self):
+        """detach_events() accepts multiple events at once."""
+        card = self._card()
+        ev1 = AsyncEvent()
+        ev2 = AsyncEvent()
+        ev3 = AsyncEvent()
+        card.bind("title", ev1)
+        card.bind("title", ev2)
+        card.bind("title", ev3)
+
+        card.detach_events(ev1, ev2)
+
+        assert ev1.subscriber_count == 0
+        assert ev2.subscriber_count == 0
+        assert ev3.subscriber_count == 1

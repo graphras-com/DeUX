@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from .._errors import DeuxError
 from ..render.metrics import RenderMetrics
-from ._executor import get_executor, shutdown_executor
+from ._executor import get_executor
 from .async_event import AsyncEvent
 from .capabilities import DeviceCapabilities
 from .device_info import DeviceInfo
@@ -176,30 +176,37 @@ class Deck:
                 await self._event_task
 
         if self._device:
-            try:
-                await self._exec_device_io(self._device.show_logo)
-                await self._exec_device_io(self._device.close)
-            except (HidWriteTimeout, HidApiError, Exception) as e:
-                logger.warning("Error closing device: %s", e)
+            if self._device.is_open:
+                try:
+                    await self._exec_device_io(self._device.show_logo)
+                    await self._exec_device_io(self._device.close)
+                except (HidWriteTimeout, HidApiError, Exception) as e:
+                    logger.warning("Error closing device: %s", e)
+            else:
+                logger.debug("Device already closed; skipping show_logo/close")
 
         self._device = None
         self._closed_event.set()
-        shutdown_executor(wait=True)
         logger.info("Deck stopped")
 
     def _detach_all_cards(self) -> None:
-        """Unsubscribe all AsyncEvent handlers on every DuiCard across all screens.
+        """Unsubscribe deck-owned AsyncEvent handlers on every DuiCard across all screens.
 
-        Prevents handler accumulation across reconnect cycles.
+        Only removes bindings to this deck's own events (e.g.
+        ``on_brightness_changed``, ``on_screen_changed``), preserving
+        service-owned bindings established in controller ``__init__``.
+        This prevents handler accumulation across reconnect cycles
+        without breaking reactive bindings to external services.
         """
         from ..dui.card import DuiCard
 
+        deck_events = (self.on_brightness_changed, self.on_screen_changed)
         for screen in self._screens.values():
             if screen.touch_strip is None:
                 continue
             for card in screen.touch_strip.cards:
                 if isinstance(card, DuiCard):
-                    card.detach()
+                    card.detach_events(*deck_events)
 
     async def wait_closed(self) -> None:
         """Block until the deck is closed (e.g. by stop() or disconnect)."""
