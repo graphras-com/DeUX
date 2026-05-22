@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any
 from ._executor import get_executor, shutdown_executor
 from .deck import Deck, DeckError
 from .device_info import DeviceInfo
-from .hid._ctypes_hidapi import HidApiError
 from .hid.discovery import enumerate_devices
 
 if TYPE_CHECKING:
@@ -120,7 +119,7 @@ class DeckManager:
             try:
                 await deck.stop()
             except Exception:
-                logger.warning("Error stopping deck %s", serial)
+                logger.warning("Error stopping deck %s", serial, exc_info=True)
         self._decks.clear()
 
         self._closed_event.set()
@@ -238,8 +237,8 @@ class DeckManager:
             devices = await loop.run_in_executor(
                 get_executor(), enumerate_devices
             )
-        except (HidApiError, Exception):
-            logger.debug("Device enumeration failed")
+        except OSError:
+            logger.warning("Device enumeration failed", exc_info=True)
             return
 
         managed_paths: dict[str, str] = {}
@@ -270,7 +269,7 @@ class DeckManager:
                 device_by_serial[serial] = d
                 self._path_serial_cache[dev_path] = serial
                 await loop.run_in_executor(get_executor(), d.close)
-            except (HidApiError, Exception):
+            except OSError:
                 if dev_path not in self._failed_probe_paths:
                     self._failed_probe_paths.add(dev_path)
                     logger.info(
@@ -294,7 +293,7 @@ class DeckManager:
                 logger.info("Device disconnected: %s", serial)
                 try:
                     info = deck.info
-                except Exception:
+                except (DeckError, OSError):
                     info = DeviceInfo(
                         deck_type="unknown",
                         serial=serial,
