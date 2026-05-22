@@ -114,4 +114,4 @@ __all__ = [
     "set_allow_private_urls",
 ]
 
-from deux._version import __version__
+from deux._version_safe import __version__

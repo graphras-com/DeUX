@@ -32,7 +32,7 @@ import platformdirs
 
 from deux._errors import DeuxError
 from deux._url_safety import check_url
-from deux._version import __version__
+from deux._version_safe import __version__
 
 logger = logging.getLogger(__name__)
 
