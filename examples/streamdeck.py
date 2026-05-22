@@ -1183,7 +1183,9 @@ async def run() -> None:
     """
     app = StreamDeckApp(MEDIA_CATALOG, SCENE_DEFS)
     manager = DeckManager(
-        brightness=app.dashboard.brightness, auto_reconnect=True
+        poll_interval=0.5,
+        brightness=app.dashboard.brightness,
+        auto_reconnect=True,
     )
 
     @manager.on_connect()
