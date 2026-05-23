@@ -8,7 +8,9 @@ from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
 from .._errors import DeuxError
+from ..dui.key import DuiKey
 from ..render.metrics import RenderMetrics
+from ..render.theme import get_active_theme
 from ._executor import get_executor
 from .async_event import AsyncEvent
 from .capabilities import DeviceCapabilities
@@ -253,8 +255,9 @@ class Deck:
         device.  Failures to stop an individual spinner are logged
         and swallowed — shutdown must never raise.
         """
-        from ..dui.card import DuiCard
-        from ..dui.key import DuiKey
+        # Inline import: dui.card transitively imports runtime.events, which
+        # triggers runtime package init while this module is still loading.
+        from ..dui.card import DuiCard  # noqa: PLC0415
 
         for screen in self._screens.values():
             for key_slot in screen.keys.values():
@@ -285,7 +288,9 @@ class Deck:
         This prevents handler accumulation across reconnect cycles
         without breaking reactive bindings to external services.
         """
-        from ..dui.card import DuiCard
+        # Inline import: dui.card transitively imports runtime.events, which
+        # triggers runtime package init while this module is still loading.
+        from ..dui.card import DuiCard  # noqa: PLC0415
 
         deck_events = (self.on_brightness_changed, self.on_screen_changed)
         for screen in self._screens.values():
@@ -437,7 +442,9 @@ class Deck:
         Call this after all screens have been set up (keys and cards
         installed) to avoid network latency on first render.
         """
-        from ..dui.iconify import prefetch_icons
+        # Inline import: tests patch ``deux.dui.iconify.prefetch_icons``;
+        # importing it lazily keeps that patching point effective.
+        from ..dui.iconify import prefetch_icons  # noqa: PLC0415
 
         all_icons: set[str] = set()
         for screen in self._screens.values():
@@ -455,8 +462,6 @@ class Deck:
         str
             CSS stylesheet string from the most specific theme.
         """
-        from ..render.theme import get_active_theme
-
         screen = self._active_screen
         if screen is not None and screen.theme is not None:
             return screen.theme.css
@@ -515,7 +520,9 @@ class Deck:
             If the device is not opened — capabilities are required to
             size the screen, and they are only known after :meth:`start`.
         """
-        from ..ui.screen import Screen
+        # Inline import: ui.screen transitively imports runtime.events via
+        # ui.touch_strip -> ui.cards.base, creating a cycle at module load.
+        from ..ui.screen import Screen  # noqa: PLC0415
 
         if self._caps is None:
             raise DeckError("Device not opened")

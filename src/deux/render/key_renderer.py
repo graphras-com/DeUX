@@ -11,6 +11,8 @@ import time
 
 from PIL import Image
 
+from .touch_renderer import _parse_color
+
 _perf_logger = logging.getLogger("deux.render.profiler")
 
 
@@ -44,8 +46,6 @@ def render_key_image(
     bytes
         Encoded image bytes ready to send to the device.
     """
-    from .touch_renderer import _parse_color
-
     t0 = time.perf_counter()
     key_w, key_h = key_size
     r, g, b = _parse_color(background)

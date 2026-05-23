@@ -376,7 +376,9 @@ class EventMap:
         AsyncHandler or None
             The matched handler, or ``None`` if no region/mapping matched.
         """
-        from ..runtime.events import EventType as ET_Enum
+        # Inline import: importing runtime.events triggers runtime.__init__
+        # which loads runtime.deck and creates a cycle through dui.* modules.
+        from ..runtime.events import EventType as ET_Enum  # noqa: PLC0415
 
         if event_type == ET_Enum.TOUCH_SHORT:
             touch_name = "tap"

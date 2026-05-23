@@ -6,6 +6,7 @@ import base64
 import builtins
 import copy
 import functools
+import io
 import logging
 import math
 import os
@@ -14,16 +15,21 @@ import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from defusedxml import DefusedXmlException
-from PIL import ImageFont
-
-if TYPE_CHECKING:
-    from PIL import Image
+from PIL import Image, ImageFont
 
 from .._xml import safe_fromstring
 from ..render.context import RenderingContext
+from ..render.svg_rasterize import (
+    _rasterize_svg,
+    _svg_to_image,
+    compose_svg_layers,
+    inject_background_rect,
+    set_svg_dimensions,
+    slice_background_viewbox,
+)
 from .iconify import IconifyError, fetch_icon
 from .schema import (
     Binding,
@@ -178,7 +184,9 @@ def _get_default_font_family() -> str:
         The default font family name.
     """
     try:
-        from ..render.theme import get_default_font_family
+        # Inline import: tests patch ``deux.render.theme.get_default_font_family``;
+        # importing it lazily keeps that patching point effective.
+        from ..render.theme import get_default_font_family  # noqa: PLC0415
 
         return get_default_font_family()
     except ImportError:
@@ -743,8 +751,6 @@ class SvgRenderer:
         panel_height : int
             Height of a single panel in pixels.
         """
-        from ..render.svg_rasterize import compose_svg_layers, slice_background_viewbox
-
         bg_slice = slice_background_viewbox(bg_root, card_index, panel_width, panel_height)
         card_layer = copy.deepcopy(self._original_root)
         card_layer.set("width", str(panel_width))
@@ -849,12 +855,6 @@ class SvgRenderer:
         bytes
             Encoded image bytes ready to send to the device.
         """
-        from ..render.svg_rasterize import (
-            _rasterize_svg,
-            inject_background_rect,
-            set_svg_dimensions,
-        )
-
         root = copy.deepcopy(self._base_root)
         self._reset_parent_map_cache()
 
@@ -1097,12 +1097,8 @@ class SvgRenderer:
             img_bytes = value
         else:
             # Accept PIL Image objects — encode to PNG bytes for embedding.
-            from PIL import Image as _PILImage
-
-            if isinstance(value, _PILImage.Image):
-                import io as _io
-
-                _buf = _io.BytesIO()
+            if isinstance(value, Image.Image):
+                _buf = io.BytesIO()
                 value.convert("RGBA").save(_buf, format="PNG")
                 img_bytes = _buf.getvalue()
             else:
@@ -1522,8 +1518,6 @@ class SvgRenderer:
         Image.Image
             An RGBA :class:`~PIL.Image.Image`.
         """
-        from ..render.svg_rasterize import _svg_to_image
-
         if self._target_width is not None and self._target_height is not None:
             width = self._target_width
             height = self._target_height

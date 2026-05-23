@@ -475,7 +475,9 @@ def _find_and_open_device() -> PreviewDeckDevice:
 
     Prints an error and exits if no device is found.
     """
-    from deux.runtime.hid.discovery import enumerate_devices
+    # Inline import: tests patch ``deux.runtime.hid.discovery.enumerate_devices``;
+    # importing it lazily keeps that patching point effective.
+    from deux.runtime.hid.discovery import enumerate_devices  # noqa: PLC0415
 
     devices = enumerate_devices()
     if not devices:

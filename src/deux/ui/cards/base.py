@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import contextlib
+import io
 import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from ...render.touch_renderer import compose_card_with_background
 from ...runtime.events import AsyncHandler, EventType, TouchEvent
 
 if TYPE_CHECKING:
@@ -302,16 +304,12 @@ class Card(ABC):
         bytes
             Encoded image bytes ready to send to the device.
         """
-        from ...render.touch_renderer import compose_card_with_background
-
         rendered = self.render()
         self.set_rendered(rendered)
 
         # Convert PIL Image to PNG bytes for compositing.
         card_bytes: bytes | None = None
         if rendered is not None:
-            import io
-
             buf = io.BytesIO()
             rendered.save(buf, format="PNG")
             card_bytes = buf.getvalue()

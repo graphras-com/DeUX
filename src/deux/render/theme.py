@@ -27,6 +27,8 @@ import colorsys
 import logging
 import random
 
+from .svg_rasterize import set_svg_stylesheet
+
 logger = logging.getLogger(__name__)
 
 # Default primary colour: rgb(39, 87, 179)
@@ -402,8 +404,6 @@ def set_active_theme(theme: Theme | None) -> None:
         default theme.
     """
     global _active_theme  # noqa: PLW0603
-    from .svg_rasterize import set_svg_stylesheet
-
     _active_theme = Theme.default() if theme is None else theme
     set_svg_stylesheet(_active_theme.css)
     logger.debug("Active theme set to %r", _active_theme)
