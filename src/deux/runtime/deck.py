@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from contextlib import suppress
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
 from typing import TYPE_CHECKING, Any
 
 from .._errors import DeuxError
@@ -116,6 +117,17 @@ class Deck:
         self._screens: dict[str, Screen] = {}
         self._active_screen: Screen | None = None
         self._theme: Theme | None = None
+
+        # Batched-render gate.  When ``_batch_render_depth > 0`` the deck
+        # is inside a full-screen operation (initial render, screen
+        # switch, theme change) and incoming ``refresh()`` calls are
+        # deferred so partial per-key writes cannot land on the LCD
+        # between the old frame and the new one.  ``_refresh_pending``
+        # records that at least one refresh was suppressed so a single
+        # drain refresh can fire when the gate reopens.  Both fields
+        # are reset by :meth:`stop` so reconnects start clean.
+        self._batch_render_depth: int = 0
+        self._refresh_pending: bool = False
 
         self.on_brightness_changed = AsyncEvent()
         self.on_screen_changed = AsyncEvent()
@@ -266,6 +278,8 @@ class Deck:
 
         self._device = None
         self._closed_event.set()
+        self._batch_render_depth = 0
+        self._refresh_pending = False
         logger.info("Deck stopped")
 
     async def _stop_all_spinners(self) -> None:
@@ -451,9 +465,10 @@ class Deck:
         if self._active_screen is None:
             return
 
-        self._renderer.apply_theme()
-        self._active_screen.mark_all_dirty()
-        await self._renderer.render_screen_complete()
+        async with self._batched_render():
+            self._renderer.apply_theme()
+            self._active_screen.mark_all_dirty()
+            await self._renderer.render_screen_complete()
 
     async def preload_icons(self) -> None:
         """Prefetch Iconify icons for all registered screens.
@@ -767,25 +782,27 @@ class Deck:
         if target is self._active_screen:
             return
 
-        self._active_screen = target
-        logger.info("Switching to screen: %s", name)
+        async with self._batched_render():
+            self._active_screen = target
+            logger.info("Switching to screen: %s", name)
 
-        # Apply the resolved theme cascade for this screen.
-        self._renderer.apply_theme()
+            # Apply the resolved theme cascade for this screen.
+            self._renderer.apply_theme()
 
-        self._wire_refresh_callbacks()
+            self._wire_refresh_callbacks()
 
-        # Emit *before* rendering so that bind() handlers listening to
-        # on_screen_changed can seed card values (e.g. the nav pager)
-        # prior to the first paint, avoiding a flash of defaults.
-        await self.on_screen_changed.emit(name, self._screens)
+            # Emit *before* rendering so that bind() handlers listening to
+            # on_screen_changed can seed card values (e.g. the nav pager)
+            # prior to the first paint, avoiding a flash of defaults.
+            await self.on_screen_changed.emit(name, self._screens)
 
-        # Force a full repaint: mark every control on the incoming screen
-        # dirty so the renderer does not skip cards/keys that were already
-        # rendered on a previous visit or shared with another screen.
-        target.mark_all_dirty()
+            # Force a full repaint: mark every control on the incoming
+            # screen dirty so the renderer does not skip cards/keys that
+            # were already rendered on a previous visit or shared with
+            # another screen.
+            target.mark_all_dirty()
 
-        await self._renderer.render_screen_complete()
+            await self._renderer.render_screen_complete()
 
     def _wire_refresh_callbacks(self) -> None:
         """Register ``self.refresh`` on every key and card of the active screen.
@@ -846,6 +863,35 @@ class Deck:
         """Render and push the info screen image (e.g. Neo)."""
         await self._renderer.render_info_screen()
 
+    @asynccontextmanager
+    async def _batched_render(self) -> AsyncIterator[None]:
+        """Suppress per-control ``refresh()`` calls inside a batched render.
+
+        Used to wrap operations that end in a full
+        :meth:`DeckRenderer.render_screen_complete` call (initial
+        screen load, screen switch, theme change).  While the gate
+        is closed, any handler that calls
+        :meth:`Card.request_refresh` / :meth:`KeySlot.request_refresh`
+        is folded into a single drain refresh fired after the
+        batched render finishes.
+
+        Re-entrant: nested batched operations are tracked by a depth
+        counter and only the outermost exit fires the drain refresh.
+
+        Yields
+        ------
+        None
+            Inside the context, :meth:`refresh` is gated.
+        """
+        self._batch_render_depth += 1
+        try:
+            yield
+        finally:
+            self._batch_render_depth -= 1
+            if self._batch_render_depth == 0 and self._refresh_pending:
+                self._refresh_pending = False
+                await self.refresh()
+
     async def refresh(self) -> None:
         """Re-render and push all dirty controls on the active screen.
 
@@ -853,7 +899,18 @@ class Deck:
         updates outside of ``set_screen()``.  Also drains any pending
         callbacks queued by programmatic ``set_value()`` calls on
         range controls.
+
+        While the deck is inside a batched render (initial screen
+        load, screen switch, or theme change), this call is recorded
+        as pending and a single drain refresh fires once the batched
+        operation completes.  This prevents partial per-key writes
+        from landing on the LCD between the old frame and the new
+        one.
         """
+        if self._batch_render_depth > 0:
+            self._refresh_pending = True
+            return
+
         screen = self._current_screen()
         if not screen:
             return
