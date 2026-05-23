@@ -235,8 +235,7 @@ deux.clear_dui_cache()
 key = deux.DuiKey("MyPackage")   # re-read from disk
 ```
 
-For finer control, call
-[`DuiRepository.invalidate(name)`][deux.DuiRepository.invalidate] on a
+For finer control, call `DuiRepository.invalidate(name)` on a
 custom repository instance to drop only one entry.
 
 ### Resolving without instantiating a control
