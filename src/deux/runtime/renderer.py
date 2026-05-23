@@ -14,14 +14,15 @@ from typing import TYPE_CHECKING, Any, cast
 
 from ..dui.animator import DeviceUnavailable
 from ..dui.key import DuiKey
+from ..render.context import RenderingContext
 from ..render.key_renderer import render_blank_key
 from ..render.profiler import RenderProfiler
+from ..render.svg_rasterize import set_svg_stylesheet
 from ..render.touch_renderer import composite_frame_on_tile
 from .hid._ctypes_hidapi import HidApiError
 
 if TYPE_CHECKING:
     from ..dui.animator import PushFn
-    from ..render.context import RenderingContext
     from ..render.metrics import RenderMetrics
     from ..ui.cards.base import Card
     from ..ui.controls.key_slot import KeySlot
@@ -395,8 +396,10 @@ class DeckRenderer:
         -------
         bool
             ``True`` if the card should be rendered this cycle (i.e. it
-            is dirty and not currently animating); ``False`` otherwise.
+             is dirty and not currently animating); ``False`` otherwise.
         """
+        # Inline import: dui.card transitively imports runtime.events, which
+        # triggers runtime package init while this module is still loading.
         from ..dui.card import DuiCard
 
         if isinstance(card, DuiCard):
@@ -604,6 +607,8 @@ class DeckRenderer:
         # 1. Prefetch icons
         icons = screen.collect_all_icons()
         if icons:
+            # Inline import: tests patch ``deux.dui.iconify.prefetch_icons``;
+            # importing it lazily keeps that patching point effective.
             from ..dui.iconify import prefetch_icons
 
             with prof.step("prefetch_icons"):
@@ -631,9 +636,6 @@ class DeckRenderer:
         stylesheet is also updated so that renderers without an explicit
         context pick up the correct CSS.
         """
-        from ..render.context import RenderingContext
-        from ..render.svg_rasterize import set_svg_stylesheet
-
         css = self._deck.resolve_stylesheet()
 
         # Update global stylesheet for renderers without an explicit context.
@@ -651,8 +653,9 @@ class DeckRenderer:
         ctx : RenderingContext
             The context to propagate.
         """
+        # Inline import: dui.card transitively imports runtime.events, which
+        # triggers runtime package init while this module is still loading.
         from ..dui.card import DuiCard
-        from ..dui.key import DuiKey
 
         screen = self._deck.active_screen
         if screen is None:
