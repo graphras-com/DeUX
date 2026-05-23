@@ -236,6 +236,71 @@ status_icon:
 
 Icons are fetched from the Iconify API and cached in-process.
 
+### list
+
+Render a dynamic list of items as repeated child elements of a parent SVG node (typically a `<text>` element).
+Each item is either a plain text label or an Iconify icon reference (prefix with `icon:`).
+The item at `default_index` receives `active_attrs`; all others receive `inactive_attrs`.
+
+```yaml
+nav:
+  type: list
+  node: pager                # ID of the parent SVG element
+  child_tag: tspan           # SVG element generated per item (default "tspan")
+  default_items:             # initial list of labels (default [])
+    - Main
+    - Settings
+    - "icon:mdi:home"        # prefix with "icon:" to render an Iconify icon
+  default_index: 0           # active item index; use null or -1 for "no active item"
+  active_attrs:              # attributes applied to the active item
+    fill: "#ffffff"
+    font-weight: bold
+  inactive_attrs:            # attributes applied to all inactive items
+    fill: "#888888"
+  separator: " · "           # inserted between items; empty string disables (default)
+  icon_size: 14              # pixel size for "icon:" items (default 16)
+```
+
+Runtime updates may provide a partial payload (`{"items": [...]}` or `{"index": N}`); the other half is preserved.
+An index of `-1` is normalised to `None` (no active item).
+Setting `items` without `index` clamps the existing index to the new bounds.
+
+### transform
+
+Apply one or more SVG transforms to a node proportional to a 0–1 value.
+The only currently supported `kind` is `rotate`, which interpolates linearly between two angles.
+Multiple transforms in the list are composed (space-separated) in order.
+
+```yaml
+gauge:
+  type: transform
+  node: needle
+  default: 0.0               # initial normalised value (0.0–1.0)
+  transforms:
+    - kind: rotate
+      from: -90              # angle in degrees when value is 0.0 (default 0)
+      to: 90                 # angle in degrees when value is 1.0 (default 360)
+      origin: center         # "center" (default) or an explicit "x y" pair
+```
+
+`origin: center` resolves to the element's bounding box center at render time.
+Providing an explicit `"x y"` string (e.g. `"60 60"`) sets a fixed origin in SVG user-space coordinates.
+The `transforms` list must be non-empty.
+
+### css_class
+
+Bind a CSS class string to an SVG element's `class` attribute.
+The binding replaces the entire `class` attribute on the target node; setting an empty string removes the attribute.
+
+```yaml
+style:
+  type: css_class
+  node: card
+  default: ""                # initial class value (default "")
+```
+
+This is useful when the layout SVG embeds a `<style>` block and you want to switch between named visual states (e.g. `default: "muted"` then update to `"active"` at runtime).
+
 ---
 
 ## Events
