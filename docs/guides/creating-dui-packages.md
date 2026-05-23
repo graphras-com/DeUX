@@ -2,6 +2,8 @@
 
 A `.dui` package is a self-contained directory that declaratively defines a Stream Deck UI — either a touchscreen card or a physical key — using an SVG layout, a YAML manifest, and optional image assets. No Python rendering code required.
 
+> Looking for the packages bundled with DeUX (`IconKey`, `PictureKey`, `DashboardCard`) or for how `DuiKey("name")` resolves to a package? See the [DUI Repository & Built-in Packages](dui-repository.md) guide.
+
 ## Package Structure
 
 ```
