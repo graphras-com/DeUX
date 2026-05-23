@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from contextlib import suppress
+import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
 from typing import TYPE_CHECKING, Any
 
 from .._errors import DeuxError
@@ -116,6 +118,26 @@ class Deck:
         self._screens: dict[str, Screen] = {}
         self._active_screen: Screen | None = None
         self._theme: Theme | None = None
+
+        # Batched-render gate.  When ``_batch_render_depth > 0`` the deck
+        # is inside a full-screen operation (initial render, screen
+        # switch, theme change) and incoming ``refresh()`` calls are
+        # deferred so partial per-key writes cannot land on the LCD
+        # between the old frame and the new one.  ``_refresh_pending``
+        # records that at least one refresh was suppressed so a single
+        # drain refresh can fire when the gate reopens.  Both fields
+        # are reset by :meth:`stop` so reconnects start clean.
+        self._batch_render_depth: int = 0
+        self._refresh_pending: bool = False
+
+        # Splash hold deadline.  When :meth:`show_full_screen_image` is
+        # called with ``min_display_ms > 0``, this records the
+        # ``perf_counter()`` timestamp before which the next batched
+        # render's *push* phase must not begin.  Render work runs in
+        # parallel with the splash; only the final device push is
+        # gated.  Cleared after the first deadline-await consumes it,
+        # so the hold applies exactly once per splash.
+        self._splash_push_deadline: float | None = None
 
         self.on_brightness_changed = AsyncEvent()
         self.on_screen_changed = AsyncEvent()
@@ -266,6 +288,9 @@ class Deck:
 
         self._device = None
         self._closed_event.set()
+        self._batch_render_depth = 0
+        self._refresh_pending = False
+        self._splash_push_deadline = None
         logger.info("Deck stopped")
 
     async def _stop_all_spinners(self) -> None:
@@ -451,9 +476,10 @@ class Deck:
         if self._active_screen is None:
             return
 
-        self._renderer.apply_theme()
-        self._active_screen.mark_all_dirty()
-        await self._renderer.render_screen_complete()
+        async with self._batched_render():
+            self._renderer.apply_theme()
+            self._active_screen.mark_all_dirty()
+            await self._renderer.render_screen_complete()
 
     async def preload_icons(self) -> None:
         """Prefetch Iconify icons for all registered screens.
@@ -531,6 +557,7 @@ class Deck:
         fit: SplashFitMode = "cover",
         background: tuple[int, int, int] = (0, 0, 0),
         jpeg_quality: int = 90,
+        min_display_ms: int = 0,
     ) -> None:
         """Upload an image covering the entire LCD (HID command ``0x08``).
 
@@ -567,6 +594,18 @@ class Deck:
             ``fit="contain"``.
         jpeg_quality : int, default=90
             JPEG encoding quality (1-95).
+        min_display_ms : int, default=0
+            Minimum time, in milliseconds, that this image must remain
+            visible on the LCD before the *push phase* of the next
+            batched render (``set_screen`` / ``set_theme``) may begin.
+            The render's CPU work still runs in parallel with the
+            splash; only the final device push is delayed.  Effective
+            total splash time is therefore
+            ``max(min_display_ms, render_time)`` -- a fast render waits
+            for the remainder of the requested display time, while a
+            slow render is never artificially delayed.  Default of
+            ``0`` disables the hold entirely.  The deadline is one-shot
+            and is consumed by the first batched push that follows.
 
         Raises
         ------
@@ -578,11 +617,11 @@ class Deck:
 
         Examples
         --------
-        ::
+        Hold a splash for at least 500 ms so the user can perceive it
+        even when the first ``set_screen`` is very fast::
 
-            await deck.show_full_screen_image("assets/boot.png")
-            await asyncio.sleep(2)
-            await deck.set_screen("home")  # clobbers the splash
+            await deck.show_splash("boot.png", min_display_ms=500)
+            await deck.set_screen("home")  # push delayed until 500ms elapsed
         """
         if self._device is None:
             raise DeckError("Device not opened")
@@ -617,6 +656,13 @@ class Deck:
                 self._device.set_full_screen_image, jpeg_bytes
             )
 
+        if min_display_ms > 0:
+            self._splash_push_deadline = (
+                time.perf_counter() + min_display_ms / 1000.0
+            )
+        else:
+            self._splash_push_deadline = None
+
     async def show_splash(
         self,
         image: Image.Image | str | Path | bytes,
@@ -624,6 +670,7 @@ class Deck:
         fit: SplashFitMode = "cover",
         background: tuple[int, int, int] = (0, 0, 0),
         jpeg_quality: int = 90,
+        min_display_ms: int = 0,
     ) -> None:
         """Alias for :meth:`show_full_screen_image`, intended for startup.
 
@@ -641,6 +688,8 @@ class Deck:
             See :meth:`show_full_screen_image`.
         jpeg_quality : int, default=90
             See :meth:`show_full_screen_image`.
+        min_display_ms : int, default=0
+            See :meth:`show_full_screen_image`.
 
         See Also
         --------
@@ -652,6 +701,7 @@ class Deck:
             fit=fit,
             background=background,
             jpeg_quality=jpeg_quality,
+            min_display_ms=min_display_ms,
         )
 
     async def clear_full_screen_image(
@@ -767,25 +817,27 @@ class Deck:
         if target is self._active_screen:
             return
 
-        self._active_screen = target
-        logger.info("Switching to screen: %s", name)
+        async with self._batched_render():
+            self._active_screen = target
+            logger.info("Switching to screen: %s", name)
 
-        # Apply the resolved theme cascade for this screen.
-        self._renderer.apply_theme()
+            # Apply the resolved theme cascade for this screen.
+            self._renderer.apply_theme()
 
-        self._wire_refresh_callbacks()
+            self._wire_refresh_callbacks()
 
-        # Emit *before* rendering so that bind() handlers listening to
-        # on_screen_changed can seed card values (e.g. the nav pager)
-        # prior to the first paint, avoiding a flash of defaults.
-        await self.on_screen_changed.emit(name, self._screens)
+            # Emit *before* rendering so that bind() handlers listening to
+            # on_screen_changed can seed card values (e.g. the nav pager)
+            # prior to the first paint, avoiding a flash of defaults.
+            await self.on_screen_changed.emit(name, self._screens)
 
-        # Force a full repaint: mark every control on the incoming screen
-        # dirty so the renderer does not skip cards/keys that were already
-        # rendered on a previous visit or shared with another screen.
-        target.mark_all_dirty()
+            # Force a full repaint: mark every control on the incoming
+            # screen dirty so the renderer does not skip cards/keys that
+            # were already rendered on a previous visit or shared with
+            # another screen.
+            target.mark_all_dirty()
 
-        await self._renderer.render_screen_complete()
+            await self._renderer.render_screen_complete()
 
     def _wire_refresh_callbacks(self) -> None:
         """Register ``self.refresh`` on every key and card of the active screen.
@@ -846,6 +898,58 @@ class Deck:
         """Render and push the info screen image (e.g. Neo)."""
         await self._renderer.render_info_screen()
 
+    async def _consume_splash_push_deadline(self) -> None:
+        """Block until any pending splash-hold deadline has elapsed.
+
+        Called by :class:`DeckRenderer` at the start of each push phase
+        of a batched render.  If :meth:`show_full_screen_image` was
+        called with ``min_display_ms > 0`` since the last batched push,
+        this awaits the remaining time before allowing the push to
+        proceed.  Render-phase CPU work runs in parallel with this
+        wait, so the effective splash display time is
+        ``max(min_display_ms, render_time)``.
+
+        The deadline is consumed (cleared) on the first call so that
+        subsequent pushes within the same batched render -- and any
+        following batched renders -- are not delayed.
+        """
+        deadline = self._splash_push_deadline
+        if deadline is None:
+            return
+        self._splash_push_deadline = None
+        remaining = deadline - time.perf_counter()
+        if remaining > 0:
+            await asyncio.sleep(remaining)
+
+    @asynccontextmanager
+    async def _batched_render(self) -> AsyncIterator[None]:
+        """Suppress per-control ``refresh()`` calls inside a batched render.
+
+        Used to wrap operations that end in a full
+        :meth:`DeckRenderer.render_screen_complete` call (initial
+        screen load, screen switch, theme change).  While the gate
+        is closed, any handler that calls
+        :meth:`Card.request_refresh` / :meth:`KeySlot.request_refresh`
+        is folded into a single drain refresh fired after the
+        batched render finishes.
+
+        Re-entrant: nested batched operations are tracked by a depth
+        counter and only the outermost exit fires the drain refresh.
+
+        Yields
+        ------
+        None
+            Inside the context, :meth:`refresh` is gated.
+        """
+        self._batch_render_depth += 1
+        try:
+            yield
+        finally:
+            self._batch_render_depth -= 1
+            if self._batch_render_depth == 0 and self._refresh_pending:
+                self._refresh_pending = False
+                await self.refresh()
+
     async def refresh(self) -> None:
         """Re-render and push all dirty controls on the active screen.
 
@@ -853,7 +957,18 @@ class Deck:
         updates outside of ``set_screen()``.  Also drains any pending
         callbacks queued by programmatic ``set_value()`` calls on
         range controls.
+
+        While the deck is inside a batched render (initial screen
+        load, screen switch, or theme change), this call is recorded
+        as pending and a single drain refresh fires once the batched
+        operation completes.  This prevents partial per-key writes
+        from landing on the LCD between the old frame and the new
+        one.
         """
+        if self._batch_render_depth > 0:
+            self._refresh_pending = True
+            return
+
         screen = self._current_screen()
         if not screen:
             return

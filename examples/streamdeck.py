@@ -1101,8 +1101,20 @@ class StreamDeckApp:
             "yes" if caps.has_touchscreen else "no",
         )
 
-        await deck.show_splash(EXAMPLES_DIR.joinpath("assets/background.png"))
-        await asyncio.sleep(2)
+        # Push a splash image to the LCD.  The deck's batched-render
+        # gate holds this splash on screen while we configure
+        # controllers and build screens below; the first ``set_screen``
+        # call replaces it atomically with the finished UI -- no
+        # flicker, no artificial delay.
+        #
+        # ``min_display_ms=500`` ensures the splash remains visible for
+        # at least half a second even when the first ``set_screen`` is
+        # extremely fast.  Rendering still runs in parallel with the
+        # splash; only the final device push is delayed.
+        await deck.show_splash(
+            EXAMPLES_DIR.joinpath("assets/display_bg.png"),
+            min_display_ms=1000,
+        )
 
         # Demonstrate Deck.on_screen_changed: log every screen switch.
         @deck.on_screen_changed
