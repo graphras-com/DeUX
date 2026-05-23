@@ -70,6 +70,35 @@ class TestDuiCardIsCard:
         assert card.spec is card_package_spec
 
 
+class TestDuiCardPublicPassThroughs:
+    """Public pass-throughs that avoid reaching into ``_renderer``."""
+
+    def test_collect_icon_names_delegates(self, card_package_spec):
+        card = DuiCard(card_package_spec)
+        assert card.collect_icon_names() == card._renderer.collect_icon_names()
+
+    def test_set_rendering_context_delegates(self, card_package_spec):
+        from deux.render.context import RenderingContext
+
+        card = DuiCard(card_package_spec)
+        ctx = RenderingContext(stylesheet="x { }")
+        card.set_rendering_context(ctx)
+        assert card._renderer.rendering_context is ctx
+        card.set_rendering_context(None)
+        assert card._renderer.rendering_context is None
+
+    def test_has_pending_callbacks_property(self, card_package_spec):
+        async def handler():
+            return None
+
+        card = DuiCard(card_package_spec)
+        assert card.has_pending_callbacks is False
+        card.queue_pending_callback(handler, ())
+        assert card.has_pending_callbacks is True
+        card.drain_pending_callbacks()
+        assert card.has_pending_callbacks is False
+
+
 class TestDuiCardDataBinding:
     def test_set_marks_dirty(self):
         spec = _make_card_spec(

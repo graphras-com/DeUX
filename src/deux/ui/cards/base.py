@@ -223,6 +223,19 @@ class Card(ABC):
         return callbacks
 
     @property
+    def has_pending_callbacks(self) -> bool:
+        """Whether the card has callbacks queued for the next drain.
+
+        Returns
+        -------
+        bool
+            ``True`` if at least one callback has been queued via
+            :meth:`queue_pending_callback` and has not yet been drained
+            by :meth:`drain_pending_callbacks`.
+        """
+        return bool(self._pending_callbacks)
+
+    @property
     def is_dirty(self) -> bool:
         """Whether the card needs re-rendering."""
         return self._dirty
