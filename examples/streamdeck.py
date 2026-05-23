@@ -1101,6 +1101,9 @@ class StreamDeckApp:
             "yes" if caps.has_touchscreen else "no",
         )
 
+        await deck.show_splash(EXAMPLES_DIR.joinpath("assets/background.png"))
+        await asyncio.sleep(2)
+
         # Demonstrate Deck.on_screen_changed: log every screen switch.
         @deck.on_screen_changed
         async def _log_screen(name: str, screens: dict) -> None:
