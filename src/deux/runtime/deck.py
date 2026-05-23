@@ -165,6 +165,8 @@ class Deck:
 
         self._running = False
 
+        await self._stop_all_spinners()
+
         self._detach_all_cards()
 
         if self._transport:
@@ -191,6 +193,37 @@ class Deck:
         self._device = None
         self._closed_event.set()
         logger.info("Deck stopped")
+
+    async def _stop_all_spinners(self) -> None:
+        """Stop spinner animations on every DuiKey and DuiCard.
+
+        Called from :meth:`stop` before the device is closed so that
+        no in-flight spinner frames are pushed to a half-torn-down
+        device.  Failures to stop an individual spinner are logged
+        and swallowed — shutdown must never raise.
+        """
+        from ..dui.card import DuiCard
+        from ..dui.key import DuiKey
+
+        for screen in self._screens.values():
+            for key_slot in screen.keys.values():
+                if isinstance(key_slot, DuiKey) and key_slot.is_animating:
+                    try:
+                        await key_slot.finish_busy()
+                    except Exception:
+                        logger.exception(
+                            "Error stopping spinner on key %r", key_slot
+                        )
+            if screen.touch_strip is None:
+                continue
+            for card in screen.touch_strip.cards:
+                if isinstance(card, DuiCard) and card.is_animating:
+                    try:
+                        await card.finish_busy()
+                    except Exception:
+                        logger.exception(
+                            "Error stopping spinner on card %r", card
+                        )
 
     def _detach_all_cards(self) -> None:
         """Unsubscribe deck-owned AsyncEvent handlers on every DuiCard across all screens.
