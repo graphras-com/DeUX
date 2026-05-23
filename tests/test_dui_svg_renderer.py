@@ -591,6 +591,8 @@ class TestSvgRendererRange:
             bindings={"bar": RangeBinding(node="bar", default=0.0)},
         )
         renderer = SvgRenderer(spec)
+        # Extents are populated lazily on first apply.
+        renderer.render()
         assert renderer._range_extents["bar"] == 80.0
 
     def test_range_extent_cached_vertical(self):
@@ -603,6 +605,8 @@ class TestSvgRendererRange:
             },
         )
         renderer = SvgRenderer(spec)
+        # Extents are populated lazily on first apply.
+        renderer.render()
         assert renderer._range_extents["vbar"] == 80.0
 
     def test_range_renders_differently(self):
