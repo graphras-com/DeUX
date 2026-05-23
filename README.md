@@ -21,7 +21,7 @@ A high-level, asyncio-native Python library for Elgato Stream Deck devices. Defi
 - TouchStrip and InfoScreen support
 - `.dui` package format: declarative touchscreen card UIs using SVG layouts + YAML manifests with data bindings
 - Iconify icon integration
-- Supports Stream Deck+, Mini, Neo, and XL
+- Supports Stream Deck (Classic 15-key), Stream Deck XL, Stream Deck Neo, Stream Deck+, and Stream Deck+ XL
 
 ## System requirements
 
