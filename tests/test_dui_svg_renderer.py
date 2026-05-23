@@ -1984,6 +1984,32 @@ class TestIconifyBindingRendering:
         assert list(g) == []
         assert any("failed to parse" in rec.message for rec in caplog.records)
 
+    def test_unexpected_parser_error_propagates(self, monkeypatch):
+        """Non-parse errors (e.g. programming bugs) must NOT be swallowed."""
+        import deux.dui.svg_renderer as svg_renderer_mod
+
+        monkeypatch.setattr(
+            svg_renderer_mod, "fetch_icon", lambda name: "<svg/>", raising=True
+        )
+
+        spec = _make_spec(
+            _ICONIFY_SVG,
+            bindings={
+                "icon": IconifyBinding(node="icon", size=55, default="line-md:home"),
+            },
+        )
+        renderer = SvgRenderer(spec)
+
+        def boom(_data):
+            raise AttributeError("unexpected bug")
+
+        monkeypatch.setattr(
+            svg_renderer_mod, "safe_fromstring", boom, raising=True
+        )
+
+        with pytest.raises(AttributeError, match="unexpected bug"):
+            self._serialise_with_bindings(renderer)
+
     def test_full_render_produces_image(self, monkeypatch):
         """End-to-end render goes through CairoSVG without exceptions."""
         self._patch_fetch(monkeypatch)
