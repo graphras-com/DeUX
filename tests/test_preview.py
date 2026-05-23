@@ -20,6 +20,8 @@ if TYPE_CHECKING:
 from deux.tools.preview import (
     _MAX_CARD_SLOTS,
     _MAX_KEY_SLOTS,
+    _center_on_canvas,
+    _compute_fit_dims,
     _svg_to_png_fit,
     _watch_and_reload,
     build_parser,
@@ -573,6 +575,79 @@ class TestSvgToPngFit:
         png_bytes = _svg_to_png_fit(svg, 80, 80)
         img = Image.open(io.BytesIO(png_bytes))
         assert img.height <= 80
+
+
+class TestComputeFitDims:
+    """Tests for the shared ``_compute_fit_dims`` helper."""
+
+    def test_preserves_aspect_ratio_wide(self):
+        svg = (
+            b'<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100">'
+            b"</svg>"
+        )
+        assert _compute_fit_dims(svg, 80, 80) == (80, 40)
+
+    def test_preserves_aspect_ratio_tall(self):
+        svg = (
+            b'<svg xmlns="http://www.w3.org/2000/svg" width="50" height="200">'
+            b"</svg>"
+        )
+        assert _compute_fit_dims(svg, 80, 80) == (20, 80)
+
+    def test_strips_unit_suffix(self):
+        svg = (
+            b'<svg xmlns="http://www.w3.org/2000/svg" width="100px" height="50px">'
+            b"</svg>"
+        )
+        assert _compute_fit_dims(svg, 200, 200) == (200, 100)
+
+    def test_missing_dims_falls_back(self):
+        svg = b'<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+        assert _compute_fit_dims(svg, 64, 32) == (64, 32)
+
+    def test_zero_dim_falls_back(self):
+        svg = (
+            b'<svg xmlns="http://www.w3.org/2000/svg" width="0" height="100">'
+            b"</svg>"
+        )
+        assert _compute_fit_dims(svg, 64, 32) == (64, 32)
+
+    def test_malformed_svg_falls_back(self):
+        assert _compute_fit_dims(b"not valid svg", 10, 20) == (10, 20)
+
+    def test_dims_never_below_one(self):
+        svg = (
+            b'<svg xmlns="http://www.w3.org/2000/svg" width="10000" height="1">'
+            b"</svg>"
+        )
+        out_w, out_h = _compute_fit_dims(svg, 100, 100)
+        assert out_w >= 1 and out_h >= 1
+
+
+class TestCenterOnCanvas:
+    """Tests for the shared ``_center_on_canvas`` helper."""
+
+    def test_returns_rgb_canvas_at_size(self):
+        svg_img = Image.new("RGBA", (20, 20), (255, 0, 0, 255))
+        canvas = _center_on_canvas(svg_img, (100, 100), "black")
+        assert canvas.mode == "RGB"
+        assert canvas.size == (100, 100)
+
+    def test_centres_smaller_image(self):
+        svg_img = Image.new("RGBA", (20, 20), (255, 0, 0, 255))
+        canvas = _center_on_canvas(svg_img, (100, 100), "black")
+        assert canvas.getpixel((50, 50)) == (255, 0, 0)
+        assert canvas.getpixel((0, 0)) == (0, 0, 0)
+
+    def test_rgb_image_no_alpha(self):
+        svg_img = Image.new("RGB", (40, 40), (0, 255, 0))
+        canvas = _center_on_canvas(svg_img, (60, 60), "black")
+        assert canvas.getpixel((30, 30)) == (0, 255, 0)
+
+    def test_custom_background(self):
+        svg_img = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
+        canvas = _center_on_canvas(svg_img, (40, 40), "#0000ff")
+        assert canvas.getpixel((0, 0)) == (0, 0, 255)
 
 
 class TestFindAndOpenDevice:
