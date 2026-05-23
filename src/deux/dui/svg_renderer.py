@@ -186,7 +186,7 @@ def _get_default_font_family() -> str:
     try:
         # Inline import: tests patch ``deux.render.theme.get_default_font_family``;
         # importing it lazily keeps that patching point effective.
-        from ..render.theme import get_default_font_family
+        from ..render.theme import get_default_font_family  # noqa: PLC0415
 
         return get_default_font_family()
     except ImportError:

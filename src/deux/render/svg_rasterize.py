@@ -24,12 +24,13 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from PIL import Image
+
 from .._errors import DeuxError
 from .._xml import safe_fromstring
 from .context import RenderingContext
 
 if TYPE_CHECKING:
-    from PIL import Image
     from resvg import usvg as _usvg_mod
 
 logger = logging.getLogger(__name__)
@@ -256,7 +257,10 @@ def _get_usvg_opts() -> _usvg_mod.Options:
     """
     opts = getattr(_thread_local, "usvg_opts", None)
     if opts is None:
-        from resvg import usvg
+        # Lazy import: resvg is an optional native dep; importing it lazily
+        # lets the module load even when resvg is missing so callers can
+        # catch the ImportError as a RasterizeError at call time.
+        from resvg import usvg  # noqa: PLC0415
 
         opts = usvg.Options.default()
         opts.load_system_fonts()
@@ -309,7 +313,8 @@ def _prepare_svg_tree(svg_data: bytes, width: int, height: int) -> _usvg_mod.Tre
     ET.register_namespace("xlink", _XLINK_NS)
     svg_text = ET.tostring(root, encoding="unicode", xml_declaration=False)
 
-    from resvg import usvg
+    # Lazy import: resvg is an optional native dep — see _get_usvg_opts.
+    from resvg import usvg  # noqa: PLC0415
 
     return usvg.Tree.from_str(svg_text, _get_usvg_opts())
 
@@ -343,7 +348,9 @@ def _resvg_rasterize(svg_data: bytes, width: int, height: int) -> bytes:
         If ``resvg`` is not installed or SVG parsing/rendering fails.
     """
     try:
-        from resvg import render as _resvg_render
+        # Lazy import: resvg is an optional native dep; the ImportError is
+        # caught below and re-raised as RasterizeError.
+        from resvg import render as _resvg_render  # noqa: PLC0415
 
         tree = _prepare_svg_tree(svg_data, width, height)
         png_bytes: bytes = _resvg_render(tree, (1.0, 0.0, 0.0, 0.0, 1.0, 0.0))
@@ -384,7 +391,9 @@ def _resvg_rasterize_rgba(
         If ``resvg`` is not installed or SVG parsing/rendering fails.
     """
     try:
-        from resvg import render_rgba as _resvg_render_rgba
+        # Lazy import: resvg is an optional native dep; the ImportError is
+        # caught below and re-raised as RasterizeError.
+        from resvg import render_rgba as _resvg_render_rgba  # noqa: PLC0415
 
         tree = _prepare_svg_tree(svg_data, width, height)
         rgba_bytes, w, h = _resvg_render_rgba(tree, (1.0, 0.0, 0.0, 0.0, 1.0, 0.0))
@@ -629,8 +638,6 @@ def _svg_to_image(
     RasterizeError
         If resvg is not available or rasterisation fails.
     """
-    from PIL import Image
-
     css = ctx.resolve_stylesheet() if ctx is not None else _stylesheet.css
 
     t0 = time.perf_counter()

@@ -400,7 +400,7 @@ class DeckRenderer:
         """
         # Inline import: dui.card transitively imports runtime.events, which
         # triggers runtime package init while this module is still loading.
-        from ..dui.card import DuiCard
+        from ..dui.card import DuiCard  # noqa: PLC0415
 
         if isinstance(card, DuiCard):
             card.set_bg_tile(bg_tile)
@@ -609,7 +609,7 @@ class DeckRenderer:
         if icons:
             # Inline import: tests patch ``deux.dui.iconify.prefetch_icons``;
             # importing it lazily keeps that patching point effective.
-            from ..dui.iconify import prefetch_icons
+            from ..dui.iconify import prefetch_icons  # noqa: PLC0415
 
             with prof.step("prefetch_icons"):
                 await prefetch_icons(icons)
@@ -655,7 +655,7 @@ class DeckRenderer:
         """
         # Inline import: dui.card transitively imports runtime.events, which
         # triggers runtime package init while this module is still loading.
-        from ..dui.card import DuiCard
+        from ..dui.card import DuiCard  # noqa: PLC0415
 
         screen = self._deck.active_screen
         if screen is None:

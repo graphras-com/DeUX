@@ -72,7 +72,7 @@ class DuiCard(BindingMixin, Card):
         if isinstance(spec, str):
             # Inline import: keeps the lookup go through repository.resolve_dui
             # at call time so monkeypatching that symbol in tests works.
-            from .repository import resolve_dui
+            from .repository import resolve_dui  # noqa: PLC0415
 
             spec = resolve_dui(spec)
         super().__init__()

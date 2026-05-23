@@ -10,6 +10,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
+from PIL import Image
+
 from ..dui.key import DuiKey
 from ..render.background_layer import BackgroundLayer
 from ..render.defaults import get_default_backgrounds
@@ -415,7 +417,7 @@ class Screen:
         """
         # Inline import: dui.card imports ui.cards.base, which would create
         # a cycle if hoisted to module top.
-        from ..dui.card import DuiCard
+        from ..dui.card import DuiCard  # noqa: PLC0415
 
         icons: set[str] = set()
         for key_slot in self._keys.values():
@@ -457,8 +459,6 @@ class Screen:
             # [PosixPath('/tmp/deck_screenshot/key_0.png'),
             #  PosixPath('/tmp/deck_screenshot/card_1.png')]
         """
-        from PIL import Image
-
         out_dir = Path(directory)
         out_dir.mkdir(parents=True, exist_ok=True)
         written: list[Path] = []

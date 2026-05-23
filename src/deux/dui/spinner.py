@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 from PIL import Image
 
 from .._xml import safe_fromstring
+from .schema import SpinnerType
 from .svg_renderer import _find_element_by_id
 
 if TYPE_CHECKING:
@@ -86,8 +87,6 @@ class SpinnerFrames:
 
     def _generate(self) -> list[bytes]:
         """Generate all animation frames."""
-        from .schema import SpinnerType
-
         if self._spinner.type == SpinnerType.ROTATION:
             return self._generate_rotation()
         if self._spinner.type == SpinnerType.PULSE:
@@ -301,7 +300,9 @@ class SpinnerFrames:
         bytes
             Encoded image bytes.
         """
-        from ..render.key_renderer import _encode_image_bytes
+        # Inline import: tests patch ``deux.render.key_renderer._encode_image_bytes``;
+        # importing it lazily keeps that patching point effective.
+        from ..render.key_renderer import _encode_image_bytes  # noqa: PLC0415
 
         return _encode_image_bytes(img, self._image_format)
 
@@ -348,7 +349,9 @@ class SpinnerFrames:
         bytes
             Image data encoded in the instance's configured format.
         """
-        from ..render.svg_rasterize import _svg_to_image
+        # Inline import: tests patch ``deux.render.svg_rasterize._svg_to_image``;
+        # importing it lazily keeps that patching point effective.
+        from ..render.svg_rasterize import _svg_to_image  # noqa: PLC0415
 
         svg_bytes = ET.tostring(root, encoding="unicode", xml_declaration=True)
         frame = _svg_to_image(

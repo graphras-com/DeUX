@@ -257,7 +257,7 @@ class Deck:
         """
         # Inline import: dui.card transitively imports runtime.events, which
         # triggers runtime package init while this module is still loading.
-        from ..dui.card import DuiCard
+        from ..dui.card import DuiCard  # noqa: PLC0415
 
         for screen in self._screens.values():
             for key_slot in screen.keys.values():
@@ -290,7 +290,7 @@ class Deck:
         """
         # Inline import: dui.card transitively imports runtime.events, which
         # triggers runtime package init while this module is still loading.
-        from ..dui.card import DuiCard
+        from ..dui.card import DuiCard  # noqa: PLC0415
 
         deck_events = (self.on_brightness_changed, self.on_screen_changed)
         for screen in self._screens.values():
@@ -444,7 +444,7 @@ class Deck:
         """
         # Inline import: tests patch ``deux.dui.iconify.prefetch_icons``;
         # importing it lazily keeps that patching point effective.
-        from ..dui.iconify import prefetch_icons
+        from ..dui.iconify import prefetch_icons  # noqa: PLC0415
 
         all_icons: set[str] = set()
         for screen in self._screens.values():
@@ -522,7 +522,7 @@ class Deck:
         """
         # Inline import: ui.screen transitively imports runtime.events via
         # ui.touch_strip -> ui.cards.base, creating a cycle at module load.
-        from ..ui.screen import Screen
+        from ..ui.screen import Screen  # noqa: PLC0415
 
         if self._caps is None:
             raise DeckError("Device not opened")

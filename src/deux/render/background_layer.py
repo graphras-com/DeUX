@@ -15,6 +15,7 @@ import xml.etree.ElementTree as ET
 from typing import Literal
 
 from .._xml import safe_fromstring
+from .svg_rasterize import _rasterize_svg, _svg_to_image
 
 logger = logging.getLogger(__name__)
 _perf_logger = logging.getLogger("deux.render.profiler")
@@ -226,8 +227,6 @@ class BackgroundLayer:
 
     def _rasterize_touchstrip(self) -> None:
         """Rasterize and slice a touchstrip background SVG using Pillow."""
-        from .svg_rasterize import _svg_to_image
-
         assert self._svg is not None  # noqa: S101 — invariant
 
         t0 = time.perf_counter()
@@ -261,8 +260,6 @@ class BackgroundLayer:
 
     def _rasterize_key(self) -> None:
         """Rasterize a key background SVG to encoded device bytes."""
-        from .svg_rasterize import _rasterize_svg
-
         assert self._svg is not None  # noqa: S101 — invariant
 
         t0 = time.perf_counter()

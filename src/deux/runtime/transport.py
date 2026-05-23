@@ -11,6 +11,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
+from ._executor import get_executor
 from .events import (
     DeckEvent,
     EncoderPressEvent,
@@ -19,6 +20,7 @@ from .events import (
     KeyEvent,
     TouchEvent,
 )
+from .hid._ctypes_hidapi import HidApiError
 from .hid.protocol import (
     EncoderButtonEvent,
     EncoderRotateEvent,
@@ -90,9 +92,6 @@ class AsyncTransport:
 
     async def _poll_loop(self) -> None:
         """Background task: poll HID input and enqueue events."""
-        from ._executor import get_executor
-        from .hid._ctypes_hidapi import HidApiError
-
         loop = asyncio.get_running_loop()
         executor = get_executor()
 
