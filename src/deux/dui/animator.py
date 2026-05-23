@@ -14,6 +14,17 @@ PushFn = Callable[[bytes], Coroutine[Any, Any, None]]
 """Async callable that pushes a single image frame to the device."""
 
 
+class DeviceUnavailable(Exception):
+    """Raised by a ``PushFn`` when the target device is gone.
+
+    The :class:`SpinnerAnimator` treats this as a terminal signal:
+    it stops the loop silently instead of logging an error per frame.
+    A ``push_fn`` should raise this when it detects that the
+    underlying device handle is missing or has been closed (for
+    example, after a hot-unplug while the spinner is still running).
+    """
+
+
 class SpinnerAnimator:
     """Drive frame-by-frame spinner animation on an asyncio event loop.
 
@@ -75,7 +86,15 @@ class SpinnerAnimator:
             self._task = None
 
     async def _loop(self) -> None:
-        """Cycle through frames at the configured interval."""
+        """Cycle through frames at the configured interval.
+
+        The loop terminates silently if a frame push raises
+        :class:`DeviceUnavailable`, since further pushes cannot
+        succeed until the device reconnects and the spinner is
+        restarted by application code.  Other exceptions are
+        logged per frame so a transient hiccup does not kill
+        the animation.
+        """
         idx = 0
         n = len(self._frames)
         try:
@@ -83,6 +102,12 @@ class SpinnerAnimator:
                 frame = self._frames[idx % n]
                 try:
                     await self._push_fn(frame)
+                except DeviceUnavailable as exc:
+                    logger.debug(
+                        "Spinner stopping: device unavailable (%s)", exc
+                    )
+                    self._running = False
+                    break
                 except Exception:
                     logger.exception("Error pushing spinner frame")
                 idx += 1

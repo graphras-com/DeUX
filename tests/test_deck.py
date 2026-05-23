@@ -765,6 +765,54 @@ class TestDeckRendererTouchHelpers:
         card.clear_background_layer.assert_not_called()
         assert should_render is True
 
+    async def test_card_push_fn_raises_device_unavailable_when_closed(
+        self, deck
+    ):
+        """The card push_fn surfaces device-closed as DeviceUnavailable."""
+        from deux.dui.animator import DeviceUnavailable
+        from deux.dui.card import DuiCard
+
+        card = MagicMock(spec=DuiCard)
+        card.is_animating = False
+        card.is_dirty = True
+        await deck._renderer._setup_card(
+            0, card, None, None, PANEL_WIDTH, PANEL_HEIGHT
+        )
+
+        # Extract the push_fn that was wired onto the card.
+        push_fn, _kwargs = card.set_push_fn.call_args
+        push_callable = push_fn[0]
+
+        # Device is None — the closure must refuse to dereference it.
+        assert deck._device is None
+        with pytest.raises(DeviceUnavailable):
+            await push_callable(b"frame")
+
+    async def test_card_push_fn_translates_hid_error(
+        self, deck, mock_streamdeck_device
+    ):
+        """HidApiError from device I/O is translated to DeviceUnavailable."""
+        from deux.dui.animator import DeviceUnavailable
+        from deux.dui.card import DuiCard
+        from deux.runtime.hid._ctypes_hidapi import HidApiError
+
+        deck._device = mock_streamdeck_device
+        mock_streamdeck_device.set_partial_window_image.side_effect = (
+            HidApiError("hid_write failed: not ready")
+        )
+
+        card = MagicMock(spec=DuiCard)
+        card.is_animating = False
+        card.is_dirty = True
+        await deck._renderer._setup_card(
+            0, card, None, None, PANEL_WIDTH, PANEL_HEIGHT
+        )
+        push_fn, _kwargs = card.set_push_fn.call_args
+        push_callable = push_fn[0]
+
+        with pytest.raises(DeviceUnavailable):
+            await push_callable(b"frame")
+
 
 class TestDeckInfo:
     def test_no_device_raises(self, deck):
@@ -886,6 +934,34 @@ class TestDeckStop:
             mock_enum.return_value = [mock_streamdeck_device]
             await d.start()
             await d.stop()
+
+    async def test_stop_stops_active_spinners(self, deck):
+        """stop() halts active spinner animations on keys and cards."""
+        from deux.dui.card import DuiCard
+        from deux.dui.key import DuiKey
+
+        screen = deck.screen("main")
+
+        # Fabricate animating key + card with mocked animators so we
+        # don't need spinner specs / push wiring.
+        key = MagicMock(spec=DuiKey)
+        key.is_animating = True
+        key.finish_busy = AsyncMock()
+        screen._keys[0] = key
+
+        assert screen._touch_strip is not None
+        card = MagicMock(spec=DuiCard)
+        card.is_animating = True
+        card.finish_busy = AsyncMock()
+        screen._touch_strip._cards[0] = card
+
+        deck._running = True  # so stop() proceeds
+
+        # Stop without an underlying device.
+        await deck.stop()
+
+        key.finish_busy.assert_awaited_once()
+        card.finish_busy.assert_awaited_once()
 
 
 class TestDeckWaitClosed:

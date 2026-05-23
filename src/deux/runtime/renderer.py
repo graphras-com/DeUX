@@ -12,10 +12,12 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any, cast
 
+from ..dui.animator import DeviceUnavailable
 from ..dui.key import DuiKey
 from ..render.key_renderer import render_blank_key
 from ..render.profiler import RenderProfiler
 from ..render.touch_renderer import composite_frame_on_tile
+from .hid._ctypes_hidapi import HidApiError
 
 if TYPE_CHECKING:
     from ..dui.animator import PushFn
@@ -145,11 +147,23 @@ class DeckRenderer:
                 async def _push_key_frame(
                     frame_bytes: bytes, idx: int = key_index
                 ) -> None:
-                    async with deck._device_lock:
-                        await deck._exec_device_io(
-                            deck._device.set_key_image,  # type: ignore[union-attr]
-                            idx, frame_bytes
+                    device = deck._device
+                    if device is None:
+                        raise DeviceUnavailable(
+                            f"deck {deck!r} device is None"
                         )
+                    async with deck._device_lock:
+                        device = deck._device
+                        if device is None:
+                            raise DeviceUnavailable(
+                                f"deck {deck!r} device closed"
+                            )
+                        try:
+                            await deck._exec_device_io(
+                                device.set_key_image, idx, frame_bytes
+                            )
+                        except HidApiError as exc:
+                            raise DeviceUnavailable(str(exc)) from exc
 
                 dui_key.set_push_fn(_push_key_frame, key_size=caps.key_size)
 
@@ -226,12 +240,21 @@ class DeckRenderer:
         # Re-wire push_fn every render so a DuiKey reused across screens
         # always animates at the slot of the currently active screen.
         async def _push_key_frame(frame_bytes: bytes) -> None:
+            device = deck._device
+            if device is None:
+                raise DeviceUnavailable(f"deck {deck!r} device is None")
             async with deck._device_lock:
-                await deck._exec_device_io(
-                    deck._device.set_key_image,  # type: ignore[union-attr]
-                    key_index,
-                    frame_bytes,
-                )
+                device = deck._device
+                if device is None:
+                    raise DeviceUnavailable(f"deck {deck!r} device closed")
+                try:
+                    await deck._exec_device_io(
+                        device.set_key_image,
+                        key_index,
+                        frame_bytes,
+                    )
+                except HidApiError as exc:
+                    raise DeviceUnavailable(str(exc)) from exc
 
         if deck._caps is None:
             return
@@ -318,15 +341,24 @@ class DeckRenderer:
                 )
             else:
                 out_bytes = frame_bytes
+            device = deck._device
+            if device is None:
+                raise DeviceUnavailable(f"deck {deck!r} device is None")
             async with deck._device_lock:
-                await deck._exec_device_io(
-                    deck._device.set_partial_window_image,  # type: ignore[union-attr]
-                    x_pos,
-                    y_pos,
-                    panel_width,
-                    panel_height,
-                    out_bytes,
-                )
+                device = deck._device
+                if device is None:
+                    raise DeviceUnavailable(f"deck {deck!r} device closed")
+                try:
+                    await deck._exec_device_io(
+                        device.set_partial_window_image,
+                        x_pos,
+                        y_pos,
+                        panel_width,
+                        panel_height,
+                        out_bytes,
+                    )
+                except HidApiError as exc:
+                    raise DeviceUnavailable(str(exc)) from exc
 
         return _push_card_frame
 
