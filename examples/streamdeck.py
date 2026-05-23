@@ -1113,7 +1113,7 @@ class StreamDeckApp:
         # splash; only the final device push is delayed.
         await deck.show_splash(
             EXAMPLES_DIR.joinpath("assets/display_bg.png"),
-            min_display_ms=500,
+            min_display_ms=1000,
         )
 
         # Demonstrate Deck.on_screen_changed: log every screen switch.
