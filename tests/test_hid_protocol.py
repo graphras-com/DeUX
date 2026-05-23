@@ -223,6 +223,40 @@ class TestParseInputReportEdgeCases:
         assert parse_input_report(b"\x00\x00") is None
         assert parse_input_report(b"") is None
 
+    def test_declared_payload_len_exceeds_actual_returns_none(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Reports with declared payload_len > actual payload are rejected.
+
+        Defensive bounds check: a malformed device report (or fuzzed input)
+        where ``payload_len > len(payload)`` must not be silently truncated.
+        """
+        # KEY_STATE: declared 10, only 3 actual payload bytes
+        data = _build_input(InputCommand.KEY_STATE, b"\x01\x00\x01", payload_len=10)
+        with caplog.at_level("DEBUG", logger="deux.runtime.hid.protocol"):
+            assert parse_input_report(data) is None
+        assert "Truncated HID report" in caplog.text
+
+    def test_encoder_declared_payload_len_exceeds_actual_returns_none(self) -> None:
+        """Encoder reports with declared payload_len > actual are rejected."""
+        payload = bytes([EncoderEventType.ROTATE]) + struct.pack("bb", 1, -1)
+        data = _build_input(InputCommand.ENCODER, payload, payload_len=20)
+        assert parse_input_report(data) is None
+
+    def test_encoder_payload_len_too_small_returns_none(self) -> None:
+        """Encoder reports with payload_len < 2 are rejected.
+
+        Previously these would silently emit an empty event tuple because
+        ``payload[1:payload_len]`` returned an empty slice.
+        """
+        # payload_len=1 means there's no encoder data after the content type
+        payload = bytes([EncoderEventType.ROTATE, 0x05, 0x06])
+        data = _build_input(InputCommand.ENCODER, payload, payload_len=1)
+        assert parse_input_report(data) is None
+
+        data = _build_input(InputCommand.ENCODER, payload, payload_len=0)
+        assert parse_input_report(data) is None
+
 
 class TestParseInputReportWithReportId:
     """Tests that parse_input_report handles Report ID prefix.
