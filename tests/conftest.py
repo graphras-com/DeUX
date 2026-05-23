@@ -420,6 +420,14 @@ def _make_mock_streamdeck(caps: DeviceCapabilities) -> MagicMock:
     device.key_layout = (caps.key_cols, caps.key_rows)
     device.key_size = (caps.key_pixel_width, caps.key_pixel_height)
     device.lcd_size = (getattr(caps, "lcd_width", 0), getattr(caps, "lcd_height", 0))
+    # Logical LCD size mirrors the per-PID table on the real HidDevice;
+    # the mock test PIDs (Mini 0x0063 etc.) are not in that table, so
+    # default to lcd_size, allowing tests to exercise full-screen image
+    # paths without each test patching product_id.
+    device.logical_lcd_size = (
+        getattr(caps, "lcd_width", 0),
+        getattr(caps, "lcd_height", 0),
+    )
     device.has_window = caps.has_touch or caps.has_screen
     device.window_size = (
         (caps.touchscreen_width, caps.touchscreen_height) if caps.has_touch
