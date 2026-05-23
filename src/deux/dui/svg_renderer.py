@@ -16,6 +16,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from defusedxml import DefusedXmlException
 from PIL import ImageFont
 
 if TYPE_CHECKING:
@@ -180,7 +181,7 @@ def _get_default_font_family() -> str:
         from ..render.theme import get_default_font_family
 
         return get_default_font_family()
-    except Exception:
+    except ImportError:
         return _DEFAULT_FONT_FAMILY
 
 
@@ -1349,7 +1350,7 @@ class SvgRenderer:
 
         try:
             icon_root = safe_fromstring(svg_source)  # untrusted: network (Iconify)
-        except Exception as exc:
+        except (ET.ParseError, DefusedXmlException) as exc:
             logger.warning(
                 "Iconify binding '%s': failed to parse icon SVG: %s",
                 binding.node,
@@ -1457,7 +1458,7 @@ class SvgRenderer:
 
         try:
             icon_root = safe_fromstring(svg_source)  # untrusted: network (Iconify)
-        except Exception as exc:
+        except (ET.ParseError, DefusedXmlException) as exc:
             logger.warning(
                 "List binding icon '%s': failed to parse SVG: %s", icon_name, exc
             )

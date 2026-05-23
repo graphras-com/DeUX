@@ -484,6 +484,21 @@ class TestSvgRendererFontIntegration:
         result = _get_default_font_family()
         assert result == "Inter"
 
+    def test_get_default_font_family_propagates_unexpected_errors(self, monkeypatch):
+        """Non-ImportError failures must propagate, not silently fall back."""
+        import deux.render.theme as theme_module
+        from deux.dui.svg_renderer import _get_default_font_family
+
+        def boom() -> str:
+            raise RuntimeError("theme system broken")
+
+        monkeypatch.setattr(
+            theme_module, "get_default_font_family", boom, raising=True
+        )
+
+        with pytest.raises(RuntimeError, match="theme system broken"):
+            _get_default_font_family()
+
 
 # ---------------------------------------------------------------------------
 # Public API imports
