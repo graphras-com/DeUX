@@ -7,9 +7,12 @@ is not supported.
 
 from __future__ import annotations
 
+import logging
 import struct
 from dataclasses import dataclass
 from enum import IntEnum
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -292,7 +295,9 @@ def parse_input_report(data: bytes) -> InputEvent | None:
     Returns
     -------
     InputEvent or None
-        A typed event, or ``None`` if the report is unrecognised.
+        A typed event, or ``None`` if the report is unrecognised or
+        malformed (e.g. the declared ``payload_len`` exceeds the actual
+        bytes available, or an encoder report has no content type byte).
     """
     if len(data) < 4:
         return None
@@ -308,6 +313,16 @@ def parse_input_report(data: bytes) -> InputEvent | None:
     command = data[0]
     payload_len = struct.unpack_from("<H", data, 1)[0]
     payload = data[3:]
+
+    # Defensive bounds check: a malformed device report (or fuzzed input)
+    # may declare a payload length larger than the bytes actually present.
+    # Reject such reports rather than silently truncating to avoid producing
+    # empty event tuples that mask buggy firmware or USB corruption.
+    if payload_len > len(payload):
+        logger.debug(
+            "Truncated HID report: declared %d, actual %d", payload_len, len(payload)
+        )
+        return None
 
     if command == InputCommand.KEY_STATE:
         states = tuple(b != 0 for b in payload[:payload_len])
@@ -331,7 +346,7 @@ def parse_input_report(data: bytes) -> InputEvent | None:
         return None
 
     if command == InputCommand.ENCODER:
-        if len(payload) < 2:
+        if len(payload) < 2 or payload_len < 2:
             return None
         content_type = payload[0]
         encoder_data = payload[1:payload_len]
