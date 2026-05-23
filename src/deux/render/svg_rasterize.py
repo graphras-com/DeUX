@@ -265,6 +265,55 @@ def _get_usvg_opts() -> _usvg_mod.Options:
     return opts
 
 
+def _prepare_svg_tree(svg_data: bytes, width: int, height: int) -> _usvg_mod.Tree:
+    """Normalise SVG bytes and parse them into a ``usvg.Tree``.
+
+    Performs the shared preparation steps used by both PNG and RGBA
+    rasterisation paths: ensures a ``viewBox`` is present (preserving
+    the original design dimensions), sets the target ``width`` and
+    ``height`` attributes so resvg scales vector content correctly,
+    registers SVG namespaces to avoid ``ns0:`` prefixes, serialises
+    the tree back to text, and constructs a :class:`usvg.Tree`.
+
+    Parameters
+    ----------
+    svg_data : bytes
+        Raw SVG content.
+    width : int
+        Desired output width in pixels.
+    height : int
+        Desired output height in pixels.
+
+    Returns
+    -------
+    usvg.Tree
+        Parsed micro-SVG tree ready for rasterisation.
+
+    Raises
+    ------
+    ImportError
+        If the ``resvg`` package is not installed.
+    """
+    root = safe_fromstring(svg_data)
+    if "viewBox" not in root.attrib:
+        orig_w = root.get("width", str(width))
+        orig_h = root.get("height", str(height))
+        # Strip non-numeric units (e.g. "100px" -> "100")
+        orig_w = "".join(c for c in orig_w if c.isdigit() or c == ".")
+        orig_h = "".join(c for c in orig_h if c.isdigit() or c == ".")
+        root.set("viewBox", f"0 0 {orig_w} {orig_h}")
+    root.set("width", str(width))
+    root.set("height", str(height))
+
+    ET.register_namespace("", _SVG_NS)
+    ET.register_namespace("xlink", _XLINK_NS)
+    svg_text = ET.tostring(root, encoding="unicode", xml_declaration=False)
+
+    from resvg import usvg
+
+    return usvg.Tree.from_str(svg_text, _get_usvg_opts())
+
+
 def _resvg_rasterize(svg_data: bytes, width: int, height: int) -> bytes:
     """Rasterise SVG bytes to PNG via the ``resvg`` Rust binding.
 
@@ -296,25 +345,7 @@ def _resvg_rasterize(svg_data: bytes, width: int, height: int) -> bytes:
     try:
         from resvg import render as _resvg_render
 
-        root = safe_fromstring(svg_data)
-        if "viewBox" not in root.attrib:
-            orig_w = root.get("width", str(width))
-            orig_h = root.get("height", str(height))
-            # Strip non-numeric units (e.g. "100px" -> "100")
-            orig_w = "".join(c for c in orig_w if c.isdigit() or c == ".")
-            orig_h = "".join(c for c in orig_h if c.isdigit() or c == ".")
-            root.set("viewBox", f"0 0 {orig_w} {orig_h}")
-        root.set("width", str(width))
-        root.set("height", str(height))
-
-        ET.register_namespace("", _SVG_NS)
-        ET.register_namespace("xlink", _XLINK_NS)
-        svg_text = ET.tostring(root, encoding="unicode", xml_declaration=False)
-
-        from resvg import usvg
-
-        tree = usvg.Tree.from_str(svg_text, _get_usvg_opts())
-
+        tree = _prepare_svg_tree(svg_data, width, height)
         png_bytes: bytes = _resvg_render(tree, (1.0, 0.0, 0.0, 0.0, 1.0, 0.0))
         return png_bytes
     except ImportError as exc:
@@ -355,24 +386,7 @@ def _resvg_rasterize_rgba(
     try:
         from resvg import render_rgba as _resvg_render_rgba
 
-        root = safe_fromstring(svg_data)
-        if "viewBox" not in root.attrib:
-            orig_w = root.get("width", str(width))
-            orig_h = root.get("height", str(height))
-            orig_w = "".join(c for c in orig_w if c.isdigit() or c == ".")
-            orig_h = "".join(c for c in orig_h if c.isdigit() or c == ".")
-            root.set("viewBox", f"0 0 {orig_w} {orig_h}")
-        root.set("width", str(width))
-        root.set("height", str(height))
-
-        ET.register_namespace("", _SVG_NS)
-        ET.register_namespace("xlink", _XLINK_NS)
-        svg_text = ET.tostring(root, encoding="unicode", xml_declaration=False)
-
-        from resvg import usvg
-
-        tree = usvg.Tree.from_str(svg_text, _get_usvg_opts())
-
+        tree = _prepare_svg_tree(svg_data, width, height)
         rgba_bytes, w, h = _resvg_render_rgba(tree, (1.0, 0.0, 0.0, 0.0, 1.0, 0.0))
         return bytes(rgba_bytes), w, h
     except ImportError as exc:
