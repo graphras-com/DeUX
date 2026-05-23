@@ -54,6 +54,36 @@ class Screen:
     """
 
     def __init__(self, name: str, caps: DeviceCapabilities) -> None:
+        """Initialise a screen for the given device capabilities.
+
+        Screens are normally created via :meth:`Deck.screen` rather than
+        instantiated directly; the deck supplies the matching device
+        capabilities.
+
+        Parameters
+        ----------
+        name : str
+            Identifier used to look up and activate this screen via
+            :meth:`Deck.set_screen`.
+        caps : DeviceCapabilities
+            Capability snapshot describing the target device.  Drives
+            which controls are provisioned (touch strip, info screen)
+            and which slot indices are valid.
+
+        Notes
+        -----
+        Construction has the following side effects:
+
+        * A :class:`~deux.render.background_layer.BackgroundLayer` is
+          created for keys regardless of device.
+        * A :class:`~deux.ui.touch_strip.TouchStrip` is provisioned only
+          when the device has both a touchscreen and at least one dial.
+        * An :class:`~deux.ui.info_screen.InfoScreen` is provisioned
+          only when the device reports an info screen.
+        * Bundled default backgrounds for the device's VID:PID are
+          applied on a best-effort basis; failures are logged but never
+          raised.
+        """
         self._name = name
         self._caps = caps
         self._keys: dict[int, KeySlot] = {}
