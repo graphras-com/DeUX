@@ -43,13 +43,12 @@ class _TestCard(Card):
 def deck(tmp_path):
     """A Deck instance with required serial_number.
 
-    Capabilities are pre-populated so tests can call ``deck.screen()``
-    without going through the real device-discovery path.
+    Capabilities are pre-populated via the public
+    :meth:`Deck.for_testing` constructor so tests can call
+    ``deck.screen()`` without going through the real
+    device-discovery path.
     """
-    d = Deck(serial_number="TEST123")
-    d._caps = STREAM_DECK_PLUS
-    d._metrics = RenderMetrics(STREAM_DECK_PLUS)
-    return d
+    return Deck.for_testing(STREAM_DECK_PLUS, serial_number="TEST123")
 
 
 class TestDeckInit:
@@ -70,11 +69,6 @@ class TestDeckInit:
 
 class TestDeckPage:
     def test_creates_screen(self, deck):
-        p = deck.screen("main")
-        assert isinstance(p, Screen)
-        assert p.name == "main"
-
-    def test_creates_page(self, deck):
         p = deck.screen("main")
         assert isinstance(p, Screen)
         assert p.name == "main"
@@ -855,6 +849,39 @@ class TestDeckCapabilities:
 
     def test_metrics_after_set(self, deck):
         assert deck.metrics.key_count == 8
+
+
+class TestDeckForTesting:
+    """Tests for the public :meth:`Deck.for_testing` constructor."""
+
+    def test_seeds_capabilities_and_metrics(self):
+        d = Deck.for_testing(STREAM_DECK_PLUS)
+        assert d.capabilities is STREAM_DECK_PLUS
+        assert d.metrics.key_count == STREAM_DECK_PLUS.key_count
+
+    def test_default_serial_and_brightness(self):
+        d = Deck.for_testing(STREAM_DECK_PLUS)
+        assert d.brightness == 80
+        assert d.is_connected is False
+
+    def test_custom_serial_and_brightness(self):
+        d = Deck.for_testing(
+            STREAM_DECK_PLUS, serial_number="ABC123", brightness=42
+        )
+        assert d.brightness == 42
+
+    def test_does_not_open_device(self):
+        """No HID I/O — info still raises until a device is attached."""
+        d = Deck.for_testing(STREAM_DECK_PLUS)
+        with pytest.raises(DeckError, match="Device not opened"):
+            _ = d.info
+
+    def test_screen_works_without_real_device(self):
+        """The whole point: screen() must succeed after for_testing."""
+        d = Deck.for_testing(STREAM_DECK_PLUS)
+        s = d.screen("main")
+        assert isinstance(s, Screen)
+        assert s.name == "main"
 
 
 class TestDeckStart:

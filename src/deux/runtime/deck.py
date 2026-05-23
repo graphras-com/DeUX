@@ -100,6 +100,57 @@ class Deck:
         self._renderer = DeckRenderer(self)
         self._event_router = DeckEventRouter(self)
 
+    @classmethod
+    def for_testing(
+        cls,
+        capabilities: DeviceCapabilities,
+        *,
+        serial_number: str = "TEST",
+        brightness: int = 80,
+    ) -> Deck:
+        """Construct a :class:`Deck` pre-seeded with capabilities for tests.
+
+        Real construction goes through :meth:`start`, which discovers a
+        physical device and derives :attr:`capabilities` and
+        :attr:`metrics` from it.  Tests that exercise behaviour above
+        the device layer need those two attributes populated without
+        any HID I/O.
+
+        This helper provides the supported way to do so, so that tests
+        do not have to assign to the private ``_caps`` / ``_metrics``
+        attributes directly.  No device is opened and no transport is
+        started — :attr:`is_connected` remains ``False`` until the
+        normal :meth:`start` path is invoked.
+
+        Parameters
+        ----------
+        capabilities : DeviceCapabilities
+            The capabilities to seed onto the deck.  Drives the
+            derived :class:`~deux.render.metrics.RenderMetrics` and
+            anything else that reads :attr:`capabilities`.
+        serial_number : str, default="TEST"
+            Serial number recorded on the instance.  Does not need to
+            correspond to a real device.
+        brightness : int, default=80
+            Initial brightness (0-100).
+
+        Returns
+        -------
+        Deck
+            A deck instance with :attr:`capabilities` and
+            :attr:`metrics` populated.
+
+        Notes
+        -----
+        This constructor is intended for unit tests.  Production code
+        should use the normal :class:`Deck` constructor and
+        :meth:`start`.
+        """
+        deck = cls(serial_number=serial_number, brightness=brightness)
+        deck._caps = capabilities
+        deck._metrics = RenderMetrics(capabilities)
+        return deck
+
     async def start(self) -> None:
         """Discover the device by serial, open it, and start the event loop."""
         if self._running:
