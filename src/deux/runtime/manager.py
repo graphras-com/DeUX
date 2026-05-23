@@ -51,17 +51,6 @@ class DeckManager:
 
         async with manager:
             await manager.wait_closed()
-
-    Parameters
-    ----------
-    poll_interval
-        Seconds between device scans (default 2.0).
-    brightness
-        Default brightness for new Deck instances (0-100).
-    auto_reconnect
-        If ``True`` (default), automatically reconnect
-        devices that disconnect.  The ``on_connect`` handler is
-        called again on reconnection.
     """
 
     def __init__(
@@ -70,6 +59,32 @@ class DeckManager:
         brightness: int = 80,
         auto_reconnect: bool = True,
     ) -> None:
+        """Construct a deck manager.
+
+        Construction is side-effect free; no devices are scanned until
+        :meth:`start` is called (directly or via ``async with``).
+
+        Parameters
+        ----------
+        poll_interval : float, default=2.0
+            Seconds between HID device scans.  Lower values detect
+            hot-plug events faster at the cost of more frequent
+            enumeration.
+        brightness : int, default=80
+            Default brightness percentage in ``[0, 100]`` applied to
+            newly connected :class:`Deck` instances.
+        auto_reconnect : bool, default=True
+            When ``True``, devices that disconnect are automatically
+            reopened on the next scan and registered ``on_connect``
+            handlers fire again.  When ``False``, disconnected devices
+            stay disconnected until the next manual restart.
+
+        Notes
+        -----
+        The scan loop, executor lifecycle, and event subscriptions are
+        created lazily by :meth:`start`; constructing a manager is
+        cheap and does no I/O.
+        """
         self._poll_interval = poll_interval
         self._brightness = brightness
         self._auto_reconnect = auto_reconnect

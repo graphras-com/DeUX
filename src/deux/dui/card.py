@@ -59,16 +59,35 @@ class DuiCard(BindingMixin, Card):
 
     The card index is assigned automatically when you install the card
     on a screen with :meth:`~deux.ui.screen.Screen.set_card`.
-
-    Parameters
-    ----------
-    spec : PackageSpec or str
-        A validated :class:`~deux.dui.schema.PackageSpec`, or a
-        package name (e.g. ``"DashboardCard"``) to resolve from the
-        DUI repository.
     """
 
     def __init__(self, spec: PackageSpec | str) -> None:
+        """Construct a DUI-backed touchscreen card.
+
+        Parameters
+        ----------
+        spec : PackageSpec or str
+            Either a pre-validated
+            :class:`~deux.dui.schema.PackageSpec`, or a package name
+            (for example ``"DashboardCard"``) to resolve from the DUI
+            repository.  String resolution is deferred to
+            :func:`~deux.dui.repository.resolve_dui` at call time so
+            tests that monkeypatch that symbol behave correctly.
+
+        Raises
+        ------
+        deux.dui.repository.PackageError
+            If *spec* is a string and no matching package is found in
+            any registered search path.
+
+        Notes
+        -----
+        Construction performs no rendering and no device I/O.  The
+        underlying :class:`~deux.dui.svg_renderer.SvgRenderer` and
+        :class:`~deux.dui.events.EventMap` are built eagerly from
+        *spec*; binding values, push callbacks, and background tiles
+        are configured later via the corresponding setters.
+        """
         if isinstance(spec, str):
             # Inline import: keeps the lookup go through repository.resolve_dui
             # at call time so monkeypatching that symbol in tests works.

@@ -71,13 +71,29 @@ class Deck:
         serial_number: str,
         brightness: int = 80,
     ) -> None:
-        """
+        """Construct a deck handle for the given serial number.
+
+        Instances are normally created by :class:`DeckManager` in
+        response to a device-connect event; application code receives
+        them via ``on_connect`` handlers.  For unit tests that need a
+        deck without HID I/O, use :meth:`Deck.for_testing`.
+
         Parameters
         ----------
-        serial_number
-            The serial number of the target device.
-        brightness
-            Initial brightness (0-100).
+        serial_number : str
+            Serial number of the target device.  Used during
+            :meth:`start` to locate the matching HID device.
+        brightness : int, default=80
+            Initial brightness percentage in ``[0, 100]`` applied once
+            the device is opened.
+
+        Notes
+        -----
+        Construction performs no I/O.  The HID device is opened and the
+        event loop started by :meth:`start`.  The
+        :attr:`on_brightness_changed` and :attr:`on_screen_changed`
+        events are wired up here and ready for subscription before
+        :meth:`start` is called.
         """
         self._serial_number = serial_number
         self._brightness = brightness

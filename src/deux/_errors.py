@@ -13,9 +13,4 @@ from __future__ import annotations
 
 
 class DeuxError(Exception):
-    """Root exception for every error raised by the deux library.
-
-    Application code can catch ``DeuxError`` to handle any
-    library-level failure in a single clause while still being
-    able to catch more specific subclasses when needed.
-    """
+    """Root exception for every error raised by the deux library."""
