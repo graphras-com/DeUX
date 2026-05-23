@@ -12,6 +12,7 @@ import deux.render.svg_rasterize as svg_mod
 from deux.render.svg_rasterize import (
     RasterizeError,
     _inject_stylesheet,
+    _prepare_svg_tree,
     _resvg_rasterize,
     _svg_to_png,
     get_svg_stylesheet,
@@ -100,6 +101,54 @@ class TestResvgRasterizer:
         assert 'viewBox="0 0 100 100"' in svg_arg
         assert 'width="50"' in svg_arg
         assert 'height="50"' in svg_arg
+
+
+class TestPrepareSvgTree:
+    """Tests for the shared _prepare_svg_tree helper."""
+
+    def _patch_usvg(self) -> tuple[MagicMock, MagicMock]:
+        mock_usvg = MagicMock()
+        mock_tree = MagicMock()
+        mock_usvg.Options.default.return_value = mock_usvg
+        mock_usvg.Tree.from_str.return_value = mock_tree
+        return mock_usvg, mock_tree
+
+    def test_injects_viewbox_when_missing(self):
+        """A missing viewBox is synthesised from existing width/height."""
+        svg = (
+            b'<svg xmlns="http://www.w3.org/2000/svg" width="80px" height="60">'
+            b'<rect/></svg>'
+        )
+        mock_usvg, mock_tree = self._patch_usvg()
+        mock_resvg_mod = MagicMock()
+        mock_resvg_mod.usvg = mock_usvg
+
+        with patch.dict("sys.modules", {"resvg": mock_resvg_mod, "resvg.usvg": mock_usvg}):
+            result = _prepare_svg_tree(svg, 40, 30)
+
+        assert result is mock_tree
+        svg_arg = mock_usvg.Tree.from_str.call_args[0][0]
+        assert 'viewBox="0 0 80 60"' in svg_arg
+        assert 'width="40"' in svg_arg
+        assert 'height="30"' in svg_arg
+
+    def test_preserves_existing_viewbox(self):
+        """An existing viewBox is preserved, only width/height are overridden."""
+        svg = (
+            b'<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"'
+            b' viewBox="0 0 100 100"><rect/></svg>'
+        )
+        mock_usvg, _ = self._patch_usvg()
+        mock_resvg_mod = MagicMock()
+        mock_resvg_mod.usvg = mock_usvg
+
+        with patch.dict("sys.modules", {"resvg": mock_resvg_mod, "resvg.usvg": mock_usvg}):
+            _prepare_svg_tree(svg, 75, 75)
+
+        svg_arg = mock_usvg.Tree.from_str.call_args[0][0]
+        assert 'viewBox="0 0 100 100"' in svg_arg
+        assert 'width="75"' in svg_arg
+        assert 'height="75"' in svg_arg
 
 
 class TestSvgToPng:
