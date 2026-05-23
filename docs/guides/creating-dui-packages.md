@@ -770,8 +770,11 @@ async def on_toggle():
 async def on_next():
     ...
 
-# Render to image
+# Render to a PIL Image (panel-sized, sized from the SVG's intrinsic dimensions)
 image = card.render()
+
+# Or render directly to encoded device-ready bytes
+panel_bytes = card.render_bytes(panel_width=800, panel_height=100)
 ```
 
 ### Physical Key
@@ -788,9 +791,19 @@ key.set("indicator_color", "#00ff00")
 async def on_activate():
     ...
 
-# Render to encoded image bytes
-image_bytes = key.render_image()
+# Render to encoded image bytes. key_size is REQUIRED — pass the
+# target key dimensions (width, height) in pixels.
+image_bytes = key.render_image(key_size=(120, 120))
 ```
+
+> **Render API note.** `DuiCard` and `DuiKey` deliberately expose different
+> render entry points:
+>
+> - `DuiCard.render()` returns a PIL `Image`. For encoded bytes, use
+>   `DuiCard.render_bytes(panel_width=..., panel_height=...)` or, when
+>   composing a touch strip, `DuiCard.render_panel_bytes(...)`.
+> - `DuiKey.render_image(key_size, image_format="JPEG")` returns encoded
+>   device-ready `bytes` directly; there is no `DuiKey.render()` method.
 
 ---
 
