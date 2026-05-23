@@ -109,11 +109,12 @@ def test_summary_is_hierarchical(run_script: _FakeGenFiles) -> None:
     assert "- [Tools](tools.md)" in lines
     assert "- [Runtime](runtime.md)" in lines
 
-    # Nested entries are indented to signal hierarchy to mkdocs-literate-nav.
-    assert "    - [Hid](runtime/hid.md)" in lines
-    assert "    - [Verify](tools/verify.md)" in lines
-    assert "    - [Preview](tools/preview.md)" in lines
-    assert "    - [Splash](tools/splash.md)" in lines
+    # Nested entries are indented two spaces per level so Python-markdown
+    # treats them as a sub-list rather than parent paragraph continuation.
+    assert "  - [Hid](runtime/hid.md)" in lines
+    assert "  - [Verify](tools/verify.md)" in lines
+    assert "  - [Preview](tools/preview.md)" in lines
+    assert "  - [Splash](tools/splash.md)" in lines
 
 
 def test_skips_private_modules(run_script: _FakeGenFiles) -> None:
@@ -123,3 +124,35 @@ def test_skips_private_modules(run_script: _FakeGenFiles) -> None:
         stem = path[len("reference/") :].removesuffix(".md")
         for segment in stem.split("/"):
             assert not segment.startswith("_"), f"private segment leaked: {path}"
+
+
+def test_suppresses_reexported_submodule_pages(run_script: _FakeGenFiles) -> None:
+    """Submodules re-exported by their parent ``__init__`` get no page.
+
+    Emitting them anyway produces duplicate mkdocstrings anchors for the
+    same symbol (e.g. ``deux.dui.resolve_dui`` available on both
+    ``reference/dui/`` and ``reference/dui/repository/``), which trips
+    ``mkdocs --strict`` autoref warnings and fails the docs build.
+    """
+    # ``src/deux/dui/__init__.py`` re-exports from ``.repository``,
+    # ``.card``, ``.key``, ``.loader``, ``.schema`` etc., so none of those
+    # should produce a standalone page.
+    for reexported in ("repository", "card", "key", "loader", "schema"):
+        assert f"reference/dui/{reexported}.md" not in run_script.files
+
+    # ``src/deux/render/__init__.py`` re-exports from ``.theme`` and
+    # ``.metrics`` among others.
+    for reexported in ("theme", "metrics", "context"):
+        assert f"reference/render/{reexported}.md" not in run_script.files
+
+
+def test_top_level_packages_emitted_even_when_root_reexports(
+    run_script: _FakeGenFiles,
+) -> None:
+    """``src/deux/__init__.py`` re-exports from every top-level sub-package.
+
+    The script must still emit landing pages for them — otherwise the
+    re-export filter would erase the entire pre-existing API reference.
+    """
+    for name in ("runtime", "ui", "dui", "render"):
+        assert f"reference/{name}.md" in run_script.files
