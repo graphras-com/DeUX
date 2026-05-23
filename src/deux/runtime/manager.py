@@ -175,6 +175,12 @@ class DeckManager:
         -------
         Callable
             Decorator that registers the handler.
+
+        Notes
+        -----
+        Unlike :attr:`on_disconnect`, this is a decorator *factory* and
+        must be invoked with parentheses (``@manager.on_connect()``) even
+        when no filter arguments are passed.
         """
         filters = {"serial": serial, "deck_type": deck_type}
 
@@ -203,6 +209,12 @@ class DeckManager:
         -------
         Callable
             Decorator that registers the handler.
+
+        Notes
+        -----
+        Unlike :meth:`on_connect`, this is a property returning the
+        decorator directly. Use it bare (``@manager.on_disconnect``);
+        calling it with parentheses raises :class:`TypeError`.
         """
 
         def decorator(handler: AsyncHandler) -> AsyncHandler:
