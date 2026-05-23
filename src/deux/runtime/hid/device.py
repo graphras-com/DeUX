@@ -89,6 +89,34 @@ _WINDOW_SIZES: dict[int, tuple[int, int]] = {
     0x00C6: (1200, 100),
 }
 
+# Logical full-LCD dimensions per PID (width, height), in the orientation
+# the user sees them upright on the device.  These are used by the
+# full-screen image upload path (HID command 0x08), which targets the
+# entire back-panel LCD beneath the keys (and, where present, the
+# touchscreen/info strip).
+#
+# Pre-upload rotation is taken from ``PID_ROTATION`` (``self.rotation``);
+# the caller is responsible for resizing to this logical size and then
+# rotating before encoding to JPEG.  For example, on the Stream Deck + XL
+# (CCW 90°) a 1280x800 logical image is transmitted as 800x1280.
+_LCD_SIZES: dict[int, tuple[int, int]] = {
+    # Stream Deck Classic — 480x272, low DPI, rotate 180° before upload
+    0x006D: (480, 272),
+    0x0080: (480, 272),
+    0x00A5: (480, 272),
+    0x00B9: (480, 272),
+    # Stream Deck XL — 1024x600, high DPI, rotate 180° before upload
+    0x006C: (1024, 600),
+    0x008F: (1024, 600),
+    0x00BA: (1024, 600),
+    # Stream Deck Neo — 480x320, high DPI, rotate 180° before upload
+    0x009A: (480, 320),
+    # Stream Deck + — 800x480, high DPI, no rotation
+    0x0084: (800, 480),
+    # Stream Deck + XL — 1280x800, high DPI, rotate 90° CCW before upload
+    0x00C6: (1280, 800),
+}
+
 # Neo sensor count (capacitive touch sensors mapped as extra buttons)
 _NEO_SENSOR_COUNT: dict[int, int] = {
     0x009A: 2,
@@ -267,6 +295,28 @@ class HidDevice:
         if self._unit_info:
             return (self._unit_info.lcd_width, self._unit_info.lcd_height)
         return (0, 0)
+
+    @property
+    def logical_lcd_size(self) -> tuple[int, int]:
+        """Logical full-LCD dimensions as ``(width, height)``.
+
+        The size of the entire back-panel LCD in the orientation the
+        user sees it upright on the device (i.e. *before* the device's
+        pre-upload :attr:`rotation` is applied).  Use this when
+        preparing a full-screen image for HID command ``0x08``.
+
+        Unlike :attr:`lcd_size` (which depends on the ``Get Unit
+        Information`` feature report and reflects the transmit
+        orientation), ``logical_lcd_size`` is a hardcoded per-PID
+        constant taken from the Stream Deck hardware specification.
+
+        Returns
+        -------
+        tuple[int, int]
+            ``(width, height)`` in pixels, or ``(0, 0)`` if the PID
+            is not in the logical LCD-size table.
+        """
+        return _LCD_SIZES.get(self.product_id, (0, 0))
 
     @property
     def has_window(self) -> bool:

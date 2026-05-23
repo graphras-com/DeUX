@@ -432,6 +432,36 @@ class TestPidProperties:
         assert dev.encoder_count == enc_count
         assert dev.sensor_count == sensors
 
+    @pytest.mark.parametrize(
+        ("pid", "expected"),
+        [
+            # Stream Deck Classic family — 480x272
+            (0x006D, (480, 272)),
+            (0x0080, (480, 272)),
+            (0x00A5, (480, 272)),
+            (0x00B9, (480, 272)),
+            # Stream Deck XL family — 1024x600
+            (0x006C, (1024, 600)),
+            (0x008F, (1024, 600)),
+            (0x00BA, (1024, 600)),
+            # Neo — 480x320
+            (0x009A, (480, 320)),
+            # Plus — 800x480
+            (0x0084, (800, 480)),
+            # Plus XL — 1280x800 (logical, pre-rotation)
+            (0x00C6, (1280, 800)),
+        ],
+    )
+    def test_logical_lcd_size(self, pid, expected):
+        """logical_lcd_size matches the per-PID hardware table."""
+        dev = HidDevice(_make_info(pid=pid))
+        assert dev.logical_lcd_size == expected
+
+    def test_logical_lcd_size_unknown_pid(self):
+        """Unknown PIDs return (0, 0) for logical_lcd_size."""
+        dev = HidDevice(_make_info(pid=0xDEAD))
+        assert dev.logical_lcd_size == (0, 0)
+
 
 # ---------------------------------------------------------------------------
 # 7. read_input

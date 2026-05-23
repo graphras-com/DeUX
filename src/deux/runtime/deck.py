@@ -23,9 +23,14 @@ from .renderer import DeckRenderer
 from .transport import AsyncTransport
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
+    from PIL import Image
+
     from ..render.theme import Theme
     from ..ui.screen import Screen
     from .hid.device import HidDevice
+    from .splash import FitMode as SplashFitMode
 
 logger = logging.getLogger(__name__)
 
@@ -516,6 +521,194 @@ class Deck:
                 await self._exec_device_io(self._device.set_brightness, clamped)
         self._brightness = clamped
         await self.on_brightness_changed.emit(clamped)
+
+    # -- full-screen ("splash") image --------------------------------------
+
+    async def show_full_screen_image(
+        self,
+        image: Image.Image | str | Path | bytes,
+        *,
+        fit: SplashFitMode = "cover",
+        background: tuple[int, int, int] = (0, 0, 0),
+        jpeg_quality: int = 90,
+    ) -> None:
+        """Upload an image covering the entire LCD (HID command ``0x08``).
+
+        The image is loaded (PIL image, file path, raw image bytes, or
+        SVG), resized to the device's logical LCD size using *fit*,
+        rotated into the device's transmit orientation, JPEG-encoded,
+        and pushed via
+        :meth:`HidDevice.set_full_screen_image`.
+
+        **Important behavioural contract.**  This is a one-shot,
+        whole-LCD blit.  Any subsequent per-key (``set_key_image``),
+        per-window (``set_partial_window_image``), or per-screen render
+        will paint over the image.  In particular, calling
+        :meth:`set_screen` after :meth:`show_full_screen_image` will
+        immediately clobber the image as the renderer pushes the new
+        screen.
+
+        Intended use cases are startup splashes, loading screens, and
+        lock screens.  For persistent backgrounds, use the per-screen
+        background layer in :class:`Screen` instead.
+
+        Parameters
+        ----------
+        image : Image.Image, str, Path, or bytes
+            Source image.  ``.svg`` files and SVG byte streams are
+            rasterised at the target LCD size; other formats are
+            decoded with Pillow.
+        fit : {"cover", "contain", "stretch"}, default="cover"
+            Resize strategy.  ``"cover"`` scales to fill and crops the
+            overflow; ``"contain"`` letterboxes with *background*;
+            ``"stretch"`` ignores aspect ratio.
+        background : tuple[int, int, int], default=(0, 0, 0)
+            RGB background colour used to letterbox under
+            ``fit="contain"``.
+        jpeg_quality : int, default=90
+            JPEG encoding quality (1-95).
+
+        Raises
+        ------
+        DeckError
+            If the device is not opened, or its PID has no known
+            logical LCD size.
+        SplashError
+            If image preparation fails.
+
+        Examples
+        --------
+        ::
+
+            await deck.show_full_screen_image("assets/boot.png")
+            await asyncio.sleep(2)
+            await deck.set_screen("home")  # clobbers the splash
+        """
+        if self._device is None:
+            raise DeckError("Device not opened")
+        logical_size = self._device.logical_lcd_size
+        if logical_size == (0, 0):
+            raise DeckError(
+                f"Device PID 0x{self._device.product_id:04X} has no "
+                "known LCD size; cannot prepare full-screen image"
+            )
+        rotation = self._device.rotation
+
+        # Inline import: splash transitively pulls in the resvg backend
+        # for SVG inputs.  Keeping the import local avoids paying that
+        # cost on deck construction for callers that never use this API.
+        from .splash import prepare_full_screen_jpeg  # noqa: PLC0415
+
+        loop = asyncio.get_running_loop()
+        jpeg_bytes = await loop.run_in_executor(
+            get_executor(),
+            lambda: prepare_full_screen_jpeg(
+                image,
+                logical_size=logical_size,
+                rotation=rotation,
+                fit=fit,
+                background=background,
+                jpeg_quality=jpeg_quality,
+            ),
+        )
+
+        async with self._device_lock:
+            await self._exec_device_io(
+                self._device.set_full_screen_image, jpeg_bytes
+            )
+
+    async def show_splash(
+        self,
+        image: Image.Image | str | Path | bytes,
+        *,
+        fit: SplashFitMode = "cover",
+        background: tuple[int, int, int] = (0, 0, 0),
+        jpeg_quality: int = 90,
+    ) -> None:
+        """Alias for :meth:`show_full_screen_image`, intended for startup.
+
+        Provides a semantically clearer entry point for the common case
+        of displaying a boot/splash image before the first screen is
+        rendered.
+
+        Parameters
+        ----------
+        image : Image.Image, str, Path, or bytes
+            See :meth:`show_full_screen_image`.
+        fit : {"cover", "contain", "stretch"}, default="cover"
+            See :meth:`show_full_screen_image`.
+        background : tuple[int, int, int], default=(0, 0, 0)
+            See :meth:`show_full_screen_image`.
+        jpeg_quality : int, default=90
+            See :meth:`show_full_screen_image`.
+
+        See Also
+        --------
+        show_full_screen_image
+        clear_full_screen_image
+        """
+        await self.show_full_screen_image(
+            image,
+            fit=fit,
+            background=background,
+            jpeg_quality=jpeg_quality,
+        )
+
+    async def clear_full_screen_image(
+        self,
+        color: tuple[int, int, int] = (0, 0, 0),
+        *,
+        jpeg_quality: int = 90,
+    ) -> None:
+        """Clear the LCD by uploading a solid-colour full-screen image.
+
+        Uses the same HID command ``0x08`` path as
+        :meth:`show_full_screen_image`, ensuring a deterministic
+        clear across all supported deck families.  Behaviour-wise this
+        is equivalent to ``show_full_screen_image`` with a solid-colour
+        source; like that method, any subsequent per-key or per-window
+        write will paint over the cleared LCD.
+
+        Parameters
+        ----------
+        color : tuple[int, int, int], default=(0, 0, 0)
+            RGB fill colour.
+        jpeg_quality : int, default=90
+            JPEG encoding quality (1-95).
+
+        Raises
+        ------
+        DeckError
+            If the device is not opened, or its PID has no known
+            logical LCD size.
+        """
+        if self._device is None:
+            raise DeckError("Device not opened")
+        logical_size = self._device.logical_lcd_size
+        if logical_size == (0, 0):
+            raise DeckError(
+                f"Device PID 0x{self._device.product_id:04X} has no "
+                "known LCD size; cannot prepare full-screen image"
+            )
+        rotation = self._device.rotation
+
+        from .splash import prepare_solid_color_jpeg  # noqa: PLC0415
+
+        loop = asyncio.get_running_loop()
+        jpeg_bytes = await loop.run_in_executor(
+            get_executor(),
+            lambda: prepare_solid_color_jpeg(
+                color,
+                logical_size=logical_size,
+                rotation=rotation,
+                jpeg_quality=jpeg_quality,
+            ),
+        )
+
+        async with self._device_lock:
+            await self._exec_device_io(
+                self._device.set_full_screen_image, jpeg_bytes
+            )
 
     def screen(self, name: str) -> Screen:
         """Get or create a screen by name.
