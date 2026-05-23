@@ -10,6 +10,8 @@ refresh fired once the batched operation completes.
 
 from __future__ import annotations
 
+import asyncio
+import time
 from unittest.mock import AsyncMock
 
 import pytest
@@ -215,6 +217,7 @@ class TestStopResetsGate:
         """Manually corrupt the gate state then verify stop clears it."""
         deck._batch_render_depth = 5
         deck._refresh_pending = True
+        deck._splash_push_deadline = time.perf_counter() + 10.0
 
         # stop() short-circuits when _running is False, so simulate a
         # running deck without a real device by setting the flag and
@@ -224,3 +227,68 @@ class TestStopResetsGate:
 
         assert deck._batch_render_depth == 0
         assert deck._refresh_pending is False
+        assert deck._splash_push_deadline is None
+
+
+class TestSplashPushDeadline:
+    """:meth:`Deck._consume_splash_push_deadline` enforces the splash hold."""
+
+    async def test_no_deadline_returns_immediately(self, deck):
+        """With no pending deadline the helper is a no-op."""
+        assert deck._splash_push_deadline is None
+        start = time.perf_counter()
+        await deck._consume_splash_push_deadline()
+        elapsed = time.perf_counter() - start
+        assert elapsed < 0.01
+
+    async def test_future_deadline_blocks_until_elapsed(self, deck):
+        """Helper sleeps until the deadline has been reached."""
+        deck._splash_push_deadline = time.perf_counter() + 0.05  # 50 ms
+
+        start = time.perf_counter()
+        await deck._consume_splash_push_deadline()
+        elapsed = time.perf_counter() - start
+
+        assert 0.04 <= elapsed < 0.2
+        # Deadline is consumed.
+        assert deck._splash_push_deadline is None
+
+    async def test_past_deadline_does_not_block(self, deck):
+        """A deadline already in the past returns immediately and clears."""
+        deck._splash_push_deadline = time.perf_counter() - 1.0
+
+        start = time.perf_counter()
+        await deck._consume_splash_push_deadline()
+        elapsed = time.perf_counter() - start
+
+        assert elapsed < 0.01
+        assert deck._splash_push_deadline is None
+
+    async def test_deadline_is_one_shot(self, deck):
+        """Two consecutive calls only wait once; the second is a no-op."""
+        deck._splash_push_deadline = time.perf_counter() + 0.05
+
+        await deck._consume_splash_push_deadline()
+        start = time.perf_counter()
+        await deck._consume_splash_push_deadline()
+        elapsed = time.perf_counter() - start
+
+        assert elapsed < 0.01
+
+    async def test_render_phase_runs_in_parallel_with_hold(self, deck):
+        """A simulated render concurrent with the hold completes in max(render, hold)."""
+
+        async def fake_render() -> None:
+            # Simulated CPU render: 20 ms.
+            await asyncio.sleep(0.02)
+
+        deck._splash_push_deadline = time.perf_counter() + 0.05  # 50 ms
+
+        start = time.perf_counter()
+        # Render runs in parallel; push then waits for the deadline.
+        await fake_render()
+        await deck._consume_splash_push_deadline()
+        elapsed = time.perf_counter() - start
+
+        # max(20 ms, 50 ms) = 50 ms (plus small overhead).
+        assert 0.045 <= elapsed < 0.2

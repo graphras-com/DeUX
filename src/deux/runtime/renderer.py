@@ -199,6 +199,7 @@ class DeckRenderer:
 
         # Phase 2: push all key images to device under a single lock
         with prof.step("push_phase"):
+            await deck._consume_splash_push_deadline()
             async with deck._device_lock:
                 for key_index in sorted(key_images):
                     await deck._exec_device_io(
@@ -526,6 +527,7 @@ class DeckRenderer:
             )
 
         with prof.step("push_to_device"):
+            await deck._consume_splash_push_deadline()
             async with deck._device_lock:
                 for cidx, panel_bytes in sorted(results, key=lambda r: r[0]):
                     await self._push_card(
@@ -551,6 +553,7 @@ class DeckRenderer:
 
         image_bytes = info.render_bytes()
 
+        await deck._consume_splash_push_deadline()
         async with deck._device_lock:
             await deck._exec_device_io(
                 deck._device.set_partial_window_image,

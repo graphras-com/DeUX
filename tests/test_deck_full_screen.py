@@ -162,6 +162,52 @@ class TestShowSplash:
 
 
 # ---------------------------------------------------------------------------
+# min_display_ms — splash push-hold deadline
+# ---------------------------------------------------------------------------
+
+
+class TestSplashMinDisplayMs:
+    """:meth:`Deck.show_full_screen_image` ``min_display_ms`` semantics."""
+
+    async def test_default_does_not_set_deadline(self, mock_streamdeck_device):
+        """Default ``min_display_ms=0`` leaves the deadline at None."""
+        deck = _attached_deck(mock_streamdeck_device)
+        src = Image.new("RGB", (200, 200), (10, 20, 30))
+
+        await deck.show_full_screen_image(src)
+
+        assert deck._splash_push_deadline is None
+
+    async def test_positive_value_records_future_deadline(
+        self, mock_streamdeck_device
+    ):
+        """A positive value sets a deadline in the future."""
+        import time as _time
+
+        deck = _attached_deck(mock_streamdeck_device)
+        src = Image.new("RGB", (200, 200), (10, 20, 30))
+
+        before = _time.perf_counter()
+        await deck.show_full_screen_image(src, min_display_ms=250)
+        after = _time.perf_counter()
+
+        assert deck._splash_push_deadline is not None
+        # Deadline should be ~250ms after the call's start.
+        assert before + 0.25 <= deck._splash_push_deadline <= after + 0.25 + 0.05
+
+    async def test_show_splash_forwards_min_display_ms(
+        self, mock_streamdeck_device
+    ):
+        """``show_splash`` forwards ``min_display_ms`` to the underlying method."""
+        deck = _attached_deck(mock_streamdeck_device)
+        src = Image.new("RGB", (200, 200), (10, 20, 30))
+
+        await deck.show_splash(src, min_display_ms=100)
+
+        assert deck._splash_push_deadline is not None
+
+
+# ---------------------------------------------------------------------------
 # clear_full_screen_image
 # ---------------------------------------------------------------------------
 
