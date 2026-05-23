@@ -20,6 +20,7 @@ nav:
   - Home: index.md
   - Architecture: architecture.md
   - Guides:
+      - DUI Repository & Built-in Packages: guides/dui-repository.md
       - Creating DUI Packages: guides/creating-dui-packages.md
   - Example: example.md
   - API Reference: reference/

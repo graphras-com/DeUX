@@ -120,6 +120,8 @@ No environment variables are required. Device capabilities are auto-detected fro
 
 `.dui` packages are configured via YAML manifests defining bindings (text, image, visibility, color, range, slider, toggle, iconify) and event mappings.
 
+DeUX ships with three ready-to-use packages — `IconKey`, `PictureKey`, and `DashboardCard` — that the quick-start example uses by name. See the [DUI Repository & Built-in Packages](docs/guides/dui-repository.md) guide for the full catalogue and instructions on registering your own package directories. To author new packages, see [Creating DUI Packages](docs/guides/creating-dui-packages.md).
+
 ## Development
 
 Run tests:
