@@ -39,7 +39,7 @@ class RenderingContext:
         "use the system-wide default".
     stylesheet : str or None
         CSS stylesheet text derived from *theme*.  When set, this
-        overrides the module-level ``_active_stylesheet`` in
+        overrides the module-level ``_stylesheet`` holder in
         :mod:`~deux.render.svg_rasterize` for the duration of the
         render.
 

@@ -31,12 +31,12 @@ def _fake_png(width: int = 10, height: int = 10) -> bytes:
 @pytest.fixture(autouse=True)
 def _reset_stylesheet():
     """Reset stylesheet and cached usvg options before/after each test."""
-    original_stylesheet = svg_mod._active_stylesheet
+    original_stylesheet = svg_mod._stylesheet.css
     # Clear thread-local usvg opts cache so each test gets fresh mocks
     original_opts = getattr(svg_mod._thread_local, "usvg_opts", None)
     svg_mod._thread_local.usvg_opts = None
     yield
-    svg_mod._active_stylesheet = original_stylesheet
+    svg_mod._stylesheet.css = original_stylesheet
     svg_mod._thread_local.usvg_opts = original_opts
 
 
@@ -165,7 +165,7 @@ class TestSvgStylesheet:
 
     def test_default_stylesheet_is_none(self):
         """No stylesheet is active by default."""
-        svg_mod._active_stylesheet = None
+        svg_mod._stylesheet.css = None
         assert get_svg_stylesheet() is None
 
     def test_set_and_get_stylesheet(self):

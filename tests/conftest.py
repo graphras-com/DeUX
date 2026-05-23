@@ -22,7 +22,7 @@ from deux.ui.screen import Screen
 from deux.ui.touch_strip import TouchStrip
 
 # Capture pristine state BEFORE any test modules are imported.
-_PRISTINE_ACTIVE_STYLESHEET: str | None = _svg_mod._active_stylesheet
+_PRISTINE_ACTIVE_STYLESHEET: str | None = _svg_mod._stylesheet.css
 _PRISTINE_ACTIVE_THEME = _theme_mod._active_theme
 
 if TYPE_CHECKING:
@@ -36,10 +36,10 @@ def _reset_svg_state():
     Restores the pristine state captured at conftest import time.
     Also resets ``_active_theme`` to prevent cross-test state bleed.
     """
-    _svg_mod._active_stylesheet = _PRISTINE_ACTIVE_STYLESHEET
+    _svg_mod._stylesheet.css = _PRISTINE_ACTIVE_STYLESHEET
     _theme_mod._active_theme = _PRISTINE_ACTIVE_THEME
     yield
-    _svg_mod._active_stylesheet = _PRISTINE_ACTIVE_STYLESHEET
+    _svg_mod._stylesheet.css = _PRISTINE_ACTIVE_STYLESHEET
     _theme_mod._active_theme = _PRISTINE_ACTIVE_THEME
 
 

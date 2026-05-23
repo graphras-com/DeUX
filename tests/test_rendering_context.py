@@ -47,26 +47,26 @@ class TestContextIsolation:
         """_svg_to_png with ctx= does not read or modify global stylesheet."""
         import deux.render.svg_rasterize as svg_mod
 
-        original_stylesheet = svg_mod._active_stylesheet
+        original_stylesheet = svg_mod._stylesheet.css
 
         theme = Theme.from_color(255, 0, 0)
         _ctx = RenderingContext.from_theme(theme)
 
         # The global should remain unchanged after creating a context.
-        assert svg_mod._active_stylesheet == original_stylesheet
+        assert svg_mod._stylesheet.css == original_stylesheet
         assert _ctx.resolve_stylesheet() == theme.css
 
     def test_rasterize_svg_with_context_does_not_mutate_global(self):
         """_rasterize_svg with ctx= does not read or modify global stylesheet."""
         import deux.render.svg_rasterize as svg_mod
 
-        original_stylesheet = svg_mod._active_stylesheet
+        original_stylesheet = svg_mod._stylesheet.css
 
         theme = Theme.from_color(0, 255, 0)
         _ctx = RenderingContext.from_theme(theme)
 
         # The global should remain unchanged.
-        assert svg_mod._active_stylesheet == original_stylesheet
+        assert svg_mod._stylesheet.css == original_stylesheet
         assert _ctx.resolve_stylesheet() == theme.css
 
 
