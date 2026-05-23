@@ -89,6 +89,70 @@ def _find_svg_ids(svg_source: str) -> set[str]:
     return ids
 
 
+def _parse_direction(binding_name: str, raw: dict[str, Any]) -> RangeDirection:
+    """Parse and validate a ``direction`` field from a binding entry.
+
+    Parameters
+    ----------
+    binding_name : str
+        Binding name for error messages.
+    raw : dict[str, Any]
+        Raw YAML mapping for the binding. The ``direction`` key is optional
+        and defaults to ``"horizontal"``.
+
+    Returns
+    -------
+    RangeDirection
+        The parsed direction enum value.
+
+    Raises
+    ------
+    PackageError
+        If the direction value is not a valid :class:`RangeDirection`.
+    """
+    direction_raw = raw.get("direction", "horizontal")
+    try:
+        return RangeDirection(direction_raw)
+    except ValueError:
+        valid_dirs = [d.value for d in RangeDirection]
+        raise PackageError(
+            f"Binding '{binding_name}' has invalid direction '{direction_raw}'. "
+            f"Valid directions: {valid_dirs}"
+        ) from None
+
+
+def _parse_normalised_default(binding_name: str, raw: dict[str, Any]) -> float:
+    """Parse and validate a normalised ``default`` field (0.0 to 1.0).
+
+    Parameters
+    ----------
+    binding_name : str
+        Binding name for error messages.
+    raw : dict[str, Any]
+        Raw YAML mapping for the binding. The ``default`` key is optional
+        and defaults to ``0.0``.
+
+    Returns
+    -------
+    float
+        The parsed default value, guaranteed to be in ``[0.0, 1.0]``.
+
+    Raises
+    ------
+    PackageError
+        If the value is not numeric or falls outside ``[0.0, 1.0]``.
+    """
+    default_val = raw.get("default", 0.0)
+    if not isinstance(default_val, (int, float)):
+        raise PackageError(f"Binding '{binding_name}': default must be a number")
+    default_float = float(default_val)
+    if not 0.0 <= default_float <= 1.0:
+        raise PackageError(
+            f"Binding '{binding_name}': default must be between 0.0 and 1.0"
+        )
+    return default_float
+
+
 def _parse_binding(name: str, raw: dict[str, Any]) -> Binding:
     """Parse a single binding entry from the manifest.
 
@@ -210,43 +274,15 @@ def _parse_binding(name: str, raw: dict[str, Any]) -> Binding:
         )
 
     if binding_type == BindingType.RANGE:
-        direction_raw = raw.get("direction", "horizontal")
-        try:
-            direction = RangeDirection(direction_raw)
-        except ValueError:
-            valid_dirs = [d.value for d in RangeDirection]
-            raise PackageError(
-                f"Binding '{name}' has invalid direction '{direction_raw}'. "
-                f"Valid directions: {valid_dirs}"
-            ) from None
-        default_val = raw.get("default", 0.0)
-        if not isinstance(default_val, (int, float)):
-            raise PackageError(f"Binding '{name}': default must be a number")
-        default_float = float(default_val)
-        if not 0.0 <= default_float <= 1.0:
-            raise PackageError(f"Binding '{name}': default must be between 0.0 and 1.0")
         return RangeBinding(
             node=node,
-            default=default_float,
-            direction=direction,
+            default=_parse_normalised_default(name, raw),
+            direction=_parse_direction(name, raw),
         )
 
     if binding_type == BindingType.SLIDER:
-        direction_raw = raw.get("direction", "horizontal")
-        try:
-            direction = RangeDirection(direction_raw)
-        except ValueError:
-            valid_dirs = [d.value for d in RangeDirection]
-            raise PackageError(
-                f"Binding '{name}' has invalid direction '{direction_raw}'. "
-                f"Valid directions: {valid_dirs}"
-            ) from None
-        default_val = raw.get("default", 0.0)
-        if not isinstance(default_val, (int, float)):
-            raise PackageError(f"Binding '{name}': default must be a number")
-        default_float = float(default_val)
-        if not 0.0 <= default_float <= 1.0:
-            raise PackageError(f"Binding '{name}': default must be between 0.0 and 1.0")
+        direction = _parse_direction(name, raw)
+        default_float = _parse_normalised_default(name, raw)
         min_pos_raw = raw.get("min_pos")
         if min_pos_raw is None:
             raise PackageError(f"Binding '{name}' missing 'min_pos'")
@@ -425,12 +461,7 @@ def _parse_transform_binding(name: str, node: str, raw: dict[str, Any]) -> Trans
     PackageError
         If any field is missing or has an invalid value.
     """
-    default_val = raw.get("default", 0.0)
-    if not isinstance(default_val, (int, float)):
-        raise PackageError(f"Binding '{name}': default must be a number")
-    default_float = float(default_val)
-    if not 0.0 <= default_float <= 1.0:
-        raise PackageError(f"Binding '{name}': default must be between 0.0 and 1.0")
+    default_float = _parse_normalised_default(name, raw)
 
     raw_transforms = raw.get("transforms")
     if raw_transforms is None:
