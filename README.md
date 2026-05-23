@@ -114,6 +114,10 @@ async def main():
 asyncio.run(main())
 ```
 
+> **Note:** `on_connect()` is a decorator factory (call with parens) and accepts
+> optional `serial=` / `deck_type=` filters. `on_disconnect` is a property —
+> use it bare, without parens (`@manager.on_disconnect`).
+
 ## Configuration
 
 No environment variables are required. Device capabilities are auto-detected from hardware.

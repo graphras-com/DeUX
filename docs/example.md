@@ -81,6 +81,13 @@ async def run() -> None:
 deck is ready, and re-fires it on reconnects when `auto_reconnect=True`.
 On disconnect, the example shuts down its background tasks cleanly.
 
+> **Note:** the two hooks have different shapes. `on_connect()` is a
+> decorator factory (call with parens) and accepts optional `serial=` /
+> `deck_type=` filters to scope the handler to specific devices.
+> `on_disconnect` is a property that returns the decorator directly — use
+> it bare, without parens (`@manager.on_disconnect`). Calling
+> `@manager.on_disconnect()` will raise `TypeError`.
+
 ## Highlights
 
 ### Real countdown timer
