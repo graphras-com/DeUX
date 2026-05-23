@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 
 class PackageType(Enum):
@@ -78,6 +79,10 @@ class TextBinding:
     max_height: int | None = None
     line_height: float | None = None
 
+    def default_value(self) -> Any:
+        """Return the initial stored value for this binding."""
+        return self.default
+
 
 @dataclass(frozen=True, slots=True)
 class ImageBinding:
@@ -87,6 +92,14 @@ class ImageBinding:
     fit: ImageFit = ImageFit.COVER
     placeholder_node: str | None = None
 
+    # ImageBinding has no default-displayable value; renderer treats every
+    # assignment as a change (PIL Image equality is expensive/unreliable).
+    force_dirty = True
+
+    def default_value(self) -> Any:
+        """Return the initial stored value for this binding."""
+        return None
+
 
 @dataclass(frozen=True, slots=True)
 class VisibilityBinding:
@@ -94,6 +107,10 @@ class VisibilityBinding:
 
     node: str
     default: bool = True
+
+    def default_value(self) -> Any:
+        """Return the initial stored value for this binding."""
+        return self.default
 
 
 _COLOR_ATTRIBUTES: frozenset[str] = frozenset({"fill", "stroke", "color"})
@@ -115,6 +132,10 @@ class ColorBinding:
             )
             raise ValueError(msg)
 
+    def default_value(self) -> Any:
+        """Return the initial stored value for this binding."""
+        return self.default
+
 
 @dataclass(frozen=True, slots=True)
 class RangeBinding:
@@ -123,6 +144,10 @@ class RangeBinding:
     node: str
     default: float = 0.0
     direction: RangeDirection = RangeDirection.HORIZONTAL
+
+    def default_value(self) -> Any:
+        """Return the initial stored value for this binding."""
+        return self.default
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,6 +159,10 @@ class SliderBinding:
     direction: RangeDirection = RangeDirection.HORIZONTAL
     min_pos: float = 0.0
     max_pos: float = 0.0
+
+    def default_value(self) -> Any:
+        """Return the initial stored value for this binding."""
+        return self.default
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,6 +176,10 @@ class ToggleBinding:
     node_on: str
     node_off: str
     default: bool = False
+
+    def default_value(self) -> Any:
+        """Return the initial stored value for this binding."""
+        return self.default
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,6 +199,10 @@ class IconifyBinding:
     node: str
     size: int
     default: str = ""
+
+    def default_value(self) -> Any:
+        """Return the initial stored value for this binding."""
+        return self.default
 
 
 @dataclass(frozen=True, slots=True)
@@ -214,6 +251,40 @@ class ListBinding:
     inactive_attrs: dict[str, str] = field(default_factory=dict)
     separator: str = ""
     icon_size: int = 16
+
+    def default_value(self) -> Any:
+        """Return the initial stored value for this binding."""
+        return {"items": list(self.default_items), "index": self.default_index}
+
+    def coerce(self, raw: Any, current: Any) -> Any:
+        """Merge a partial ``{"items": ..., "index": ...}`` payload into *current*.
+
+        When *raw* is a mapping containing only ``items`` or only ``index``,
+        the other half is preserved from *current*.  An ``index`` of ``-1``
+        is normalised to ``None``.  If ``items`` is provided without
+        ``index``, the existing index is clamped to the new bounds (or
+        cleared to ``None`` if the new list is empty).
+        """
+        if not isinstance(raw, dict):
+            return raw
+        base = current if isinstance(current, dict) else {"items": [], "index": None}
+        merged = dict(base)
+        if "items" in raw:
+            merged["items"] = list(raw["items"])
+        if "index" in raw:
+            merged["index"] = raw["index"]
+        # Clamp index when items changed but index wasn't explicitly set.
+        if "items" in raw and "index" not in raw:
+            items = merged["items"]
+            idx = merged["index"]
+            if idx is not None and idx != -1 and items and idx >= len(items):
+                merged["index"] = len(items) - 1
+            elif not items:
+                merged["index"] = None
+        # Normalise -1 → None.
+        if merged.get("index") == -1:
+            merged["index"] = None
+        return merged
 
 
 class TransformKind(Enum):
@@ -275,6 +346,10 @@ class TransformBinding:
     default: float = 0.0
     transforms: tuple[TransformSpec, ...] = ()
 
+    def default_value(self) -> Any:
+        """Return the initial stored value for this binding."""
+        return self.default
+
 
 @dataclass(frozen=True, slots=True)
 class CssClassBinding:
@@ -293,6 +368,10 @@ class CssClassBinding:
 
     node: str
     default: str = ""
+
+    def default_value(self) -> Any:
+        """Return the initial stored value for this binding."""
+        return self.default
 
 
 Binding = (

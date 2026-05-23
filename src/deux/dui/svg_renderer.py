@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any
 
 from PIL import ImageFont
 
@@ -521,28 +521,43 @@ class SvgRenderer:
         self._parent_map_root: ET.Element | None = None
         self._parent_map_cache: dict[ET.Element, ET.Element] | None = None
 
+        # Register binding handlers as bound methods so subclasses can override
+        # ``_apply_*`` and have the override take effect without re-registering.
+        self._binding_handlers: dict[type[Binding], Callable[..., None]] = {
+            TextBinding: lambda root, elem, name, binding, value: self._apply_text(
+                root, elem, binding, value
+            ),
+            ImageBinding: lambda root, elem, name, binding, value: self._apply_image(
+                root, elem, binding, value
+            ),
+            VisibilityBinding: lambda root, elem, name, binding, value: self._apply_visibility(
+                elem, value
+            ),
+            ColorBinding: lambda root, elem, name, binding, value: self._apply_color(
+                elem, binding, value
+            ),
+            RangeBinding: lambda root, elem, name, binding, value: self._apply_range(
+                elem, name, binding, value
+            ),
+            SliderBinding: lambda root, elem, name, binding, value: self._apply_slider(
+                elem, binding, value
+            ),
+            IconifyBinding: lambda root, elem, name, binding, value: self._apply_iconify(
+                elem, binding, value
+            ),
+            ListBinding: lambda root, elem, name, binding, value: self._apply_list(
+                root, elem, binding, value
+            ),
+            TransformBinding: lambda root, elem, name, binding, value: self._apply_transform(
+                elem, binding, value
+            ),
+            CssClassBinding: lambda root, elem, name, binding, value: self._apply_css_class(
+                elem, value
+            ),
+        }
+
         for name, binding in spec.bindings.items():
-            if isinstance(binding, (TextBinding, VisibilityBinding, ColorBinding, CssClassBinding)):
-                self._values[name] = binding.default
-            elif isinstance(binding, RangeBinding):
-                self._values[name] = binding.default
-                elem = _find_element_by_id(self._base_root, binding.node)
-                if elem is not None:
-                    attr = (
-                        "width"
-                        if binding.direction == RangeDirection.HORIZONTAL
-                        else "height"
-                    )
-                    self._range_extents[name] = float(elem.get(attr, "0"))
-            elif isinstance(
-                binding, (SliderBinding, ToggleBinding, IconifyBinding, TransformBinding)
-            ):
-                self._values[name] = binding.default
-            elif isinstance(binding, ListBinding):
-                self._values[name] = {
-                    "items": list(binding.default_items),
-                    "index": binding.default_index,
-                }
+            self._values[name] = binding.default_value()
 
     def set(self, name: str, value: Any) -> bool:
         """Set a binding value.
@@ -573,37 +588,21 @@ class SvgRenderer:
 
         old = self._values.get(name)
         binding = self._spec.bindings[name]
-        if isinstance(binding, ImageBinding):
-            self._values[name] = value
+
+        # Per-binding coercion (e.g. ListBinding merges partial updates).
+        coerce = getattr(binding, "coerce", None)
+        new_value = coerce(value, old) if callable(coerce) else value
+
+        # Some bindings (e.g. images) always count as changed because their
+        # values aren't cheaply comparable.
+        if getattr(binding, "force_dirty", False):
+            self._values[name] = new_value
             return True
 
-        if isinstance(binding, ListBinding) and isinstance(value, dict):
-            current = self._values.get(name, {"items": [], "index": None})
-            merged = dict(current)
-            if "items" in value:
-                merged["items"] = list(value["items"])
-            if "index" in value:
-                merged["index"] = value["index"]
-            # Clamp index when items changed but index wasn't explicitly set.
-            if "items" in value and "index" not in value:
-                items = merged["items"]
-                idx = merged["index"]
-                if idx is not None and idx != -1 and items and idx >= len(items):
-                    merged["index"] = len(items) - 1
-                elif not items:
-                    merged["index"] = None
-            # Normalise -1 → None.
-            if merged.get("index") == -1:
-                merged["index"] = None
-            if old == merged:
-                return False
-            self._values[name] = merged
-            return True
-
-        if old == value:
+        if old == new_value:
             return False
 
-        self._values[name] = value
+        self._values[name] = new_value
         return True
 
     def set_many(self, **kwargs: Any) -> bool:
@@ -936,40 +935,9 @@ class SvgRenderer:
                 bg_elem.set("display", "none")
 
     #: Dispatch table mapping binding types to handler methods.
-    #: Each handler is called with (root, elem, name, binding, value).
-    #: To support a new binding type, register it here without modifying
-    #: ``_apply_binding`` itself.
-    _BINDING_HANDLERS: ClassVar[
-        dict[type[Binding], Callable[[SvgRenderer, ET.Element, ET.Element, str, Any, Any], None]]
-    ] = {}
-
-    @staticmethod
-    def _register_binding_handler(
-        binding_type: type[Binding],
-    ) -> Callable[
-        [Callable[[SvgRenderer, ET.Element, ET.Element, str, Any, Any], None]],
-        Callable[[SvgRenderer, ET.Element, ET.Element, str, Any, Any], None],
-    ]:
-        """Decorator to register a binding handler in the dispatch table.
-
-        Parameters
-        ----------
-        binding_type : type[Binding]
-            The binding class this handler processes.
-
-        Returns
-        -------
-        Callable
-            The decorator that registers the handler.
-        """
-
-        def decorator(
-            func: Callable[[SvgRenderer, ET.Element, ET.Element, str, Any, Any], None],
-        ) -> Callable[[SvgRenderer, ET.Element, ET.Element, str, Any, Any], None]:
-            SvgRenderer._BINDING_HANDLERS[binding_type] = func
-            return func
-
-        return decorator
+    #: Populated per-instance in :meth:`__init__` (bound to ``self``) so that
+    #: handler resolution is uniform across binding types and overriding
+    #: ``_apply_*`` in subclasses automatically takes effect.
 
     def _apply_binding(
         self,
@@ -1008,9 +976,9 @@ class SvgRenderer:
             )
             return
 
-        handler = self._BINDING_HANDLERS.get(type(binding))
+        handler = self._binding_handlers.get(type(binding))
         if handler is not None:
-            handler(self, root, elem, name, binding, value)
+            handler(root, elem, name, binding, value)
         else:
             logger.warning(
                 "Binding '%s': no handler registered for type '%s'",
@@ -1247,7 +1215,18 @@ class SvgRenderer:
         ratio = max(
             0.0, min(1.0, float(value if value is not None else binding.default))
         )
-        extent = self._range_extents.get(name, 0.0)
+        if name not in self._range_extents:
+            # Lazily capture the original extent from the unmodified template
+            # the first time this binding is applied, since per-render clones
+            # already carry the previously-mutated value.
+            original = _find_element_by_id(self._base_root, binding.node)
+            attr_lookup = (
+                "width" if binding.direction == RangeDirection.HORIZONTAL else "height"
+            )
+            self._range_extents[name] = (
+                float(original.get(attr_lookup, "0")) if original is not None else 0.0
+            )
+        extent = self._range_extents[name]
         attr = "width" if binding.direction == RangeDirection.HORIZONTAL else "height"
         elem.set(attr, str(ratio * extent))
 
@@ -1553,77 +1532,3 @@ class SvgRenderer:
 
         return _svg_to_image(svg_data, width, height, mode="RGBA", ctx=self._rendering_ctx)
 
-
-# ---------------------------------------------------------------------------
-# Binding handler registrations
-# ---------------------------------------------------------------------------
-
-
-@SvgRenderer._register_binding_handler(TextBinding)
-def _handle_text(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_text(root, elem, binding, value)
-
-
-@SvgRenderer._register_binding_handler(ImageBinding)
-def _handle_image(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_image(root, elem, binding, value)
-
-
-@SvgRenderer._register_binding_handler(VisibilityBinding)
-def _handle_visibility(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_visibility(elem, value)
-
-
-@SvgRenderer._register_binding_handler(ColorBinding)
-def _handle_color(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_color(elem, binding, value)
-
-
-@SvgRenderer._register_binding_handler(RangeBinding)
-def _handle_range(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_range(elem, name, binding, value)
-
-
-@SvgRenderer._register_binding_handler(SliderBinding)
-def _handle_slider(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_slider(elem, binding, value)
-
-
-@SvgRenderer._register_binding_handler(IconifyBinding)
-def _handle_iconify(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_iconify(elem, binding, value)
-
-
-@SvgRenderer._register_binding_handler(ListBinding)
-def _handle_list(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_list(root, elem, binding, value)
-
-
-@SvgRenderer._register_binding_handler(TransformBinding)
-def _handle_transform(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_transform(elem, binding, value)
-
-
-@SvgRenderer._register_binding_handler(CssClassBinding)
-def _handle_css_class(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_css_class(elem, value)
