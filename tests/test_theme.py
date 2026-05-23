@@ -31,10 +31,10 @@ from deux.ui.screen import Screen
 def _reset_theme():
     """Reset theme state before/after each test."""
     original = theme_mod._active_theme
-    original_css = svg_mod._active_stylesheet
+    original_css = svg_mod._stylesheet.css
     yield
     theme_mod._active_theme = original
-    svg_mod._active_stylesheet = original_css
+    svg_mod._stylesheet.css = original_css
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +324,7 @@ class TestActiveTheme:
     def test_set_active_theme_updates_stylesheet(self):
         custom = Theme.from_color(255, 0, 0)
         set_active_theme(custom)
-        assert svg_mod._active_stylesheet == custom.css
+        assert svg_mod._stylesheet.css == custom.css
 
     def test_set_active_theme_none_resets_to_default(self):
         set_active_theme(Theme.from_color(255, 0, 0))
