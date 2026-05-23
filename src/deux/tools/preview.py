@@ -46,11 +46,26 @@ if TYPE_CHECKING:
 from PIL import Image
 
 from deux.render.key_renderer import _encode_image_bytes
-from deux.render.svg_rasterize import _svg_to_png
+from deux.render.svg_rasterize import _svg_to_image, _svg_to_png
 from deux.runtime.capabilities import DeviceCapabilities
 from deux.runtime.deck import _HID_WRITE_TIMEOUT
 
+from .._xml import safe_fromstring
+
 logger = logging.getLogger(__name__)
+
+# CLI output convention
+# ---------------------
+# User-facing messages and errors are written to stderr via
+# ``print(..., file=sys.stderr)`` (annotated with a ruff T201 ignore
+# directive at each call site). This is the deliberate CLI convention:
+# such output should always reach the user regardless of the configured
+# logging level. The ``logger`` is reserved for diagnostic / status
+# output (``debug`` and ``info``) that respects the ``--verbose`` flag.
+
+# Regex used to strip unit suffixes (``"px"``, ``"pt"``, ...) from SVG
+# width / height attributes.
+_DIM_RE = re.compile(r"([\d.]+)")
 
 # Upper-bound slot counts used only to generate ``--keyN`` / ``--cardN``
 # CLI flags. The tool ignores flags that don't correspond to an actual
@@ -97,13 +112,55 @@ def parse_hex_color(value: str) -> str:
 
 
 
+def _compute_fit_dims(
+    svg_data: bytes, max_width: int, max_height: int
+) -> tuple[int, int]:
+    """Compute output dimensions that fit *svg_data* into a bounding box.
+
+    Parses the SVG's intrinsic ``width`` / ``height`` attributes and
+    returns ``(out_w, out_h)`` preserving aspect ratio within
+    *max_width* x *max_height*. Falls back to ``(max_width, max_height)``
+    if the SVG omits or has unparseable dimensions.
+
+    Parameters
+    ----------
+    svg_data : bytes
+        Raw SVG content (UTF-8).
+    max_width : int
+        Maximum output width in pixels.
+    max_height : int
+        Maximum output height in pixels.
+
+    Returns
+    -------
+    tuple[int, int]
+        ``(out_w, out_h)`` — both ``>= 1``.
+    """
+    try:
+        root = safe_fromstring(svg_data)  # untrusted: user-supplied SVG
+        w_match = _DIM_RE.match(root.get("width", ""))
+        h_match = _DIM_RE.match(root.get("height", ""))
+        if w_match and h_match:
+            svg_w = float(w_match.group(1))
+            svg_h = float(h_match.group(1))
+            if svg_w > 0 and svg_h > 0:
+                scale = min(max_width / svg_w, max_height / svg_h)
+                return max(1, int(svg_w * scale)), max(1, int(svg_h * scale))
+    except Exception:
+        logger.debug(
+            "Failed to parse SVG intrinsic dimensions; using fallback raster size %dx%d.",
+            max_width,
+            max_height,
+        )
+    return max_width, max_height
+
+
 def _svg_to_png_fit(svg_data: bytes, max_width: int, max_height: int) -> bytes:
     """Rasterise SVG bytes to PNG, fitting within a bounding box.
 
-    Parses the SVG's intrinsic ``width`` and ``height`` attributes to
-    compute the correct output size that preserves aspect ratio within
-    the *max_width* x *max_height* bounding box, then delegates to
-    the active SVG backend.
+    Parses the SVG's intrinsic dimensions to compute the correct output
+    size that preserves aspect ratio within *max_width* x *max_height*,
+    then delegates to the active SVG backend.
 
     Parameters
     ----------
@@ -124,35 +181,8 @@ def _svg_to_png_fit(svg_data: bytes, max_width: int, max_height: int) -> bytes:
     RasterizeError
         If no SVG renderer backend is available.
     """
-    import re as _re
-
-    from .._xml import safe_fromstring
-
-    # Try to extract intrinsic dimensions to preserve aspect ratio.
-    try:
-        root = safe_fromstring(svg_data)  # untrusted: user-supplied SVG
-        w_attr = root.get("width", "")
-        h_attr = root.get("height", "")
-        # Strip unit suffixes like "px", "pt", etc.
-        w_match = _re.match(r"([\d.]+)", w_attr)
-        h_match = _re.match(r"([\d.]+)", h_attr)
-        if w_match and h_match:
-            svg_w = float(w_match.group(1))
-            svg_h = float(h_match.group(1))
-            if svg_w > 0 and svg_h > 0:
-                scale = min(max_width / svg_w, max_height / svg_h)
-                out_w = max(1, int(svg_w * scale))
-                out_h = max(1, int(svg_h * scale))
-                return _svg_to_png(svg_data, out_w, out_h)
-    except Exception:
-        logger.debug(
-            "Failed to parse SVG intrinsic dimensions; using fallback raster size %dx%d.",
-            max_width,
-            max_height,
-        )
-
-    # Fallback: force exact dimensions.
-    return _svg_to_png(svg_data, max_width, max_height)
+    out_w, out_h = _compute_fit_dims(svg_data, max_width, max_height)
+    return _svg_to_png(svg_data, out_w, out_h)
 
 
 def _svg_to_image_fit(
@@ -160,7 +190,7 @@ def _svg_to_image_fit(
 ) -> Image.Image:
     """Rasterise SVG bytes to a PIL RGBA Image fitted within a bounding box.
 
-    Preserves the SVG's intrinsic aspect ratio.  Uses the raw-RGBA path
+    Preserves the SVG's intrinsic aspect ratio. Uses the raw-RGBA path
     to avoid a PNG encode/decode round-trip.
 
     Parameters
@@ -182,32 +212,7 @@ def _svg_to_image_fit(
     RasterizeError
         If no SVG renderer backend is available.
     """
-    import re as _re
-
-    from .._xml import safe_fromstring
-    from ..render.svg_rasterize import _svg_to_image
-
-    out_w, out_h = max_width, max_height
-    try:
-        root = safe_fromstring(svg_data)
-        w_attr = root.get("width", "")
-        h_attr = root.get("height", "")
-        w_match = _re.match(r"([\d.]+)", w_attr)
-        h_match = _re.match(r"([\d.]+)", h_attr)
-        if w_match and h_match:
-            svg_w = float(w_match.group(1))
-            svg_h = float(h_match.group(1))
-            if svg_w > 0 and svg_h > 0:
-                scale = min(max_width / svg_w, max_height / svg_h)
-                out_w = max(1, int(svg_w * scale))
-                out_h = max(1, int(svg_h * scale))
-    except Exception:
-        logger.debug(
-            "Failed to parse SVG intrinsic dimensions; using fallback raster size %dx%d.",
-            max_width,
-            max_height,
-        )
-
+    out_w, out_h = _compute_fit_dims(svg_data, max_width, max_height)
     return _svg_to_image(svg_data, out_w, out_h, mode="RGBA")
 
 
@@ -222,6 +227,39 @@ def load_svg(path: Path, max_width: int, max_height: int) -> Image.Image:
     img = _svg_to_image_fit(svg_data, max_width, max_height)
     img.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
     return img
+
+
+def _center_on_canvas(
+    svg_img: Image.Image,
+    size: tuple[int, int],
+    background: str,
+) -> Image.Image:
+    """Centre *svg_img* on an RGB canvas of *size* filled with *background*.
+
+    Pastes using *svg_img*'s alpha channel as the mask when present.
+
+    Parameters
+    ----------
+    svg_img : Image.Image
+        Image to composite onto the canvas.
+    size : tuple[int, int]
+        ``(width, height)`` of the target canvas.
+    background : str
+        Canvas fill colour (any PIL-compatible colour string).
+
+    Returns
+    -------
+    Image.Image
+        New RGB canvas with *svg_img* centred.
+    """
+    canvas = Image.new("RGB", size, background)
+    x = (size[0] - svg_img.width) // 2
+    y = (size[1] - svg_img.height) // 2
+    if svg_img.mode == "RGBA":
+        canvas.paste(svg_img, (x, y), svg_img)
+    else:
+        canvas.paste(svg_img, (x, y))
+    return canvas
 
 
 def compose_key_image(
@@ -248,14 +286,7 @@ def compose_key_image(
     bytes
         JPEG-encoded image bytes ready for ``set_key_image``.
     """
-    canvas = Image.new("RGB", key_size, background)
-    x = (key_size[0] - svg_img.width) // 2
-    y = (key_size[1] - svg_img.height) // 2
-    if svg_img.mode == "RGBA":
-        canvas.paste(svg_img, (x, y), svg_img)
-    else:
-        canvas.paste(svg_img, (x, y))
-    return _encode_image_bytes(canvas)
+    return _encode_image_bytes(_center_on_canvas(svg_img, key_size, background))
 
 
 def compose_card_image(
@@ -279,14 +310,7 @@ def compose_card_image(
     Image.Image
         Composited card image at *panel_size*.
     """
-    canvas = Image.new("RGB", panel_size, background)
-    x = (panel_size[0] - svg_img.width) // 2
-    y = (panel_size[1] - svg_img.height) // 2
-    if svg_img.mode == "RGBA":
-        canvas.paste(svg_img, (x, y), svg_img)
-    else:
-        canvas.paste(svg_img, (x, y))
-    return canvas
+    return _center_on_canvas(svg_img, panel_size, background)
 
 
 def compose_touchstrip(
@@ -338,14 +362,9 @@ def compose_full_touchstrip(
     bytes
         JPEG-encoded image bytes ready for ``set_touchscreen_image``.
     """
-    canvas = Image.new("RGB", touchscreen_size, background)
-    x = (touchscreen_size[0] - svg_img.width) // 2
-    y = (touchscreen_size[1] - svg_img.height) // 2
-    if svg_img.mode == "RGBA":
-        canvas.paste(svg_img, (x, y), svg_img)
-    else:
-        canvas.paste(svg_img, (x, y))
-    return _encode_image_bytes(canvas)
+    return _encode_image_bytes(
+        _center_on_canvas(svg_img, touchscreen_size, background)
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
