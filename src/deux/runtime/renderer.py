@@ -91,21 +91,17 @@ class DeckRenderer:
     def _resolve_stylesheet(self) -> str:
         """Resolve the effective CSS stylesheet for the active screen.
 
-        The cascade is: screen theme > deck theme > system theme.
+        .. deprecated::
+            Use :meth:`Deck.resolve_stylesheet` instead.  This method is
+            retained as a thin pass-through to avoid breaking downstream
+            callers and is scheduled for removal in a future release.
 
         Returns
         -------
         str
             CSS stylesheet string from the most specific theme.
         """
-        from ..render.theme import get_active_theme
-
-        screen = self._deck._active_screen
-        if screen is not None and screen.theme is not None:
-            return screen.theme.css
-        if self._deck._theme is not None:
-            return self._deck._theme.css
-        return get_active_theme().css
+        return self._deck.resolve_stylesheet()
 
     # ------------------------------------------------------------------
     # Key rendering
@@ -606,7 +602,7 @@ class DeckRenderer:
         from ..render.context import RenderingContext
         from ..render.svg_rasterize import set_svg_stylesheet
 
-        css = self._resolve_stylesheet()
+        css = self._deck.resolve_stylesheet()
 
         # Update global stylesheet for renderers without an explicit context.
         set_svg_stylesheet(css)
@@ -626,17 +622,17 @@ class DeckRenderer:
         from ..dui.card import DuiCard
         from ..dui.key import DuiKey
 
-        screen = self._deck._active_screen
+        screen = self._deck.active_screen
         if screen is None:
             return
 
         # Keys
         for key_slot in screen.keys.values():
             if isinstance(key_slot, DuiKey):
-                key_slot._renderer.set_rendering_context(ctx)
+                key_slot.set_rendering_context(ctx)
 
         # Touchscreen cards
         if screen.touch_strip is not None:
             for card in screen.touch_strip.cards:
                 if isinstance(card, DuiCard):
-                    card._renderer.set_rendering_context(ctx)
+                    card.set_rendering_context(ctx)

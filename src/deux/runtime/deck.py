@@ -361,7 +361,7 @@ class Deck:
         if all_icons:
             await prefetch_icons(all_icons)
 
-    def _resolve_stylesheet(self) -> str:
+    def resolve_stylesheet(self) -> str:
         """Resolve the effective CSS stylesheet for the active screen.
 
         The cascade is: screen theme > deck theme > system theme.
@@ -371,7 +371,19 @@ class Deck:
         str
             CSS stylesheet string from the most specific theme.
         """
-        return self._renderer._resolve_stylesheet()
+        from ..render.theme import get_active_theme
+
+        screen = self._active_screen
+        if screen is not None and screen.theme is not None:
+            return screen.theme.css
+        if self._theme is not None:
+            return self._theme.css
+        return get_active_theme().css
+
+    # Backwards-compatible alias preserved for callers that used the
+    # private name prior to the encapsulation refactor.  Prefer the
+    # public :meth:`resolve_stylesheet` for new code.
+    _resolve_stylesheet = resolve_stylesheet
 
     async def set_brightness(self, percent: int) -> None:
         """Set screen brightness.
@@ -548,7 +560,7 @@ class Deck:
 
         # Only drain cards that actually have pending callbacks.
         cards_with_pending = [
-            card for card in screen.cards if card._pending_callbacks
+            card for card in screen.cards if card.has_pending_callbacks
         ]
         if cards_with_pending:
             await asyncio.gather(

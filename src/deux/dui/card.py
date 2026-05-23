@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import builtins
 import logging
 import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING, Any
@@ -18,6 +19,7 @@ from .svg_renderer import SvgRenderer
 if TYPE_CHECKING:
     from PIL import Image
 
+    from ..render.context import RenderingContext
     from ..render.metrics import RenderMetrics
     from ..runtime.async_event import AsyncEvent
     from ..runtime.events import AsyncHandler, TouchEvent
@@ -298,6 +300,28 @@ class DuiCard(BindingMixin, Card):
             If *name* is not a known binding.
         """
         return self._renderer.get(name)
+
+    def collect_icon_names(self) -> builtins.set[str]:
+        """Return all Iconify icon identifiers needed by this card.
+
+        Returns
+        -------
+        set[str]
+            A set of ``"prefix:icon"`` strings referenced by the card's
+            bindings (defaults and current values).
+        """
+        return self._renderer.collect_icon_names()
+
+    def set_rendering_context(self, ctx: RenderingContext | None) -> None:
+        """Set the explicit rendering context for this card.
+
+        Parameters
+        ----------
+        ctx : RenderingContext or None
+            The rendering context to apply, or ``None`` to revert to
+            module-level defaults.
+        """
+        self._renderer.set_rendering_context(ctx)
 
     def set_range(
         self, name: str, value: float, *, min_val: float = 0, max_val: float = 1

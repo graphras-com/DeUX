@@ -421,11 +421,11 @@ class Screen:
         icons: set[str] = set()
         for key_slot in self._keys.values():
             if isinstance(key_slot, DuiKey):
-                icons.update(key_slot._renderer.collect_icon_names())
+                icons.update(key_slot.collect_icon_names())
         if self._touch_strip is not None:
             for card in self._touch_strip.cards:
                 if isinstance(card, DuiCard):
-                    icons.update(card._renderer.collect_icon_names())
+                    icons.update(card.collect_icon_names())
         return icons
 
     def screenshot(self, directory: str | Path) -> list[Path]:

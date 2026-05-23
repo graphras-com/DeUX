@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import builtins
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -15,6 +16,7 @@ from .spinner import SpinnerFrames
 from .svg_renderer import SvgRenderer
 
 if TYPE_CHECKING:
+    from ..render.context import RenderingContext
     from ..runtime.async_event import AsyncEvent
     from ..runtime.events import AsyncHandler
 
@@ -153,6 +155,28 @@ class DuiKey(BindingMixin, KeySlot):
             If *name* is not a known binding.
         """
         return self._renderer.get(name)
+
+    def collect_icon_names(self) -> builtins.set[str]:
+        """Return all Iconify icon identifiers needed by this key.
+
+        Returns
+        -------
+        set[str]
+            A set of ``"prefix:icon"`` strings referenced by the key's
+            bindings (defaults and current values).
+        """
+        return self._renderer.collect_icon_names()
+
+    def set_rendering_context(self, ctx: RenderingContext | None) -> None:
+        """Set the explicit rendering context for this key.
+
+        Parameters
+        ----------
+        ctx : RenderingContext or None
+            The rendering context to apply, or ``None`` to revert to
+            module-level defaults.
+        """
+        self._renderer.set_rendering_context(ctx)
 
     def set_range(
         self, name: str, value: float, *, min_val: float = 0, max_val: float = 1

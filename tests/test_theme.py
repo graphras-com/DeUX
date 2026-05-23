@@ -404,7 +404,7 @@ class TestDeckResolveStylesheet:
         set_active_theme(system_theme)
         screen = deck.screen("main")
         deck._active_screen = screen
-        assert deck._resolve_stylesheet() == system_theme.css
+        assert deck.resolve_stylesheet() == system_theme.css
 
     def test_deck_theme_overrides_system(self, deck):
         """Deck theme takes precedence over system theme."""
@@ -413,7 +413,7 @@ class TestDeckResolveStylesheet:
         deck.theme = deck_theme
         screen = deck.screen("main")
         deck._active_screen = screen
-        assert deck._resolve_stylesheet() == deck_theme.css
+        assert deck.resolve_stylesheet() == deck_theme.css
 
     def test_screen_theme_overrides_deck(self, deck):
         """Screen theme takes precedence over deck theme."""
@@ -422,7 +422,7 @@ class TestDeckResolveStylesheet:
         screen_theme = Theme.from_color(200, 200, 200)
         screen.theme = screen_theme
         deck._active_screen = screen
-        assert deck._resolve_stylesheet() == screen_theme.css
+        assert deck.resolve_stylesheet() == screen_theme.css
 
     def test_screen_theme_overrides_system(self, deck):
         """Screen theme takes precedence over system theme."""
@@ -431,13 +431,20 @@ class TestDeckResolveStylesheet:
         screen_theme = Theme.from_color(200, 200, 200)
         screen.theme = screen_theme
         deck._active_screen = screen
-        assert deck._resolve_stylesheet() == screen_theme.css
+        assert deck.resolve_stylesheet() == screen_theme.css
 
     def test_no_active_screen_uses_system(self, deck):
         """No active screen at all — uses system theme."""
         system_theme = Theme.from_color(10, 20, 30)
         set_active_theme(system_theme)
-        assert deck._resolve_stylesheet() == system_theme.css
+        assert deck.resolve_stylesheet() == system_theme.css
+
+    def test_private_alias_matches_public(self, deck):
+        """The legacy ``_resolve_stylesheet`` alias mirrors the public API."""
+        deck.theme = Theme.from_color(42, 42, 42)
+        screen = deck.screen("main")
+        deck._active_screen = screen
+        assert deck._resolve_stylesheet() == deck.resolve_stylesheet()
 
 
 # ---------------------------------------------------------------------------
