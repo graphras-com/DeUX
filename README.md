@@ -96,6 +96,8 @@ async def main():
     @manager.on_connect()
     async def handle(deck):
         screen = deck.screen("main")
+        # DuiKey accepts a built-in package name (e.g. "IconKey") or a PackageSpec
+        # returned by load_package(). See docs/guides/dui-repository.md for details.
         key = DuiKey("IconKey")
         key.set("label", "Hello")
         key.set("icon", "mdi:hand-wave")
