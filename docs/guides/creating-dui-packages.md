@@ -40,12 +40,50 @@ These fields are optional for local use but required when publishing to a DUI pa
 | `category` | `str` | no | Primary category from a controlled vocabulary (see below) |
 | `url` | `str` | no | Project or source URL |
 | `icon` | `str` | no | Path to a thumbnail in `assets/` for repository listings |
-| `min_deux` | `str` | no | Minimum DeUX version required (e.g. `"0.5.0"`) |
-| `device` | `list[str]` | no | Explicit device compatibility (`[StreamDeckPlus, StreamDeckXL]`) |
+| `min_deux` | `str` | no | Minimum DeUX version required (e.g. `"0.5.0"`) — see [below](#min_deux) |
+| `device` | `list[str]` | no | Explicit device compatibility — see [valid values](#device) |
 
 #### Valid Categories
 
-`media` · `productivity` · `system` · `gaming` · `social` · `development` · `utilities` · `streaming` · `home-automation` · `communication`
+The `category` field is validated against a fixed controlled vocabulary at load time. Passing any other value raises a `PackageError` (`Invalid category '<value>'. Valid categories: [...]`). The accepted values are:
+
+> `media` · `productivity` · `system` · `gaming` · `social` · `development` · `utilities` · `streaming` · `home-automation` · `communication`
+
+The authoritative list lives in `VALID_CATEGORIES` in `src/deux/dui/schema.py` and is re-exported from `deux.dui`.
+
+#### `min_deux`
+
+Declares the minimum DeUX runtime version a package needs (for example `"0.5.0"`). The loader validates that the value is a string and stores it on the resulting `PackageSpec`, but **it does not compare it against the installed DeUX version**. The field is purely declarative metadata used by repository tooling, package browsers, and `verify` reports to surface compatibility expectations.
+
+Best practice:
+
+- Pin to the lowest DeUX version that actually exposes every feature your package relies on.
+- Use a standard `MAJOR.MINOR.PATCH` string so downstream tools can sort and compare it.
+- Bump the value whenever you adopt a manifest field or behavior introduced in a newer DeUX release.
+
+If you omit `min_deux`, the package is assumed to work with any DeUX version that can load its manifest schema.
+
+#### `device`
+
+Optional list of Stream Deck families the package is designed for. The loader validates that each entry is a non-empty string, but does not currently restrict the values to a fixed whitelist — empty/missing means "no explicit restriction".
+
+By convention, packages and the bundled tooling use these PascalCase identifiers, which map to the hardware families enumerated in `src/deux/runtime/hid/device.py`:
+
+| Identifier | Hardware family |
+|------------|-----------------|
+| `StreamDeckClassic` | Stream Deck Classic (original, MK.2) |
+| `StreamDeckXL` | Stream Deck XL |
+| `StreamDeckNeo` | Stream Deck Neo |
+| `StreamDeckPlus` | Stream Deck + |
+| `StreamDeckPlusXL` | Stream Deck + XL |
+
+Example:
+
+```yaml
+device: [StreamDeckPlus, StreamDeckPlusXL]
+```
+
+Use this field to signal which devices a package was authored and tested against. Repository tooling can filter listings by device, and `verify` reports include the declared compatibility set.
 
 ### Optional Sections
 
