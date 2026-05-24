@@ -29,7 +29,7 @@ classifiers = [
 ]
 dependencies = [
     "pillow>=12.2.0",
-    "pyyaml>=6.0",
+    "pyyaml>=6.0.3",
     "platformdirs>=4.9.6",
     "defusedxml>=0.7.1",
     "resvg @ git+https://github.com/graphras-com/resvg-py.git@main",
