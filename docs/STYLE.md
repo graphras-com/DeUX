@@ -59,5 +59,5 @@ over bare backticks, so the reader can navigate directly to the reference.
 ## Docstrings
 
 All public Python symbols use NumPy-style docstrings. See the example in
-[CONTRIBUTING.md](../CONTRIBUTING.md#code-style). The terminology rules above
-apply equally to docstring prose.
+[`CONTRIBUTING.md`](https://github.com/graphras-com/DeUX/blob/main/CONTRIBUTING.md#code-style).
+The terminology rules above apply equally to docstring prose.
