@@ -445,6 +445,24 @@ async def handle(steps: int):
 - `accumulate_delay` must be a positive number
 - `accumulate_max_steps` must be a positive integer
 
+**Under the hood:** accumulated turns are powered by
+[`DialAccumulator`][deux.ui.DialAccumulator], a small asyncio debounce
+primitive. `accumulate_delay` maps to its `delay` constructor argument
+and `accumulate_max_steps` maps to `max_steps`. You can use
+`DialAccumulator` directly from Python code (outside of `.dui` packages)
+when you need the same debounce behaviour on an
+[`EncoderSlot`][deux.EncoderSlot]:
+
+```python
+from deux.ui import DialAccumulator
+
+acc = DialAccumulator(my_handler, delay=0.2, max_steps=5)
+
+@encoder.on_turn
+async def on_turn(direction: int) -> None:
+    acc.tick(direction)
+```
+
 ---
 
 ## Regions (TouchStripCard Only)

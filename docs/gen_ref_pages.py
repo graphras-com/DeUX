@@ -161,6 +161,28 @@ def _walk_package(pkg_dir: Path, depth: int, dotted_prefix: str, rel_prefix: str
 _walk_package(SRC / PACKAGE, depth=0, dotted_prefix=PACKAGE, rel_prefix="")
 
 
+# Emit a top-level landing page for the ``deux`` package so symbols that
+# are only re-exported at the top level (e.g. ``DeuxError``, ``SSRFError``,
+# ``set_allow_private_urls`` from underscore-prefixed modules) have a
+# canonical mkdocstrings anchor that cross-references can resolve.
+_top_doc = "reference/index.md"
+with mkdocs_gen_files.open(_top_doc, "w") as f:
+    f.write(f"# {PACKAGE}\n\n")
+    f.write(f"::: {PACKAGE}\n")
+    f.write("    options:\n")
+    f.write("      members:\n")
+    # Restrict to symbols not already documented elsewhere to avoid
+    # duplicate anchors. These are the underscore-module-backed
+    # re-exports.
+    for sym in ("DeuxError", "SSRFError", "set_allow_private_urls"):
+        f.write(f"        - {sym}\n")
+    f.write("      show_submodules: false\n")
+mkdocs_gen_files.set_edit_path(_top_doc, f"../src/{PACKAGE}/__init__.py")
+# Insert at the top of the SUMMARY so it appears first under the API
+# Reference root.
+nav_entries.insert(0, (0, "Top-level Package", "index.md"))
+
+
 # Write the SUMMARY consumed by mkdocs-literate-nav. Indentation drives nesting.
 # Python-markdown's list parser requires each nested level to be indented by
 # *two* spaces relative to the parent's bullet content; using four spaces
