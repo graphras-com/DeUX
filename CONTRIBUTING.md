@@ -63,6 +63,9 @@ Every contribution **must** follow this sequence:
 - **Type checking:** mypy in strict mode. Add type annotations to all public APIs.
 - **Docstrings:** NumPy-style for all public modules, classes, methods, and functions.
   See the example below.
+- **Documentation terminology:** Follow [`docs/STYLE.md`](docs/STYLE.md) for the
+  canonical forms of `DUI`, `.dui`, `deux.dui`, Stream Deck product names, device
+  identifiers (`StreamDeckPlus`, …), and class names (`KeySlot`, `EncoderSlot`).
 
 ```python
 def connect(device_id: str, timeout: float = 5.0) -> bool:

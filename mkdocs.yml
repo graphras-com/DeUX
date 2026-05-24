@@ -27,6 +27,7 @@ nav:
       - Full-Screen Images: guides/full-screen-images.md
       - CLI Tools: guides/cli-tools.md
   - Example: example.md
+  - Style Guide: STYLE.md
   - API Reference: reference/
 
 plugins:
