@@ -46,7 +46,7 @@ jobs:
     uses: ./.github/workflows/python-lint.yml
     with:
       python-version: ${{ vars.CI_PYTHON_VERSION || '3.11' }}
-      install-spec: ${{ vars.CI_PYTHON_INSTALL_SPEC || '.[test]' }}
+      install-spec: ${{ vars.CI_PYTHON_LINT_INSTALL_SPEC || '.[dev]' }}
 
   py-build:
     name: Python Build
@@ -64,7 +64,7 @@ jobs:
     uses: ./.github/workflows/python-typecheck.yml
     with:
       python-version: ${{ vars.CI_PYTHON_VERSION || '3.11' }}
-      install-spec: ${{ vars.CI_PYTHON_INSTALL_SPEC || '.[test]' }}
+      install-spec: ${{ vars.CI_PYTHON_TYPECHECK_INSTALL_SPEC || '.[dev,test]' }}
 
   py-test:
     name: Test Suite
