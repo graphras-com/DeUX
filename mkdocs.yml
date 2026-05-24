@@ -22,6 +22,7 @@ nav:
   - Guides:
       - DUI Repository & Built-in Packages: guides/dui-repository.md
       - Creating DUI Packages: guides/creating-dui-packages.md
+      - CLI Tools: guides/cli-tools.md
   - Example: example.md
   - API Reference: reference/
 
