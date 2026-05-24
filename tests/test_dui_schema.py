@@ -393,3 +393,97 @@ class TestListBinding:
         b = ListBinding(node="pager")
         with pytest.raises(AttributeError):
             b.node = "other"  # type: ignore[misc]
+
+
+class TestBindingDefaultValue:
+    """Each Binding subclass exposes a ``default_value()`` used by SvgRenderer."""
+
+    def test_text_default_value(self):
+        assert TextBinding(node="t", default="hi").default_value() == "hi"
+
+    def test_image_default_value_is_none(self):
+        from deux.dui.schema import ImageBinding
+
+        assert ImageBinding(node="i").default_value() is None
+
+    def test_image_is_force_dirty(self):
+        from deux.dui.schema import ImageBinding
+
+        assert ImageBinding.force_dirty is True
+
+    def test_visibility_default_value(self):
+        from deux.dui.schema import VisibilityBinding
+
+        assert VisibilityBinding(node="v", default=False).default_value() is False
+
+    def test_color_default_value(self):
+        assert ColorBinding(node="c", default="#abcdef").default_value() == "#abcdef"
+
+    def test_range_default_value(self):
+        from deux.dui.schema import RangeBinding
+
+        assert RangeBinding(node="r", default=0.42).default_value() == 0.42
+
+    def test_slider_default_value(self):
+        from deux.dui.schema import SliderBinding
+
+        assert SliderBinding(node="s", default=0.3).default_value() == 0.3
+
+    def test_toggle_default_value(self):
+        from deux.dui.schema import ToggleBinding
+
+        assert ToggleBinding(node_on="a", node_off="b", default=True).default_value() is True
+
+    def test_iconify_default_value(self):
+        from deux.dui.schema import IconifyBinding
+
+        assert (
+            IconifyBinding(node="i", size=16, default="mdi:home").default_value() == "mdi:home"
+        )
+
+    def test_transform_default_value(self):
+        from deux.dui.schema import TransformBinding
+
+        assert TransformBinding(node="t", default=0.25).default_value() == 0.25
+
+    def test_css_class_default_value(self):
+        assert CssClassBinding(node="x", default="cls").default_value() == "cls"
+
+    def test_list_default_value(self):
+        b = ListBinding(
+            node="pager", default_items=("a", "b", "c"), default_index=1
+        )
+        assert b.default_value() == {"items": ["a", "b", "c"], "index": 1}
+
+
+class TestListBindingCoerce:
+    """ListBinding.coerce merges partial ``{"items"|"index"}`` payloads."""
+
+    def test_coerce_items_only_preserves_index(self):
+        b = ListBinding(node="pager")
+        out = b.coerce({"items": ["x", "y"]}, {"items": ["a"], "index": 0})
+        assert out == {"items": ["x", "y"], "index": 0}
+
+    def test_coerce_index_only_preserves_items(self):
+        b = ListBinding(node="pager")
+        out = b.coerce({"index": 1}, {"items": ["a", "b"], "index": 0})
+        assert out == {"items": ["a", "b"], "index": 1}
+
+    def test_coerce_negative_one_normalised_to_none(self):
+        b = ListBinding(node="pager")
+        out = b.coerce({"index": -1}, {"items": ["a"], "index": 0})
+        assert out["index"] is None
+
+    def test_coerce_clamps_index_when_items_shrink(self):
+        b = ListBinding(node="pager")
+        out = b.coerce({"items": ["a"]}, {"items": ["a", "b", "c"], "index": 2})
+        assert out == {"items": ["a"], "index": 0}
+
+    def test_coerce_empty_items_clears_index(self):
+        b = ListBinding(node="pager")
+        out = b.coerce({"items": []}, {"items": ["a"], "index": 0})
+        assert out == {"items": [], "index": None}
+
+    def test_coerce_non_dict_returned_as_is(self):
+        b = ListBinding(node="pager")
+        assert b.coerce("plain", {"items": [], "index": None}) == "plain"

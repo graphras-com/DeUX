@@ -21,7 +21,7 @@ A high-level, asyncio-native Python library for Elgato Stream Deck devices. Defi
 - TouchStrip and InfoScreen support
 - `.dui` package format: declarative touchscreen card UIs using SVG layouts + YAML manifests with data bindings
 - Iconify icon integration
-- Supports Stream Deck+, Mini, Neo, and XL
+- Supports Stream Deck (Classic 15-key), Stream Deck XL, Stream Deck Neo, Stream Deck+, and Stream Deck+ XL
 
 ## System requirements
 
@@ -96,6 +96,8 @@ async def main():
     @manager.on_connect()
     async def handle(deck):
         screen = deck.screen("main")
+        # DuiKey accepts a built-in package name (e.g. "IconKey") or a PackageSpec
+        # returned by load_package(). See docs/guides/dui-repository.md for details.
         key = DuiKey("IconKey")
         key.set("label", "Hello")
         key.set("icon", "mdi:hand-wave")
@@ -114,11 +116,17 @@ async def main():
 asyncio.run(main())
 ```
 
+> **Note:** `on_connect()` is a decorator factory (call with parens) and accepts
+> optional `serial=` / `deck_type=` filters. `on_disconnect` is a property —
+> use it bare, without parens (`@manager.on_disconnect`).
+
 ## Configuration
 
 No environment variables are required. Device capabilities are auto-detected from hardware.
 
 `.dui` packages are configured via YAML manifests defining bindings (text, image, visibility, color, range, slider, toggle, iconify) and event mappings.
+
+DeUX ships with three ready-to-use packages — `IconKey`, `PictureKey`, and `DashboardCard` — that the quick-start example uses by name. See the [DUI Repository & Built-in Packages](https://graphras-com.github.io/DeUX/guides/dui-repository/) guide for the full catalogue and instructions on registering your own package directories. To author new packages, see [Creating DUI Packages](https://graphras-com.github.io/DeUX/guides/creating-dui-packages/).
 
 ## Development
 

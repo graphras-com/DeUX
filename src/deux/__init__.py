@@ -30,6 +30,7 @@ from __future__ import annotations
 
 from ._errors import DeuxError
 from ._url_safety import SSRFError, set_allow_private_urls
+from ._version_safe import __version__
 from .dui import (
     DuiCard,
     DuiKey,
@@ -113,5 +114,3 @@ __all__ = [
     "set_active_theme",
     "set_allow_private_urls",
 ]
-
-from deux._version import __version__

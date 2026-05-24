@@ -7,9 +7,13 @@ is not supported.
 
 from __future__ import annotations
 
+import logging
 import struct
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import IntEnum
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -292,7 +296,9 @@ def parse_input_report(data: bytes) -> InputEvent | None:
     Returns
     -------
     InputEvent or None
-        A typed event, or ``None`` if the report is unrecognised.
+        A typed event, or ``None`` if the report is unrecognised or
+        malformed (e.g. the declared ``payload_len`` exceeds the actual
+        bytes available, or an encoder report has no content type byte).
     """
     if len(data) < 4:
         return None
@@ -308,6 +314,16 @@ def parse_input_report(data: bytes) -> InputEvent | None:
     command = data[0]
     payload_len = struct.unpack_from("<H", data, 1)[0]
     payload = data[3:]
+
+    # Defensive bounds check: a malformed device report (or fuzzed input)
+    # may declare a payload length larger than the bytes actually present.
+    # Reject such reports rather than silently truncating to avoid producing
+    # empty event tuples that mask buggy firmware or USB corruption.
+    if payload_len > len(payload):
+        logger.debug(
+            "Truncated HID report: declared %d, actual %d", payload_len, len(payload)
+        )
+        return None
 
     if command == InputCommand.KEY_STATE:
         states = tuple(b != 0 for b in payload[:payload_len])
@@ -331,7 +347,7 @@ def parse_input_report(data: bytes) -> InputEvent | None:
         return None
 
     if command == InputCommand.ENCODER:
-        if len(payload) < 2:
+        if len(payload) < 2 or payload_len < 2:
             return None
         content_type = payload[0]
         encoder_data = payload[1:payload_len]
@@ -479,6 +495,45 @@ def _chunk_payload(
     return chunks
 
 
+def _build_chunked_reports(
+    payload: bytes,
+    header_size: int,
+    write_header: Callable[[bytearray, int, int, bool], None],
+) -> list[bytes]:
+    """Build a list of HID output reports by chunking ``payload``.
+
+    Encapsulates the common allocate/chunk/copy scaffold shared by every
+    image-update command. Per-command header layout is supplied via
+    ``write_header``.
+
+    Parameters
+    ----------
+    payload : bytes
+        The payload (typically JPEG image data) to split across reports.
+    header_size : int
+        Number of header bytes reserved at the start of each report; the
+        payload chunk is written immediately after.
+    write_header : Callable[[bytearray, int, int, bool], None]
+        Callback invoked for each report with
+        ``(buf, chunk_index, chunk_size, is_last)`` to populate the
+        command-specific header.
+
+    Returns
+    -------
+    list[bytes]
+        List of 1024-byte output reports ready for ``hid_write``.
+    """
+    max_data = OUTPUT_REPORT_SIZE - header_size
+    chunks = _chunk_payload(payload, max_data)
+    reports: list[bytes] = []
+    for chunk_idx, is_last, chunk_data in chunks:
+        buf = bytearray(OUTPUT_REPORT_SIZE)
+        write_header(buf, chunk_idx, len(chunk_data), is_last)
+        buf[header_size : header_size + len(chunk_data)] = chunk_data
+        reports.append(bytes(buf))
+    return reports
+
+
 def build_key_image_reports(key_index: int, jpeg_data: bytes) -> list[bytes]:
     """Build output reports for ``Update Key Image`` (command 0x07).
 
@@ -494,20 +549,16 @@ def build_key_image_reports(key_index: int, jpeg_data: bytes) -> list[bytes]:
     list[bytes]
         List of 1024-byte output reports ready for ``hid_write``.
     """
-    max_data = OUTPUT_REPORT_SIZE - _KEY_IMAGE_HEADER
-    chunks = _chunk_payload(jpeg_data, max_data)
-    reports: list[bytes] = []
-    for chunk_idx, is_last, chunk_data in chunks:
-        buf = bytearray(OUTPUT_REPORT_SIZE)
+
+    def write_header(buf: bytearray, chunk_idx: int, chunk_size: int, is_last: bool) -> None:
         buf[0] = ReportId.OUTPUT
         buf[1] = OutputCommand.UPDATE_KEY_IMAGE
         buf[2] = key_index
         buf[3] = 0x01 if is_last else 0x00
-        struct.pack_into("<H", buf, 4, len(chunk_data))
+        struct.pack_into("<H", buf, 4, chunk_size)
         struct.pack_into("<H", buf, 6, chunk_idx)
-        buf[8 : 8 + len(chunk_data)] = chunk_data
-        reports.append(bytes(buf))
-    return reports
+
+    return _build_chunked_reports(jpeg_data, _KEY_IMAGE_HEADER, write_header)
 
 
 def build_full_screen_reports(jpeg_data: bytes) -> list[bytes]:
@@ -523,20 +574,16 @@ def build_full_screen_reports(jpeg_data: bytes) -> list[bytes]:
     list[bytes]
         List of 1024-byte output reports ready for ``hid_write``.
     """
-    max_data = OUTPUT_REPORT_SIZE - _FULL_SCREEN_HEADER
-    chunks = _chunk_payload(jpeg_data, max_data)
-    reports: list[bytes] = []
-    for chunk_idx, is_last, chunk_data in chunks:
-        buf = bytearray(OUTPUT_REPORT_SIZE)
+
+    def write_header(buf: bytearray, chunk_idx: int, chunk_size: int, is_last: bool) -> None:
         buf[0] = ReportId.OUTPUT
         buf[1] = OutputCommand.UPDATE_FULL_SCREEN
         buf[2] = 0x00  # reserved
         buf[3] = 0x01 if is_last else 0x00
-        struct.pack_into("<H", buf, 4, len(chunk_data))
+        struct.pack_into("<H", buf, 4, chunk_size)
         struct.pack_into("<H", buf, 6, chunk_idx)
-        buf[8 : 8 + len(chunk_data)] = chunk_data
-        reports.append(bytes(buf))
-    return reports
+
+    return _build_chunked_reports(jpeg_data, _FULL_SCREEN_HEADER, write_header)
 
 
 def build_window_reports(jpeg_data: bytes) -> list[bytes]:
@@ -552,20 +599,16 @@ def build_window_reports(jpeg_data: bytes) -> list[bytes]:
     list[bytes]
         List of 1024-byte output reports ready for ``hid_write``.
     """
-    max_data = OUTPUT_REPORT_SIZE - _WINDOW_HEADER
-    chunks = _chunk_payload(jpeg_data, max_data)
-    reports: list[bytes] = []
-    for chunk_idx, is_last, chunk_data in chunks:
-        buf = bytearray(OUTPUT_REPORT_SIZE)
+
+    def write_header(buf: bytearray, chunk_idx: int, chunk_size: int, is_last: bool) -> None:
         buf[0] = ReportId.OUTPUT
         buf[1] = OutputCommand.UPDATE_WINDOW
         buf[2] = 0x00  # reserved
         buf[3] = 0x01 if is_last else 0x00
-        struct.pack_into("<H", buf, 4, len(chunk_data))
+        struct.pack_into("<H", buf, 4, chunk_size)
         struct.pack_into("<H", buf, 6, chunk_idx)
-        buf[8 : 8 + len(chunk_data)] = chunk_data
-        reports.append(bytes(buf))
-    return reports
+
+    return _build_chunked_reports(jpeg_data, _WINDOW_HEADER, write_header)
 
 
 def build_partial_window_reports(
@@ -591,11 +634,8 @@ def build_partial_window_reports(
     list[bytes]
         List of 1024-byte output reports ready for ``hid_write``.
     """
-    max_data = OUTPUT_REPORT_SIZE - _PARTIAL_WINDOW_HEADER
-    chunks = _chunk_payload(jpeg_data, max_data)
-    reports: list[bytes] = []
-    for chunk_idx, is_last, chunk_data in chunks:
-        buf = bytearray(OUTPUT_REPORT_SIZE)
+
+    def write_header(buf: bytearray, chunk_idx: int, chunk_size: int, is_last: bool) -> None:
         buf[0] = ReportId.OUTPUT
         buf[1] = OutputCommand.UPDATE_PARTIAL_WINDOW
         struct.pack_into("<H", buf, 2, x)
@@ -604,11 +644,10 @@ def build_partial_window_reports(
         struct.pack_into("<H", buf, 8, height)
         buf[0x0A] = 0x01 if is_last else 0x00
         struct.pack_into("<H", buf, 0x0B, chunk_idx)
-        struct.pack_into("<H", buf, 0x0D, len(chunk_data))
+        struct.pack_into("<H", buf, 0x0D, chunk_size)
         buf[0x0F] = 0x00  # reserved
-        buf[0x10 : 0x10 + len(chunk_data)] = chunk_data
-        reports.append(bytes(buf))
-    return reports
+
+    return _build_chunked_reports(jpeg_data, _PARTIAL_WINDOW_HEADER, write_header)
 
 
 def build_background_reports(bg_index: int, jpeg_data: bytes) -> list[bytes]:
@@ -633,21 +672,17 @@ def build_background_reports(bg_index: int, jpeg_data: bytes) -> list[bytes]:
     The ``Update Background`` command has chunk index and chunk contents
     size fields swapped compared to the other output commands.
     """
-    max_data = OUTPUT_REPORT_SIZE - _BACKGROUND_HEADER
-    chunks = _chunk_payload(jpeg_data, max_data)
-    reports: list[bytes] = []
-    for chunk_idx, is_last, chunk_data in chunks:
-        buf = bytearray(OUTPUT_REPORT_SIZE)
+
+    def write_header(buf: bytearray, chunk_idx: int, chunk_size: int, is_last: bool) -> None:
         buf[0] = ReportId.OUTPUT
         buf[1] = OutputCommand.UPDATE_BACKGROUND
         buf[2] = bg_index
         buf[3] = 0x01 if is_last else 0x00
         # Note: chunk_index and chunk_size are swapped vs other commands
         struct.pack_into("<H", buf, 4, chunk_idx)
-        struct.pack_into("<H", buf, 6, len(chunk_data))
-        buf[8 : 8 + len(chunk_data)] = chunk_data
-        reports.append(bytes(buf))
-    return reports
+        struct.pack_into("<H", buf, 6, chunk_size)
+
+    return _build_chunked_reports(jpeg_data, _BACKGROUND_HEADER, write_header)
 
 
 # ---------------------------------------------------------------------------

@@ -2,6 +2,8 @@
 
 A `.dui` package is a self-contained directory that declaratively defines a Stream Deck UI — either a touchscreen card or a physical key — using an SVG layout, a YAML manifest, and optional image assets. No Python rendering code required.
 
+> Looking for the packages bundled with DeUX (`IconKey`, `PictureKey`, `DashboardCard`) or for how `DuiKey("name")` resolves to a package? See the [DUI Repository & Built-in Packages](dui-repository.md) guide.
+
 ## Package Structure
 
 ```
@@ -38,12 +40,50 @@ These fields are optional for local use but required when publishing to a DUI pa
 | `category` | `str` | no | Primary category from a controlled vocabulary (see below) |
 | `url` | `str` | no | Project or source URL |
 | `icon` | `str` | no | Path to a thumbnail in `assets/` for repository listings |
-| `min_deux` | `str` | no | Minimum DeUX version required (e.g. `"0.5.0"`) |
-| `device` | `list[str]` | no | Explicit device compatibility (`[StreamDeckPlus, StreamDeckXL]`) |
+| `min_deux` | `str` | no | Minimum DeUX version required (e.g. `"0.5.0"`) — see [below](#min_deux) |
+| `device` | `list[str]` | no | Explicit device compatibility — see [valid values](#device) |
 
 #### Valid Categories
 
-`media` · `productivity` · `system` · `gaming` · `social` · `development` · `utilities` · `streaming` · `home-automation` · `communication`
+The `category` field is validated against a fixed controlled vocabulary at load time. Passing any other value raises a `PackageError` (`Invalid category '<value>'. Valid categories: [...]`). The accepted values are:
+
+> `media` · `productivity` · `system` · `gaming` · `social` · `development` · `utilities` · `streaming` · `home-automation` · `communication`
+
+The authoritative list lives in `VALID_CATEGORIES` in `src/deux/dui/schema.py` and is re-exported from `deux.dui`.
+
+#### `min_deux`
+
+Declares the minimum DeUX runtime version a package needs (for example `"0.5.0"`). The loader validates that the value is a string and stores it on the resulting `PackageSpec`, but **it does not compare it against the installed DeUX version**. The field is purely declarative metadata used by repository tooling, package browsers, and `verify` reports to surface compatibility expectations.
+
+Best practice:
+
+- Pin to the lowest DeUX version that actually exposes every feature your package relies on.
+- Use a standard `MAJOR.MINOR.PATCH` string so downstream tools can sort and compare it.
+- Bump the value whenever you adopt a manifest field or behavior introduced in a newer DeUX release.
+
+If you omit `min_deux`, the package is assumed to work with any DeUX version that can load its manifest schema.
+
+#### `device`
+
+Optional list of Stream Deck families the package is designed for. The loader validates that each entry is a non-empty string, but does not currently restrict the values to a fixed whitelist — empty/missing means "no explicit restriction".
+
+By convention, packages and the bundled tooling use these PascalCase identifiers, which map to the hardware families enumerated in `src/deux/runtime/hid/device.py`:
+
+| Identifier | Hardware family |
+|------------|-----------------|
+| `StreamDeckClassic` | Stream Deck Classic (original, MK.2) |
+| `StreamDeckXL` | Stream Deck XL |
+| `StreamDeckNeo` | Stream Deck Neo |
+| `StreamDeckPlus` | Stream Deck + |
+| `StreamDeckPlusXL` | Stream Deck + XL |
+
+Example:
+
+```yaml
+device: [StreamDeckPlus, StreamDeckPlusXL]
+```
+
+Use this field to signal which devices a package was authored and tested against. Repository tooling can filter listings by device, and `verify` reports include the declared compatibility set.
 
 ### Optional Sections
 
@@ -234,6 +274,71 @@ status_icon:
 
 Icons are fetched from the Iconify API and cached in-process.
 
+### list
+
+Render a dynamic list of items as repeated child elements of a parent SVG node (typically a `<text>` element).
+Each item is either a plain text label or an Iconify icon reference (prefix with `icon:`).
+The item at `default_index` receives `active_attrs`; all others receive `inactive_attrs`.
+
+```yaml
+nav:
+  type: list
+  node: pager                # ID of the parent SVG element
+  child_tag: tspan           # SVG element generated per item (default "tspan")
+  default_items:             # initial list of labels (default [])
+    - Main
+    - Settings
+    - "icon:mdi:home"        # prefix with "icon:" to render an Iconify icon
+  default_index: 0           # active item index; use null or -1 for "no active item"
+  active_attrs:              # attributes applied to the active item
+    fill: "#ffffff"
+    font-weight: bold
+  inactive_attrs:            # attributes applied to all inactive items
+    fill: "#888888"
+  separator: " · "           # inserted between items; empty string disables (default)
+  icon_size: 14              # pixel size for "icon:" items (default 16)
+```
+
+Runtime updates may provide a partial payload (`{"items": [...]}` or `{"index": N}`); the other half is preserved.
+An index of `-1` is normalised to `None` (no active item).
+Setting `items` without `index` clamps the existing index to the new bounds.
+
+### transform
+
+Apply one or more SVG transforms to a node proportional to a 0–1 value.
+The only currently supported `kind` is `rotate`, which interpolates linearly between two angles.
+Multiple transforms in the list are composed (space-separated) in order.
+
+```yaml
+gauge:
+  type: transform
+  node: needle
+  default: 0.0               # initial normalised value (0.0–1.0)
+  transforms:
+    - kind: rotate
+      from: -90              # angle in degrees when value is 0.0 (default 0)
+      to: 90                 # angle in degrees when value is 1.0 (default 360)
+      origin: center         # "center" (default) or an explicit "x y" pair
+```
+
+`origin: center` resolves to the element's bounding box center at render time.
+Providing an explicit `"x y"` string (e.g. `"60 60"`) sets a fixed origin in SVG user-space coordinates.
+The `transforms` list must be non-empty.
+
+### css_class
+
+Bind a CSS class string to an SVG element's `class` attribute.
+The binding replaces the entire `class` attribute on the target node; setting an empty string removes the attribute.
+
+```yaml
+style:
+  type: css_class
+  node: card
+  default: ""                # initial class value (default "")
+```
+
+This is useful when the layout SVG embeds a `<style>` block and you want to switch between named visual states (e.g. `default: "muted"` then update to `"active"` at runtime).
+
 ---
 
 ## Events
@@ -339,6 +444,24 @@ async def handle(steps: int):
 - `accumulate_delay` and `accumulate_max_steps` require `accumulate: true`
 - `accumulate_delay` must be a positive number
 - `accumulate_max_steps` must be a positive integer
+
+**Under the hood:** accumulated turns are powered by
+[`DialAccumulator`][deux.ui.DialAccumulator], a small asyncio debounce
+primitive. `accumulate_delay` maps to its `delay` constructor argument
+and `accumulate_max_steps` maps to `max_steps`. You can use
+`DialAccumulator` directly from Python code (outside of `.dui` packages)
+when you need the same debounce behaviour on an
+[`EncoderSlot`][deux.EncoderSlot]:
+
+```python
+from deux.ui import DialAccumulator
+
+acc = DialAccumulator(my_handler, delay=0.2, max_steps=5)
+
+@encoder.on_turn
+async def on_turn(direction: int) -> None:
+    acc.tick(direction)
+```
 
 ---
 
@@ -703,8 +826,11 @@ async def on_toggle():
 async def on_next():
     ...
 
-# Render to image
+# Render to a PIL Image (panel-sized, sized from the SVG's intrinsic dimensions)
 image = card.render()
+
+# Or render directly to encoded device-ready bytes
+panel_bytes = card.render_bytes(panel_width=800, panel_height=100)
 ```
 
 ### Physical Key
@@ -721,9 +847,19 @@ key.set("indicator_color", "#00ff00")
 async def on_activate():
     ...
 
-# Render to encoded image bytes
-image_bytes = key.render_image()
+# Render to encoded image bytes. key_size is REQUIRED — pass the
+# target key dimensions (width, height) in pixels.
+image_bytes = key.render_image(key_size=(120, 120))
 ```
+
+> **Render API note.** `DuiCard` and `DuiKey` deliberately expose different
+> render entry points:
+>
+> - `DuiCard.render()` returns a PIL `Image`. For encoded bytes, use
+>   `DuiCard.render_bytes(panel_width=..., panel_height=...)` or, when
+>   composing a touch strip, `DuiCard.render_panel_bytes(...)`.
+> - `DuiKey.render_image(key_size, image_format="JPEG")` returns encoded
+>   device-ready `bytes` directly; there is no `DuiKey.render()` method.
 
 ---
 
@@ -748,7 +884,9 @@ All validation errors raise `PackageError` with a descriptive message.
 
 ## Package Verification Tool
 
-Use the verify tool to check packages before publishing to a repository.
+Use the verify tool to check packages before publishing to a repository. For
+a full reference of all DeUX CLI utilities — including the live `preview`
+and `splash` tools — see the [CLI Tools guide](cli-tools.md).
 
 ### Basic verification
 

@@ -11,6 +11,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
+from ._executor import get_executor
 from .events import (
     DeckEvent,
     EncoderPressEvent,
@@ -19,6 +20,7 @@ from .events import (
     KeyEvent,
     TouchEvent,
 )
+from .hid._ctypes_hidapi import HidApiError
 from .hid.protocol import (
     EncoderButtonEvent,
     EncoderRotateEvent,
@@ -76,23 +78,38 @@ class AsyncTransport:
         return self._queue
 
     def start(self) -> None:
-        """Start the input polling background task."""
+        """Start the input polling background task.
+
+        Spawns an asyncio task that continuously polls the underlying
+        HID device for input events and forwards decoded events to
+        :attr:`queue`. Calling :meth:`start` more than once without an
+        intervening :meth:`stop` will replace the previous polling task
+        reference; callers should treat the method as one-shot per
+        transport lifetime.
+
+        Notes
+        -----
+        Must be called from within a running asyncio event loop.
+        """
         self._running = True
         self._poll_task = asyncio.create_task(
             self._poll_loop(), name="deux-hid-poll"
         )
 
     def stop(self) -> None:
-        """Stop polling."""
+        """Stop polling.
+
+        Signals the polling loop to exit and cancels the background
+        task if it is still running. Safe to call multiple times and
+        safe to call when :meth:`start` was never invoked; in both
+        cases the method becomes a no-op.
+        """
         self._running = False
         if self._poll_task and not self._poll_task.done():
             self._poll_task.cancel()
 
     async def _poll_loop(self) -> None:
         """Background task: poll HID input and enqueue events."""
-        from ._executor import get_executor
-        from .hid._ctypes_hidapi import HidApiError
-
         loop = asyncio.get_running_loop()
         executor = get_executor()
 
@@ -106,6 +123,10 @@ class AsyncTransport:
                     )
                 except HidApiError:
                     logger.warning("HID device disconnected during poll")
+                    # Nullify the handle immediately so no other async
+                    # task can call into a stale OS handle (which causes
+                    # SIGABRT / Trace/BPT trap on macOS).
+                    self._device._handle = None  # noqa: SLF001
                     break
 
                 if event is not None:

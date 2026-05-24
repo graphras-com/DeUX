@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from deux.dui.animator import SpinnerAnimator
+from deux.dui.animator import DeviceUnavailable, SpinnerAnimator
 
 
 class TestSpinnerAnimatorLifecycle:
@@ -71,3 +71,44 @@ class TestSpinnerAnimatorLifecycle:
         push_fn = AsyncMock()
         with pytest.raises(ValueError, match="must not be empty"):
             SpinnerAnimator(frames=[], interval_ms=50, push_fn=push_fn)
+
+
+class TestSpinnerAnimatorErrors:
+    async def test_device_unavailable_stops_loop(self):
+        """A push raising DeviceUnavailable terminates the loop quietly."""
+        calls = 0
+
+        async def push_fn(_frame: bytes) -> None:
+            nonlocal calls
+            calls += 1
+            raise DeviceUnavailable("device gone")
+
+        animator = SpinnerAnimator(
+            frames=[b"a", b"b"], interval_ms=5, push_fn=push_fn
+        )
+        await animator.start()
+        # Give the loop time to attempt one push and exit.
+        await asyncio.sleep(0.05)
+        assert animator.is_running is False
+        # Only one push should be attempted before the loop bails out.
+        assert calls == 1
+        # stop() must be idempotent / safe after self-termination.
+        await animator.stop()
+
+    async def test_generic_exception_keeps_loop_running(self):
+        """Non-DeviceUnavailable errors are logged and looping continues."""
+        calls = 0
+
+        async def push_fn(_frame: bytes) -> None:
+            nonlocal calls
+            calls += 1
+            if calls < 3:
+                raise RuntimeError("transient")
+
+        animator = SpinnerAnimator(
+            frames=[b"a"], interval_ms=10, push_fn=push_fn
+        )
+        await animator.start()
+        await asyncio.sleep(0.1)
+        await animator.stop()
+        assert calls >= 3

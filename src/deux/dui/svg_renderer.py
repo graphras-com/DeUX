@@ -6,6 +6,7 @@ import base64
 import builtins
 import copy
 import functools
+import io
 import logging
 import math
 import os
@@ -14,15 +15,21 @@ import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import Any
 
-from PIL import ImageFont
-
-if TYPE_CHECKING:
-    from PIL import Image
+from defusedxml import DefusedXmlException
+from PIL import Image, ImageFont
 
 from .._xml import safe_fromstring
 from ..render.context import RenderingContext
+from ..render.svg_rasterize import (
+    _rasterize_svg,
+    _svg_to_image,
+    compose_svg_layers,
+    inject_background_rect,
+    set_svg_dimensions,
+    slice_background_viewbox,
+)
 from .iconify import IconifyError, fetch_icon
 from .schema import (
     Binding,
@@ -177,19 +184,64 @@ def _get_default_font_family() -> str:
         The default font family name.
     """
     try:
-        from ..render.theme import get_default_font_family
+        # Inline import: tests patch ``deux.render.theme.get_default_font_family``;
+        # importing it lazily keeps that patching point effective.
+        from ..render.theme import get_default_font_family  # noqa: PLC0415
 
         return get_default_font_family()
-    except Exception:
+    except ImportError:
         return _DEFAULT_FONT_FAMILY
 
 
-def _resolve_font_attrs(root: ET.Element, elem: ET.Element) -> tuple[str, float]:
+def _build_parent_map(root: ET.Element) -> dict[ET.Element, ET.Element]:
+    """Build a child-to-parent mapping for an SVG tree.
+
+    Walks the tree once and returns a dictionary mapping every child
+    element to its parent.  Use this when multiple lookups against the
+    same tree are required so the O(N) walk is amortised across all
+    callers.
+
+    Parameters
+    ----------
+    root : ET.Element
+        The SVG document root to walk.
+
+    Returns
+    -------
+    dict[ET.Element, ET.Element]
+        Mapping of each child element to its parent element.
+    """
+    parent_map: dict[ET.Element, ET.Element] = {}
+    for parent in root.iter():
+        for child in parent:
+            parent_map[child] = parent
+    return parent_map
+
+
+def _resolve_font_attrs(
+    root: ET.Element,
+    elem: ET.Element,
+    parent_map: dict[ET.Element, ET.Element] | None = None,
+) -> tuple[str, float]:
     """Resolve font-family and font-size from an SVG element and its ancestors.
 
     Walks from *elem* up through the SVG tree to find ``font-family``
     and ``font-size`` attributes.  Falls back to sensible defaults if
     neither the element nor any ancestor declares them.
+
+    Parameters
+    ----------
+    root : ET.Element
+        The SVG document root.  Used to build the parent map when one
+        is not supplied.
+    elem : ET.Element
+        The element whose font attributes are being resolved.
+    parent_map : dict[ET.Element, ET.Element] or None, optional
+        Pre-built child-to-parent mapping for *root*.  When omitted,
+        the map is rebuilt on every call (O(N) per call).  Callers that
+        resolve fonts for multiple elements against the same tree
+        should build the map once via :func:`_build_parent_map` and
+        pass it in to avoid an O(N*M) cost.
 
     Returns
     -------
@@ -199,10 +251,8 @@ def _resolve_font_attrs(root: ET.Element, elem: ET.Element) -> tuple[str, float]
     family: str | None = None
     size: float | None = None
 
-    parent_map: dict[ET.Element, ET.Element] = {}
-    for parent in root.iter():
-        for child in parent:
-            parent_map[child] = parent
+    if parent_map is None:
+        parent_map = _build_parent_map(root)
 
     current: ET.Element | None = elem
     while current is not None:
@@ -471,29 +521,52 @@ class SvgRenderer:
         self._target_width: int | None = None
         self._target_height: int | None = None
         self._rendering_ctx: RenderingContext | None = None
+        # Per-render cache of the child→parent map for the currently rendered
+        # tree.  Populated lazily by :meth:`_get_parent_map` during a render
+        # pass and reset to ``None`` between renders so that mutations done by
+        # bindings (e.g. wrapped-text ``<tspan>`` children) don't poison later
+        # renders.  Caching it here keeps font-attribute resolution at O(N)
+        # per render instead of O(N*M) for M text bindings.
+        self._parent_map_root: ET.Element | None = None
+        self._parent_map_cache: dict[ET.Element, ET.Element] | None = None
+
+        # Register binding handlers as bound methods so subclasses can override
+        # ``_apply_*`` and have the override take effect without re-registering.
+        self._binding_handlers: dict[type[Binding], Callable[..., None]] = {
+            TextBinding: lambda root, elem, name, binding, value: self._apply_text(
+                root, elem, binding, value
+            ),
+            ImageBinding: lambda root, elem, name, binding, value: self._apply_image(
+                root, elem, binding, value
+            ),
+            VisibilityBinding: lambda root, elem, name, binding, value: self._apply_visibility(
+                elem, value
+            ),
+            ColorBinding: lambda root, elem, name, binding, value: self._apply_color(
+                elem, binding, value
+            ),
+            RangeBinding: lambda root, elem, name, binding, value: self._apply_range(
+                elem, name, binding, value
+            ),
+            SliderBinding: lambda root, elem, name, binding, value: self._apply_slider(
+                elem, binding, value
+            ),
+            IconifyBinding: lambda root, elem, name, binding, value: self._apply_iconify(
+                elem, binding, value
+            ),
+            ListBinding: lambda root, elem, name, binding, value: self._apply_list(
+                root, elem, binding, value
+            ),
+            TransformBinding: lambda root, elem, name, binding, value: self._apply_transform(
+                elem, binding, value
+            ),
+            CssClassBinding: lambda root, elem, name, binding, value: self._apply_css_class(
+                elem, value
+            ),
+        }
 
         for name, binding in spec.bindings.items():
-            if isinstance(binding, (TextBinding, VisibilityBinding, ColorBinding, CssClassBinding)):
-                self._values[name] = binding.default
-            elif isinstance(binding, RangeBinding):
-                self._values[name] = binding.default
-                elem = _find_element_by_id(self._base_root, binding.node)
-                if elem is not None:
-                    attr = (
-                        "width"
-                        if binding.direction == RangeDirection.HORIZONTAL
-                        else "height"
-                    )
-                    self._range_extents[name] = float(elem.get(attr, "0"))
-            elif isinstance(
-                binding, (SliderBinding, ToggleBinding, IconifyBinding, TransformBinding)
-            ):
-                self._values[name] = binding.default
-            elif isinstance(binding, ListBinding):
-                self._values[name] = {
-                    "items": list(binding.default_items),
-                    "index": binding.default_index,
-                }
+            self._values[name] = binding.default_value()
 
     def set(self, name: str, value: Any) -> bool:
         """Set a binding value.
@@ -524,37 +597,21 @@ class SvgRenderer:
 
         old = self._values.get(name)
         binding = self._spec.bindings[name]
-        if isinstance(binding, ImageBinding):
-            self._values[name] = value
+
+        # Per-binding coercion (e.g. ListBinding merges partial updates).
+        coerce = getattr(binding, "coerce", None)
+        new_value = coerce(value, old) if callable(coerce) else value
+
+        # Some bindings (e.g. images) always count as changed because their
+        # values aren't cheaply comparable.
+        if getattr(binding, "force_dirty", False):
+            self._values[name] = new_value
             return True
 
-        if isinstance(binding, ListBinding) and isinstance(value, dict):
-            current = self._values.get(name, {"items": [], "index": None})
-            merged = dict(current)
-            if "items" in value:
-                merged["items"] = list(value["items"])
-            if "index" in value:
-                merged["index"] = value["index"]
-            # Clamp index when items changed but index wasn't explicitly set.
-            if "items" in value and "index" not in value:
-                items = merged["items"]
-                idx = merged["index"]
-                if idx is not None and idx != -1 and items and idx >= len(items):
-                    merged["index"] = len(items) - 1
-                elif not items:
-                    merged["index"] = None
-            # Normalise -1 → None.
-            if merged.get("index") == -1:
-                merged["index"] = None
-            if old == merged:
-                return False
-            self._values[name] = merged
-            return True
-
-        if old == value:
+        if old == new_value:
             return False
 
-        self._values[name] = value
+        self._values[name] = new_value
         return True
 
     def set_many(self, **kwargs: Any) -> bool:
@@ -694,8 +751,6 @@ class SvgRenderer:
         panel_height : int
             Height of a single panel in pixels.
         """
-        from ..render.svg_rasterize import compose_svg_layers, slice_background_viewbox
-
         bg_slice = slice_background_viewbox(bg_root, card_index, panel_width, panel_height)
         card_layer = copy.deepcopy(self._original_root)
         card_layer.set("width", str(panel_width))
@@ -712,6 +767,39 @@ class SvgRenderer:
         """
         self._base_root = copy.deepcopy(self._original_root)
 
+    def _get_parent_map(self, root: ET.Element) -> dict[ET.Element, ET.Element]:
+        """Return a cached child→parent map for *root* for the current render.
+
+        The map is rebuilt only when *root* differs from the previously
+        cached tree (i.e. at the start of a new render pass).  Subsequent
+        calls within the same render reuse the cached map, avoiding the
+        O(N) walk per text-binding that was the dominant cost of dense
+        cards with multiple text bindings.
+
+        Parameters
+        ----------
+        root : ET.Element
+            The root of the SVG tree currently being rendered.
+
+        Returns
+        -------
+        dict[ET.Element, ET.Element]
+            Mapping of each child element to its parent element.
+        """
+        if self._parent_map_root is not root or self._parent_map_cache is None:
+            self._parent_map_root = root
+            self._parent_map_cache = _build_parent_map(root)
+        return self._parent_map_cache
+
+    def _reset_parent_map_cache(self) -> None:
+        """Drop the cached parent map.
+
+        Called at the start of each render so that the map is rebuilt
+        for the freshly cloned tree.
+        """
+        self._parent_map_root = None
+        self._parent_map_cache = None
+
     def render(self) -> Image.Image:
         """Rasterise the SVG with current binding values to a PIL Image.
 
@@ -724,6 +812,7 @@ class SvgRenderer:
             native dimensions.
         """
         root = copy.deepcopy(self._base_root)
+        self._reset_parent_map_cache()
 
         for name, binding in self._spec.bindings.items():
             value = self._values.get(name)
@@ -766,13 +855,8 @@ class SvgRenderer:
         bytes
             Encoded image bytes ready to send to the device.
         """
-        from ..render.svg_rasterize import (
-            _rasterize_svg,
-            inject_background_rect,
-            set_svg_dimensions,
-        )
-
         root = copy.deepcopy(self._base_root)
+        self._reset_parent_map_cache()
 
         for name, binding in self._spec.bindings.items():
             value = self._values.get(name)
@@ -816,6 +900,7 @@ class SvgRenderer:
             SVG markup as a Unicode string.
         """
         root = copy.deepcopy(self._base_root)
+        self._reset_parent_map_cache()
 
         for name, binding in self._spec.bindings.items():
             value = self._values.get(name)
@@ -851,40 +936,9 @@ class SvgRenderer:
                 bg_elem.set("display", "none")
 
     #: Dispatch table mapping binding types to handler methods.
-    #: Each handler is called with (root, elem, name, binding, value).
-    #: To support a new binding type, register it here without modifying
-    #: ``_apply_binding`` itself.
-    _BINDING_HANDLERS: ClassVar[
-        dict[type[Binding], Callable[[SvgRenderer, ET.Element, ET.Element, str, Any, Any], None]]
-    ] = {}
-
-    @staticmethod
-    def _register_binding_handler(
-        binding_type: type[Binding],
-    ) -> Callable[
-        [Callable[[SvgRenderer, ET.Element, ET.Element, str, Any, Any], None]],
-        Callable[[SvgRenderer, ET.Element, ET.Element, str, Any, Any], None],
-    ]:
-        """Decorator to register a binding handler in the dispatch table.
-
-        Parameters
-        ----------
-        binding_type : type[Binding]
-            The binding class this handler processes.
-
-        Returns
-        -------
-        Callable
-            The decorator that registers the handler.
-        """
-
-        def decorator(
-            func: Callable[[SvgRenderer, ET.Element, ET.Element, str, Any, Any], None],
-        ) -> Callable[[SvgRenderer, ET.Element, ET.Element, str, Any, Any], None]:
-            SvgRenderer._BINDING_HANDLERS[binding_type] = func
-            return func
-
-        return decorator
+    #: Populated per-instance in :meth:`__init__` (bound to ``self``) so that
+    #: handler resolution is uniform across binding types and overriding
+    #: ``_apply_*`` in subclasses automatically takes effect.
 
     def _apply_binding(
         self,
@@ -923,9 +977,9 @@ class SvgRenderer:
             )
             return
 
-        handler = self._BINDING_HANDLERS.get(type(binding))
+        handler = self._binding_handlers.get(type(binding))
         if handler is not None:
-            handler(self, root, elem, name, binding, value)
+            handler(root, elem, name, binding, value)
         else:
             logger.warning(
                 "Binding '%s': no handler registered for type '%s'",
@@ -960,7 +1014,7 @@ class SvgRenderer:
             return
 
         if binding.max_width is not None:
-            family, size_f = _resolve_font_attrs(root, elem)
+            family, size_f = _resolve_font_attrs(root, elem, self._get_parent_map(root))
             font = _load_font(family, int(size_f))
             text = _truncate_text(text, binding.max_width, binding.overflow, font=font)
         elem.text = text
@@ -978,7 +1032,7 @@ class SvgRenderer:
         attribute so that ``text-anchor`` alignment is respected on
         every line.
         """
-        family, size_f = _resolve_font_attrs(root, elem)
+        family, size_f = _resolve_font_attrs(root, elem, self._get_parent_map(root))
         font = _load_font(family, int(size_f))
 
         line_height = binding.line_height or (size_f * _DEFAULT_LINE_HEIGHT_RATIO)
@@ -1043,12 +1097,8 @@ class SvgRenderer:
             img_bytes = value
         else:
             # Accept PIL Image objects — encode to PNG bytes for embedding.
-            from PIL import Image as _PILImage
-
-            if isinstance(value, _PILImage.Image):
-                import io as _io
-
-                _buf = _io.BytesIO()
+            if isinstance(value, Image.Image):
+                _buf = io.BytesIO()
                 value.convert("RGBA").save(_buf, format="PNG")
                 img_bytes = _buf.getvalue()
             else:
@@ -1162,7 +1212,18 @@ class SvgRenderer:
         ratio = max(
             0.0, min(1.0, float(value if value is not None else binding.default))
         )
-        extent = self._range_extents.get(name, 0.0)
+        if name not in self._range_extents:
+            # Lazily capture the original extent from the unmodified template
+            # the first time this binding is applied, since per-render clones
+            # already carry the previously-mutated value.
+            original = _find_element_by_id(self._base_root, binding.node)
+            attr_lookup = (
+                "width" if binding.direction == RangeDirection.HORIZONTAL else "height"
+            )
+            self._range_extents[name] = (
+                float(original.get(attr_lookup, "0")) if original is not None else 0.0
+            )
+        extent = self._range_extents[name]
         attr = "width" if binding.direction == RangeDirection.HORIZONTAL else "height"
         elem.set(attr, str(ratio * extent))
 
@@ -1285,7 +1346,7 @@ class SvgRenderer:
 
         try:
             icon_root = safe_fromstring(svg_source)  # untrusted: network (Iconify)
-        except Exception as exc:
+        except (ET.ParseError, DefusedXmlException) as exc:
             logger.warning(
                 "Iconify binding '%s': failed to parse icon SVG: %s",
                 binding.node,
@@ -1393,7 +1454,7 @@ class SvgRenderer:
 
         try:
             icon_root = safe_fromstring(svg_source)  # untrusted: network (Iconify)
-        except Exception as exc:
+        except (ET.ParseError, DefusedXmlException) as exc:
             logger.warning(
                 "List binding icon '%s': failed to parse SVG: %s", icon_name, exc
             )
@@ -1457,8 +1518,6 @@ class SvgRenderer:
         Image.Image
             An RGBA :class:`~PIL.Image.Image`.
         """
-        from ..render.svg_rasterize import _svg_to_image
-
         if self._target_width is not None and self._target_height is not None:
             width = self._target_width
             height = self._target_height
@@ -1468,77 +1527,3 @@ class SvgRenderer:
 
         return _svg_to_image(svg_data, width, height, mode="RGBA", ctx=self._rendering_ctx)
 
-
-# ---------------------------------------------------------------------------
-# Binding handler registrations
-# ---------------------------------------------------------------------------
-
-
-@SvgRenderer._register_binding_handler(TextBinding)
-def _handle_text(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_text(root, elem, binding, value)
-
-
-@SvgRenderer._register_binding_handler(ImageBinding)
-def _handle_image(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_image(root, elem, binding, value)
-
-
-@SvgRenderer._register_binding_handler(VisibilityBinding)
-def _handle_visibility(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_visibility(elem, value)
-
-
-@SvgRenderer._register_binding_handler(ColorBinding)
-def _handle_color(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_color(elem, binding, value)
-
-
-@SvgRenderer._register_binding_handler(RangeBinding)
-def _handle_range(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_range(elem, name, binding, value)
-
-
-@SvgRenderer._register_binding_handler(SliderBinding)
-def _handle_slider(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_slider(elem, binding, value)
-
-
-@SvgRenderer._register_binding_handler(IconifyBinding)
-def _handle_iconify(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_iconify(elem, binding, value)
-
-
-@SvgRenderer._register_binding_handler(ListBinding)
-def _handle_list(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_list(root, elem, binding, value)
-
-
-@SvgRenderer._register_binding_handler(TransformBinding)
-def _handle_transform(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_transform(elem, binding, value)
-
-
-@SvgRenderer._register_binding_handler(CssClassBinding)
-def _handle_css_class(
-    self: SvgRenderer, root: ET.Element, elem: ET.Element, name: str, binding: Any, value: Any
-) -> None:
-    self._apply_css_class(elem, value)

@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any
 from ._executor import get_executor, shutdown_executor
 from .deck import Deck, DeckError
 from .device_info import DeviceInfo
-from .hid._ctypes_hidapi import HidApiError
 from .hid.discovery import enumerate_devices
 
 if TYPE_CHECKING:
@@ -52,17 +51,6 @@ class DeckManager:
 
         async with manager:
             await manager.wait_closed()
-
-    Parameters
-    ----------
-    poll_interval
-        Seconds between device scans (default 2.0).
-    brightness
-        Default brightness for new Deck instances (0-100).
-    auto_reconnect
-        If ``True`` (default), automatically reconnect
-        devices that disconnect.  The ``on_connect`` handler is
-        called again on reconnection.
     """
 
     def __init__(
@@ -71,6 +59,32 @@ class DeckManager:
         brightness: int = 80,
         auto_reconnect: bool = True,
     ) -> None:
+        """Construct a deck manager.
+
+        Construction is side-effect free; no devices are scanned until
+        :meth:`start` is called (directly or via ``async with``).
+
+        Parameters
+        ----------
+        poll_interval : float, default=2.0
+            Seconds between HID device scans.  Lower values detect
+            hot-plug events faster at the cost of more frequent
+            enumeration.
+        brightness : int, default=80
+            Default brightness percentage in ``[0, 100]`` applied to
+            newly connected :class:`Deck` instances.
+        auto_reconnect : bool, default=True
+            When ``True``, devices that disconnect are automatically
+            reopened on the next scan and registered ``on_connect``
+            handlers fire again.  When ``False``, disconnected devices
+            stay disconnected until the next manual restart.
+
+        Notes
+        -----
+        The scan loop, executor lifecycle, and event subscriptions are
+        created lazily by :meth:`start`; constructing a manager is
+        cheap and does no I/O.
+        """
         self._poll_interval = poll_interval
         self._brightness = brightness
         self._auto_reconnect = auto_reconnect
@@ -120,7 +134,7 @@ class DeckManager:
             try:
                 await deck.stop()
             except Exception:
-                logger.warning("Error stopping deck %s", serial)
+                logger.warning("Error stopping deck %s", serial, exc_info=True)
         self._decks.clear()
 
         self._closed_event.set()
@@ -161,6 +175,12 @@ class DeckManager:
         -------
         Callable
             Decorator that registers the handler.
+
+        Notes
+        -----
+        Unlike :attr:`on_disconnect`, this is a decorator *factory* and
+        must be invoked with parentheses (``@manager.on_connect()``) even
+        when no filter arguments are passed.
         """
         filters = {"serial": serial, "deck_type": deck_type}
 
@@ -189,6 +209,12 @@ class DeckManager:
         -------
         Callable
             Decorator that registers the handler.
+
+        Notes
+        -----
+        Unlike :meth:`on_connect`, this is a property returning the
+        decorator directly. Use it bare (``@manager.on_disconnect``);
+        calling it with parentheses raises :class:`TypeError`.
         """
 
         def decorator(handler: AsyncHandler) -> AsyncHandler:
@@ -238,8 +264,8 @@ class DeckManager:
             devices = await loop.run_in_executor(
                 get_executor(), enumerate_devices
             )
-        except (HidApiError, Exception):
-            logger.debug("Device enumeration failed")
+        except OSError:
+            logger.warning("Device enumeration failed", exc_info=True)
             return
 
         managed_paths: dict[str, str] = {}
@@ -270,7 +296,7 @@ class DeckManager:
                 device_by_serial[serial] = d
                 self._path_serial_cache[dev_path] = serial
                 await loop.run_in_executor(get_executor(), d.close)
-            except (HidApiError, Exception):
+            except OSError:
                 if dev_path not in self._failed_probe_paths:
                     self._failed_probe_paths.add(dev_path)
                     logger.info(
@@ -294,7 +320,7 @@ class DeckManager:
                 logger.info("Device disconnected: %s", serial)
                 try:
                     info = deck.info
-                except Exception:
+                except (DeckError, OSError):
                     info = DeviceInfo(
                         deck_type="unknown",
                         serial=serial,

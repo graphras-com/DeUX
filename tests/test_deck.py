@@ -43,13 +43,12 @@ class _TestCard(Card):
 def deck(tmp_path):
     """A Deck instance with required serial_number.
 
-    Capabilities are pre-populated so tests can call ``deck.screen()``
-    without going through the real device-discovery path.
+    Capabilities are pre-populated via the public
+    :meth:`Deck.for_testing` constructor so tests can call
+    ``deck.screen()`` without going through the real
+    device-discovery path.
     """
-    d = Deck(serial_number="TEST123")
-    d._caps = STREAM_DECK_PLUS
-    d._metrics = RenderMetrics(STREAM_DECK_PLUS)
-    return d
+    return Deck.for_testing(STREAM_DECK_PLUS, serial_number="TEST123")
 
 
 class TestDeckInit:
@@ -70,11 +69,6 @@ class TestDeckInit:
 
 class TestDeckPage:
     def test_creates_screen(self, deck):
-        p = deck.screen("main")
-        assert isinstance(p, Screen)
-        assert p.name == "main"
-
-    def test_creates_page(self, deck):
         p = deck.screen("main")
         assert isinstance(p, Screen)
         assert p.name == "main"
@@ -658,6 +652,162 @@ class TestDeckRenderTouchscreen:
         assert mock_streamdeck_device.set_partial_window_image.call_count == 4
 
 
+class TestDeckRendererTouchHelpers:
+    """Unit tests for the extracted touchscreen helpers on DeckRenderer."""
+
+    async def test_touchscreen_image_format_defaults_to_jpeg(self, deck):
+        """Returns JPEG when capabilities are absent."""
+        deck._caps = None
+        assert deck._renderer._touchscreen_image_format() == "JPEG"
+
+    async def test_touchscreen_image_format_uses_caps(self, deck):
+        """Returns the format declared by the device capabilities."""
+        deck._caps = STREAM_DECK_PLUS
+        assert (
+            deck._renderer._touchscreen_image_format()
+            == STREAM_DECK_PLUS.touchscreen_image_format
+        )
+
+    async def test_push_card_invokes_device_io_with_offset(
+        self, deck, mock_streamdeck_device
+    ):
+        """`_push_card` computes ``x = card_idx * panel_width`` and dispatches."""
+        deck._device = mock_streamdeck_device
+        payload = b"frame-bytes"
+        await deck._renderer._push_card(2, payload, PANEL_WIDTH, PANEL_HEIGHT)
+        mock_streamdeck_device.set_partial_window_image.assert_called_once_with(
+            2 * PANEL_WIDTH, 0, PANEL_WIDTH, PANEL_HEIGHT, payload
+        )
+
+    async def test_make_card_push_fn_pushes_frame_without_bg_tile(
+        self, deck, mock_streamdeck_device
+    ):
+        """Without a bg tile, the frame bytes are forwarded as-is."""
+        deck._device = mock_streamdeck_device
+        deck._caps = STREAM_DECK_PLUS
+        push_fn = deck._renderer._make_card_push_fn(
+            1, PANEL_WIDTH, PANEL_HEIGHT, bg_tile=None
+        )
+        frame = b"raw-frame"
+        await push_fn(frame)
+        mock_streamdeck_device.set_partial_window_image.assert_called_once_with(
+            PANEL_WIDTH, 0, PANEL_WIDTH, PANEL_HEIGHT, frame
+        )
+
+    async def test_make_card_push_fn_composites_when_bg_tile_present(
+        self, deck, mock_streamdeck_device
+    ):
+        """With a bg tile, the frame is composited before being pushed."""
+        deck._device = mock_streamdeck_device
+        deck._caps = STREAM_DECK_PLUS
+        bg_tile = _make_jpeg_frame(PANEL_WIDTH, PANEL_HEIGHT)
+        push_fn = deck._renderer._make_card_push_fn(
+            0, PANEL_WIDTH, PANEL_HEIGHT, bg_tile=bg_tile
+        )
+        frame = _make_jpeg_frame(PANEL_WIDTH, PANEL_HEIGHT)
+        with patch(
+            "deux.runtime.renderer.composite_frame_on_tile",
+            return_value=b"composited",
+        ) as mock_compose:
+            await push_fn(frame)
+        mock_compose.assert_called_once()
+        mock_streamdeck_device.set_partial_window_image.assert_called_once_with(
+            0, 0, PANEL_WIDTH, PANEL_HEIGHT, b"composited"
+        )
+
+    async def test_setup_card_non_dui_card_returns_dirty_flag(self, deck):
+        """Non-DUI cards skip background wiring and return ``is_dirty``."""
+        card = _TestCard()
+        # Force dirty=False to verify it propagates.
+        card._dirty = False  # type: ignore[attr-defined]
+        should_render = await deck._renderer._setup_card(
+            0, card, None, None, PANEL_WIDTH, PANEL_HEIGHT
+        )
+        assert should_render is False
+
+    async def test_setup_card_dui_card_animating_returns_false(self, deck):
+        """A DuiCard with an active animation is not re-rendered."""
+        from deux.dui.card import DuiCard
+
+        card = MagicMock(spec=DuiCard)
+        card.is_animating = True
+        card.is_dirty = True
+        should_render = await deck._renderer._setup_card(
+            0, card, None, None, PANEL_WIDTH, PANEL_HEIGHT
+        )
+        # Background layer cleared (no bg_svg_root) and push_fn wired.
+        card.set_bg_tile.assert_called_once_with(None)
+        card.clear_background_layer.assert_called_once()
+        card.set_push_fn.assert_called_once()
+        assert should_render is False
+
+    async def test_setup_card_dui_card_wires_bg_layer(self, deck):
+        """A non-animating DuiCard wires the SVG background and reports dirty."""
+        from deux.dui.card import DuiCard
+
+        card = MagicMock(spec=DuiCard)
+        card.is_animating = False
+        card.is_dirty = True
+        bg_root = object()
+        should_render = await deck._renderer._setup_card(
+            3, card, b"tile", bg_root, PANEL_WIDTH, PANEL_HEIGHT
+        )
+        card.set_bg_tile.assert_called_once_with(b"tile")
+        card.set_background_layer.assert_called_once_with(
+            bg_root, 3, PANEL_WIDTH, PANEL_HEIGHT
+        )
+        card.clear_background_layer.assert_not_called()
+        assert should_render is True
+
+    async def test_card_push_fn_raises_device_unavailable_when_closed(
+        self, deck
+    ):
+        """The card push_fn surfaces device-closed as DeviceUnavailable."""
+        from deux.dui.animator import DeviceUnavailable
+        from deux.dui.card import DuiCard
+
+        card = MagicMock(spec=DuiCard)
+        card.is_animating = False
+        card.is_dirty = True
+        await deck._renderer._setup_card(
+            0, card, None, None, PANEL_WIDTH, PANEL_HEIGHT
+        )
+
+        # Extract the push_fn that was wired onto the card.
+        push_fn, _kwargs = card.set_push_fn.call_args
+        push_callable = push_fn[0]
+
+        # Device is None — the closure must refuse to dereference it.
+        assert deck._device is None
+        with pytest.raises(DeviceUnavailable):
+            await push_callable(b"frame")
+
+    async def test_card_push_fn_translates_hid_error(
+        self, deck, mock_streamdeck_device
+    ):
+        """HidApiError from device I/O is translated to DeviceUnavailable."""
+        from deux.dui.animator import DeviceUnavailable
+        from deux.dui.card import DuiCard
+        from deux.runtime.hid._ctypes_hidapi import HidApiError
+
+        deck._device = mock_streamdeck_device
+        mock_streamdeck_device.set_partial_window_image.side_effect = (
+            HidApiError("hid_write failed: not ready")
+        )
+
+        card = MagicMock(spec=DuiCard)
+        card.is_animating = False
+        card.is_dirty = True
+        await deck._renderer._setup_card(
+            0, card, None, None, PANEL_WIDTH, PANEL_HEIGHT
+        )
+        push_fn, _kwargs = card.set_push_fn.call_args
+        push_callable = push_fn[0]
+
+        with pytest.raises(DeviceUnavailable):
+            await push_callable(b"frame")
+
+
 class TestDeckInfo:
     def test_no_device_raises(self, deck):
         with pytest.raises(DeckError, match="Device not opened"):
@@ -699,6 +849,39 @@ class TestDeckCapabilities:
 
     def test_metrics_after_set(self, deck):
         assert deck.metrics.key_count == 8
+
+
+class TestDeckForTesting:
+    """Tests for the public :meth:`Deck.for_testing` constructor."""
+
+    def test_seeds_capabilities_and_metrics(self):
+        d = Deck.for_testing(STREAM_DECK_PLUS)
+        assert d.capabilities is STREAM_DECK_PLUS
+        assert d.metrics.key_count == STREAM_DECK_PLUS.key_count
+
+    def test_default_serial_and_brightness(self):
+        d = Deck.for_testing(STREAM_DECK_PLUS)
+        assert d.brightness == 80
+        assert d.is_connected is False
+
+    def test_custom_serial_and_brightness(self):
+        d = Deck.for_testing(
+            STREAM_DECK_PLUS, serial_number="ABC123", brightness=42
+        )
+        assert d.brightness == 42
+
+    def test_does_not_open_device(self):
+        """No HID I/O — info still raises until a device is attached."""
+        d = Deck.for_testing(STREAM_DECK_PLUS)
+        with pytest.raises(DeckError, match="Device not opened"):
+            _ = d.info
+
+    def test_screen_works_without_real_device(self):
+        """The whole point: screen() must succeed after for_testing."""
+        d = Deck.for_testing(STREAM_DECK_PLUS)
+        s = d.screen("main")
+        assert isinstance(s, Screen)
+        assert s.name == "main"
 
 
 class TestDeckStart:
@@ -778,6 +961,34 @@ class TestDeckStop:
             mock_enum.return_value = [mock_streamdeck_device]
             await d.start()
             await d.stop()
+
+    async def test_stop_stops_active_spinners(self, deck):
+        """stop() halts active spinner animations on keys and cards."""
+        from deux.dui.card import DuiCard
+        from deux.dui.key import DuiKey
+
+        screen = deck.screen("main")
+
+        # Fabricate animating key + card with mocked animators so we
+        # don't need spinner specs / push wiring.
+        key = MagicMock(spec=DuiKey)
+        key.is_animating = True
+        key.finish_busy = AsyncMock()
+        screen._keys[0] = key
+
+        assert screen._touch_strip is not None
+        card = MagicMock(spec=DuiCard)
+        card.is_animating = True
+        card.finish_busy = AsyncMock()
+        screen._touch_strip._cards[0] = card
+
+        deck._running = True  # so stop() proceeds
+
+        # Stop without an underlying device.
+        await deck.stop()
+
+        key.finish_busy.assert_awaited_once()
+        card.finish_busy.assert_awaited_once()
 
 
 class TestDeckWaitClosed:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import builtins
 import logging
 import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING, Any
@@ -18,6 +19,7 @@ from .svg_renderer import SvgRenderer
 if TYPE_CHECKING:
     from PIL import Image
 
+    from ..render.context import RenderingContext
     from ..render.metrics import RenderMetrics
     from ..runtime.async_event import AsyncEvent
     from ..runtime.events import AsyncHandler, TouchEvent
@@ -57,18 +59,39 @@ class DuiCard(BindingMixin, Card):
 
     The card index is assigned automatically when you install the card
     on a screen with :meth:`~deux.ui.screen.Screen.set_card`.
-
-    Parameters
-    ----------
-    spec : PackageSpec or str
-        A validated :class:`~deux.dui.schema.PackageSpec`, or a
-        package name (e.g. ``"DashboardCard"``) to resolve from the
-        DUI repository.
     """
 
     def __init__(self, spec: PackageSpec | str) -> None:
+        """Construct a DUI-backed touchscreen card.
+
+        Parameters
+        ----------
+        spec : PackageSpec or str
+            Either a pre-validated
+            :class:`~deux.dui.schema.PackageSpec`, or a package name
+            (for example ``"DashboardCard"``) to resolve from the DUI
+            repository.  String resolution is deferred to
+            :func:`~deux.dui.repository.resolve_dui` at call time so
+            tests that monkeypatch that symbol behave correctly.
+
+        Raises
+        ------
+        deux.dui.repository.PackageError
+            If *spec* is a string and no matching package is found in
+            any registered search path.
+
+        Notes
+        -----
+        Construction performs no rendering and no device I/O.  The
+        underlying :class:`~deux.dui.svg_renderer.SvgRenderer` and
+        :class:`~deux.dui.events.EventMap` are built eagerly from
+        *spec*; binding values, push callbacks, and background tiles
+        are configured later via the corresponding setters.
+        """
         if isinstance(spec, str):
-            from .repository import resolve_dui
+            # Inline import: keeps the lookup go through repository.resolve_dui
+            # at call time so monkeypatching that symbol in tests works.
+            from .repository import resolve_dui  # noqa: PLC0415
 
             spec = resolve_dui(spec)
         super().__init__()
@@ -298,6 +321,28 @@ class DuiCard(BindingMixin, Card):
             If *name* is not a known binding.
         """
         return self._renderer.get(name)
+
+    def collect_icon_names(self) -> builtins.set[str]:
+        """Return all Iconify icon identifiers needed by this card.
+
+        Returns
+        -------
+        set[str]
+            A set of ``"prefix:icon"`` strings referenced by the card's
+            bindings (defaults and current values).
+        """
+        return self._renderer.collect_icon_names()
+
+    def set_rendering_context(self, ctx: RenderingContext | None) -> None:
+        """Set the explicit rendering context for this card.
+
+        Parameters
+        ----------
+        ctx : RenderingContext or None
+            The rendering context to apply, or ``None`` to revert to
+            module-level defaults.
+        """
+        self._renderer.set_rendering_context(ctx)
 
     def set_range(
         self, name: str, value: float, *, min_val: float = 0, max_val: float = 1

@@ -591,6 +591,8 @@ class TestSvgRendererRange:
             bindings={"bar": RangeBinding(node="bar", default=0.0)},
         )
         renderer = SvgRenderer(spec)
+        # Extents are populated lazily on first apply.
+        renderer.render()
         assert renderer._range_extents["bar"] == 80.0
 
     def test_range_extent_cached_vertical(self):
@@ -603,6 +605,8 @@ class TestSvgRendererRange:
             },
         )
         renderer = SvgRenderer(spec)
+        # Extents are populated lazily on first apply.
+        renderer.render()
         assert renderer._range_extents["vbar"] == 80.0
 
     def test_range_renders_differently(self):
@@ -1234,6 +1238,97 @@ class TestResolveFontAttrs:
         family, size = _resolve_font_attrs(root, elem)
         assert family == "Courier"
         assert size == 20.0
+
+    def test_accepts_prebuilt_parent_map(self):
+        import xml.etree.ElementTree as ET
+
+        from deux.dui.svg_renderer import _build_parent_map, _find_element_by_id
+
+        root = ET.fromstring(_WRAP_SVG)
+        elem = _find_element_by_id(root, "label")
+        parent_map = _build_parent_map(root)
+        family, size = _resolve_font_attrs(root, elem, parent_map)
+        assert family == "DejaVu Sans"
+        assert size == 15.0
+
+
+class TestParentMapCaching:
+    """Verify the per-render parent-map cache avoids O(N*M) rebuilds."""
+
+    def test_build_parent_map_walks_tree_once(self):
+        import xml.etree.ElementTree as ET
+
+        from deux.dui.svg_renderer import _build_parent_map
+
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg">'
+            '<g id="outer"><g id="inner"><text id="t">x</text></g></g>'
+            "</svg>"
+        )
+        root = ET.fromstring(svg)
+        parent_map = _build_parent_map(root)
+        outer = root.find("{http://www.w3.org/2000/svg}g")
+        assert outer is not None
+        inner = outer.find("{http://www.w3.org/2000/svg}g")
+        assert inner is not None
+        text = inner.find("{http://www.w3.org/2000/svg}text")
+        assert text is not None
+        assert parent_map[outer] is root
+        assert parent_map[inner] is outer
+        assert parent_map[text] is inner
+
+    def test_render_builds_parent_map_once_per_render(self, monkeypatch, tmp_path):
+        """Multiple text bindings in one render share a single parent map build."""
+        from deux.dui import svg_renderer as svg_renderer_mod
+
+        # Build a minimal package with multiple text bindings against the
+        # same SVG tree.  Each text binding has max_width set so that
+        # _resolve_font_attrs (and thus the parent map) is invoked.
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" '
+            'font-family="DejaVu Sans" font-size="12">'
+            '<text id="t1" x="0" y="10">a</text>'
+            '<text id="t2" x="0" y="25">b</text>'
+            '<text id="t3" x="0" y="40">c</text>'
+            "</svg>"
+        )
+        from deux.dui.schema import TextBinding
+
+        spec = _make_spec(
+            svg,
+            bindings={
+                "a": TextBinding(node="t1", default="a", max_width=80),
+                "b": TextBinding(node="t2", default="b", max_width=80),
+                "c": TextBinding(node="t3", default="c", max_width=80),
+            },
+        )
+        renderer = SvgRenderer(spec)
+
+        call_count = {"n": 0}
+        real_build = svg_renderer_mod._build_parent_map
+
+        def counting_build(root):
+            call_count["n"] += 1
+            return real_build(root)
+
+        monkeypatch.setattr(svg_renderer_mod, "_build_parent_map", counting_build)
+
+        # Stub rasterise to avoid the cairosvg dependency in this test.
+        from PIL import Image as _PILImage
+
+        monkeypatch.setattr(
+            renderer, "_rasterise", lambda data: _PILImage.new("RGBA", (10, 10))
+        )
+
+        renderer.render()
+        assert call_count["n"] == 1, (
+            f"parent map rebuilt {call_count['n']} times for 3 text bindings; "
+            "expected exactly 1"
+        )
+
+        # A second render builds the map again (fresh deep-copied tree).
+        renderer.render()
+        assert call_count["n"] == 2
 
 
 class TestLoadFont:
@@ -1888,6 +1983,32 @@ class TestIconifyBindingRendering:
         g = _find_by_id(root, "icon")
         assert list(g) == []
         assert any("failed to parse" in rec.message for rec in caplog.records)
+
+    def test_unexpected_parser_error_propagates(self, monkeypatch):
+        """Non-parse errors (e.g. programming bugs) must NOT be swallowed."""
+        import deux.dui.svg_renderer as svg_renderer_mod
+
+        monkeypatch.setattr(
+            svg_renderer_mod, "fetch_icon", lambda name: "<svg/>", raising=True
+        )
+
+        spec = _make_spec(
+            _ICONIFY_SVG,
+            bindings={
+                "icon": IconifyBinding(node="icon", size=55, default="line-md:home"),
+            },
+        )
+        renderer = SvgRenderer(spec)
+
+        def boom(_data):
+            raise AttributeError("unexpected bug")
+
+        monkeypatch.setattr(
+            svg_renderer_mod, "safe_fromstring", boom, raising=True
+        )
+
+        with pytest.raises(AttributeError, match="unexpected bug"):
+            self._serialise_with_bindings(renderer)
 
     def test_full_render_produces_image(self, monkeypatch):
         """End-to-end render goes through CairoSVG without exceptions."""

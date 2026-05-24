@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import contextlib
+import io
 import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from ...render.touch_renderer import compose_card_with_background
 from ...runtime.events import AsyncHandler, EventType, TouchEvent
 
 if TYPE_CHECKING:
@@ -223,6 +225,19 @@ class Card(ABC):
         return callbacks
 
     @property
+    def has_pending_callbacks(self) -> bool:
+        """Whether the card has callbacks queued for the next drain.
+
+        Returns
+        -------
+        bool
+            ``True`` if at least one callback has been queued via
+            :meth:`queue_pending_callback` and has not yet been drained
+            by :meth:`drain_pending_callbacks`.
+        """
+        return bool(self._pending_callbacks)
+
+    @property
     def is_dirty(self) -> bool:
         """Whether the card needs re-rendering."""
         return self._dirty
@@ -289,16 +304,12 @@ class Card(ABC):
         bytes
             Encoded image bytes ready to send to the device.
         """
-        from ...render.touch_renderer import compose_card_with_background
-
         rendered = self.render()
         self.set_rendered(rendered)
 
         # Convert PIL Image to PNG bytes for compositing.
         card_bytes: bytes | None = None
         if rendered is not None:
-            import io
-
             buf = io.BytesIO()
             rendered.save(buf, format="PNG")
             card_bytes = buf.getvalue()

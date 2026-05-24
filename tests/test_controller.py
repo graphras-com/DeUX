@@ -58,15 +58,15 @@ class TestCardController:
         controller.card = DuiCard(_card_spec())
         await controller.on_detach()
 
-    async def test_on_detach_unsubscribes_bound_events(self):
-        """Default on_detach calls card.detach(), removing event handlers."""
+    async def test_on_detach_preserves_service_bindings(self):
+        """Default on_detach no longer calls card.detach(); service bindings survive."""
         controller = CardController()
         controller.card = DuiCard(_card_spec())
         event = AsyncEvent()
         controller.card.bind("title", event)
         assert event.subscriber_count == 1
         await controller.on_detach()
-        assert event.subscriber_count == 0
+        assert event.subscriber_count == 1
 
     async def test_subclass_can_override_lifecycle(self):
         attached: list[object] = []

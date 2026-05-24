@@ -30,7 +30,7 @@ classifiers = [
 dependencies = [
     "pillow>=12.2.0",
     "pyyaml>=6.0",
-    "platformdirs>=4.0",
+    "platformdirs>=4.9.6",
     "defusedxml>=0.7.0",
     "resvg @ git+https://github.com/graphras-com/resvg-py.git@main",
 ]
@@ -59,32 +59,33 @@ src = ["src"]
 
 [tool.ruff.lint]
 select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "I",   # isort
-    "B",   # flake8-bugbear
-    "UP",  # pyupgrade
-    "C4",  # comprehensions
-    "SIM", # simplify
+    "E",       # pycodestyle errors
+    "W",       # pycodestyle warnings
+    "F",       # pyflakes
+    "I",       # isort
+    "B",       # flake8-bugbear
+    "UP",      # pyupgrade
+    "C4",      # comprehensions
+    "SIM",     # simplify
+    "PLC0415", # pylint: imports must live at the top of the module
 ]
 ignore = ["B008"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["B011"]
+"tests/*" = ["B011", "PLC0415"]
 
 [project.optional-dependencies]
 test = [
     "pytest>=9.0.3",
     "pytest-asyncio>=0.24",
-    "pytest-cov>=6.0",
+    "pytest-cov>=7.1.0",
     "types-PyYAML>=6.0",
 ]
 
 docs = [
     "mkdocs-material>=9.5",
-    "mkdocstrings[python]>=0.25",
-    "mkdocs-gen-files>=0.5",
+    "mkdocstrings[python]>=1.0.4",
+    "mkdocs-gen-files>=0.6.1",
     "mkdocs-literate-nav>=0.6",
     "pylint>=3.0",
 ]

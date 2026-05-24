@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from contextlib import suppress
+import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, suppress
 from typing import TYPE_CHECKING, Any
 
 from .._errors import DeuxError
+from ..dui.key import DuiKey
 from ..render.metrics import RenderMetrics
-from ._executor import get_executor, shutdown_executor
+from ..render.theme import get_active_theme
+from ._executor import get_executor
 from .async_event import AsyncEvent
 from .capabilities import DeviceCapabilities
 from .device_info import DeviceInfo
@@ -21,9 +25,14 @@ from .renderer import DeckRenderer
 from .transport import AsyncTransport
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
+    from PIL import Image
+
     from ..render.theme import Theme
     from ..ui.screen import Screen
     from .hid.device import HidDevice
+    from .splash import FitMode as SplashFitMode
 
 logger = logging.getLogger(__name__)
 
@@ -69,13 +78,29 @@ class Deck:
         serial_number: str,
         brightness: int = 80,
     ) -> None:
-        """
+        """Construct a deck handle for the given serial number.
+
+        Instances are normally created by :class:`DeckManager` in
+        response to a device-connect event; application code receives
+        them via ``on_connect`` handlers.  For unit tests that need a
+        deck without HID I/O, use :meth:`Deck.for_testing`.
+
         Parameters
         ----------
-        serial_number
-            The serial number of the target device.
-        brightness
-            Initial brightness (0-100).
+        serial_number : str
+            Serial number of the target device.  Used during
+            :meth:`start` to locate the matching HID device.
+        brightness : int, default=80
+            Initial brightness percentage in ``[0, 100]`` applied once
+            the device is opened.
+
+        Notes
+        -----
+        Construction performs no I/O.  The HID device is opened and the
+        event loop started by :meth:`start`.  The
+        :attr:`on_brightness_changed` and :attr:`on_screen_changed`
+        events are wired up here and ready for subscription before
+        :meth:`start` is called.
         """
         self._serial_number = serial_number
         self._brightness = brightness
@@ -94,11 +119,82 @@ class Deck:
         self._active_screen: Screen | None = None
         self._theme: Theme | None = None
 
+        # Batched-render gate.  When ``_batch_render_depth > 0`` the deck
+        # is inside a full-screen operation (initial render, screen
+        # switch, theme change) and incoming ``refresh()`` calls are
+        # deferred so partial per-key writes cannot land on the LCD
+        # between the old frame and the new one.  ``_refresh_pending``
+        # records that at least one refresh was suppressed so a single
+        # drain refresh can fire when the gate reopens.  Both fields
+        # are reset by :meth:`stop` so reconnects start clean.
+        self._batch_render_depth: int = 0
+        self._refresh_pending: bool = False
+
+        # Splash hold deadline.  When :meth:`show_full_screen_image` is
+        # called with ``min_display_ms > 0``, this records the
+        # ``perf_counter()`` timestamp before which the next batched
+        # render's *push* phase must not begin.  Render work runs in
+        # parallel with the splash; only the final device push is
+        # gated.  Cleared after the first deadline-await consumes it,
+        # so the hold applies exactly once per splash.
+        self._splash_push_deadline: float | None = None
+
         self.on_brightness_changed = AsyncEvent()
         self.on_screen_changed = AsyncEvent()
 
         self._renderer = DeckRenderer(self)
         self._event_router = DeckEventRouter(self)
+
+    @classmethod
+    def for_testing(
+        cls,
+        capabilities: DeviceCapabilities,
+        *,
+        serial_number: str = "TEST",
+        brightness: int = 80,
+    ) -> Deck:
+        """Construct a :class:`Deck` pre-seeded with capabilities for tests.
+
+        Real construction goes through :meth:`start`, which discovers a
+        physical device and derives :attr:`capabilities` and
+        :attr:`metrics` from it.  Tests that exercise behaviour above
+        the device layer need those two attributes populated without
+        any HID I/O.
+
+        This helper provides the supported way to do so, so that tests
+        do not have to assign to the private ``_caps`` / ``_metrics``
+        attributes directly.  No device is opened and no transport is
+        started — :attr:`is_connected` remains ``False`` until the
+        normal :meth:`start` path is invoked.
+
+        Parameters
+        ----------
+        capabilities : DeviceCapabilities
+            The capabilities to seed onto the deck.  Drives the
+            derived :class:`~deux.render.metrics.RenderMetrics` and
+            anything else that reads :attr:`capabilities`.
+        serial_number : str, default="TEST"
+            Serial number recorded on the instance.  Does not need to
+            correspond to a real device.
+        brightness : int, default=80
+            Initial brightness (0-100).
+
+        Returns
+        -------
+        Deck
+            A deck instance with :attr:`capabilities` and
+            :attr:`metrics` populated.
+
+        Notes
+        -----
+        This constructor is intended for unit tests.  Production code
+        should use the normal :class:`Deck` constructor and
+        :meth:`start`.
+        """
+        deck = cls(serial_number=serial_number, brightness=brightness)
+        deck._caps = capabilities
+        deck._metrics = RenderMetrics(capabilities)
+        return deck
 
     async def start(self) -> None:
         """Discover the device by serial, open it, and start the event loop."""
@@ -165,6 +261,8 @@ class Deck:
 
         self._running = False
 
+        await self._stop_all_spinners()
+
         self._detach_all_cards()
 
         if self._transport:
@@ -176,30 +274,77 @@ class Deck:
                 await self._event_task
 
         if self._device:
-            try:
-                await self._exec_device_io(self._device.show_logo)
-                await self._exec_device_io(self._device.close)
-            except (HidWriteTimeout, HidApiError, Exception) as e:
-                logger.warning("Error closing device: %s", e)
+            if self._device.is_open:
+                try:
+                    await self._exec_device_io(self._device.show_logo)
+                    await self._exec_device_io(self._device.close)
+                except Exception as e:
+                    # Intentional catch-all: shutdown must never raise.
+                    # Covers HidWriteTimeout/HidApiError plus any transport,
+                    # OS, or backend-specific errors surfaced during close.
+                    logger.warning("Error closing device: %s", e)
+            else:
+                logger.debug("Device already closed; skipping show_logo/close")
 
         self._device = None
         self._closed_event.set()
-        shutdown_executor(wait=True)
+        self._batch_render_depth = 0
+        self._refresh_pending = False
+        self._splash_push_deadline = None
         logger.info("Deck stopped")
 
-    def _detach_all_cards(self) -> None:
-        """Unsubscribe all AsyncEvent handlers on every DuiCard across all screens.
+    async def _stop_all_spinners(self) -> None:
+        """Stop spinner animations on every DuiKey and DuiCard.
 
-        Prevents handler accumulation across reconnect cycles.
+        Called from :meth:`stop` before the device is closed so that
+        no in-flight spinner frames are pushed to a half-torn-down
+        device.  Failures to stop an individual spinner are logged
+        and swallowed — shutdown must never raise.
         """
-        from ..dui.card import DuiCard
+        # Inline import: dui.card transitively imports runtime.events, which
+        # triggers runtime package init while this module is still loading.
+        from ..dui.card import DuiCard  # noqa: PLC0415
 
+        for screen in self._screens.values():
+            for key_slot in screen.keys.values():
+                if isinstance(key_slot, DuiKey) and key_slot.is_animating:
+                    try:
+                        await key_slot.finish_busy()
+                    except Exception:
+                        logger.exception(
+                            "Error stopping spinner on key %r", key_slot
+                        )
+            if screen.touch_strip is None:
+                continue
+            for card in screen.touch_strip.cards:
+                if isinstance(card, DuiCard) and card.is_animating:
+                    try:
+                        await card.finish_busy()
+                    except Exception:
+                        logger.exception(
+                            "Error stopping spinner on card %r", card
+                        )
+
+    def _detach_all_cards(self) -> None:
+        """Unsubscribe deck-owned AsyncEvent handlers on every DuiCard across all screens.
+
+        Only removes bindings to this deck's own events (e.g.
+        ``on_brightness_changed``, ``on_screen_changed``), preserving
+        service-owned bindings established in controller ``__init__``.
+        This prevents handler accumulation across reconnect cycles
+        without breaking reactive bindings to external services.
+        """
+        # Inline import: dui.card transitively imports runtime.events, which
+        # triggers runtime package init while this module is still loading.
+        from ..dui.card import DuiCard  # noqa: PLC0415
+
+        deck_events = (self.on_brightness_changed, self.on_screen_changed)
         for screen in self._screens.values():
             if screen.touch_strip is None:
                 continue
             for card in screen.touch_strip.cards:
                 if isinstance(card, DuiCard):
-                    card.detach()
+                    card.detach_events(*deck_events)
 
     async def wait_closed(self) -> None:
         """Block until the deck is closed (e.g. by stop() or disconnect)."""
@@ -331,9 +476,10 @@ class Deck:
         if self._active_screen is None:
             return
 
-        self._renderer.apply_theme()
-        self._active_screen.mark_all_dirty()
-        await self._renderer.render_screen_complete()
+        async with self._batched_render():
+            self._renderer.apply_theme()
+            self._active_screen.mark_all_dirty()
+            await self._renderer.render_screen_complete()
 
     async def preload_icons(self) -> None:
         """Prefetch Iconify icons for all registered screens.
@@ -343,7 +489,9 @@ class Deck:
         Call this after all screens have been set up (keys and cards
         installed) to avoid network latency on first render.
         """
-        from ..dui.iconify import prefetch_icons
+        # Inline import: tests patch ``deux.dui.iconify.prefetch_icons``;
+        # importing it lazily keeps that patching point effective.
+        from ..dui.iconify import prefetch_icons  # noqa: PLC0415
 
         all_icons: set[str] = set()
         for screen in self._screens.values():
@@ -351,7 +499,7 @@ class Deck:
         if all_icons:
             await prefetch_icons(all_icons)
 
-    def _resolve_stylesheet(self) -> str:
+    def resolve_stylesheet(self) -> str:
         """Resolve the effective CSS stylesheet for the active screen.
 
         The cascade is: screen theme > deck theme > system theme.
@@ -361,7 +509,17 @@ class Deck:
         str
             CSS stylesheet string from the most specific theme.
         """
-        return self._renderer._resolve_stylesheet()
+        screen = self._active_screen
+        if screen is not None and screen.theme is not None:
+            return screen.theme.css
+        if self._theme is not None:
+            return self._theme.css
+        return get_active_theme().css
+
+    # Backwards-compatible alias preserved for callers that used the
+    # private name prior to the encapsulation refactor.  Prefer the
+    # public :meth:`resolve_stylesheet` for new code.
+    _resolve_stylesheet = resolve_stylesheet
 
     async def set_brightness(self, percent: int) -> None:
         """Set screen brightness.
@@ -390,6 +548,218 @@ class Deck:
         self._brightness = clamped
         await self.on_brightness_changed.emit(clamped)
 
+    # -- full-screen ("splash") image --------------------------------------
+
+    async def show_full_screen_image(
+        self,
+        image: Image.Image | str | Path | bytes,
+        *,
+        fit: SplashFitMode = "cover",
+        background: tuple[int, int, int] = (0, 0, 0),
+        jpeg_quality: int = 90,
+        min_display_ms: int = 0,
+    ) -> None:
+        """Upload an image covering the entire LCD (HID command ``0x08``).
+
+        The image is loaded (PIL image, file path, raw image bytes, or
+        SVG), resized to the device's logical LCD size using *fit*,
+        rotated into the device's transmit orientation, JPEG-encoded,
+        and pushed via
+        :meth:`HidDevice.set_full_screen_image`.
+
+        **Important behavioural contract.**  This is a one-shot,
+        whole-LCD blit.  Any subsequent per-key (``set_key_image``),
+        per-window (``set_partial_window_image``), or per-screen render
+        will paint over the image.  In particular, calling
+        :meth:`set_screen` after :meth:`show_full_screen_image` will
+        immediately clobber the image as the renderer pushes the new
+        screen.
+
+        Intended use cases are startup splashes, loading screens, and
+        lock screens.  For persistent backgrounds, use the per-screen
+        background layer in :class:`Screen` instead.
+
+        Parameters
+        ----------
+        image : Image.Image, str, Path, or bytes
+            Source image.  ``.svg`` files and SVG byte streams are
+            rasterised at the target LCD size; other formats are
+            decoded with Pillow.
+        fit : {"cover", "contain", "stretch"}, default="cover"
+            Resize strategy.  ``"cover"`` scales to fill and crops the
+            overflow; ``"contain"`` letterboxes with *background*;
+            ``"stretch"`` ignores aspect ratio.
+        background : tuple[int, int, int], default=(0, 0, 0)
+            RGB background colour used to letterbox under
+            ``fit="contain"``.
+        jpeg_quality : int, default=90
+            JPEG encoding quality (1-95).
+        min_display_ms : int, default=0
+            Minimum time, in milliseconds, that this image must remain
+            visible on the LCD before the *push phase* of the next
+            batched render (``set_screen`` / ``set_theme``) may begin.
+            The render's CPU work still runs in parallel with the
+            splash; only the final device push is delayed.  Effective
+            total splash time is therefore
+            ``max(min_display_ms, render_time)`` -- a fast render waits
+            for the remainder of the requested display time, while a
+            slow render is never artificially delayed.  Default of
+            ``0`` disables the hold entirely.  The deadline is one-shot
+            and is consumed by the first batched push that follows.
+
+        Raises
+        ------
+        DeckError
+            If the device is not opened, or its PID has no known
+            logical LCD size.
+        SplashError
+            If image preparation fails.
+
+        Examples
+        --------
+        Hold a splash for at least 500 ms so the user can perceive it
+        even when the first ``set_screen`` is very fast::
+
+            await deck.show_splash("boot.png", min_display_ms=500)
+            await deck.set_screen("home")  # push delayed until 500ms elapsed
+        """
+        if self._device is None:
+            raise DeckError("Device not opened")
+        logical_size = self._device.logical_lcd_size
+        if logical_size == (0, 0):
+            raise DeckError(
+                f"Device PID 0x{self._device.product_id:04X} has no "
+                "known LCD size; cannot prepare full-screen image"
+            )
+        rotation = self._device.rotation
+
+        # Inline import: splash transitively pulls in the resvg backend
+        # for SVG inputs.  Keeping the import local avoids paying that
+        # cost on deck construction for callers that never use this API.
+        from .splash import prepare_full_screen_jpeg  # noqa: PLC0415
+
+        loop = asyncio.get_running_loop()
+        jpeg_bytes = await loop.run_in_executor(
+            get_executor(),
+            lambda: prepare_full_screen_jpeg(
+                image,
+                logical_size=logical_size,
+                rotation=rotation,
+                fit=fit,
+                background=background,
+                jpeg_quality=jpeg_quality,
+            ),
+        )
+
+        async with self._device_lock:
+            await self._exec_device_io(
+                self._device.set_full_screen_image, jpeg_bytes
+            )
+
+        if min_display_ms > 0:
+            self._splash_push_deadline = (
+                time.perf_counter() + min_display_ms / 1000.0
+            )
+        else:
+            self._splash_push_deadline = None
+
+    async def show_splash(
+        self,
+        image: Image.Image | str | Path | bytes,
+        *,
+        fit: SplashFitMode = "cover",
+        background: tuple[int, int, int] = (0, 0, 0),
+        jpeg_quality: int = 90,
+        min_display_ms: int = 0,
+    ) -> None:
+        """Alias for :meth:`show_full_screen_image`, intended for startup.
+
+        Provides a semantically clearer entry point for the common case
+        of displaying a boot/splash image before the first screen is
+        rendered.
+
+        Parameters
+        ----------
+        image : Image.Image, str, Path, or bytes
+            See :meth:`show_full_screen_image`.
+        fit : {"cover", "contain", "stretch"}, default="cover"
+            See :meth:`show_full_screen_image`.
+        background : tuple[int, int, int], default=(0, 0, 0)
+            See :meth:`show_full_screen_image`.
+        jpeg_quality : int, default=90
+            See :meth:`show_full_screen_image`.
+        min_display_ms : int, default=0
+            See :meth:`show_full_screen_image`.
+
+        See Also
+        --------
+        show_full_screen_image
+        clear_full_screen_image
+        """
+        await self.show_full_screen_image(
+            image,
+            fit=fit,
+            background=background,
+            jpeg_quality=jpeg_quality,
+            min_display_ms=min_display_ms,
+        )
+
+    async def clear_full_screen_image(
+        self,
+        color: tuple[int, int, int] = (0, 0, 0),
+        *,
+        jpeg_quality: int = 90,
+    ) -> None:
+        """Clear the LCD by uploading a solid-colour full-screen image.
+
+        Uses the same HID command ``0x08`` path as
+        :meth:`show_full_screen_image`, ensuring a deterministic
+        clear across all supported deck families.  Behaviour-wise this
+        is equivalent to ``show_full_screen_image`` with a solid-colour
+        source; like that method, any subsequent per-key or per-window
+        write will paint over the cleared LCD.
+
+        Parameters
+        ----------
+        color : tuple[int, int, int], default=(0, 0, 0)
+            RGB fill colour.
+        jpeg_quality : int, default=90
+            JPEG encoding quality (1-95).
+
+        Raises
+        ------
+        DeckError
+            If the device is not opened, or its PID has no known
+            logical LCD size.
+        """
+        if self._device is None:
+            raise DeckError("Device not opened")
+        logical_size = self._device.logical_lcd_size
+        if logical_size == (0, 0):
+            raise DeckError(
+                f"Device PID 0x{self._device.product_id:04X} has no "
+                "known LCD size; cannot prepare full-screen image"
+            )
+        rotation = self._device.rotation
+
+        from .splash import prepare_solid_color_jpeg  # noqa: PLC0415
+
+        loop = asyncio.get_running_loop()
+        jpeg_bytes = await loop.run_in_executor(
+            get_executor(),
+            lambda: prepare_solid_color_jpeg(
+                color,
+                logical_size=logical_size,
+                rotation=rotation,
+                jpeg_quality=jpeg_quality,
+            ),
+        )
+
+        async with self._device_lock:
+            await self._exec_device_io(
+                self._device.set_full_screen_image, jpeg_bytes
+            )
+
     def screen(self, name: str) -> Screen:
         """Get or create a screen by name.
 
@@ -409,7 +779,9 @@ class Deck:
             If the device is not opened — capabilities are required to
             size the screen, and they are only known after :meth:`start`.
         """
-        from ..ui.screen import Screen
+        # Inline import: ui.screen transitively imports runtime.events via
+        # ui.touch_strip -> ui.cards.base, creating a cycle at module load.
+        from ..ui.screen import Screen  # noqa: PLC0415
 
         if self._caps is None:
             raise DeckError("Device not opened")
@@ -445,25 +817,27 @@ class Deck:
         if target is self._active_screen:
             return
 
-        self._active_screen = target
-        logger.info("Switching to screen: %s", name)
+        async with self._batched_render():
+            self._active_screen = target
+            logger.info("Switching to screen: %s", name)
 
-        # Apply the resolved theme cascade for this screen.
-        self._renderer.apply_theme()
+            # Apply the resolved theme cascade for this screen.
+            self._renderer.apply_theme()
 
-        self._wire_refresh_callbacks()
+            self._wire_refresh_callbacks()
 
-        # Emit *before* rendering so that bind() handlers listening to
-        # on_screen_changed can seed card values (e.g. the nav pager)
-        # prior to the first paint, avoiding a flash of defaults.
-        await self.on_screen_changed.emit(name, self._screens)
+            # Emit *before* rendering so that bind() handlers listening to
+            # on_screen_changed can seed card values (e.g. the nav pager)
+            # prior to the first paint, avoiding a flash of defaults.
+            await self.on_screen_changed.emit(name, self._screens)
 
-        # Force a full repaint: mark every control on the incoming screen
-        # dirty so the renderer does not skip cards/keys that were already
-        # rendered on a previous visit or shared with another screen.
-        target.mark_all_dirty()
+            # Force a full repaint: mark every control on the incoming
+            # screen dirty so the renderer does not skip cards/keys that
+            # were already rendered on a previous visit or shared with
+            # another screen.
+            target.mark_all_dirty()
 
-        await self._renderer.render_screen_complete()
+            await self._renderer.render_screen_complete()
 
     def _wire_refresh_callbacks(self) -> None:
         """Register ``self.refresh`` on every key and card of the active screen.
@@ -524,6 +898,58 @@ class Deck:
         """Render and push the info screen image (e.g. Neo)."""
         await self._renderer.render_info_screen()
 
+    async def _consume_splash_push_deadline(self) -> None:
+        """Block until any pending splash-hold deadline has elapsed.
+
+        Called by :class:`DeckRenderer` at the start of each push phase
+        of a batched render.  If :meth:`show_full_screen_image` was
+        called with ``min_display_ms > 0`` since the last batched push,
+        this awaits the remaining time before allowing the push to
+        proceed.  Render-phase CPU work runs in parallel with this
+        wait, so the effective splash display time is
+        ``max(min_display_ms, render_time)``.
+
+        The deadline is consumed (cleared) on the first call so that
+        subsequent pushes within the same batched render -- and any
+        following batched renders -- are not delayed.
+        """
+        deadline = self._splash_push_deadline
+        if deadline is None:
+            return
+        self._splash_push_deadline = None
+        remaining = deadline - time.perf_counter()
+        if remaining > 0:
+            await asyncio.sleep(remaining)
+
+    @asynccontextmanager
+    async def _batched_render(self) -> AsyncIterator[None]:
+        """Suppress per-control ``refresh()`` calls inside a batched render.
+
+        Used to wrap operations that end in a full
+        :meth:`DeckRenderer.render_screen_complete` call (initial
+        screen load, screen switch, theme change).  While the gate
+        is closed, any handler that calls
+        :meth:`Card.request_refresh` / :meth:`KeySlot.request_refresh`
+        is folded into a single drain refresh fired after the
+        batched render finishes.
+
+        Re-entrant: nested batched operations are tracked by a depth
+        counter and only the outermost exit fires the drain refresh.
+
+        Yields
+        ------
+        None
+            Inside the context, :meth:`refresh` is gated.
+        """
+        self._batch_render_depth += 1
+        try:
+            yield
+        finally:
+            self._batch_render_depth -= 1
+            if self._batch_render_depth == 0 and self._refresh_pending:
+                self._refresh_pending = False
+                await self.refresh()
+
     async def refresh(self) -> None:
         """Re-render and push all dirty controls on the active screen.
 
@@ -531,14 +957,25 @@ class Deck:
         updates outside of ``set_screen()``.  Also drains any pending
         callbacks queued by programmatic ``set_value()`` calls on
         range controls.
+
+        While the deck is inside a batched render (initial screen
+        load, screen switch, or theme change), this call is recorded
+        as pending and a single drain refresh fires once the batched
+        operation completes.  This prevents partial per-key writes
+        from landing on the LCD between the old frame and the new
+        one.
         """
+        if self._batch_render_depth > 0:
+            self._refresh_pending = True
+            return
+
         screen = self._current_screen()
         if not screen:
             return
 
         # Only drain cards that actually have pending callbacks.
         cards_with_pending = [
-            card for card in screen.cards if card._pending_callbacks
+            card for card in screen.cards if card.has_pending_callbacks
         ]
         if cards_with_pending:
             await asyncio.gather(

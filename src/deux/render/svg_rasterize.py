@@ -24,12 +24,13 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from PIL import Image
+
 from .._errors import DeuxError
 from .._xml import safe_fromstring
 from .context import RenderingContext
 
 if TYPE_CHECKING:
-    from PIL import Image
     from resvg import usvg as _usvg_mod
 
 logger = logging.getLogger(__name__)
@@ -47,12 +48,96 @@ class RasterizeError(DeuxError):
 #: Maximum number of rasterised images to keep in the LRU cache.
 _SVG_CACHE_MAX_SIZE: int = 128
 
-_svg_image_cache: OrderedDict[tuple[bytes, int, int, str], bytes] = OrderedDict()
-_svg_image_cache_lock = threading.Lock()
 
-#: Cache hit/miss counters for diagnostics.
-_svg_cache_hits: int = 0
-_svg_cache_misses: int = 0
+class _SvgRasterCache:
+    """Thread-safe LRU cache for rasterised SVG output.
+
+    Encapsulates the cache storage, lock, hit/miss counters, and size
+    bound previously held as module-level globals.  Tests may construct
+    a fresh instance for isolation, but production code uses the
+    module-level singleton :data:`_raster_cache`.
+
+    Parameters
+    ----------
+    max_size : int, default=:data:`_SVG_CACHE_MAX_SIZE`
+        Maximum number of cached entries before LRU eviction kicks in.
+
+    Attributes
+    ----------
+    max_size : int
+        Configured maximum cache size.
+    """
+
+    def __init__(self, max_size: int = _SVG_CACHE_MAX_SIZE) -> None:
+        self.max_size = max_size
+        self._store: OrderedDict[tuple[bytes, int, int, str], bytes] = OrderedDict()
+        self._lock = threading.Lock()
+        self._hits = 0
+        self._misses = 0
+
+    def get(self, key: tuple[bytes, int, int, str]) -> bytes | None:
+        """Look up a cached entry, updating LRU order and hit counter on success.
+
+        Parameters
+        ----------
+        key : tuple[bytes, int, int, str]
+            Cache key from :func:`_svg_cache_key`.
+
+        Returns
+        -------
+        bytes or None
+            Cached image bytes, or ``None`` on a miss.
+        """
+        with self._lock:
+            value = self._store.get(key)
+            if value is not None:
+                self._store.move_to_end(key)
+                self._hits += 1
+                return value
+        return None
+
+    def put(self, key: tuple[bytes, int, int, str], value: bytes) -> None:
+        """Store an entry, evicting the LRU element if ``max_size`` is exceeded.
+
+        Parameters
+        ----------
+        key : tuple[bytes, int, int, str]
+            Cache key from :func:`_svg_cache_key`.
+        value : bytes
+            Serialised image bytes to cache.
+        """
+        with self._lock:
+            self._store[key] = value
+            self._store.move_to_end(key)
+            self._misses += 1
+            while len(self._store) > self.max_size:
+                self._store.popitem(last=False)
+
+    def clear(self) -> None:
+        """Drop all entries and reset hit/miss counters."""
+        with self._lock:
+            self._store.clear()
+            self._hits = 0
+            self._misses = 0
+
+    def stats(self) -> dict[str, int]:
+        """Return a snapshot of size, hit, and miss counters.
+
+        Returns
+        -------
+        dict[str, int]
+            Dictionary with ``"size"``, ``"hits"``, and ``"misses"`` keys.
+        """
+        with self._lock:
+            return {
+                "size": len(self._store),
+                "hits": self._hits,
+                "misses": self._misses,
+            }
+
+
+#: Module-level singleton used by the public rasterisation entry points.
+_raster_cache = _SvgRasterCache()
 
 
 def _svg_cache_key(
@@ -89,9 +174,9 @@ def _svg_cache_key(
 
 
 def _svg_cache_get(key: tuple[bytes, int, int, str]) -> bytes | None:
-    """Look up a cached rasterisation result.
+    """Look up a cached rasterisation result in the module-level cache.
 
-    Moves the entry to the end of the LRU on hit.
+    Thin wrapper around :meth:`_SvgRasterCache.get` on :data:`_raster_cache`.
 
     Parameters
     ----------
@@ -103,21 +188,13 @@ def _svg_cache_get(key: tuple[bytes, int, int, str]) -> bytes | None:
     bytes or None
         Cached image bytes, or ``None`` on a miss.
     """
-    global _svg_cache_hits  # noqa: PLW0603
-    with _svg_image_cache_lock:
-        value = _svg_image_cache.get(key)
-        if value is not None:
-            _svg_image_cache.move_to_end(key)
-            _svg_cache_hits += 1
-            return value
-    return None
+    return _raster_cache.get(key)
 
 
 def _svg_cache_put(key: tuple[bytes, int, int, str], value: bytes) -> None:
-    """Store a rasterisation result in the cache.
+    """Store a rasterisation result in the module-level cache.
 
-    Evicts the least-recently-used entry when the cache exceeds
-    :data:`_SVG_CACHE_MAX_SIZE`.
+    Thin wrapper around :meth:`_SvgRasterCache.put` on :data:`_raster_cache`.
 
     Parameters
     ----------
@@ -126,13 +203,7 @@ def _svg_cache_put(key: tuple[bytes, int, int, str], value: bytes) -> None:
     value : bytes
         Serialised image bytes to cache.
     """
-    global _svg_cache_misses  # noqa: PLW0603
-    with _svg_image_cache_lock:
-        _svg_image_cache[key] = value
-        _svg_image_cache.move_to_end(key)
-        _svg_cache_misses += 1
-        while len(_svg_image_cache) > _SVG_CACHE_MAX_SIZE:
-            _svg_image_cache.popitem(last=False)
+    _raster_cache.put(key, value)
 
 
 def clear_svg_cache() -> None:
@@ -142,11 +213,7 @@ def clear_svg_cache() -> None:
     counters.  Call this after changing the global stylesheet or
     theme to ensure stale images are not served.
     """
-    global _svg_cache_hits, _svg_cache_misses  # noqa: PLW0603
-    with _svg_image_cache_lock:
-        _svg_image_cache.clear()
-        _svg_cache_hits = 0
-        _svg_cache_misses = 0
+    _raster_cache.clear()
     logger.debug("SVG rasterisation cache cleared")
 
 
@@ -158,12 +225,7 @@ def svg_cache_stats() -> dict[str, int]:
     dict[str, int]
         Dictionary with ``"size"``, ``"hits"``, and ``"misses"`` keys.
     """
-    with _svg_image_cache_lock:
-        return {
-            "size": len(_svg_image_cache),
-            "hits": _svg_cache_hits,
-            "misses": _svg_cache_misses,
-        }
+    return _raster_cache.stats()
 
 
 # ---------------------------------------------------------------------------
@@ -195,13 +257,66 @@ def _get_usvg_opts() -> _usvg_mod.Options:
     """
     opts = getattr(_thread_local, "usvg_opts", None)
     if opts is None:
-        from resvg import usvg
+        # Lazy import: resvg is an optional native dep; importing it lazily
+        # lets the module load even when resvg is missing so callers can
+        # catch the ImportError as a RasterizeError at call time.
+        from resvg import usvg  # noqa: PLC0415
 
         opts = usvg.Options.default()
         opts.load_system_fonts()
         _thread_local.usvg_opts = opts
         logger.debug("usvg Options created and system fonts loaded (thread-local cache)")
     return opts
+
+
+def _prepare_svg_tree(svg_data: bytes, width: int, height: int) -> _usvg_mod.Tree:
+    """Normalise SVG bytes and parse them into a ``usvg.Tree``.
+
+    Performs the shared preparation steps used by both PNG and RGBA
+    rasterisation paths: ensures a ``viewBox`` is present (preserving
+    the original design dimensions), sets the target ``width`` and
+    ``height`` attributes so resvg scales vector content correctly,
+    registers SVG namespaces to avoid ``ns0:`` prefixes, serialises
+    the tree back to text, and constructs a :class:`usvg.Tree`.
+
+    Parameters
+    ----------
+    svg_data : bytes
+        Raw SVG content.
+    width : int
+        Desired output width in pixels.
+    height : int
+        Desired output height in pixels.
+
+    Returns
+    -------
+    usvg.Tree
+        Parsed micro-SVG tree ready for rasterisation.
+
+    Raises
+    ------
+    ImportError
+        If the ``resvg`` package is not installed.
+    """
+    root = safe_fromstring(svg_data)
+    if "viewBox" not in root.attrib:
+        orig_w = root.get("width", str(width))
+        orig_h = root.get("height", str(height))
+        # Strip non-numeric units (e.g. "100px" -> "100")
+        orig_w = "".join(c for c in orig_w if c.isdigit() or c == ".")
+        orig_h = "".join(c for c in orig_h if c.isdigit() or c == ".")
+        root.set("viewBox", f"0 0 {orig_w} {orig_h}")
+    root.set("width", str(width))
+    root.set("height", str(height))
+
+    ET.register_namespace("", _SVG_NS)
+    ET.register_namespace("xlink", _XLINK_NS)
+    svg_text = ET.tostring(root, encoding="unicode", xml_declaration=False)
+
+    # Lazy import: resvg is an optional native dep — see _get_usvg_opts.
+    from resvg import usvg  # noqa: PLC0415
+
+    return usvg.Tree.from_str(svg_text, _get_usvg_opts())
 
 
 def _resvg_rasterize(svg_data: bytes, width: int, height: int) -> bytes:
@@ -233,27 +348,11 @@ def _resvg_rasterize(svg_data: bytes, width: int, height: int) -> bytes:
         If ``resvg`` is not installed or SVG parsing/rendering fails.
     """
     try:
-        from resvg import render as _resvg_render
+        # Lazy import: resvg is an optional native dep; the ImportError is
+        # caught below and re-raised as RasterizeError.
+        from resvg import render as _resvg_render  # noqa: PLC0415
 
-        root = safe_fromstring(svg_data)
-        if "viewBox" not in root.attrib:
-            orig_w = root.get("width", str(width))
-            orig_h = root.get("height", str(height))
-            # Strip non-numeric units (e.g. "100px" -> "100")
-            orig_w = "".join(c for c in orig_w if c.isdigit() or c == ".")
-            orig_h = "".join(c for c in orig_h if c.isdigit() or c == ".")
-            root.set("viewBox", f"0 0 {orig_w} {orig_h}")
-        root.set("width", str(width))
-        root.set("height", str(height))
-
-        ET.register_namespace("", _SVG_NS)
-        ET.register_namespace("xlink", _XLINK_NS)
-        svg_text = ET.tostring(root, encoding="unicode", xml_declaration=False)
-
-        from resvg import usvg
-
-        tree = usvg.Tree.from_str(svg_text, _get_usvg_opts())
-
+        tree = _prepare_svg_tree(svg_data, width, height)
         png_bytes: bytes = _resvg_render(tree, (1.0, 0.0, 0.0, 0.0, 1.0, 0.0))
         return png_bytes
     except ImportError as exc:
@@ -292,26 +391,11 @@ def _resvg_rasterize_rgba(
         If ``resvg`` is not installed or SVG parsing/rendering fails.
     """
     try:
-        from resvg import render_rgba as _resvg_render_rgba
+        # Lazy import: resvg is an optional native dep; the ImportError is
+        # caught below and re-raised as RasterizeError.
+        from resvg import render_rgba as _resvg_render_rgba  # noqa: PLC0415
 
-        root = safe_fromstring(svg_data)
-        if "viewBox" not in root.attrib:
-            orig_w = root.get("width", str(width))
-            orig_h = root.get("height", str(height))
-            orig_w = "".join(c for c in orig_w if c.isdigit() or c == ".")
-            orig_h = "".join(c for c in orig_h if c.isdigit() or c == ".")
-            root.set("viewBox", f"0 0 {orig_w} {orig_h}")
-        root.set("width", str(width))
-        root.set("height", str(height))
-
-        ET.register_namespace("", _SVG_NS)
-        ET.register_namespace("xlink", _XLINK_NS)
-        svg_text = ET.tostring(root, encoding="unicode", xml_declaration=False)
-
-        from resvg import usvg
-
-        tree = usvg.Tree.from_str(svg_text, _get_usvg_opts())
-
+        tree = _prepare_svg_tree(svg_data, width, height)
         rgba_bytes, w, h = _resvg_render_rgba(tree, (1.0, 0.0, 0.0, 0.0, 1.0, 0.0))
         return bytes(rgba_bytes), w, h
     except ImportError as exc:
@@ -324,7 +408,27 @@ def _resvg_rasterize_rgba(
 # Application-wide CSS stylesheet
 # ---------------------------------------------------------------------------
 
-_active_stylesheet: str | None = None
+class _StylesheetHolder:
+    """Holder for the application-wide CSS stylesheet override.
+
+    Encapsulates the previously module-level ``_active_stylesheet``
+    global so that callers (and tests) interact with an explicit
+    object rather than rebinding a module attribute.
+
+    Attributes
+    ----------
+    css : str or None
+        Current stylesheet text, or ``None`` if none is active.
+    """
+
+    __slots__ = ("css",)
+
+    def __init__(self) -> None:
+        self.css: str | None = None
+
+
+#: Module-level singleton tracking the active application-wide stylesheet.
+_stylesheet = _StylesheetHolder()
 
 
 def set_svg_stylesheet(css: str | None) -> None:
@@ -350,10 +454,9 @@ def set_svg_stylesheet(css: str | None) -> None:
 
         set_svg_stylesheet(\"\"\".text-primary { color: #ff0000; }\"\"\")
     """
-    global _active_stylesheet  # noqa: PLW0603
-    if css == _active_stylesheet:
+    if css == _stylesheet.css:
         return
-    _active_stylesheet = css
+    _stylesheet.css = css
     clear_svg_cache()
     logger.debug(
         "SVG stylesheet %s",
@@ -370,7 +473,7 @@ def get_svg_stylesheet() -> str | None:
         The CSS text set via :func:`set_svg_stylesheet`, or ``None``
         if no stylesheet is active.
     """
-    return _active_stylesheet
+    return _stylesheet.css
 
 
 def load_svg_stylesheet(path: str | Path) -> None:
@@ -482,7 +585,7 @@ def _svg_to_png(
     RasterizeError
         If resvg is not available or rasterisation fails.
     """
-    css = ctx.resolve_stylesheet() if ctx is not None else _active_stylesheet
+    css = ctx.resolve_stylesheet() if ctx is not None else _stylesheet.css
 
     t0 = time.perf_counter()
     if css is not None:
@@ -535,9 +638,7 @@ def _svg_to_image(
     RasterizeError
         If resvg is not available or rasterisation fails.
     """
-    from PIL import Image
-
-    css = ctx.resolve_stylesheet() if ctx is not None else _active_stylesheet
+    css = ctx.resolve_stylesheet() if ctx is not None else _stylesheet.css
 
     t0 = time.perf_counter()
 
@@ -621,7 +722,7 @@ def _rasterize_svg(
     if fmt not in ("png", "jpeg", "bmp"):
         raise ValueError(f"Unsupported output format: {output_format!r}")
 
-    css = ctx.resolve_stylesheet() if ctx is not None else _active_stylesheet
+    css = ctx.resolve_stylesheet() if ctx is not None else _stylesheet.css
     cache_key = _svg_cache_key(svg_data, width, height, f"raster:{fmt}:{quality}", css)
     cached = _svg_cache_get(cache_key)
     if cached is not None:

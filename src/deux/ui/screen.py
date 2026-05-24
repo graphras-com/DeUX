@@ -4,12 +4,19 @@ from __future__ import annotations
 
 import io
 import logging
+import xml.etree.ElementTree as ET
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
+from PIL import Image
+
+from ..dui.key import DuiKey
 from ..render.background_layer import BackgroundLayer
+from ..render.defaults import get_default_backgrounds
+from ..render.metrics import RenderMetrics
+from ..render.svg_rasterize import RasterizeError
 from .controls.encoder_slot import EncoderSlot
 from .controls.key_slot import KeySlot
 from .info_screen import InfoScreen
@@ -47,6 +54,36 @@ class Screen:
     """
 
     def __init__(self, name: str, caps: DeviceCapabilities) -> None:
+        """Initialise a screen for the given device capabilities.
+
+        Screens are normally created via :meth:`Deck.screen` rather than
+        instantiated directly; the deck supplies the matching device
+        capabilities.
+
+        Parameters
+        ----------
+        name : str
+            Identifier used to look up and activate this screen via
+            :meth:`Deck.set_screen`.
+        caps : DeviceCapabilities
+            Capability snapshot describing the target device.  Drives
+            which controls are provisioned (touch strip, info screen)
+            and which slot indices are valid.
+
+        Notes
+        -----
+        Construction has the following side effects:
+
+        * A :class:`~deux.render.background_layer.BackgroundLayer` is
+          created for keys regardless of device.
+        * A :class:`~deux.ui.touch_strip.TouchStrip` is provisioned only
+          when the device has both a touchscreen and at least one dial.
+        * An :class:`~deux.ui.info_screen.InfoScreen` is provisioned
+          only when the device reports an info screen.
+        * Bundled default backgrounds for the device's VID:PID are
+          applied on a best-effort basis; failures are logged but never
+          raised.
+        """
         self._name = name
         self._caps = caps
         self._keys: dict[int, KeySlot] = {}
@@ -60,8 +97,6 @@ class Screen:
         self._key_bg_dirty: bool = False
 
         if self._caps.has_touchscreen and self._caps.dial_count > 0:
-            from ..render.metrics import RenderMetrics
-
             metrics = RenderMetrics(self._caps)
             self._touch_strip: TouchStrip | None = TouchStrip(
                 panel_count=metrics.panel_count,
@@ -95,29 +130,31 @@ class Screen:
         background has been explicitly configured.  Failures are logged
         but never raised — defaults are best-effort.
         """
-        from ..render.defaults import get_default_backgrounds
-
         try:
             backgrounds = get_default_backgrounds(
                 self._caps.vendor_id, self._caps.product_id
             )
         except Exception:
-            logger.debug("Could not load default backgrounds", exc_info=True)
+            logger.warning("Could not load default backgrounds", exc_info=True)
             return
 
         if "touchscreen" in backgrounds and self._touch_strip is not None:
             try:
                 svg_data = backgrounds["touchscreen"]
                 self._touch_strip.bg_layer.set_svg(svg_data, trusted=True)
-            except Exception:
-                logger.debug("Failed to apply default touchscreen background", exc_info=True)
+            except (ET.ParseError, RasterizeError, OSError):
+                logger.warning(
+                    "Failed to apply default touchscreen background", exc_info=True
+                )
 
         if "key" in backgrounds:
             try:
                 svg_data = backgrounds["key"]
                 self._key_bg_layer.set_svg(svg_data, trusted=True)
-            except Exception:
-                logger.debug("Failed to apply default key background", exc_info=True)
+            except (ET.ParseError, RasterizeError, OSError):
+                logger.warning(
+                    "Failed to apply default key background", exc_info=True
+                )
 
     def _rasterize_key_background(self) -> None:
         """Re-rasterize the key background via the BackgroundLayer.
@@ -408,17 +445,18 @@ class Screen:
             A set of ``"prefix:icon"`` strings used across all
             keys and cards on this screen.
         """
-        from ..dui.card import DuiCard
-        from ..dui.key import DuiKey
+        # Inline import: dui.card imports ui.cards.base, which would create
+        # a cycle if hoisted to module top.
+        from ..dui.card import DuiCard  # noqa: PLC0415
 
         icons: set[str] = set()
         for key_slot in self._keys.values():
             if isinstance(key_slot, DuiKey):
-                icons.update(key_slot._renderer.collect_icon_names())
+                icons.update(key_slot.collect_icon_names())
         if self._touch_strip is not None:
             for card in self._touch_strip.cards:
                 if isinstance(card, DuiCard):
-                    icons.update(card._renderer.collect_icon_names())
+                    icons.update(card.collect_icon_names())
         return icons
 
     def screenshot(self, directory: str | Path) -> list[Path]:
@@ -451,8 +489,6 @@ class Screen:
             # [PosixPath('/tmp/deck_screenshot/key_0.png'),
             #  PosixPath('/tmp/deck_screenshot/card_1.png')]
         """
-        from PIL import Image
-
         out_dir = Path(directory)
         out_dir.mkdir(parents=True, exist_ok=True)
         written: list[Path] = []

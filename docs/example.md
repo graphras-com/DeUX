@@ -41,15 +41,21 @@ that each own one widget plus its state. A top-level
 
 ```
 StreamDeckApp
-├── AudioController        ── AudioCard.dui      (touch-strip card 0)
-├── LightsController       ── LightCard.dui      (touch-strip card 1)
-├── TimerController        ── TimerCard.dui      (touch-strip card 2)
-├── DashboardController    ── DashboardCard.dui  (touch-strip card 3)
-├── FavoritesController    ── PictureKey.dui     (keys 0..N favourites)
-├── SceneController        ── IconKey.dui        (remaining keys)
+├── AudioController        ── AudioCard.dui      (local;    Main card 0)
+├── LightsController       ── LightCard.dui      (local;    Main card 1)
+├── GaugeController        ── GaugeCard.dui      (local;    Main card 2)
+├── TimerController        ── TimerCard.dui      (local;    Settings card 2)
+├── DashboardController    ── DashboardCard.dui  (built-in; cards 3 on both screens)
+├── FavoritesController    ── PictureKey.dui     (built-in; Main keys 0..N favourites)
+├── SceneController        ── IconKey.dui        (built-in; remaining Main keys)
 └── ScreenCycler           ── (no widget; bound to dashboard's
                                  ``next_screen`` event)
 ```
+
+`.dui` packages tagged ``local`` live under ``examples/`` and are loaded
+by path. Packages tagged ``built-in`` ship inside DeUX at
+``src/deux/dui/packages/`` and are resolved automatically by the
+``DuiRepository`` — no path required.
 
 Controllers never talk to the deck directly. They mutate their card's
 bindings via `set`/`set_many` and call `card.request_refresh()` when the
@@ -80,6 +86,13 @@ async def run() -> None:
 `DeckManager` discovers connected devices, calls `on_connect` once a
 deck is ready, and re-fires it on reconnects when `auto_reconnect=True`.
 On disconnect, the example shuts down its background tasks cleanly.
+
+> **Note:** the two hooks have different shapes. `on_connect()` is a
+> decorator factory (call with parens) and accepts optional `serial=` /
+> `deck_type=` filters to scope the handler to specific devices.
+> `on_disconnect` is a property that returns the decorator directly — use
+> it bare, without parens (`@manager.on_disconnect`). Calling
+> `@manager.on_disconnect()` will raise `TypeError`.
 
 ## Highlights
 
@@ -134,11 +147,12 @@ async def _click():
 ### Two screens, cycled by an encoder press
 
 `ScreenCycler` swaps between a busy `main` screen (favourites, scenes,
-all four cards) and a focused `settings` screen (dashboard and lights
-only). The dashboard card stays in the same slot on every screen so
-the encoder used to cycle screens is always the rightmost one. The
-same controllers appear on both — DeUX re-renders whatever is
-installed on the active screen.
+plus the audio, lights, gauge, and dashboard cards) and a focused
+`settings` screen (timer and dashboard cards, with the remaining keys
+as unassigned `IconKey` templates). The dashboard card stays in the
+same slot on every screen so the encoder used to cycle screens is
+always the rightmost one. The same controllers appear on both — DeUX
+re-renders whatever is installed on the active screen.
 
 The cycler doesn't own any widget. Instead, `DashboardCard.dui`
 declares a `next_screen` event mapped to an encoder press-release, and
@@ -185,6 +199,8 @@ Once running, here are some interactions to try:
 | Click the timer encoder | Start or pause the countdown |
 | Hold the timer encoder | Reset the timer |
 | Turn the timer encoder | Add/remove 30 seconds |
+| Turn the gauge encoder | Adjust the gauge needle |
+| Press the gauge encoder | Toggle the gauge's background drift simulator |
 | Press the dashboard encoder | Cycle to the next screen |
 
 ## Full source
