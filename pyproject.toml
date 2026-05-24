@@ -86,7 +86,7 @@ docs = [
     "mkdocs-material>=9.5",
     "mkdocstrings[python]>=1.0.4",
     "mkdocs-gen-files>=0.6.1",
-    "mkdocs-literate-nav>=0.6",
+    "mkdocs-literate-nav>=0.6.3",
     "pylint>=3.0",
 ]
 
