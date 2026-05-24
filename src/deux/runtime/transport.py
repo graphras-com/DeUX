@@ -78,14 +78,32 @@ class AsyncTransport:
         return self._queue
 
     def start(self) -> None:
-        """Start the input polling background task."""
+        """Start the input polling background task.
+
+        Spawns an asyncio task that continuously polls the underlying
+        HID device for input events and forwards decoded events to
+        :attr:`queue`. Calling :meth:`start` more than once without an
+        intervening :meth:`stop` will replace the previous polling task
+        reference; callers should treat the method as one-shot per
+        transport lifetime.
+
+        Notes
+        -----
+        Must be called from within a running asyncio event loop.
+        """
         self._running = True
         self._poll_task = asyncio.create_task(
             self._poll_loop(), name="deux-hid-poll"
         )
 
     def stop(self) -> None:
-        """Stop polling."""
+        """Stop polling.
+
+        Signals the polling loop to exit and cancels the background
+        task if it is still running. Safe to call multiple times and
+        safe to call when :meth:`start` was never invoked; in both
+        cases the method becomes a no-op.
+        """
         self._running = False
         if self._poll_task and not self._poll_task.done():
             self._poll_task.cancel()
