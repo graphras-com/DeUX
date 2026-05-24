@@ -5,7 +5,8 @@
 >
 > Before running, generate a fresh coverage report:
 > ```bash
-> python -m pytest tests/ --cov=deux --cov-report=term-missing --cov-report=json
+> uv sync --extra test
+> uv run python -m pytest tests/ --cov=deux --cov-report=term-missing --cov-report=json
 > ```
 > Provide the output or `coverage.json` as context alongside the source and test files.
 

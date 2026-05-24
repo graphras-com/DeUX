@@ -94,6 +94,11 @@ audit = [
     "pip-audit>=2.7",
 ]
 
+dev = [
+    "ruff>=0.15.0",
+    "mypy>=1.18.0",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
