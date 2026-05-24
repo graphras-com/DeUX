@@ -5,11 +5,14 @@
 >
 > Before running, gather dependency data:
 > ```bash
+> # Sync the audit extra so pip-audit is available
+> uv sync --extra audit
+>
 > # List installed packages with versions
 > uv pip list --format json > /tmp/deps-installed.json
 >
-> # Check for known vulnerabilities (install pip-audit if needed: uv pip install pip-audit)
-> pip-audit --format json --output /tmp/deps-audit.json 2>&1 || true
+> # Check for known vulnerabilities
+> uv run pip-audit --format json --output /tmp/deps-audit.json 2>&1 || true
 >
 > # Show outdated packages
 > uv pip list --outdated --format json > /tmp/deps-outdated.json 2>&1 || true

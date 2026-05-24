@@ -90,6 +90,10 @@ docs = [
     "pylint>=3.0",
 ]
 
+audit = [
+    "pip-audit>=2.7",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
