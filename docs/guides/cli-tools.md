@@ -166,8 +166,9 @@ without writing any Python.
 !!! note
     The full-screen image is a **one-shot whole-LCD blit**. Any subsequent
     key or touchstrip update — including those issued by another DeUX
-    process — will paint over it. See
-    `deux.runtime.deck.Deck.show_full_screen_image` for details.
+    process — will paint over it. See the
+    [Full-Screen Images](full-screen-images.md) guide for the Python API,
+    device support matrix, and the underlying `deux.runtime.splash` module.
 
 ### Synopsis
 
