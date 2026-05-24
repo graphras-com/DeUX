@@ -22,6 +22,8 @@ nav:
   - Guides:
       - DUI Repository & Built-in Packages: guides/dui-repository.md
       - Creating DUI Packages: guides/creating-dui-packages.md
+      - Theming: guides/theming.md
+      - Error Handling: guides/error-handling.md
       - CLI Tools: guides/cli-tools.md
   - Example: example.md
   - API Reference: reference/
