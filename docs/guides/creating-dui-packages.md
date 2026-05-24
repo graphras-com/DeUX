@@ -866,7 +866,9 @@ All validation errors raise `PackageError` with a descriptive message.
 
 ## Package Verification Tool
 
-Use the verify tool to check packages before publishing to a repository.
+Use the verify tool to check packages before publishing to a repository. For
+a full reference of all DeUX CLI utilities — including the live `preview`
+and `splash` tools — see the [CLI Tools guide](cli-tools.md).
 
 ### Basic verification
 
