@@ -25,8 +25,20 @@ _device_map: dict[tuple[int, int], dict[str, str]] = {}
 class SurfaceBackgrounds(TypedDict, total=False):
     """Mapping of surface type to raw SVG bytes.
 
-    Keys are ``"key"``, ``"touchscreen"``, and/or ``"screen"``
-    depending on the device's hardware capabilities.
+    A ``TypedDict`` with three optional keys; only those matching the
+    device's hardware capabilities are populated.
+
+    Keys
+    ----
+    key : bytes
+        Raw SVG bytes used as the default background for individual key
+        images.
+    touchscreen : bytes
+        Raw SVG bytes used as the default background for the full
+        touchscreen strip (Stream Deck+ family).
+    screen : bytes
+        Raw SVG bytes used as the default background for the secondary
+        information screen (Stream Deck Neo and similar).
     """
 
     key: bytes

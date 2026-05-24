@@ -26,11 +26,53 @@ class RenderMetrics:
 
     Parameters
     ----------
-    caps
+    caps : DeviceCapabilities
         Device capabilities to derive metrics from.
+
+    Attributes
+    ----------
+    key_size : tuple[int, int]
+        ``(width, height)`` of a single key image in pixels.
+    key_image_format : str
+        Native key image format expected by the device (e.g. ``"JPEG"``
+        or ``"BMP"``).
+    key_count : int
+        Total number of physical keys on the device.
+    touchscreen_width : int
+        Width of the touchscreen surface in pixels, or ``0`` if the
+        device has no touchscreen.
+    touchscreen_height : int
+        Height of the touchscreen surface in pixels, or ``0`` if the
+        device has no touchscreen.
+    panel_count : int
+        Number of logical touchscreen panels (typically one per dial on
+        Stream Deck+), or ``0`` on devices without a touchscreen.
+    panel_width : int
+        Width of a single touchscreen panel in pixels. ``0`` when the
+        device has no touchscreen or no panels.
+    panel_height : int
+        Height of a single touchscreen panel in pixels. ``0`` when the
+        device has no touchscreen.
+    screen_width : int
+        Width of the secondary information screen in pixels, or ``0``
+        if absent.
+    screen_height : int
+        Height of the secondary information screen in pixels, or ``0``
+        if absent.
+    dial_count : int
+        Number of rotary encoders (dials) on the device.
     """
 
     def __init__(self, caps: DeviceCapabilities) -> None:
+        """Derive rendering metrics from device capabilities.
+
+        Parameters
+        ----------
+        caps : DeviceCapabilities
+            Capabilities of the device the metrics apply to. All
+            attributes are computed eagerly from this object; the
+            capabilities reference is retained for later inspection.
+        """
         self._caps = caps
 
         self.key_size: tuple[int, int] = (caps.key_pixel_width, caps.key_pixel_height)
