@@ -1,0 +1,44 @@
+name: ClockKey
+type: Key
+version: 1
+description: Analog Clock
+author: Graphras.com
+license: Apache-2.0
+category: utilities
+layout: layout.svg
+
+bindings:
+  minute_hand:
+    type: transform
+    node: minute_hand
+    default: 0
+    transforms:
+      - kind: rotate
+        from: 00
+        to: 360
+        origin: 0 0
+
+  hour_hand:
+    type: transform
+    node: hour_hand
+    default: 0
+    transforms:
+      - kind: rotate
+        from: 0
+        to: 360
+        origin: 0 0
+
+events:
+  - name: click
+    source: key_press_release
+    max_duration_ms: 300
+
+  - name: hold
+    source: key_hold
+    hold_ms: 350
+
+  - name: press
+    source: key_press
+
+  - name: release
+    source: key_release

@@ -96,6 +96,7 @@ from deux import (
     DeviceInfo,
     DuiCard,
     DuiKey,
+    KeyController,
     Theme,
     add_dui_path,
 )
@@ -860,6 +861,160 @@ class GaugeController(CardController):
     async def on_detach(self) -> None:
         """Stop the background drift simulator."""
         await self._svc.stop()
+
+class ClockController(KeyController):
+    """Analog clock key -- ticking hour and minute hands driven by system time.
+
+    Loads ``ClockKey.dui`` and updates two transform bindings,
+    ``hour_hand`` and ``minute_hand``, with rotation angles in degrees
+    derived from the local system clock.  Both bindings are declared in
+    the manifest as ``rotate`` transforms whose ``from``/``to`` span the
+    full ``0 -- 360`` degree range, so the controller writes confirmed
+    domain values (degrees) through :meth:`~deux.DuiKey.set_range` with
+    ``min_val=0`` and ``max_val=360``.
+
+    Angle calculation
+    ~~~~~~~~~~~~~~~~~
+    * **Minute hand** -- ``6 degrees per minute``  (``360 / 60``), with
+      sub-minute precision contributed by the seconds component
+      (``0.1 deg/s``).  At 12 o'clock the angle is ``0``.
+    * **Hour hand** -- ``0.5 degrees per minute``  (``30 / 60``), i.e.
+      ``30 degrees per hour`` plus a smooth drift across the hour driven
+      by the minutes (and seconds).  The hour value is taken modulo 12
+      so that 12:00 and 00:00 both render at ``0``.
+
+    Because this is a pure display (no user input changes the time), the
+    controller does not own a backend service.  It runs a single
+    ``asyncio`` task that ticks once per second, recomputes the hand
+    angles, writes them to the key, and requests a refresh.  The task is
+    started in :meth:`on_attach` and cancelled in :meth:`on_detach`, so
+    it is safe across reconnect cycles.
+
+    Notes
+    -----
+    The tick task only requests a refresh when at least one hand angle
+    actually changes since the last tick, avoiding redundant renders
+    while the second hand is between visible positions.
+    """
+
+    TICK_INTERVAL_S = 1.0
+    ANGLE_MIN = 0
+    ANGLE_MAX = 360
+    DEGREES_PER_MINUTE_MINUTE_HAND = 6.0
+    DEGREES_PER_MINUTE_HOUR_HAND = 0.5
+
+    def __init__(self) -> None:
+        self.key = DuiKey("ClockKey")
+        self._tick_task: asyncio.Task[None] | None = None
+        self._last_hour_angle: float | None = None
+        self._last_minute_angle: float | None = None
+
+    @classmethod
+    def compute_angles(cls, now: datetime.datetime) -> tuple[float, float]:
+        """Compute the (hour, minute) hand angles in degrees for *now*.
+
+        Both angles are normalised so that ``0`` corresponds to the
+        12 o'clock position and values increase clockwise.
+
+        Parameters
+        ----------
+        now : datetime.datetime
+            The point in time to render.  Only the ``hour``, ``minute``,
+            and ``second`` fields are used.
+
+        Returns
+        -------
+        tuple[float, float]
+            ``(hour_angle, minute_angle)`` both in the range
+            ``[0, 360)`` degrees.
+        """
+        total_minutes = now.minute + now.second / 60.0
+        minute_angle = (
+            total_minutes * cls.DEGREES_PER_MINUTE_MINUTE_HAND
+        ) % cls.ANGLE_MAX
+        hour_angle = (
+            (now.hour % 12) * 30.0
+            + total_minutes * cls.DEGREES_PER_MINUTE_HOUR_HAND
+        ) % cls.ANGLE_MAX
+        return hour_angle, minute_angle
+
+    def _apply_now(self, now: datetime.datetime) -> bool:
+        """Update the key bindings for time *now*.
+
+        Parameters
+        ----------
+        now : datetime.datetime
+            The time to render.
+
+        Returns
+        -------
+        bool
+            ``True`` if either hand angle changed since the previous
+            call, ``False`` otherwise.
+        """
+        hour_angle, minute_angle = self.compute_angles(now)
+        if (
+            hour_angle == self._last_hour_angle
+            and minute_angle == self._last_minute_angle
+        ):
+            return False
+        self.key.set_range(
+            "hour_hand",
+            hour_angle,
+            min_val=self.ANGLE_MIN,
+            max_val=self.ANGLE_MAX,
+        )
+        self.key.set_range(
+            "minute_hand",
+            minute_angle,
+            min_val=self.ANGLE_MIN,
+            max_val=self.ANGLE_MAX,
+        )
+        self._last_hour_angle = hour_angle
+        self._last_minute_angle = minute_angle
+        return True
+
+    async def on_attach(self, deck: Deck) -> None:
+        """Render the current time and start the per-second tick task.
+
+        Idempotent so reconnects do not stack background tasks.
+
+        Parameters
+        ----------
+        deck
+            The :class:`~deux.Deck` instance (unused -- the clock is
+            independent of deck state).
+        """
+        del deck
+        self._apply_now(datetime.datetime.now())
+        if self._tick_task is None or self._tick_task.done():
+            self._tick_task = asyncio.create_task(
+                self._tick_loop(), name="clock-tick"
+            )
+
+    async def on_detach(self) -> None:
+        """Cancel the tick task and unsubscribe key events."""
+        task = self._tick_task
+        self._tick_task = None
+        if task is not None and not task.done():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+        await super().on_detach()
+
+    async def _tick_loop(self) -> None:
+        """Drive hand updates once per second.
+
+        Only requests a refresh when a visible angle actually changes,
+        so the renderer is not woken up unnecessarily.
+        """
+        try:
+            while True:
+                await asyncio.sleep(self.TICK_INTERVAL_S)
+                if self._apply_now(datetime.datetime.now()):
+                    await self.key.request_refresh()
+        except asyncio.CancelledError:
+            pass
 
 class SceneController:
     """Scene-activation keys -- one :class:`DuiKey` per scene definition.
