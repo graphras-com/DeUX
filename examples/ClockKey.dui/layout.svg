@@ -1,0 +1,58 @@
+<svg id="Button" xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">
+    <defs>
+        <linearGradient id="backgroundGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop class="background-dark" offset="0%" stop-color="currentColor" />
+            <stop class="background-light" offset="100%" stop-color="currentColor" />
+        </linearGradient>
+        <filter id="shadow" x="-100%" y="-100%" width="210%" height="210%">
+            <feDropShadow dx="-1" dy="-1" stdDeviation="1" flood-color="black" flood-opacity=".5"/>
+        </filter>
+    </defs>
+    <rect class="background-dark" x="0" y="0" width="120" height="120" fill="currentColor"  />
+    <rect x="4" y="4" width="112" height="112" fill="url(#backgroundGradient)" rx="15" />
+    <text class="icon" font-size="12" x="60" y="48" text-anchor="middle" fill="currentColor">DeUX</text>
+    <g class="border-primary" transform="translate(60 60)" filter="url(#shadow)">
+        <g>
+            <rect x="40" y="-1" width="10" height="2" fill="currentColor" />
+            <rect x="-50" y="-1" width="10" height="2" fill="currentColor" />
+        </g>
+        <g transform="rotate(30)">
+            <rect x="40" y="-1" width="10" height="2" fill="currentColor" />
+            <rect x="-50" y="-1" width="10" height="2" fill="currentColor" />
+        </g>
+        <g transform="rotate(60)">
+            <rect x="40" y="-1" width="10" height="2" fill="currentColor" />
+            <rect x="-50" y="-1" width="10" height="2" fill="currentColor" />
+        </g>
+        <g transform="rotate(90)">
+            <rect x="40" y="-1" width="10" height="2" fill="currentColor" />
+            <rect x="-50" y="-1" width="10" height="2" fill="currentColor" />
+        </g>
+        <g transform="rotate(120)">
+            <rect x="40" y="-1" width="10" height="2" fill="currentColor" />
+            <rect x="-50" y="-1" width="10" height="2" fill="currentColor" />
+        </g>
+        <g transform="rotate(150)">
+            <rect x="40" y="-1" width="10" height="2" fill="currentColor" />
+            <rect x="-50" y="-1" width="10" height="2" fill="currentColor" />
+        </g>
+        <g filter="url(#shadow)">
+            <g transform="rotate(-90)">
+                <polygon id="hour_hand" class="sliders" transform="rotate(59)" points="-6,-2 38,-1 38,1 -6,2" fill="currentColor" />
+            </g>
+        </g>
+        <g filter="url(#shadow)">
+            <g transform="rotate(-90)">
+                <polygon id="minute_hand" class="sliders" transform="rotate(-55)" points="-6,-1.5 48,-0.5 48,0.5 -6,1.5" fill="currentColor" />
+                <circle class="sliders" cx="0" cy="0" r="4" fill="currentColor" />
+            </g>
+        </g>
+        <g filter="url(#shadow)">
+            <g transform="rotate(-90)">
+                <polygon id="second_hand" class="sucess" transform="rotate(-15)" points="-15,-1 48,-0.5 48,0.5 -15,1" fill="currentColor" />
+                <circle class="sliders" cx="0" cy="0" r="2" fill="currentColor" />
+            </g>
+        </g>
+        <circle class="icon-active" cx="0" cy="0" r="1" fill="currentColor" filter="url(#shadow)"/>
+    </g>
+</svg>
