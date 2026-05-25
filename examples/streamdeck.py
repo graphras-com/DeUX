@@ -74,6 +74,7 @@ import asyncio
 import contextlib
 import datetime
 import logging
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
@@ -914,6 +915,33 @@ class ClockController(KeyController):
         self._last_hour_angle: float | None = None
         self._last_minute_angle: float | None = None
         self._last_second_angle: float | None = None
+
+        # Log every manifest input event at INFO so the clock key is
+        # easy to verify on a live device.  These are pure observers --
+        # they do not mutate any binding.
+        for event_name in ("press", "release", "click", "hold"):
+            self.key.on(event_name)(self._log_event(event_name))
+
+    @staticmethod
+    def _log_event(name: str) -> Callable[[], Awaitable[None]]:
+        """Build an async handler that logs *name* at INFO when invoked.
+
+        Parameters
+        ----------
+        name : str
+            The DUI event name to embed in the log message.
+
+        Returns
+        -------
+        Callable[[], Awaitable[None]]
+            An async, zero-argument handler suitable for
+            :meth:`~deux.DuiKey.on`.
+        """
+
+        async def _handler() -> None:
+            log.info("ClockKey event: %s", name)
+
+        return _handler
 
     @classmethod
     def compute_angles(
