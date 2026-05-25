@@ -863,18 +863,20 @@ class GaugeController(CardController):
         await self._svc.stop()
 
 class ClockController(KeyController):
-    """Analog clock key -- ticking hour and minute hands driven by system time.
+    """Analog clock key -- ticking hour, minute, and second hands driven by system time.
 
-    Loads ``ClockKey.dui`` and updates two transform bindings,
-    ``hour_hand`` and ``minute_hand``, with rotation angles in degrees
-    derived from the local system clock.  Both bindings are declared in
-    the manifest as ``rotate`` transforms whose ``from``/``to`` span the
-    full ``0 -- 360`` degree range, so the controller writes confirmed
-    domain values (degrees) through :meth:`~deux.DuiKey.set_range` with
-    ``min_val=0`` and ``max_val=360``.
+    Loads ``ClockKey.dui`` and updates three transform bindings,
+    ``hour_hand``, ``minute_hand``, and ``second_hand``, with rotation
+    angles in degrees derived from the local system clock.  All three
+    bindings are declared in the manifest as ``rotate`` transforms whose
+    ``from``/``to`` span the full ``0 -- 360`` degree range, so the
+    controller writes confirmed domain values (degrees) through
+    :meth:`~deux.DuiKey.set_range` with ``min_val=0`` and ``max_val=360``.
 
     Angle calculation
     ~~~~~~~~~~~~~~~~~
+    * **Second hand** -- ``6 degrees per second`` (``360 / 60``). At
+      ``:00`` the angle is ``0`` (12 o'clock position).
     * **Minute hand** -- ``6 degrees per minute``  (``360 / 60``), with
       sub-minute precision contributed by the seconds component
       (``0.1 deg/s``).  At 12 o'clock the angle is ``0``.
@@ -893,13 +895,16 @@ class ClockController(KeyController):
     Notes
     -----
     The tick task only requests a refresh when at least one hand angle
-    actually changes since the last tick, avoiding redundant renders
-    while the second hand is between visible positions.
+    actually changes since the last tick, avoiding redundant renders.
+    With a one-second tick the second hand changes every iteration, so
+    in practice a refresh is issued each tick while the controller is
+    attached.
     """
 
     TICK_INTERVAL_S = 1.0
     ANGLE_MIN = 0
     ANGLE_MAX = 360
+    DEGREES_PER_SECOND_SECOND_HAND = 6.0
     DEGREES_PER_MINUTE_MINUTE_HAND = 6.0
     DEGREES_PER_MINUTE_HOUR_HAND = 0.5
 
@@ -908,12 +913,15 @@ class ClockController(KeyController):
         self._tick_task: asyncio.Task[None] | None = None
         self._last_hour_angle: float | None = None
         self._last_minute_angle: float | None = None
+        self._last_second_angle: float | None = None
 
     @classmethod
-    def compute_angles(cls, now: datetime.datetime) -> tuple[float, float]:
-        """Compute the (hour, minute) hand angles in degrees for *now*.
+    def compute_angles(
+        cls, now: datetime.datetime
+    ) -> tuple[float, float, float]:
+        """Compute the (hour, minute, second) hand angles in degrees for *now*.
 
-        Both angles are normalised so that ``0`` corresponds to the
+        All angles are normalised so that ``0`` corresponds to the
         12 o'clock position and values increase clockwise.
 
         Parameters
@@ -924,11 +932,14 @@ class ClockController(KeyController):
 
         Returns
         -------
-        tuple[float, float]
-            ``(hour_angle, minute_angle)`` both in the range
-            ``[0, 360)`` degrees.
+        tuple[float, float, float]
+            ``(hour_angle, minute_angle, second_angle)`` all in the
+            range ``[0, 360)`` degrees.
         """
         total_minutes = now.minute + now.second / 60.0
+        second_angle = (
+            now.second * cls.DEGREES_PER_SECOND_SECOND_HAND
+        ) % cls.ANGLE_MAX
         minute_angle = (
             total_minutes * cls.DEGREES_PER_MINUTE_MINUTE_HAND
         ) % cls.ANGLE_MAX
@@ -936,7 +947,7 @@ class ClockController(KeyController):
             (now.hour % 12) * 30.0
             + total_minutes * cls.DEGREES_PER_MINUTE_HOUR_HAND
         ) % cls.ANGLE_MAX
-        return hour_angle, minute_angle
+        return hour_angle, minute_angle, second_angle
 
     def _apply_now(self, now: datetime.datetime) -> bool:
         """Update the key bindings for time *now*.
@@ -949,13 +960,14 @@ class ClockController(KeyController):
         Returns
         -------
         bool
-            ``True`` if either hand angle changed since the previous
-            call, ``False`` otherwise.
+            ``True`` if any hand angle changed since the previous call,
+            ``False`` otherwise.
         """
-        hour_angle, minute_angle = self.compute_angles(now)
+        hour_angle, minute_angle, second_angle = self.compute_angles(now)
         if (
             hour_angle == self._last_hour_angle
             and minute_angle == self._last_minute_angle
+            and second_angle == self._last_second_angle
         ):
             return False
         self.key.set_range(
@@ -970,8 +982,15 @@ class ClockController(KeyController):
             min_val=self.ANGLE_MIN,
             max_val=self.ANGLE_MAX,
         )
+        self.key.set_range(
+            "second_hand",
+            second_angle,
+            min_val=self.ANGLE_MIN,
+            max_val=self.ANGLE_MAX,
+        )
         self._last_hour_angle = hour_angle
         self._last_minute_angle = minute_angle
+        self._last_second_angle = second_angle
         return True
 
     async def on_attach(self, deck: Deck) -> None:
@@ -1218,6 +1237,7 @@ class StreamDeckApp:
         self.lights = LightsController()
         self.timer = TimerController()
         self.gauge = GaugeController(simulate=False)
+        self.clock = ClockController()
         self.dashboard = DashboardController()
         self.favorites = FavoritesController(catalog, self.audio)
         self.scenes = SceneController(scene_defs)
@@ -1234,6 +1254,12 @@ class StreamDeckApp:
             self.timer,
             self.gauge,
             self.dashboard,
+        ]
+        # KeyController-derived objects follow the same lifecycle but
+        # are tracked separately because they expose ``key`` instead of
+        # ``card`` and the typed list above is constrained to cards.
+        self._key_controllers: list[KeyController] = [
+            self.clock,
         ]
 
     async def on_connect(self, deck: Deck) -> None:
@@ -1279,6 +1305,8 @@ class StreamDeckApp:
         # Drive the uniform lifecycle on every controller.
         for controller in self._controllers:
             await controller.on_attach(deck)
+        for key_controller in self._key_controllers:
+            await key_controller.on_attach(deck)
         self.nav.on_attach(deck)
         self.scenes.set_deck(deck)
 
@@ -1302,11 +1330,17 @@ class StreamDeckApp:
         )
         for controller in self._controllers:
             await controller.on_detach()
+        for key_controller in self._key_controllers:
+            await key_controller.on_detach()
 
     # -- screen construction -------------------------------------------
 
     def _build_main_screen(self, deck: Deck) -> None:
-        """Layout: favourites + scenes on keys, all four cards on the strip."""
+        """Layout: clock on key 0, favourites + scenes on the remaining keys.
+
+        Cards (audio, lights, gauge, dashboard) fill the touch strip
+        when the deck has one.
+        """
         caps = deck.capabilities
         screen = deck.screen("Main")
 
@@ -1316,13 +1350,31 @@ class StreamDeckApp:
             screen.set_card(2, self.gauge.card)
             screen.set_card(3, self.dashboard.card)
 
-        num_favs = min(len(self.favorites.keys), caps.key_count)
-        remaining = max(0, caps.key_count - num_favs)
+        # Reserve key 0 for the analog clock; lay favourites and scenes
+        # on the remaining keys in order.
+        clock_slot = 0
+        if caps.key_count > clock_slot:
+            screen.set_key(clock_slot, self.clock.key)
+            next_slot = clock_slot + 1
+        else:
+            next_slot = 0
+
+        remaining = max(0, caps.key_count - next_slot)
+        num_favs = min(len(self.favorites.keys), remaining)
+        remaining -= num_favs
         num_scenes = min(len(self.scenes.keys), remaining)
 
-        self.favorites.install(screen, list(range(num_favs)))
+        self.favorites.install(
+            screen, list(range(next_slot, next_slot + num_favs))
+        )
         self.scenes.install(
-            screen, list(range(num_favs, num_favs + num_scenes))
+            screen,
+            list(
+                range(
+                    next_slot + num_favs,
+                    next_slot + num_favs + num_scenes,
+                )
+            ),
         )
 
     def _build_settings_screen(self, deck: Deck) -> None:

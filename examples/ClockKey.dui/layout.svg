@@ -38,13 +38,19 @@
         </g>
         <g filter="url(#shadow)">
             <g transform="rotate(-90)">
-                <polygon id="hour_hand" class="sliders" transform="rotate(59)" points="-6,-1 38,-0.5 38,0.5 -6,1" fill="currentColor" />
+                <polygon id="hour_hand" class="sliders" transform="rotate(59)" points="-6,-2 38,-1 38,1 -6,2" fill="currentColor" />
             </g>
         </g>
         <g filter="url(#shadow)">
             <g transform="rotate(-90)">
                 <polygon id="minute_hand" class="sliders" transform="rotate(-55)" points="-6,-1.5 48,-0.5 48,0.5 -6,1.5" fill="currentColor" />
-                <circle class="sliders" cx="0" cy="0" r="3" fill="currentColor" />
+                <circle class="sliders" cx="0" cy="0" r="4" fill="currentColor" />
+            </g>
+        </g>
+        <g filter="url(#shadow)">
+            <g transform="rotate(-90)">
+                <polygon id="second_hand" class="sucess" transform="rotate(-15)" points="-15,-1 48,-0.5 48,0.5 -15,1" fill="currentColor" />
+                <circle class="sliders" cx="0" cy="0" r="2" fill="currentColor" />
             </g>
         </g>
         <circle class="icon-active" cx="0" cy="0" r="1" fill="currentColor" filter="url(#shadow)"/>

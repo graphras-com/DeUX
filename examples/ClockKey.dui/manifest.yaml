@@ -8,6 +8,16 @@ category: utilities
 layout: layout.svg
 
 bindings:
+  second_hand:
+    type: transform
+    node: second_hand
+    default: 0
+    transforms:
+      - kind: rotate
+        from: 00
+        to: 360
+        origin: 0 0
+
   minute_hand:
     type: transform
     node: minute_hand
