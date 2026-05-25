@@ -299,6 +299,40 @@ class TestDeckRefresh:
         await deck.refresh()
         deck._render_touchscreen.assert_not_awaited()
 
+    async def test_swallows_hidwritetimeout(self, deck):
+        """refresh() must not raise when the device was torn down mid-refresh.
+
+        Background tasks (clock ticks, spinners, timers) call
+        ``request_refresh()`` without knowing the deck's lifecycle, so a
+        disconnect that closes the device between the refresh starting
+        and the executor writing must surface as a silent no-op rather
+        than an unhandled task exception.
+        """
+        from deux.runtime.deck import HidWriteTimeout
+
+        p = deck.screen("main")
+        deck._active_screen = p
+        deck._render_touchscreen = AsyncMock(
+            side_effect=HidWriteTimeout("device closed")
+        )
+
+        # Must not raise.
+        await deck.refresh()
+        deck._render_touchscreen.assert_awaited_once()
+
+    async def test_swallows_hidapierror(self, deck):
+        """A bare HidApiError from deeper in the stack is also tolerated."""
+        from deux.runtime.deck import HidApiError
+
+        p = deck.screen("main")
+        deck._active_screen = p
+        deck._render_touchscreen = AsyncMock(
+            side_effect=HidApiError("Device is not open")
+        )
+
+        await deck.refresh()
+        deck._render_touchscreen.assert_awaited_once()
+
 
 class TestDeckDispatch:
     async def test_no_active_screen(self, deck):

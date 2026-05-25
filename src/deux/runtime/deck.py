@@ -987,20 +987,27 @@ class Deck:
             for key_index, key_slot in screen.keys.items()
             if key_slot.is_dirty and self._is_dui_key(key_slot)
         ]
-        if dirty_keys:
-            await asyncio.gather(
-                *(self._render_dui_key(ks, ki) for ki, ks in dirty_keys)
-            )
+        try:
+            if dirty_keys:
+                await asyncio.gather(
+                    *(self._render_dui_key(ks, ki) for ki, ks in dirty_keys)
+                )
 
-        if screen.key_bg_dirty:
-            await self._render_all_keys()
-            screen.clear_key_bg_dirty()
+            if screen.key_bg_dirty:
+                await self._render_all_keys()
+                screen.clear_key_bg_dirty()
 
-        if screen.touch_strip is not None and screen.touch_strip.any_dirty:
-            await self._render_touchscreen()
+            if screen.touch_strip is not None and screen.touch_strip.any_dirty:
+                await self._render_touchscreen()
 
-        if screen.info_screen is not None and screen.info_screen.is_dirty:
-            await self._render_info_screen()
+            if screen.info_screen is not None and screen.info_screen.is_dirty:
+                await self._render_info_screen()
+        except (HidWriteTimeout, HidApiError) as exc:
+            # The device was torn down (disconnect, stop) while a
+            # background task (clock tick, spinner, timer) was driving a
+            # refresh.  Refresh is best-effort: swallow the error so the
+            # caller's task doesn't crash with an unhandled exception.
+            logger.debug("Refresh skipped — device unavailable: %s", exc)
 
     async def _check_timeouts(self) -> None:
         """Check all card selection timeouts on the active screen."""
