@@ -7,13 +7,13 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/graphras-com/DeUX/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/docs-online-blue)](https://graphras-com.github.io/DeUX/)
 
-A high-level, asyncio-native Python library for Elgato Stream Deck devices. Define screen layouts, key actions, encoder controls, and touchscreen card UIs using a declarative, event-driven API.
+DeUX is a Python SDK for building standalone applications for Elgato Stream Deck devices. Instead of tethering the Stream Deck to a Windows or macOS PC, DeUX allows it to run from any Python-capable device, including Raspberry Pi systems for home automation, dashboards, kiosks, and embedded control panels.
 
 ![Stream Deck+](images/streamdeckplus.png "DeUX on Stream Deck+")
 
 ## Features
 
-- Multi-screen Multi-deck support via `DeckManager`
+- Multi-deck multi-screen support via `DeckManager`
 - Auto-discovery, hot-plug detection, and auto-reconnect via `DeckManager`
 - Screen-based navigation with atomic screen switching
 - Key slots with event decorators (press, release, press_release, hold)

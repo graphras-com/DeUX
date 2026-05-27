@@ -12,7 +12,22 @@ requires-python = ">=3.11"
 authors = [
     { name = "Graphras" },
 ]
-keywords = ["streamdeck", "elgato", "deck", "asyncio", "hid"]
+keywords = [
+    "python",
+    "automation",
+    "sdk",
+    "hid",
+    "asynchronous",
+    "python-library",
+    "declarative-ui",
+    "asyncio",
+    "elgato",
+    "streamdeck",
+    "stream-deck",
+    "plugin-framework",
+    "elgato-stream-deck",
+    "asyncio-python"
+]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Framework :: AsyncIO",
