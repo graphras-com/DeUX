@@ -1,0 +1,4 @@
+# Demo run artefacts — keep folder tracked, ignore generated screenshots.
+*
+!.gitignore
+!.gitkeep
