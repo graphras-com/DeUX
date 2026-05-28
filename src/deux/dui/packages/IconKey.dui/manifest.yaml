@@ -29,6 +29,16 @@ bindings:
     type: css_class
     node: background
     default: background-dark
+  
+  show_notification:
+    type: visibility
+    node: notification
+    default: false
+
+  notification_count:
+    type: text
+    node: notification_count
+    default: "1"
 
 spinner:
   type: rotation

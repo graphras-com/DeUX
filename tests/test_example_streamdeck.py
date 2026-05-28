@@ -26,6 +26,7 @@ from deux.dui.schema import (
     TextBinding,
     ToggleBinding,
     TransformBinding,
+    VisibilityBinding,
 )
 
 # Make examples importable
@@ -97,6 +98,11 @@ _KEY_SVG = (
     '<g id="foreground" color="#dedede">'
     '<g id="icon"></g>'
     '<text id="label" x="60" y="100" font-size="14" fill="currentColor">Key</text>'
+    '<g id="notification" display="none">'
+    '<circle cx="100" cy="20" r="10" fill="red"/>'
+    '<text id="notification_count" x="100" y="24" font-size="10" '
+    'text-anchor="middle" fill="white">1</text>'
+    "</g>"
     "</g>"
     "</svg>"
 )
@@ -375,9 +381,16 @@ def _iconkey_spec() -> PackageSpec:
             "icon_class": CssClassBinding(
                 node="icon", default="icon"
             ),
+            "show_notification": VisibilityBinding(
+                node="notification", default=False
+            ),
+            "notification_count": TextBinding(
+                node="notification_count", default="1"
+            ),
         },
         events=(
             EventMapping(name="click", source="key_press_release", max_duration_ms=300),
+            EventMapping(name="hold", source="key_hold", hold_ms=350),
             EventMapping(name="press", source="key_press"),
             EventMapping(name="release", source="key_release"),
         ),
@@ -939,9 +952,12 @@ class TestFavoritesController:
         self, ctrl: FavoritesController
     ) -> None:
         screen = MagicMock()
-        ctrl.install(screen, [0, 1, 4, 5])
-        positions = [call.args[0] for call in screen.set_key.call_args_list]
-        assert positions == [0, 1, 4, 5]
+        # ``install`` pairs positions with keys via ``zip(strict=False)``,
+        # so only the first ``len(ctrl.keys)`` positions are consumed.
+        positions = list(range(len(ctrl.keys)))
+        ctrl.install(screen, positions)
+        called_positions = [call.args[0] for call in screen.set_key.call_args_list]
+        assert called_positions == positions
 
     def test_install_truncates_to_fewer_positions(
         self, ctrl: FavoritesController
