@@ -69,8 +69,10 @@ class AsyncTransport:
         self._queue: asyncio.Queue[DeckEvent] = asyncio.Queue()
         self._running = False
         self._poll_task: asyncio.Task[None] | None = None
-        self._prev_key_states: tuple[bool, ...] = ()
-        self._prev_encoder_states: tuple[bool, ...] = ()
+        key_count = caps.key_count if caps is not None else 0
+        dial_count = caps.dial_count if caps is not None else 0
+        self._prev_key_states: tuple[bool, ...] = (False,) * key_count
+        self._prev_encoder_states: tuple[bool, ...] = (False,) * dial_count
 
     @property
     def queue(self) -> asyncio.Queue[DeckEvent]:
@@ -186,7 +188,10 @@ class AsyncTransport:
             The current key state snapshot.
         """
         for idx, pressed in enumerate(event.states):
-            if idx < len(self._prev_key_states) and pressed == self._prev_key_states[idx]:
+            if (
+                idx < len(self._prev_key_states)
+                and pressed == self._prev_key_states[idx]
+            ):
                 continue
             self._queue.put_nowait(KeyEvent(key=idx, pressed=pressed))
         self._prev_key_states = event.states
