@@ -110,16 +110,32 @@ class TestTranslateKeyState:
         transport._translate_event(event)
         assert transport.queue.empty()
 
-    async def test_initial_state_emits_all_keys(self, mock_device):
-        """First key state with no previous state emits events for all keys."""
+    async def test_initial_state_emits_only_pressed_keys(self, mock_device):
+        """First key snapshot emits events only for keys actually pressed.
+
+        Regression: the transport used to start with an empty
+        ``_prev_key_states`` tuple, which meant the first
+        :class:`KeyStateEvent` enqueued a :class:`KeyEvent` for *every*
+        key index -- including released keys, whose spurious
+        ``pressed=False`` events triggered ``release`` handlers on every
+        other key on the screen.
+
+        After the fix, ``_prev_key_states`` is initialised to all-False
+        with the device's ``key_count``, so the first snapshot only
+        emits events for keys whose state differs from "not pressed".
+        """
         transport = AsyncTransport(mock_device, STREAM_DECK_PLUS)
         transport._running = True
-        event = KeyStateEvent(states=(True, False, True, False))
+        # Stream Deck + reports 8 keys; press indices 0 and 2.
+        states = tuple(i in {0, 2} for i in range(8))
+        event = KeyStateEvent(states=states)
         transport._translate_event(event)
         events = []
         while not transport.queue.empty():
             events.append(transport.queue.get_nowait())
-        assert len(events) == 4  # all keys emit on first report
+        # Exactly two events, both for pressed keys.
+        assert len(events) == 2
+        assert {(e.key, e.pressed) for e in events} == {(0, True), (2, True)}
 
 
 class TestTranslateTouchEvents:
@@ -217,6 +233,25 @@ class TestTranslateEncoderEvents:
         event = EncoderButtonEvent(states=(False, False, False, False))
         transport._translate_event(event)
         assert transport.queue.empty()
+
+    async def test_initial_encoder_state_emits_only_pressed(self, mock_device):
+        """First encoder snapshot emits events only for buttons actually pressed.
+
+        Regression: same root cause as the key-state initial-snapshot
+        bug -- ``_prev_encoder_states`` used to start empty, so the
+        first :class:`EncoderButtonEvent` enqueued a release-style event
+        for every encoder.
+        """
+        transport = AsyncTransport(mock_device, STREAM_DECK_PLUS)
+        transport._running = True
+        event = EncoderButtonEvent(states=(False, True, False, False))
+        transport._translate_event(event)
+        events = []
+        while not transport.queue.empty():
+            events.append(transport.queue.get_nowait())
+        assert len(events) == 1
+        assert events[0].encoder == 1
+        assert events[0].pressed is True
 
     async def test_encoder_zero_rotation_ignored(self, mock_device):
         """Zero-tick encoders produce no events."""

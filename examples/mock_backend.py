@@ -44,12 +44,6 @@ MEDIA_CATALOG: list[dict[str, str]] = [
         "cover": "assets/album_cover_1.png",
     },
     {
-        "artist": "King Crimson",
-        "album": "In the Court of the Crimson King",
-        "title": "In the Court of the Crimson King",
-        "cover": "assets/album_cover_2.png",
-    },
-    {
         "artist": "Procol Harum",
         "album": "Procol Harum",
         "title": "A Whiter Shade of Pale",

@@ -1082,7 +1082,7 @@ class SceneController:
         self._svc = MockScenesService()
         self._keys: list[DuiKey] = []
         self._deck: Deck | None = None
-
+        self.screenshots = EXAMPLES_DIR.joinpath("screenshots")
         # In a real app this subscriber would update an "active scene"
         # indicator.  Here it just demonstrates that the activation
         # round-trips through the service.
@@ -1093,14 +1093,16 @@ class SceneController:
                 if self._deck is not None:
                     screen = self._deck.active_screen
                     if screen is not None:
-                        screen.screenshot("/tmp/deck_screenshot")
-                        log.info("Screenshot saved to /tmp/deck_screenshot")
+                        screen.screenshot(self.screenshots)
+                        log.info(f"Screenshot saved to {self.screenshots}")
             else:
                 log.info("Scene confirmed active: %s", label)
 
         for scene in self._scenes:
             key = DuiKey("IconKey")
             key.set_many(label=scene["label"], icon=scene["icon"])
+            if scene["label"] == "Screenshot":
+                key.set("show_notification", True)
             self._wire_key(key, scene["label"])
             self._keys.append(key)
 
@@ -1147,19 +1149,27 @@ class SceneController:
 
         @key.on("press")
         async def _press() -> None:
+            log.info(f'{key.get("label")} pressed')
             key.set("background_class", "success")
             await key.request_refresh()
 
         @key.on("release")
         async def _release() -> None:
+            log.info(f'{key.get("label")} release')
+            if key.get("label") == "Screenshot":
+                key.set("show_notification", False)
             key.set("background_class", background_class)
             await key.request_refresh()
 
+        """
         @key.on("click")
         async def _click() -> None:
             key.set("background_class", background_class)
+            log.info(key.get("label"))
+            if key.get("label") == "Screenshot":
+                key.set("show_notification", False)
             await key.request_refresh()
-
+        """
         key.forward("click", lambda: self._svc.activate(label))
 
 class ScreenCycler:
