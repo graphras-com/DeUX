@@ -912,13 +912,13 @@ class SvgRenderer:
         return ET.tostring(root, encoding="unicode", xml_declaration=True)
 
     def _hide_spinner_node(self, root: ET.Element) -> None:
-        """Hide the spinner and its background node so they are invisible at rest.
+        """Hide the spinner placeholder so it is invisible at rest.
 
-        DUI package authors may not set ``display="none"`` on the spinner
-        element or its background, which would make them visible in every
-        non-busy render.  This method forces both nodes hidden; the spinner
-        frame generators remove ``display="none"`` when producing animation
-        frames.
+        DUI package authors may not set ``display="none"`` on the
+        spinner placeholder, which would make it visible in every
+        non-busy render.  This method forces the node hidden; the
+        spinner frame generator removes ``display="none"`` when
+        producing animation frames.
 
         Parameters
         ----------
@@ -926,14 +926,10 @@ class SvgRenderer:
             The parsed SVG element tree (will be mutated in place).
         """
         spinner = self._spec.spinner
-        if spinner is not None and spinner.node is not None:
+        if spinner is not None:
             elem = _find_element_by_id(root, spinner.node)
             if elem is not None:
                 elem.set("display", "none")
-        if spinner is not None and spinner.background_node is not None:
-            bg_elem = _find_element_by_id(root, spinner.background_node)
-            if bg_elem is not None:
-                bg_elem.set("display", "none")
 
     #: Dispatch table mapping binding types to handler methods.
     #: Populated per-instance in :meth:`__init__` (bound to ``self``) so that

@@ -21,7 +21,6 @@ from deux.dui.schema import (
     RangeDirection,
     SliderBinding,
     SpinnerSpec,
-    SpinnerType,
     TextBinding,
     ToggleBinding,
     VisibilityBinding,
@@ -2070,7 +2069,7 @@ class TestSpinnerNodeHidden:
             type=PackageType.KEY,
             version=1,
             svg_source=_SPINNER_VISIBLE_SVG,
-            spinner=SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=8),
+            spinner=SpinnerSpec(node="spinner"),
         )
         renderer = SvgRenderer(spec)
         svg = renderer.render_svg()
@@ -2257,63 +2256,3 @@ class TestListBinding:
         # Separator should have inactive fill
         assert svg.count('fill="#888888"') == 2  # B + separator
 
-
-class TestSpinnerBackgroundNodeHidden:
-    """Spinner background_node must be hidden in non-busy renders."""
-
-    def test_render_hides_visible_background_node(self):
-        """render_svg() sets display='none' on the background_node."""
-        spec = PackageSpec(
-            name="Test",
-            type=PackageType.KEY,
-            version=1,
-            svg_source=_SPINNER_VISIBLE_SVG,
-            spinner=SpinnerSpec(
-                type=SpinnerType.ROTATION,
-                node="spinner",
-                frames=8,
-                background_node="spinner_bg",
-            ),
-        )
-        renderer = SvgRenderer(spec)
-        svg = renderer.render_svg()
-        import xml.etree.ElementTree as ET
-
-        root = ET.fromstring(svg)  # noqa: S314
-        ns = {"svg": "http://www.w3.org/2000/svg"}
-        bg = root.find('.//svg:rect[@id="spinner_bg"]', ns)
-        if bg is None:
-            bg = root.find('.//rect[@id="spinner_bg"]')
-        assert bg is not None
-        assert bg.get("display") == "none"
-
-    def test_no_background_node_no_error(self):
-        """Without background_node, render proceeds normally."""
-        spec = PackageSpec(
-            name="Test",
-            type=PackageType.KEY,
-            version=1,
-            svg_source=_SPINNER_VISIBLE_SVG,
-            spinner=SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=8),
-        )
-        renderer = SvgRenderer(spec)
-        svg = renderer.render_svg()
-        assert svg
-
-    def test_missing_background_node_no_error(self):
-        """If background_node references a missing element, no crash."""
-        spec = PackageSpec(
-            name="Test",
-            type=PackageType.KEY,
-            version=1,
-            svg_source=_SPINNER_VISIBLE_SVG,
-            spinner=SpinnerSpec(
-                type=SpinnerType.ROTATION,
-                node="spinner",
-                frames=8,
-                background_node="nonexistent_bg",
-            ),
-        )
-        renderer = SvgRenderer(spec)
-        svg = renderer.render_svg()
-        assert svg

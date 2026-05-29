@@ -496,80 +496,22 @@ When an event handler takes time to complete (e.g. making an API call), users ge
 
 ### Defining a Spinner
 
-Add a `spinner` section to your manifest:
+The spinner is a single, library-owned 360° rotation animation (8 frames at 100 ms intervals, fixed by DeUX). Your package only declares **where** the spinner appears.
+
+Add a `spinner` section to your manifest with a single `node` key:
 
 ```yaml
 spinner:
-  type: rotation        # "rotation", "pulse", or "custom"
-  node: spinner_icon    # SVG element ID to animate (required for rotation/pulse)
-  frames: 12            # frames per cycle (default 12, minimum 2)
-  interval_ms: 80       # ms between frames (default 80, minimum 10)
+  node: spinner   # ID of the placeholder <g> element in your SVG
 ```
 
-Your SVG must include an element with the spinner node ID. It's typically hidden by default and made visible during animation:
+Your layout SVG must contain an empty group with that ID, positioned via its `transform` attribute. DeUX injects the canonical spinner geometry (background tile + 8 radial bars) into this placeholder at runtime:
 
 ```xml
-<rect id="spinner_icon" x="80" y="30" width="30" height="30"
-      display="none" fill="#ffffff"/>
+<g id="spinner" transform="translate(60 47.5)"/>
 ```
 
-### Spinner Types
-
-#### `rotation`
-
-Rotates the SVG node by `360/frames` degrees each frame around its centre. Good for loading spinners.
-
-```yaml
-spinner:
-  type: rotation
-  node: spinner_icon
-  frames: 12
-  interval_ms: 80
-```
-
-#### `pulse`
-
-Cycles the node's opacity between 0.2 and 1.0 in a triangle wave. Good for subtle "working" indicators.
-
-```yaml
-spinner:
-  type: pulse
-  node: spinner_glow
-  frames: 8
-  interval_ms: 100
-```
-
-#### `custom`
-
-Use your own pre-rendered frames. Place them in one of two formats:
-
-**Numbered PNGs** in `assets/spinner/`:
-
-```
-MyPackage.dui/
-  assets/
-    spinner/
-      frame_00.png
-      frame_01.png
-      frame_02.png
-      ...
-```
-
-**Animated GIF** at `assets/spinner.gif`:
-
-```
-MyPackage.dui/
-  assets/
-    spinner.gif
-```
-
-For custom spinners, the `node` field is optional (ignored).
-
-```yaml
-spinner:
-  type: custom
-  interval_ms: 60
-```
+The placeholder's `transform` (typically `translate(cx cy)`) controls where the spinner is centred. All other attributes — frame count, interval, bar geometry, background colour — are owned by the library and are not configurable.
 
 ### How It Works
 
@@ -580,20 +522,16 @@ The busy state is **entirely controlled by your application** via two methods:
 
 When busy:
 
-1. Spinner frames are rendered **on top of the current UI state** — all bindings (text, colors, images, etc.) are preserved. Only the spinner node is animated; the rest of the key/card looks exactly as it did before.
-2. For touchscreen cards, only the affected panel region is updated (not the entire strip)
-3. The normal refresh cycle skips animating slots to avoid overwriting frames
-4. Frames are re-generated each time the spinner starts so they always reflect the latest binding values
+1. Spinner frames are rendered **on top of the current UI state** — all bindings (text, colors, images, etc.) are preserved. Only the spinner placeholder is animated; the rest of the key/card looks exactly as it did before.
+2. For touchscreen cards, only the affected panel region is updated (not the entire strip).
+3. The normal refresh cycle skips animating slots to avoid overwriting frames.
+4. Frames are cached process-wide by `(rendered SVG, placeholder id, size, image format, background tile)`, so repeated busy cycles on the same panel reuse the same encoded bytes.
 
-Duplicate `start_busy()` calls while already busy are no-ops.
-`finish_busy()` when not busy is also a no-op.
+Duplicate `start_busy()` calls while already busy are no-ops. `finish_busy()` when not busy is also a no-op.
 
 ### Controlling the Busy Lifecycle
 
-Your application decides when to start and stop the spinner. This
-decouples the spinner from the event handler — the handler can return
-immediately while the spinner keeps running until an external signal
-arrives.
+Your application decides when to start and stop the spinner. This decouples the spinner from the event handler — the handler can return immediately while the spinner keeps running until an external signal arrives.
 
 ```python
 @key.on("toggle")
@@ -620,13 +558,12 @@ async def handle():
     await key.finish_busy()
 ```
 
-Sometimes you don't need a spinner at all — the task resolves instantly.
-Since the application controls the busy state, you simply don't call
-`start_busy()` for fast operations.
+Sometimes you don't need a spinner at all — the task resolves instantly. Since the application controls the busy state, you simply don't call `start_busy()` for fast operations.
 
 **Validation rules:**
-- For `rotation` and `pulse` types, the `node` must exist in the SVG
-- For `custom` type, either `assets/spinner.gif` or `assets/spinner/frame_*.png` files must exist
+
+- `spinner.node` is required and must match an element ID present in the layout SVG.
+- The legacy keys `type`, `frames`, `interval_ms`, and `background_node` are no longer accepted; package loading fails if they are present.
 
 ### Complete Example
 
@@ -637,10 +574,7 @@ version: 1
 layout: layout.svg
 
 spinner:
-  type: rotation
-  node: loading_ring
-  frames: 8
-  interval_ms: 100
+  node: spinner
 
 bindings:
   label:
@@ -669,7 +603,7 @@ key = DuiKey(spec)
 async def handle():
     await key.start_busy()
     # Spinner starts — the key still shows the current
-    # label and status_color while the spinner animates in the corner.
+    # label and status_color while the spinner animates in the centre.
     await smart_home_api.toggle_light()
     # Don't call finish_busy() here — wait for the state update callback.
 
