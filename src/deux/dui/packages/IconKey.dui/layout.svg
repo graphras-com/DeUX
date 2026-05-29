@@ -21,18 +21,8 @@
     <text id="label" class="text-primary" x="60" y="100" font-size="18" text-anchor="middle" fill="currentColor" filter="url(#shadow)">
       Icon Key
     </text>
-    <g display="none" transform="translate(32.5 20)">
-      <rect id="spinner_background" color="#1c1c1c" x="0" y="0" width="55" height="55" rx="4" ry="4" fill="currentColor" fill-opacity="0.8" stroke="none" />
-      <svg id="spinner" x="3.5" y="3.5" color="#5c5b5b" width="48" height="48" viewBox="0 0 48 48" fill="none">
-        <rect color="#dedede" x="22" width="4" height="12" rx="2" fill="currentColor" />
-        <rect x="22" y="36" width="4" height="12" rx="2" fill="currentColor" />
-        <rect y="26" width="4" height="12" rx="2" transform="rotate(-90 0 26)" fill="currentColor" />
-        <rect x="36" y="26" width="4" height="12" rx="2" transform="rotate(-90 36 26)" fill="currentColor" />
-        <rect x="5.61523" y="8.4436" width="4" height="12" rx="2" transform="rotate(-45 5.61523 8.4436)" fill="currentColor" />
-        <rect x="31.071" y="33.8995" width="4" height="12" rx="2" transform="rotate(-45 31.071 33.8995)" fill="currentColor" />
-        <rect x="8.4436" y="42.3848" width="4" height="12" rx="2" transform="rotate(-135 8.4436 42.3848)" fill="currentColor" />
-        <rect x="33.8994" y="16.9288" width="4" height="12" rx="2" transform="rotate(-135 33.8994 16.9288)" fill="currentColor" />
-      </svg>
+    <g transform="translate(60 47.5)">
+      <g id="spinner"/>
     </g>
   </g>
   <rect id="halo" display="none" class="success" stroke="currentColor" fill="none" stroke-width="10" rx="10" ry="10" x="5" y="5" width="110" height="110" />

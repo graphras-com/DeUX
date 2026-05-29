@@ -1,390 +1,385 @@
-"""Spinner frame generation for busy-state animations."""
+"""Library-owned spinner frame generation for busy-state animations.
+
+The spinner is a fixed 8-frame, 360°-rotation animation rendered into
+a caller-provided placeholder ``<g id="...">`` element in a package's
+layout SVG.  All geometry (background tile + 8 radial bars) is owned
+by the library; package authors only choose where the placeholder is
+positioned via its own ``transform`` attribute.
+
+Frames are cached process-wide in an LRU keyed by
+``(rendered_svg, spinner_node_id, width, height, image_format,
+bg_signature)`` so that repeated busy cycles on the same panel reuse
+the same frame bytes.
+"""
 
 from __future__ import annotations
 
 import copy
+import hashlib
 import io
 import logging
 import xml.etree.ElementTree as ET
+from collections import OrderedDict
 from typing import TYPE_CHECKING
 
 from PIL import Image
 
 from .._xml import safe_fromstring
-from .schema import SpinnerType
 from .svg_renderer import _find_element_by_id
 
 if TYPE_CHECKING:
-    from .schema import PackageSpec, SpinnerSpec
+    pass
 
 logger = logging.getLogger(__name__)
 
 _SVG_NS = "http://www.w3.org/2000/svg"
 
+#: Number of frames in the canonical spinner animation (one per 45°).
+SPINNER_FRAME_COUNT: int = 8
 
-class SpinnerFrames:
-    """Pre-renders spinner animation frames from an SVG template.
+#: Milliseconds between frames in the canonical spinner animation.
+SPINNER_INTERVAL_MS: int = 100
 
-    Frames are generated lazily on first access and cached for the
-    lifetime of the instance.
+#: Maximum number of frame-lists held in the process-wide LRU cache.
+_CACHE_MAX_ENTRIES: int = 64
 
-    When a *bg_tile* is provided, each frame is composited onto the
-    background tile before encoding so that transparent regions of
-    the spinner reveal the touchstrip background underneath.
+#: Canonical spinner content as an SVG group fragment.  Coordinates are
+#: centred around (0, 0) so the placeholder's ``transform`` attribute
+#: positions it.  One bar is tinted ``#dedede`` (the "head" of the
+#: rotation); the remaining seven are ``#5c5b5b``.  An opaque rounded
+#: rectangle behind the bars provides contrast against arbitrary panel
+#: backgrounds.
+_SPINNER_TEMPLATE_SVG: str = (
+    f'<g xmlns="{_SVG_NS}">'
+    '<rect color="#1c1c1c" x="-27.5" y="-27.5" width="55" height="55" '
+    'rx="4" ry="4" fill="currentColor" fill-opacity="0.8" stroke="none"/>'
+    '<g class="deux-spinner-rotor" transform="rotate({angle})">'
+    f'<svg xmlns="{_SVG_NS}" color="#5c5b5b" x="-24" y="-24" '
+    'width="48" height="48" viewBox="0 0 48 48" fill="none">'
+    '<rect color="#dedede" x="22" width="4" height="12" rx="2" fill="currentColor"/>'
+    '<rect x="22" y="36" width="4" height="12" rx="2" fill="currentColor"/>'
+    '<rect y="26" width="4" height="12" rx="2" transform="rotate(-90 0 26)" fill="currentColor"/>'
+    '<rect x="36" y="26" width="4" height="12" rx="2" '
+    'transform="rotate(-90 36 26)" fill="currentColor"/>'
+    '<rect x="5.61523" y="8.4436" width="4" height="12" rx="2" '
+    'transform="rotate(-45 5.61523 8.4436)" fill="currentColor"/>'
+    '<rect x="31.071" y="33.8995" width="4" height="12" rx="2" '
+    'transform="rotate(-45 31.071 33.8995)" fill="currentColor"/>'
+    '<rect x="8.4436" y="42.3848" width="4" height="12" rx="2" '
+    'transform="rotate(-135 8.4436 42.3848)" fill="currentColor"/>'
+    '<rect x="33.8994" y="16.9288" width="4" height="12" rx="2" '
+    'transform="rotate(-135 33.8994 16.9288)" fill="currentColor"/>'
+    "</svg></g></g>"
+)
+
+
+_CacheKey = tuple[str, str, int, int, str, str]
+_cache: OrderedDict[_CacheKey, list[bytes]] = OrderedDict()
+
+
+def _bg_signature(bg_tile: bytes | Image.Image | None) -> str:
+    """Compute a stable digest for a background tile.
 
     Parameters
     ----------
-    spec
-        The package specification containing the SVG source and spinner config.
-    width
-        Target image width in pixels.
-    height
-        Target image height in pixels.
-    image_format
-        Encoding format (``"JPEG"`` or ``"BMP"``).
-    rendered_svg
-        Optional pre-rendered SVG source with bindings already applied.
-    bg_tile
-        Optional RGB background tile to composite frames onto.
+    bg_tile : bytes, PIL.Image.Image, or None
+        The background image data (or ``None`` if no tile is set).
+
+    Returns
+    -------
+    str
+        Hex digest uniquely identifying the tile, or ``"none"`` when
+        no tile is provided.
     """
+    if bg_tile is None:
+        return "none"
+    if isinstance(bg_tile, bytes):
+        return hashlib.sha1(bg_tile, usedforsecurity=False).hexdigest()
+    buf = io.BytesIO()
+    bg_tile.save(buf, format="PNG")
+    return hashlib.sha1(buf.getvalue(), usedforsecurity=False).hexdigest()
 
-    def __init__(
-        self,
-        spec: PackageSpec,
-        width: int,
-        height: int,
-        image_format: str = "JPEG",
-        rendered_svg: str | None = None,
-        bg_tile: bytes | Image.Image | None = None,
-    ) -> None:
-        if spec.spinner is None:
-            raise ValueError("PackageSpec has no spinner configuration")
-        self._spec = spec
-        self._spinner: SpinnerSpec = spec.spinner
-        self._width = width
-        self._height = height
-        self._image_format = image_format
-        self._rendered_svg = rendered_svg
-        self._bg_tile = bg_tile
-        self._cached_frames: list[bytes] | None = None
 
-    @property
-    def frame_count(self) -> int:
-        """Number of frames in the animation cycle."""
-        return self._spinner.frames
+def clear_cache() -> None:
+    """Drop all cached spinner frames.
 
-    @property
-    def interval_ms(self) -> int:
-        """Milliseconds between frames."""
-        return self._spinner.interval_ms
+    Intended for use by tests and by application code that wants to
+    release memory held by the spinner LRU.
+    """
+    _cache.clear()
 
-    @property
-    def frames(self) -> list[bytes]:
-        """Encoded animation frames, generated on first access."""
-        if self._cached_frames is None:
-            self._cached_frames = self._generate()
-        return self._cached_frames
 
-    def _generate(self) -> list[bytes]:
-        """Generate all animation frames."""
-        if self._spinner.type == SpinnerType.ROTATION:
-            return self._generate_rotation()
-        if self._spinner.type == SpinnerType.PULSE:
-            return self._generate_pulse()
-        return self._generate_custom()
+def get_frames(
+    *,
+    rendered_svg: str,
+    spinner_node_id: str,
+    width: int,
+    height: int,
+    image_format: str = "JPEG",
+    bg_tile: bytes | Image.Image | None = None,
+) -> list[bytes]:
+    """Return the 8 encoded frames of the canonical spinner animation.
 
-    def _generate_rotation(self) -> list[bytes]:
-        """Generate frames by rotating the spinner node.
+    The result is cached process-wide in an LRU keyed by the rendered
+    SVG, target dimensions, image format, and background-tile
+    signature.  Cache hits return the same ``list`` object that was
+    cached, so callers must not mutate it.
 
-        Returns
-        -------
-        list[bytes]
-            Encoded image frames, one per rotation step.
-        """
-        svg_source = self._rendered_svg or self._spec.svg_source
-        base_root = safe_fromstring(svg_source)  # untrusted: .dui package
-        node = self._spinner.node
-        assert node is not None
+    Parameters
+    ----------
+    rendered_svg : str
+        Layout SVG with bindings already applied (the same string that
+        would be rasterised for a static render).  Must contain an
+        element whose ``id`` matches ``spinner_node_id``.
+    spinner_node_id : str
+        ID of the placeholder group that the library injects spinner
+        content into.
+    width : int
+        Target image width in pixels.
+    height : int
+        Target image height in pixels.
+    image_format : str, default="JPEG"
+        Output encoding; passed through to the image encoder.
+    bg_tile : bytes, PIL.Image.Image, or None, optional
+        Optional background tile composited beneath each frame to make
+        the spinner blend with the surrounding panel.
 
-        # Find the element to determine its centre of rotation
-        elem = _find_element_by_id(base_root, node)
-        if elem is None:
-            logger.warning("Spinner node '%s' not found; returning blank frames", node)
-            return self._blank_frames()
+    Returns
+    -------
+    list[bytes]
+        ``SPINNER_FRAME_COUNT`` encoded frames, one per 45° rotation
+        step.  When the placeholder node is missing from
+        ``rendered_svg``, a list of blank fallback frames is returned.
+    """
+    key: _CacheKey = (
+        hashlib.sha1(rendered_svg.encode("utf-8"), usedforsecurity=False).hexdigest(),
+        spinner_node_id,
+        width,
+        height,
+        image_format.upper(),
+        _bg_signature(bg_tile),
+    )
+    cached = _cache.get(key)
+    if cached is not None:
+        _cache.move_to_end(key)
+        return cached
 
-        cx, cy = self._element_centre(elem)
-        step = 360.0 / self._spinner.frames
+    frames = _render_frames(
+        rendered_svg=rendered_svg,
+        spinner_node_id=spinner_node_id,
+        width=width,
+        height=height,
+        image_format=image_format,
+        bg_tile=bg_tile,
+    )
 
-        frames: list[bytes] = []
-        for i in range(self._spinner.frames):
-            root = copy.deepcopy(base_root)
-            el = _find_element_by_id(root, node)
-            if el is not None:
-                # Make the spinner node visible
-                el.attrib.pop("display", None)
-                angle = step * i
-                existing = el.get("transform", "")
-                rotation = f"rotate({angle:.1f},{cx:.1f},{cy:.1f})"
-                el.set("transform", f"{existing} {rotation}".strip())
+    _cache[key] = frames
+    _cache.move_to_end(key)
+    while len(_cache) > _CACHE_MAX_ENTRIES:
+        _cache.popitem(last=False)
+    return frames
 
-            self._show_background_node(root)
-            frames.append(self._rasterise(root))
-        return frames
 
-    def _generate_pulse(self) -> list[bytes]:
-        """Generate frames by pulsing opacity on the spinner node.
+def _render_frames(
+    *,
+    rendered_svg: str,
+    spinner_node_id: str,
+    width: int,
+    height: int,
+    image_format: str,
+    bg_tile: bytes | Image.Image | None,
+) -> list[bytes]:
+    """Generate the 8 spinner frames without consulting the cache.
 
-        Returns
-        -------
-        list[bytes]
-            Encoded image frames with a triangle-wave opacity cycle.
-        """
-        svg_source = self._rendered_svg or self._spec.svg_source
-        base_root = safe_fromstring(svg_source)  # untrusted: .dui package
-        node = self._spinner.node
-        assert node is not None
+    Parameters mirror :func:`get_frames`; see that function for
+    semantics.
 
-        n = self._spinner.frames
-        frames: list[bytes] = []
-        for i in range(n):
-            root = copy.deepcopy(base_root)
-            el = _find_element_by_id(root, node)
-            if el is not None:
-                el.attrib.pop("display", None)
-                # Triangle wave: 0→1→0 over the cycle
-                t = i / n
-                opacity = 1.0 - 2.0 * abs(t - 0.5)
-                opacity = max(0.2, min(1.0, 0.2 + 0.8 * opacity))
-                el.set("opacity", f"{opacity:.2f}")
-
-            self._show_background_node(root)
-            frames.append(self._rasterise(root))
-        return frames
-
-    def _show_background_node(self, root: ET.Element) -> None:
-        """Make the background node visible in the given SVG tree.
-
-        If ``background_node`` is configured on the spinner spec, this
-        removes ``display="none"`` from it so the background appears
-        behind the animated spinner.  No transform or opacity changes
-        are applied — the node is shown as-is.
-
-        Parameters
-        ----------
-        root
-            The parsed SVG element tree (will be mutated in place).
-        """
-        bg_id = self._spinner.background_node
-        if bg_id is not None:
-            bg_el = _find_element_by_id(root, bg_id)
-            if bg_el is not None:
-                bg_el.attrib.pop("display", None)
-
-    def _generate_custom(self) -> list[bytes]:
-        """Load custom frames from package assets.
-
-        Looks for ``assets/spinner.gif`` first, then numbered PNGs in
-        ``assets/spinner/``. Falls back to blank frames if neither is found.
-
-        Returns
-        -------
-        list[bytes]
-            Encoded image frames loaded from the package assets.
-        """
-        assets = self._spec.assets
-
-        # Try animated GIF first
-        if "spinner.gif" in assets:
-            return self._load_gif_frames(assets["spinner.gif"])
-
-        # Try numbered PNGs in spinner/ subdirectory
-        frame_keys = sorted(k for k in assets if k.startswith("spinner/frame_"))
-        if not frame_keys:
-            logger.warning("No custom spinner frames found; returning blank frames")
-            return self._blank_frames()
-
-        frames: list[bytes] = []
-        for key in frame_keys:
-            frame_img: Image.Image = Image.open(io.BytesIO(assets[key]))
-            if frame_img.size != (self._width, self._height):
-                frame_img = frame_img.resize(
-                    (self._width, self._height), Image.Resampling.LANCZOS
-                )
-            frames.append(self._composite_on_bg(frame_img.convert("RGBA")))
-        return frames
-
-    def _load_gif_frames(self, data: bytes) -> list[bytes]:
-        """Extract and encode frames from an animated GIF.
-
-        Parameters
-        ----------
-        data : bytes
-            Raw GIF file bytes.
-
-        Returns
-        -------
-        list[bytes]
-            Encoded image frames; falls back to blank frames if the GIF
-            contains no frames.
-        """
-        gif = Image.open(io.BytesIO(data))
-        n_frames = getattr(gif, "n_frames", 1)
-
-        frames: list[bytes] = []
-        for i in range(n_frames):
-            gif.seek(i)
-            frame = gif.convert("RGBA")
-            if frame.size != (self._width, self._height):
-                frame = frame.resize(
-                    (self._width, self._height), Image.Resampling.LANCZOS
-                )
-            frames.append(self._composite_on_bg(frame))
-
-        if not frames:
-            logger.warning("Animated GIF has no frames; returning blank frames")
-            return self._blank_frames()
-        return frames
-
-    def _blank_frames(self) -> list[bytes]:
-        """Return a list of blank encoded frames as fallback.
-
-        When a background tile is set, blank frames show the background
-        tile instead of solid black.
-
-        Returns
-        -------
-        list[bytes]
-            Blank or background-filled frames, one per configured spinner
-            frame count.
-        """
-        if self._bg_tile is not None:
-            data = self._encode_tile(self._bg_tile)
-        else:
-            data = self._encode_blank()
-        return [data] * self._spinner.frames
-
-    def _composite_on_bg(self, frame: Image.Image) -> bytes:
-        """Composite a frame onto the background tile if available.
-
-        Parameters
-        ----------
-        frame : Image.Image
-            RGBA frame image.
-
-        Returns
-        -------
-        bytes
-            Encoded image bytes in the instance's configured format.
-        """
-        if self._bg_tile is not None:
-            if isinstance(self._bg_tile, bytes):
-                base = Image.open(io.BytesIO(self._bg_tile)).convert("RGBA")
-            else:
-                base = self._bg_tile.convert("RGBA")
-            result = Image.alpha_composite(base, frame)
-        else:
-            result = frame
-
-        return self._encode_pil(result)
-
-    def _encode_pil(self, img: Image.Image) -> bytes:
-        """Encode a PIL image in the configured format.
-
-        Parameters
-        ----------
-        img
-            A ``PIL.Image.Image`` instance.
-
-        Returns
-        -------
-        bytes
-            Encoded image bytes.
-        """
-        # Inline import: tests patch ``deux.render.key_renderer._encode_image_bytes``;
-        # importing it lazily keeps that patching point effective.
-        from ..render.key_renderer import _encode_image_bytes  # noqa: PLC0415
-
-        return _encode_image_bytes(img, self._image_format)
-
-    def _encode_tile(self, tile: bytes | Image.Image) -> bytes:
-        """Re-encode a tile in the configured output format.
-
-        Parameters
-        ----------
-        tile : bytes or Image.Image
-            PNG-encoded tile bytes or a PIL Image.
-
-        Returns
-        -------
-        bytes
-            Image bytes in the configured format.
-        """
-        if isinstance(tile, bytes):
-            img = Image.open(io.BytesIO(tile)).convert("RGB")
-        else:
-            img = tile.convert("RGB")
-        return self._encode_pil(img)
-
-    def _encode_blank(self) -> bytes:
-        """Encode a solid black frame.
-
-        Returns
-        -------
-        bytes
-            Black frame in the configured format.
-        """
-        img = Image.new("RGB", (self._width, self._height), (0, 0, 0))
-        return self._encode_pil(img)
-
-    def _rasterise(self, root: ET.Element) -> bytes:
-        """Rasterise an SVG element tree to encoded image bytes.
-
-        Parameters
-        ----------
-        root : ET.Element
-            The SVG document root to render.
-
-        Returns
-        -------
-        bytes
-            Image data encoded in the instance's configured format.
-        """
-        # Inline import: tests patch ``deux.render.svg_rasterize._svg_to_image``;
-        # importing it lazily keeps that patching point effective.
-        from ..render.svg_rasterize import _svg_to_image  # noqa: PLC0415
-
-        svg_bytes = ET.tostring(root, encoding="unicode", xml_declaration=True)
-        frame = _svg_to_image(
-            svg_bytes.encode("utf-8"), self._width, self._height, mode="RGBA"
+    Returns
+    -------
+    list[bytes]
+        Encoded frames, or a fallback list of blank frames when the
+        placeholder node cannot be located.
+    """
+    base_root = safe_fromstring(rendered_svg)  # untrusted: .dui package source
+    placeholder = _find_element_by_id(base_root, spinner_node_id)
+    if placeholder is None:
+        logger.warning(
+            "Spinner placeholder '%s' not found in rendered SVG; "
+            "returning blank frames",
+            spinner_node_id,
         )
-        return self._composite_on_bg(frame)
+        return _blank_frames(width, height, image_format, bg_tile)
 
-    @staticmethod
-    def _element_centre(elem: ET.Element) -> tuple[float, float]:
-        """Compute the centre of an SVG element from its geometry attributes.
+    step = 360.0 / SPINNER_FRAME_COUNT
+    frames: list[bytes] = []
+    for i in range(SPINNER_FRAME_COUNT):
+        angle = step * i
+        root = copy.deepcopy(base_root)
+        target = _find_element_by_id(root, spinner_node_id)
+        if target is None:  # defensive; deep-copied tree
+            return _blank_frames(width, height, image_format, bg_tile)
+        target.attrib.pop("display", None)
+        _replace_children(target, _build_spinner_fragment(angle))
+        frames.append(_rasterise(root, width, height, image_format, bg_tile))
+    return frames
 
-        Handles both rectangular elements (``x``, ``y``, ``width``, ``height``)
-        and circle/ellipse elements (``cx``, ``cy``).
 
-        Parameters
-        ----------
-        elem : ET.Element
-            The SVG element to measure.
+def _build_spinner_fragment(angle: float) -> ET.Element:
+    """Parse the canonical spinner template for a given rotation angle.
 
-        Returns
-        -------
-        tuple[float, float]
-            ``(cx, cy)`` centre coordinates.
-        """
-        x = float(elem.get("x", "0"))
-        y = float(elem.get("y", "0"))
-        w = float(elem.get("width", "0"))
-        h = float(elem.get("height", "0"))
+    Parameters
+    ----------
+    angle : float
+        Rotation in degrees applied to the inner rotor group.
 
-        # For circle/ellipse elements
-        if w == 0 and h == 0:
-            cx = float(elem.get("cx", str(x)))
-            cy = float(elem.get("cy", str(y)))
-            return cx, cy
+    Returns
+    -------
+    xml.etree.ElementTree.Element
+        Root ``<g>`` element of the canonical spinner content.
+    """
+    return safe_fromstring(_SPINNER_TEMPLATE_SVG.format(angle=f"{angle:.1f}"))
 
-        return x + w / 2, y + h / 2
+
+def _replace_children(parent: ET.Element, replacement: ET.Element) -> None:
+    """Replace ``parent``'s children with the children of ``replacement``.
+
+    The canonical spinner template wraps its content in an outer ``<g>``
+    purely to satisfy XML parsing; only the inner elements are grafted
+    into the placeholder so that the placeholder's own ``transform``
+    (and any other attributes) remain authoritative.
+
+    Parameters
+    ----------
+    parent : xml.etree.ElementTree.Element
+        Placeholder element whose children are discarded.
+    replacement : xml.etree.ElementTree.Element
+        Container whose children become the new children of ``parent``.
+    """
+    for child in list(parent):
+        parent.remove(child)
+    for child in list(replacement):
+        parent.append(child)
+
+
+def _rasterise(
+    root: ET.Element,
+    width: int,
+    height: int,
+    image_format: str,
+    bg_tile: bytes | Image.Image | None,
+) -> bytes:
+    """Rasterise an SVG tree and composite it onto an optional tile.
+
+    Parameters
+    ----------
+    root : xml.etree.ElementTree.Element
+        SVG document root to render.
+    width : int
+        Output width in pixels.
+    height : int
+        Output height in pixels.
+    image_format : str
+        Encoding format (``"JPEG"`` or ``"BMP"``).
+    bg_tile : bytes, PIL.Image.Image, or None
+        Optional background tile used to fill transparent regions.
+
+    Returns
+    -------
+    bytes
+        Encoded image bytes in ``image_format``.
+    """
+    # Inline import: tests patch ``deux.render.svg_rasterize._svg_to_image``.
+    from ..render.svg_rasterize import _svg_to_image  # noqa: PLC0415
+
+    svg_bytes = ET.tostring(root, encoding="unicode", xml_declaration=True)
+    frame = _svg_to_image(svg_bytes.encode("utf-8"), width, height, mode="RGBA")
+    return _composite_on_bg(frame, bg_tile, image_format)
+
+
+def _composite_on_bg(
+    frame: Image.Image,
+    bg_tile: bytes | Image.Image | None,
+    image_format: str,
+) -> bytes:
+    """Composite an RGBA frame onto an optional tile and encode it.
+
+    Parameters
+    ----------
+    frame : PIL.Image.Image
+        RGBA frame produced by the SVG rasteriser.
+    bg_tile : bytes, PIL.Image.Image, or None
+        Optional tile composited beneath ``frame``.
+    image_format : str
+        Output encoding.
+
+    Returns
+    -------
+    bytes
+        Encoded image bytes.
+    """
+    if bg_tile is not None:
+        if isinstance(bg_tile, bytes):
+            base = Image.open(io.BytesIO(bg_tile)).convert("RGBA")
+        else:
+            base = bg_tile.convert("RGBA")
+        result = Image.alpha_composite(base, frame)
+    else:
+        result = frame
+    return _encode(result, image_format)
+
+
+def _encode(img: Image.Image, image_format: str) -> bytes:
+    """Encode a PIL image in the requested format.
+
+    Parameters
+    ----------
+    img : PIL.Image.Image
+        Image to encode.
+    image_format : str
+        Output format (``"JPEG"`` or ``"BMP"``).
+
+    Returns
+    -------
+    bytes
+        Encoded image bytes.
+    """
+    # Inline import: tests patch ``deux.render.key_renderer._encode_image_bytes``.
+    from ..render.key_renderer import _encode_image_bytes  # noqa: PLC0415
+
+    return _encode_image_bytes(img, image_format)
+
+
+def _blank_frames(
+    width: int,
+    height: int,
+    image_format: str,
+    bg_tile: bytes | Image.Image | None,
+) -> list[bytes]:
+    """Return ``SPINNER_FRAME_COUNT`` blank frames as a fallback.
+
+    When a background tile is provided, the blank frames show that
+    tile; otherwise they are solid black.
+
+    Parameters
+    ----------
+    width, height : int
+        Output dimensions.
+    image_format : str
+        Output encoding.
+    bg_tile : bytes, PIL.Image.Image, or None
+        Optional background tile.
+
+    Returns
+    -------
+    list[bytes]
+        ``SPINNER_FRAME_COUNT`` copies of a single blank frame.
+    """
+    if bg_tile is not None:
+        if isinstance(bg_tile, bytes):
+            img = Image.open(io.BytesIO(bg_tile)).convert("RGB")
+        else:
+            img = bg_tile.convert("RGB")
+    else:
+        img = Image.new("RGB", (width, height), (0, 0, 0))
+    data = _encode(img, image_format)
+    return [data] * SPINNER_FRAME_COUNT

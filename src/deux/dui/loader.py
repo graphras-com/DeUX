@@ -13,8 +13,6 @@ from .._xml import safe_fromstring
 from .schema import (
     DEFAULT_HOLD_MS,
     DEFAULT_MAX_DURATION_MS,
-    DEFAULT_SPINNER_FRAMES,
-    DEFAULT_SPINNER_INTERVAL_MS,
     HOLD_SOURCES,
     KNOWN_MANIFEST_KEYS,
     TURN_SOURCES,
@@ -40,7 +38,6 @@ from .schema import (
     RotateTransform,
     SliderBinding,
     SpinnerSpec,
-    SpinnerType,
     TextBinding,
     ToggleBinding,
     TransformBinding,
@@ -696,8 +693,15 @@ def _parse_event(raw: dict[str, Any], index: int) -> EventMapping:
     )
 
 
+_SPINNER_REMOVED_KEYS = ("type", "frames", "interval_ms", "background_node")
+
+
 def _parse_spinner(raw: dict[str, Any]) -> SpinnerSpec:
     """Parse a spinner configuration from the manifest.
+
+    The spinner schema is intentionally minimal: only ``node`` is
+    accepted.  All animation parameters (frame count, interval,
+    background) are owned by the library and are not configurable.
 
     Parameters
     ----------
@@ -712,47 +716,29 @@ def _parse_spinner(raw: dict[str, Any]) -> SpinnerSpec:
     Raises
     ------
     PackageError
-        If the spinner type is missing/invalid or constraints are violated.
+        If ``node`` is missing/invalid, or if any removed legacy key
+        (``type``, ``frames``, ``interval_ms``, ``background_node``)
+        is present.
     """
-    raw_type = raw.get("type")
-    if raw_type is None:
-        raise PackageError("Spinner missing 'type'")
-    try:
-        spinner_type = SpinnerType(raw_type)
-    except ValueError:
-        valid = [t.value for t in SpinnerType]
-        raise PackageError(
-            f"Invalid spinner type '{raw_type}'. Valid types: {valid}"
-        ) from None
+    for legacy in _SPINNER_REMOVED_KEYS:
+        if legacy in raw:
+            raise PackageError(
+                f"Spinner key '{legacy}' is no longer supported. "
+                f"The spinner is now a single library-owned rotation "
+                f"animation; only 'node' may be configured."
+            )
 
     node = raw.get("node")
-    if spinner_type in (SpinnerType.ROTATION, SpinnerType.PULSE):
-        if not node or not isinstance(node, str):
-            raise PackageError(
-                f"Spinner type '{raw_type}' requires a 'node' (SVG element ID)"
-            )
-    elif node is not None and not isinstance(node, str):
-        raise PackageError("Spinner 'node' must be a string if provided")
+    if not node or not isinstance(node, str):
+        raise PackageError("Spinner requires a 'node' (SVG element ID)")
 
-    frames = raw.get("frames", DEFAULT_SPINNER_FRAMES)
-    if not isinstance(frames, int) or isinstance(frames, bool) or frames < 2:
-        raise PackageError("Spinner 'frames' must be an integer >= 2")
+    unknown = set(raw) - {"node"}
+    if unknown:
+        raise PackageError(
+            f"Unknown spinner keys: {sorted(unknown)}. Only 'node' is allowed."
+        )
 
-    interval_ms = raw.get("interval_ms", DEFAULT_SPINNER_INTERVAL_MS)
-    if not isinstance(interval_ms, int) or isinstance(interval_ms, bool) or interval_ms < 10:
-        raise PackageError("Spinner 'interval_ms' must be an integer >= 10")
-
-    background_node = raw.get("background_node")
-    if background_node is not None and not isinstance(background_node, str):
-        raise PackageError("Spinner 'background_node' must be a string if provided")
-
-    return SpinnerSpec(
-        type=spinner_type,
-        node=node,
-        frames=frames,
-        interval_ms=interval_ms,
-        background_node=background_node,
-    )
+    return SpinnerSpec(node=node)
 
 
 def _parse_region(name: str, raw: dict[str, Any]) -> Region:
@@ -1149,9 +1135,9 @@ def _load_assets(pkg_dir: Path) -> dict[str, bytes]:
 
 
 def _parse_and_validate_spinner(
-    manifest: dict[str, Any], svg_ids: set[str], assets: dict[str, bytes]
+    manifest: dict[str, Any], svg_ids: set[str]
 ) -> SpinnerSpec | None:
-    """Parse the ``spinner`` section and validate referenced nodes/assets.
+    """Parse the ``spinner`` section and validate the referenced node.
 
     Parameters
     ----------
@@ -1159,8 +1145,6 @@ def _parse_and_validate_spinner(
         Parsed manifest mapping.
     svg_ids : set[str]
         Set of element IDs available in the layout SVG.
-    assets : dict[str, bytes]
-        Loaded asset catalog, used to verify custom spinner frames.
 
     Returns
     -------
@@ -1171,8 +1155,7 @@ def _parse_and_validate_spinner(
     Raises
     ------
     PackageError
-        If the spinner is malformed, references missing SVG ids, or its
-        ``custom`` type lacks the required asset files.
+        If the spinner is malformed or references a missing SVG id.
     """
     raw_spinner = manifest.get("spinner")
     if raw_spinner is None:
@@ -1181,29 +1164,12 @@ def _parse_and_validate_spinner(
         raise PackageError("'spinner' must be a mapping")
     spinner = _parse_spinner(raw_spinner)
 
-    if spinner.node is not None and spinner.node not in svg_ids:
+    if spinner.node not in svg_ids:
         raise PackageError(
             f"Spinner references node '{spinner.node}' "
             f"which does not exist in the SVG. "
             f"Available ids: {sorted(svg_ids)}"
         )
-
-    if spinner.background_node is not None and spinner.background_node not in svg_ids:
-        raise PackageError(
-            f"Spinner references background_node '{spinner.background_node}' "
-            f"which does not exist in the SVG. "
-            f"Available ids: {sorted(svg_ids)}"
-        )
-
-    if spinner.type == SpinnerType.CUSTOM:
-        has_gif = "spinner.gif" in assets
-        frame_keys = sorted(k for k in assets if k.startswith("spinner/frame_"))
-        if not has_gif and not frame_keys:
-            raise PackageError(
-                "Spinner type 'custom' requires either 'assets/spinner.gif' "
-                "or frame images in 'assets/spinner/' "
-                "(e.g. 'spinner/frame_00.png', 'spinner/frame_01.png', ...)"
-            )
 
     return spinner
 
@@ -1280,7 +1246,7 @@ def load_package(path: str | Path, *, strict: bool = True) -> PackageSpec:
     events = _parse_events(manifest)
     regions = _parse_regions(manifest)
     assets = _load_assets(pkg_dir)
-    spinner = _parse_and_validate_spinner(manifest, svg_ids, assets)
+    spinner = _parse_and_validate_spinner(manifest, svg_ids)
 
     logger.info(
         "Loaded .dui package '%s' (%s, %d bindings, %d events)",

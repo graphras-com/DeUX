@@ -41,11 +41,7 @@ bindings:
     default: "1"
 
 spinner:
-  type: rotation
   node: spinner
-  frames: 8
-  interval_ms: 100
-  background_node: spinner_background
 
 events:
   - name: click
