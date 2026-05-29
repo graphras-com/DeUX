@@ -106,7 +106,7 @@ docs = [
 ]
 
 audit = [
-    "pip-audit>=2.7",
+    "pip-audit>=2.10.0",
 ]
 
 dev = [
