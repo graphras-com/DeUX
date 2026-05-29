@@ -59,14 +59,22 @@ from .schema import (
     RotateTransform,
     SliderBinding,
     SpinnerSpec,
-    SpinnerType,
     TextBinding,
     ToggleBinding,
     TransformBinding,
     TransformKind,
     VisibilityBinding,
 )
-from .spinner import SpinnerFrames
+from .spinner import (
+    SPINNER_FRAME_COUNT,
+    SPINNER_INTERVAL_MS,
+)
+from .spinner import (
+    clear_cache as clear_spinner_cache,
+)
+from .spinner import (
+    get_frames as get_spinner_frames,
+)
 from .svg_renderer import SvgRenderer
 
 __all__ = [
@@ -92,10 +100,10 @@ __all__ = [
     "Region",
     "RotateTransform",
     "SliderBinding",
+    "SPINNER_FRAME_COUNT",
+    "SPINNER_INTERVAL_MS",
     "SpinnerAnimator",
-    "SpinnerFrames",
     "SpinnerSpec",
-    "SpinnerType",
     "SvgRenderer",
     "TextBinding",
     "ToggleBinding",
@@ -106,7 +114,9 @@ __all__ = [
     "add_dui_path",
     "clear_dui_cache",
     "clear_iconify_cache",
+    "clear_spinner_cache",
     "fetch_icon",
+    "get_spinner_frames",
     "list_dui_packages",
     "load_all_packages",
     "load_package",

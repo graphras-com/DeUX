@@ -13,7 +13,7 @@ from .animator import PushFn, SpinnerAnimator
 from .binding_mixin import BindingMixin
 from .event_map import EventMap
 from .schema import PackageSpec
-from .spinner import SpinnerFrames
+from .spinner import SPINNER_INTERVAL_MS, get_frames
 from .svg_renderer import SvgRenderer
 
 if TYPE_CHECKING:
@@ -101,7 +101,6 @@ class DuiCard(BindingMixin, Card):
         self._subscriptions: list[tuple[AsyncEvent, AsyncHandler]] = []
         self._busy = False
         self._animator: SpinnerAnimator | None = None
-        self._spinner_frames: SpinnerFrames | None = None
         self._push_fn: PushFn | None = None
         self._panel_size: tuple[int, int] | None = None
         self._bg_tile: bytes | None = None
@@ -537,18 +536,19 @@ class DuiCard(BindingMixin, Card):
 
         width, height = self._panel_size
         rendered_svg = self._renderer.render_svg()
-        spinner_frames = SpinnerFrames(
-            self._spec,
+        spinner_node_id = self._spec.spinner.node
+        frames = await asyncio.to_thread(
+            get_frames,
+            rendered_svg=rendered_svg,
+            spinner_node_id=spinner_node_id,
             width=width,
             height=height,
-            rendered_svg=rendered_svg,
             bg_tile=self._bg_tile,
         )
-        self._spinner_frames = spinner_frames
 
         self._animator = SpinnerAnimator(
-            frames=await asyncio.to_thread(lambda: spinner_frames.frames),
-            interval_ms=spinner_frames.interval_ms,
+            frames=frames,
+            interval_ms=SPINNER_INTERVAL_MS,
             push_fn=self._push_fn,
         )
         await self._animator.start()

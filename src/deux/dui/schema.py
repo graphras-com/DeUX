@@ -14,14 +14,6 @@ class PackageType(Enum):
     KEY = "Key"
 
 
-class SpinnerType(Enum):
-    """Animation strategy for the busy spinner."""
-
-    ROTATION = "rotation"
-    PULSE = "pulse"
-    CUSTOM = "custom"
-
-
 class BindingType(Enum):
     """Supported binding types for SVG node manipulation."""
 
@@ -459,49 +451,30 @@ class Region:
     events: tuple[str, ...] = ()
 
 
-DEFAULT_SPINNER_FRAMES: int = 12
-"""Default number of frames in a spinner animation cycle."""
-
-DEFAULT_SPINNER_INTERVAL_MS: int = 80
-"""Default interval (ms) between spinner animation frames."""
-
-
 @dataclass(frozen=True, slots=True)
 class SpinnerSpec:
     """Configuration for a spinner animation.
 
-    The spinner is started and stopped explicitly by the application
-    via :meth:`~deux.dui.card.DuiCard.start_busy` /
-    :meth:`~deux.dui.card.DuiCard.finish_busy` (and the equivalent
-    methods on :class:`~deux.dui.key.DuiKey`).  It provides visual
-    feedback by cycling pre-rendered animation frames on the key or
-    card panel.
+    The spinner is a single, library-owned rotation animation that
+    indicates a busy state.  Packages declare an empty
+    ``<g id="..." transform="..."/>`` placeholder in their layout SVG;
+    the library injects a canonical 8-frame rotation animation into
+    that placeholder when :meth:`~deux.dui.card.DuiCard.start_busy`
+    (or the equivalent on :class:`~deux.dui.key.DuiKey`) is called.
+
+    The placeholder's ``transform`` attribute (typically
+    ``translate(cx cy)``) is honored, so authors control where the
+    spinner appears.  Inner geometry (background tile, 8 radial bars,
+    rotation step, frame interval) is fixed by the library.
 
     Parameters
     ----------
-    type
-        Animation strategy: ``rotation`` (rotate an SVG node),
-        ``pulse`` (fade opacity), or ``custom`` (user-provided frames).
     node
-        SVG element ID to animate (required for ``rotation`` and
-        ``pulse``; ignored for ``custom``).
-    frames
-        Number of frames per animation cycle.
-    interval_ms
-        Milliseconds between frames.
-    background_node
-        Optional SVG element ID shown behind the spinner during busy
-        state.  The node is made visible when the spinner is active and
-        hidden at rest, but it is **not** animated (no rotation, pulse,
-        or opacity changes are applied to it).  Ignored for ``custom``
-        type spinners.
+        SVG element ID of the placeholder group that the library
+        replaces with the canonical spinner content.
     """
 
-    type: SpinnerType
-    node: str | None = None
-    frames: int = DEFAULT_SPINNER_FRAMES
-    interval_ms: int = DEFAULT_SPINNER_INTERVAL_MS
-    background_node: str | None = None
+    node: str
 
 
 VALID_CATEGORIES = frozenset(

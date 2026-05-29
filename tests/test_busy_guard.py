@@ -17,15 +17,15 @@ from deux.dui.schema import (
     PackageSpec,
     PackageType,
     SpinnerSpec,
-    SpinnerType,
     TextBinding,
 )
+from deux.dui.spinner import clear_cache as clear_spinner_cache
 
 _CARD_SVG = (
     '<svg id="TestCard" xmlns="http://www.w3.org/2000/svg" width="197" height="98">'
     '<rect id="bg" width="197" height="98" fill="#1c1c1c"/>'
     '<text id="title" x="4" y="40" font-size="14" fill="#ffffff">Default</text>'
-    '<rect id="spinner" x="80" y="30" width="30" height="30" display="none" fill="#fff"/>'
+    '<g id="spinner" transform="translate(100 50)"/>'
     "</svg>"
 )
 
@@ -33,9 +33,16 @@ _KEY_SVG = (
     '<svg id="TestKey" xmlns="http://www.w3.org/2000/svg" width="120" height="120">'
     '<rect id="bg" width="120" height="120" fill="#1c1c1c"/>'
     '<text id="label" x="60" y="100" font-size="14" fill="#fff" text-anchor="middle">Key</text>'
-    '<rect id="spinner" x="80" y="30" width="30" height="30" display="none" fill="#fff"/>'
+    '<g id="spinner" transform="translate(60 47.5)"/>'
     "</svg>"
 )
+
+
+@pytest.fixture(autouse=True)
+def _reset_spinner_cache():
+    clear_spinner_cache()
+    yield
+    clear_spinner_cache()
 
 
 def _fake_png(width: int = 120, height: int = 120) -> bytes:
@@ -148,7 +155,7 @@ class TestCardBusyState:
         side_effect=_fake_image,
     )
     async def test_card_spinner_starts_and_stops(self, mock_raster):
-        spinner = SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=4)
+        spinner = SpinnerSpec(node="spinner")
         spec = _make_card_spec(spinner=spinner)
         card = DuiCard(spec)
 
@@ -170,7 +177,7 @@ class TestCardBusyState:
         bindings: dict[str, Binding] = {
             "title": TextBinding(node="title", default="Default"),
         }
-        spinner = SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=2)
+        spinner = SpinnerSpec(node="spinner")
         spec = _make_card_spec(spinner=spinner, bindings=bindings)
         card = DuiCard(spec)
         card.set("title", "Updated")
@@ -255,7 +262,7 @@ class TestKeyBusyState:
         side_effect=_fake_image,
     )
     async def test_key_spinner_starts_and_stops(self, mock_raster):
-        spinner = SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=4)
+        spinner = SpinnerSpec(node="spinner")
         spec = _make_key_spec(spinner=spinner)
         key = DuiKey(spec)
 
@@ -277,7 +284,7 @@ class TestKeyBusyState:
         bindings: dict[str, Binding] = {
             "label": TextBinding(node="label", default="Key"),
         }
-        spinner = SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=2)
+        spinner = SpinnerSpec(node="spinner")
         spec = _make_key_spec(spinner=spinner, bindings=bindings)
         key = DuiKey(spec)
         key.set("label", "Playing")
@@ -309,39 +316,34 @@ class TestKeyBusyState:
 
 
 class TestSpinnerManifestValidation:
-    def test_invalid_spinner_type(self):
-        with pytest.raises(PackageError, match="Invalid spinner type"):
-            _parse_spinner({"type": "wobble"})
-
-    def test_frames_less_than_2(self):
-        with pytest.raises(PackageError, match="frames.*must be an integer >= 2"):
-            _parse_spinner({"type": "rotation", "node": "spinner", "frames": 1})
-
-    def test_interval_ms_less_than_10(self):
-        with pytest.raises(PackageError, match="interval_ms.*must be an integer >= 10"):
-            _parse_spinner({"type": "rotation", "node": "spinner", "interval_ms": 5})
-
-    def test_rotation_without_node_raises(self):
+    def test_missing_node_raises(self):
         with pytest.raises(PackageError, match="requires a 'node'"):
-            _parse_spinner({"type": "rotation"})
+            _parse_spinner({})
 
-    def test_pulse_without_node_raises(self):
+    def test_node_not_string_raises(self):
         with pytest.raises(PackageError, match="requires a 'node'"):
-            _parse_spinner({"type": "pulse"})
+            _parse_spinner({"node": 123})
 
-    def test_custom_without_frames_raises(self, tmp_path):
-        """Custom spinner with no asset frames should fail."""
-        pkg_dir = tmp_path / "Test.dui"
-        pkg_dir.mkdir()
-        (pkg_dir / "layout.svg").write_text(_CARD_SVG, encoding="utf-8")
-        manifest = (
-            "name: Test\ntype: TouchStripCard\nversion: 1\nlayout: layout.svg\n"
-            "spinner:\n  type: custom\n"
-        )
-        (pkg_dir / "manifest.yaml").write_text(manifest, encoding="utf-8")
+    def test_valid_node(self):
+        spec = _parse_spinner({"node": "spinner"})
+        assert spec.node == "spinner"
 
-        with pytest.raises(PackageError, match="custom.*requires"):
-            load_package(pkg_dir)
+    @pytest.mark.parametrize(
+        "legacy_key,legacy_value",
+        [
+            ("type", "rotation"),
+            ("frames", 8),
+            ("interval_ms", 100),
+            ("background_node", "spinner_bg"),
+        ],
+    )
+    def test_legacy_keys_rejected(self, legacy_key, legacy_value):
+        with pytest.raises(PackageError, match="no longer supported"):
+            _parse_spinner({"node": "spinner", legacy_key: legacy_value})
+
+    def test_unknown_key_rejected(self):
+        with pytest.raises(PackageError, match="Unknown spinner keys"):
+            _parse_spinner({"node": "spinner", "wobble_speed": 5})
 
     def test_spinner_node_not_in_svg_raises(self, tmp_path):
         """Spinner referencing a node not present in SVG should fail."""
@@ -350,49 +352,11 @@ class TestSpinnerManifestValidation:
         (pkg_dir / "layout.svg").write_text(_CARD_SVG, encoding="utf-8")
         manifest = (
             "name: Test\ntype: TouchStripCard\nversion: 1\nlayout: layout.svg\n"
-            "spinner:\n  type: rotation\n  node: nonexistent\n"
+            "spinner:\n  node: nonexistent\n"
         )
         (pkg_dir / "manifest.yaml").write_text(manifest, encoding="utf-8")
 
         with pytest.raises(PackageError, match="does not exist in the SVG"):
-            load_package(pkg_dir)
-
-    def test_background_node_not_string_raises(self):
-        """background_node must be a string if provided."""
-        with pytest.raises(PackageError, match="background_node.*must be a string"):
-            _parse_spinner({
-                "type": "rotation",
-                "node": "spinner",
-                "background_node": 123,
-            })
-
-    def test_background_node_valid_string(self):
-        """background_node as a valid string should parse without error."""
-        spec = _parse_spinner({
-            "type": "rotation",
-            "node": "spinner",
-            "background_node": "spinner_bg",
-        })
-        assert spec.background_node == "spinner_bg"
-
-    def test_background_node_none_by_default(self):
-        """background_node defaults to None when not specified."""
-        spec = _parse_spinner({"type": "rotation", "node": "spinner"})
-        assert spec.background_node is None
-
-    def test_background_node_not_in_svg_raises(self, tmp_path):
-        """Spinner referencing a background_node not present in SVG should fail."""
-        pkg_dir = tmp_path / "Test.dui"
-        pkg_dir.mkdir()
-        (pkg_dir / "layout.svg").write_text(_CARD_SVG, encoding="utf-8")
-        manifest = (
-            "name: Test\ntype: TouchStripCard\nversion: 1\nlayout: layout.svg\n"
-            "spinner:\n  type: rotation\n  node: spinner\n"
-            "  background_node: nonexistent_bg\n"
-        )
-        (pkg_dir / "manifest.yaml").write_text(manifest, encoding="utf-8")
-
-        with pytest.raises(PackageError, match="background_node.*does not exist in the SVG"):
             load_package(pkg_dir)
 
 
@@ -410,7 +374,7 @@ class TestCancellationDuringRasterisation:
         """Cancelling the task that runs start_busy should not leave broken state."""
         import asyncio
 
-        spinner = SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=4)
+        spinner = SpinnerSpec(node="spinner")
         spec = _make_card_spec(spinner=spinner)
         card = DuiCard(spec)
         push_fn = AsyncMock()
@@ -435,7 +399,7 @@ class TestCancellationDuringRasterisation:
         """Cancelling the task that runs start_busy on a key should not leave broken state."""
         import asyncio
 
-        spinner = SpinnerSpec(type=SpinnerType.ROTATION, node="spinner", frames=4)
+        spinner = SpinnerSpec(node="spinner")
         spec = _make_key_spec(spinner=spinner)
         key = DuiKey(spec)
         push_fn = AsyncMock()
