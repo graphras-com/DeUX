@@ -102,7 +102,7 @@ docs = [
     "mkdocstrings[python]>=1.0.4",
     "mkdocs-gen-files>=0.6.1",
     "mkdocs-literate-nav>=0.6.3",
-    "pylint>=4.0.5",
+    "pylint>=4.0.6",
 ]
 
 audit = [
