@@ -111,7 +111,7 @@ audit = [
 
 dev = [
     "ruff>=0.15.22",
-    "mypy>=2.1.0",
+    "mypy>=2.3.0",
 ]
 
 [tool.pytest.ini_options]
