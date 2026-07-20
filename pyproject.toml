@@ -99,7 +99,7 @@ test = [
 
 docs = [
     "mkdocs-material>=9.7.6",
-    "mkdocstrings[python]>=1.0.4",
+    "mkdocstrings[python]>=1.0.6",
     "mkdocs-gen-files>=0.6.1",
     "mkdocs-literate-nav>=0.6.3",
     "pylint>=4.0.6",
